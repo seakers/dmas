@@ -1,0 +1,446 @@
+#
+# A fatal error has been detected by the Java Runtime Environment:
+#
+#  SIGSEGV (0xb) at pc=0x000000010629372b, pid=41744, tid=0x0000000000003a03
+#
+# JRE version: OpenJDK Runtime Environment (Zulu 8.58.0.13-CA-macosx) (8.0_312-b07) (build 1.8.0_312-b07)
+# Java VM: OpenJDK 64-Bit Server VM (25.312-b07 mixed mode bsd-amd64 compressed oops)
+# Problematic frame:
+# C  [_orekit.cpython-310-darwin.so+0x1a72b]  JCCEnv::callObjectMethod(_jobject*, _jmethodID*, ...) const+0x9b
+#
+# Failed to write core dump. Core dumps have been disabled. To enable core dumping, try "ulimit -c unlimited" before starting Java again
+#
+# If you would like to submit a bug report, please visit:
+#   http://www.azul.com/support/
+#
+
+---------------  T H R E A D  ---------------
+
+Current thread is native thread
+
+siginfo: si_signo: 11 (SIGSEGV), si_code: 1 (SEGV_MAPERR), si_addr: 0x0000000000000000
+
+Registers:
+RAX=0x0000000000000000, RBX=0x00007f975a565130, RCX=0x0000000000000008, RDX=0x0000600000b94648
+RSP=0x0000700010c393b0, RBP=0x0000700010c394a0, RSI=0x00007f97573ffe30, RDI=0x0000000000000110
+R8 =0x0000000101cbce60, R9 =0x00000000ffffffff, R10=0x00007f9756023428, R11=0x00000000000000ff
+R12=0x00007f97573ffe30, R13=0x0000000105626940, R14=0x0000600001a94240, R15=0x0000600000b94648
+RIP=0x000000010629372b, EFLAGS=0x0000000000010246, ERR=0x0000000000000004
+  TRAPNO=0x000000000000000e
+
+Top of Stack: (sp=0x0000700010c393b0)
+0x0000700010c393b0:   0000000000000000 0000000000000000
+0x0000700010c393c0:   0000000000000000 0000000000000008
+0x0000700010c393d0:   0000000101cbce60 00000000ffffffff
+0x0000700010c393e0:   0000000000000000 0000000000000000
+0x0000700010c393f0:   000000010565b400 00000001010a15d0
+0x0000700010c39400:   0000700010c394f0 0000000101d4cf5f
+0x0000700010c39410:   00007f975a565130 0000000101c8b9c0
+0x0000700010c39420:   966ed8a14e31003b 00007f975a565130
+0x0000700010c39430:   00007f975a565130 0000000000000004
+0x0000700010c39440:   00000001010a15d0 0000000000000001
+0x0000700010c39450:   0000700010c39510 0000000100ec1185
+0x0000700010c39460:   0000003000000018 0000700010c394b0
+0x0000700010c39470:   0000700010c393b0 966ed8a14e31003b
+0x0000700010c39480:   00007f975a565130 00000000ffffffff
+0x0000700010c39490:   00007f975a565130 0000000105626940
+0x0000700010c394a0:   0000700010c394e0 0000000106298391
+0x0000700010c394b0:   00007f975719f280 966ed8a14e31003b
+0x0000700010c394c0:   00007f975a565130 00000000ffffffff
+0x0000700010c394d0:   00007f975a565130 0000000105626940
+0x0000700010c394e0:   0000700010c39510 0000000100dfbdb2
+0x0000700010c394f0:   0000700010c3b000 0000000000000000
+0x0000700010c39500:   0000000100e661c4 0000000000000073
+0x0000700010c39510:   0000700010c39630 0000000100e64c75
+0x0000700010c39520:   000000010124d6f0 8000000000000000
+0x0000700010c39530:   00007f975a565130 00007f975a565130
+0x0000700010c39540:   0000700010c39580 0000000100ebb9f9
+0x0000700010c39550:   0000000102b1e6b0 ffffffffffffffff
+0x0000700010c39560:   966ed8a14e31003b 7fffffffffffffff
+0x0000700010c39570:   00007f975a565130 0000000105626940
+0x0000700010c39580:   0000000100000000 ffffffffffffffff
+0x0000700010c39590:   ffffffffffffffff 0000000000000000
+0x0000700010c395a0:   0000700000000001 0000000000000000 
+
+Instructions: (pc=0x000000010629372b)
+0x000000010629370b:   45 10 48 89 45 c8 48 b8 18 00 00 00 30 00 00 00
+0x000000010629371b:   48 89 45 c0 48 8b 3d ea 89 d1 01 e8 b7 fa 6d 01
+0x000000010629372b:   48 8b 18 48 8d 4d c0 48 89 c7 4c 89 e6 4c 89 fa
+0x000000010629373b:   ff 93 18 01 00 00 48 89 c3 4c 89 f7 e8 94 02 00 
+
+Register to memory mapping:
+
+RAX=0x0000000000000000 is an unknown value
+RBX=0x00007f975a565130 is an unknown value
+RCX=0x0000000000000008 is an unknown value
+RDX=0x0000600000b94648 is an unknown value
+RSP=0x0000700010c393b0 is an unknown value
+RBP=0x0000700010c394a0 is an unknown value
+RSI=0x00007f97573ffe30 is a global jni handle
+RDI=0x0000000000000110 is an unknown value
+R8 =0x0000000101cbce60 is an unknown value
+R9 =0x00000000ffffffff is an unknown value
+R10=0x00007f9756023428 is an unknown value
+R11=0x00000000000000ff is an unknown value
+R12=0x00007f97573ffe30 is a global jni handle
+R13=0x0000000105626940 is an unknown value
+R14=0x0000600001a94240 is an unknown value
+R15=0x0000600000b94648 is an unknown value
+
+
+Stack: [0x000070000fc3b000,0x0000700010c3b000],  sp=0x0000700010c393b0,  free space=16376k
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+C  [_orekit.cpython-310-darwin.so+0x1a72b]  JCCEnv::callObjectMethod(_jobject*, _jmethodID*, ...) const+0x9b
+C  [_orekit.cpython-310-darwin.so+0x1f391]  JCCEnv::toPyUnicode(_jobject*) const+0x31
+C  [python3.10+0xf5db2]  PyObject_Str+0xa2
+C  [python3.10+0x15ec75]  PyUnicode_Format+0xbb5
+C  [python3.10+0x1c2a5b]  _PyEval_EvalFrameDefault+0x616b
+C  [pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so+0x3f5f]  __pyx_f_18_pydevd_frame_eval_36pydevd_frame_evaluator_darwin_310_64_get_bytecode_while_frame_eval+0x58f
+C  [python3.10+0x1bb013]  _PyEval_Vector+0x183
+C  [python3.10+0x1cb060]  call_function+0xb0
+C  [python3.10+0x1c154d]  _PyEval_EvalFrameDefault+0x4c5d
+C  [pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so+0x3f5f]  __pyx_f_18_pydevd_frame_eval_36pydevd_frame_evaluator_darwin_310_64_get_bytecode_while_frame_eval+0x58f
+C  [python3.10+0x1bb013]  _PyEval_Vector+0x183
+C  [python3.10+0x1cb060]  call_function+0xb0
+C  [python3.10+0x1c1418]  _PyEval_EvalFrameDefault+0x4b28
+C  [pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so+0x3f5f]  __pyx_f_18_pydevd_frame_eval_36pydevd_frame_evaluator_darwin_310_64_get_bytecode_while_frame_eval+0x58f
+C  [python3.10+0x1bb013]  _PyEval_Vector+0x183
+C  [python3.10+0x1cb2ed]  call_function+0x33d
+C  [python3.10+0x1c1418]  _PyEval_EvalFrameDefault+0x4b28
+C  [pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so+0x4125]  __pyx_f_18_pydevd_frame_eval_36pydevd_frame_evaluator_darwin_310_64_get_bytecode_while_frame_eval+0x755
+C  [python3.10+0x1bb013]  _PyEval_Vector+0x183
+C  [python3.10+0x1cb060]  call_function+0xb0
+C  [python3.10+0x1c1418]  _PyEval_EvalFrameDefault+0x4b28
+C  [pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so+0x4125]  __pyx_f_18_pydevd_frame_eval_36pydevd_frame_evaluator_darwin_310_64_get_bytecode_while_frame_eval+0x755
+C  [python3.10+0x1bb013]  _PyEval_Vector+0x183
+C  [python3.10+0x8de4f]  method_vectorcall+0x1df
+C  [python3.10+0x1c1668]  _PyEval_EvalFrameDefault+0x4d78
+C  [pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so+0x4125]  __pyx_f_18_pydevd_frame_eval_36pydevd_frame_evaluator_darwin_310_64_get_bytecode_while_frame_eval+0x755
+C  [python3.10+0x1bb013]  _PyEval_Vector+0x183
+C  [python3.10+0x898ae]  _PyObject_FastCallDictTstate+0x6e
+C  [python3.10+0x11d794]  slot_tp_call+0xc4
+C  [python3.10+0x8a8dc]  _PyObject_Call+0x6c
+C  [python3.10+0x2c7505]  thread_run+0xc5
+C  [python3.10+0x2483f4]  pythread_wrapper+0x24
+C  [libsystem_pthread.dylib+0x64f4]  _pthread_start+0x7d
+C  [libsystem_pthread.dylib+0x200f]  thread_start+0xf
+
+
+---------------  P R O C E S S  ---------------
+
+VM state:not at safepoint (normal execution)
+
+VM Mutex/Monitor currently owned by a thread: None
+
+heap address: 0x0000000740000000, size: 2048 MB, Compressed Oops mode: Zero based, Oop shift amount: 3
+Narrow klass base: 0x0000000000000000, Narrow klass shift: 3
+Compressed class space size: 1073741824 Address: 0x00000007c0000000
+
+Heap:
+ PSYoungGen      total 38400K, used 12748K [0x0000000795580000, 0x0000000798000000, 0x00000007c0000000)
+  eden space 33280K, 23% used [0x0000000795580000,0x0000000795cf9e90,0x0000000797600000)
+  from space 5120K, 99% used [0x0000000797600000,0x0000000797af9400,0x0000000797b00000)
+  to   space 5120K, 0% used [0x0000000797b00000,0x0000000797b00000,0x0000000798000000)
+ ParOldGen       total 87552K, used 1860K [0x0000000740000000, 0x0000000745580000, 0x0000000795580000)
+  object space 87552K, 2% used [0x0000000740000000,0x00000007401d11b0,0x0000000745580000)
+ Metaspace       used 13153K, capacity 13761K, committed 13952K, reserved 1060864K
+  class space    used 1808K, capacity 2135K, committed 2176K, reserved 1048576K
+
+Card table byte_map: [0x000000010314d000,0x000000010354e000] byte_map_base: 0x00000000ff74d000
+
+Marking Bits: (ParMarkBitMap*) 0x0000000103fad948
+ Begin Bits: [0x0000000117c89000, 0x0000000119c89000)
+ End Bits:   [0x0000000119c89000, 0x000000011bc89000)
+
+Polling page: 0x0000000101645000
+
+CodeCache: size=245760Kb used=3513Kb max_used=3519Kb free=242247Kb
+ bounds [0x0000000108c89000, 0x0000000109009000, 0x0000000117c89000]
+ total_blobs=1326 nmethods=879 adapters=360
+ compilation: enabled
+
+Compilation events (10 events):
+Event: 0.910 Thread 0x00007f975621a800  875       1       java.util.regex.Pattern::flags (5 bytes)
+Event: 0.910 Thread 0x00007f975621a800 nmethod 875 0x0000000108ff52d0 code [0x0000000108ff5420, 0x0000000108ff5530]
+Event: 0.910 Thread 0x00007f975621a800  876       3       java.util.regex.Pattern$CharProperty::<init> (5 bytes)
+Event: 0.910 Thread 0x00007f975621a800 nmethod 876 0x0000000108ff5590 code [0x0000000108ff5700, 0x0000000108ff5990]
+Event: 0.910 Thread 0x00007f975621a800  877       3       java.util.regex.Pattern$CharProperty::<init> (5 bytes)
+Event: 0.910 Thread 0x00007f975621a800 nmethod 877 0x0000000108ff5ad0 code [0x0000000108ff5c40, 0x0000000108ff5e70]
+Event: 0.918 Thread 0x00007f9756219800  878       4       java.lang.ClassLoader::checkName (43 bytes)
+Event: 0.921 Thread 0x00007f9756219800 nmethod 878 0x0000000108ff9610 code [0x0000000108ff9780, 0x0000000108ff99b8]
+Event: 0.927 Thread 0x00007f9756218000  879       4       java.util.zip.Inflater::ensureOpen (47 bytes)
+Event: 0.927 Thread 0x00007f9756218000 nmethod 879 0x0000000108ff7c90 code [0x0000000108ff7de0, 0x0000000108ff7e78]
+
+GC Heap History (2 events):
+Event: 0.835 GC heap before
+{Heap before GC invocations=1 (full 0):
+ PSYoungGen      total 38400K, used 33280K [0x0000000795580000, 0x0000000798000000, 0x00000007c0000000)
+  eden space 33280K, 100% used [0x0000000795580000,0x0000000797600000,0x0000000797600000)
+  from space 5120K, 0% used [0x0000000797b00000,0x0000000797b00000,0x0000000798000000)
+  to   space 5120K, 0% used [0x0000000797600000,0x0000000797600000,0x0000000797b00000)
+ ParOldGen       total 87552K, used 0K [0x0000000740000000, 0x0000000745580000, 0x0000000795580000)
+  object space 87552K, 0% used [0x0000000740000000,0x0000000740000000,0x0000000745580000)
+ Metaspace       used 11479K, capacity 12001K, committed 12160K, reserved 1058816K
+  class space    used 1585K, capacity 1911K, committed 1920K, reserved 1048576K
+Event: 0.841 GC heap after
+Heap after GC invocations=1 (full 0):
+ PSYoungGen      total 38400K, used 5093K [0x0000000795580000, 0x0000000798000000, 0x00000007c0000000)
+  eden space 33280K, 0% used [0x0000000795580000,0x0000000795580000,0x0000000797600000)
+  from space 5120K, 99% used [0x0000000797600000,0x0000000797af9400,0x0000000797b00000)
+  to   space 5120K, 0% used [0x0000000797b00000,0x0000000797b00000,0x0000000798000000)
+ ParOldGen       total 87552K, used 1860K [0x0000000740000000, 0x0000000745580000, 0x0000000795580000)
+  object space 87552K, 2% used [0x0000000740000000,0x00000007401d11b0,0x0000000745580000)
+ Metaspace       used 11479K, capacity 12001K, committed 12160K, reserved 1058816K
+  class space    used 1585K, capacity 1911K, committed 1920K, reserved 1048576K
+}
+
+Deoptimization events (1 events):
+Event: 0.514 Thread 0x00007f9757a71800 Uncommon trap: reason=unstable_if action=reinterpret pc=0x0000000108e46ea0 method=java.lang.CharacterData.of(I)Ljava/lang/CharacterData; @ 4
+
+Classes redefined (0 events):
+No events
+
+Internal exceptions (8 events):
+Event: 0.079 Thread 0x00007f9757a71800 Exception <a 'java/lang/NoSuchMethodError': Method sun.misc.Unsafe.defineClass(Ljava/lang/String;[BII)Ljava/lang/Class; name or signature does not match> (0x0000000795587d80) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/s
+Event: 0.079 Thread 0x00007f9757a71800 Exception <a 'java/lang/NoSuchMethodError': Method sun.misc.Unsafe.prefetchRead(Ljava/lang/Object;J)V name or signature does not match> (0x0000000795588068) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/
+Event: 0.262 Thread 0x00007f9757a71800 Exception <a 'java/security/PrivilegedActionException'> (0x00000007959b14c8) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/jvm.cpp, line 1529]
+Event: 0.262 Thread 0x00007f9757a71800 Exception <a 'java/security/PrivilegedActionException'> (0x00000007959b18c0) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/jvm.cpp, line 1529]
+Event: 0.262 Thread 0x00007f9757a71800 Exception <a 'java/security/PrivilegedActionException'> (0x00000007959b4670) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/jvm.cpp, line 1529]
+Event: 0.262 Thread 0x00007f9757a71800 Exception <a 'java/security/PrivilegedActionException'> (0x00000007959b4a68) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/jvm.cpp, line 1529]
+Event: 0.463 Thread 0x00007f9757a71800 Exception <a 'java/lang/NoSuchFieldError': method resolution failed> (0x0000000796425670) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/methodHandles.cpp, line 1176]
+Event: 0.466 Thread 0x00007f9757a71800 Exception <a 'java/lang/NoSuchFieldError': method resolution failed> (0x00000007964329b0) thrown at [/Users/tester/jenkins/workspace/zulu8-build-macosx/zulu-src/hotspot/src/share/vm/prims/methodHandles.cpp, line 1176]
+
+Events (10 events):
+Event: 0.962 loading class org/orekit/utils/StateFunction
+Event: 0.962 loading class org/orekit/utils/StateFunction done
+Event: 0.963 loading class org/orekit/utils/PythonStateJacobian
+Event: 0.963 loading class org/orekit/utils/PythonStateJacobian done
+Event: 0.963 loading class org/orekit/utils/StateJacobian
+Event: 0.963 loading class org/orekit/utils/StateJacobian done
+Event: 0.963 loading class org/orekit/utils/PythonTimeStampedCache
+Event: 0.963 loading class org/orekit/utils/PythonTimeStampedCache done
+Event: 0.964 loading class org/orekit/utils/PythonTimeStampedGenerator
+Event: 0.964 loading class org/orekit/utils/PythonTimeStampedGenerator done
+
+
+Dynamic libraries:
+0x00007ff80acdf000 	/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation
+0x00007ff80ab26000 	/usr/lib/libobjc.A.dylib
+0x00007ff8159d2000 	/usr/lib/liboah.dylib
+0x00007ff815a06000 	/usr/lib/libfakelink.dylib
+0x00007ff80d03f000 	/usr/lib/libicucore.A.dylib
+0x00007ff815a04000 	/usr/lib/libSystem.B.dylib
+0x00007ff815a0a000 	/System/Library/PrivateFrameworks/SoftLinking.framework/Versions/A/SoftLinking
+0x00007ff80ac45000 	/usr/lib/libc++abi.dylib
+0x00007ff80abec000 	/usr/lib/libc++.1.dylib
+0x00007ff8159ff000 	/usr/lib/system/libcache.dylib
+0x00007ff8159bb000 	/usr/lib/system/libcommonCrypto.dylib
+0x00007ff8159e4000 	/usr/lib/system/libcompiler_rt.dylib
+0x00007ff8159da000 	/usr/lib/system/libcopyfile.dylib
+0x00007ff80aa20000 	/usr/lib/system/libcorecrypto.dylib
+0x00007ff80aadf000 	/usr/lib/system/libdispatch.dylib
+0x00007ff80ac9e000 	/usr/lib/system/libdyld.dylib
+0x00007ff8159f6000 	/usr/lib/system/libkeymgr.dylib
+0x00007ff815999000 	/usr/lib/system/libmacho.dylib
+0x00007ff815029000 	/usr/lib/system/libquarantine.dylib
+0x00007ff8159f4000 	/usr/lib/system/libremovefile.dylib
+0x00007ff80fc02000 	/usr/lib/system/libsystem_asl.dylib
+0x00007ff80a9ce000 	/usr/lib/system/libsystem_blocks.dylib
+0x00007ff80ab63000 	/usr/lib/system/libsystem_c.dylib
+0x00007ff8159ec000 	/usr/lib/system/libsystem_collections.dylib
+0x00007ff8142d1000 	/usr/lib/system/libsystem_configuration.dylib
+0x00007ff813592000 	/usr/lib/system/libsystem_containermanager.dylib
+0x00007ff8156d6000 	/usr/lib/system/libsystem_coreservices.dylib
+0x00007ff80d2c8000 	/usr/lib/system/libsystem_darwin.dylib
+0x00007ff8159f7000 	/usr/lib/system/libsystem_dnssd.dylib
+0x00007ff80ab60000 	/usr/lib/system/libsystem_featureflags.dylib
+0x00007ff80acb4000 	/usr/lib/system/libsystem_info.dylib
+0x00007ff815937000 	/usr/lib/system/libsystem_m.dylib
+0x00007ff80aab3000 	/usr/lib/system/libsystem_malloc.dylib
+0x00007ff80fb9f000 	/usr/lib/system/libsystem_networkextension.dylib
+0x00007ff80d6f0000 	/usr/lib/system/libsystem_notify.dylib
+0x00007ff81bb73000 	/usr/lib/system/libsystem_product_info_filter.dylib
+0x00007ff8142d5000 	/usr/lib/system/libsystem_sandbox.dylib
+0x00007ff8159f1000 	/usr/lib/system/libsystem_secinit.dylib
+0x00007ff80ac5b000 	/usr/lib/system/libsystem_kernel.dylib
+0x00007ff80acaa000 	/usr/lib/system/libsystem_platform.dylib
+0x00007ff80ac92000 	/usr/lib/system/libsystem_pthread.dylib
+0x00007ff811457000 	/usr/lib/system/libsystem_symptoms.dylib
+0x00007ff80aa07000 	/usr/lib/system/libsystem_trace.dylib
+0x00007ff8159c7000 	/usr/lib/system/libunwind.dylib
+0x00007ff80a9d0000 	/usr/lib/system/libxpc.dylib
+0x0000000101647000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_opcode.cpython-310-darwin.so
+0x0000000101650000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/fcntl.cpython-310-darwin.so
+0x000000010165b000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_posixsubprocess.cpython-310-darwin.so
+0x0000000101669000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/select.cpython-310-darwin.so
+0x0000000101680000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/math.cpython-310-darwin.so
+0x00000001016a2000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_socket.cpython-310-darwin.so
+0x000000010168f000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/array.cpython-310-darwin.so
+0x0000000101661000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_heapq.cpython-310-darwin.so
+0x0000000101671000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_queue.cpython-310-darwin.so
+0x00000001016c1000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_struct.cpython-310-darwin.so
+0x00000001016b5000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/binascii.cpython-310-darwin.so
+0x00000001016e6000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/libz.1.2.11.dylib
+0x00000001017ff000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_datetime.cpython-310-darwin.so
+0x0000000101864000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_decimal.cpython-310-darwin.so
+0x0000000101655000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_bisect.cpython-310-darwin.so
+0x00000001016cd000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_random.cpython-310-darwin.so
+0x00000001016d3000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_sha512.cpython-310-darwin.so
+0x00000001018b1000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_ssl.cpython-310-darwin.so
+0x0000000101973000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/libssl.3.dylib
+0x0000000101dbe000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/libcrypto.3.dylib
+0x00000001018dc000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/pyexpat.cpython-310-darwin.so
+0x0000000101817000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/zlib.cpython-310-darwin.so
+0x00000001016da000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_bz2.cpython-310-darwin.so
+0x0000000101836000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/libbz2.1.0.8.dylib
+0x000000010182c000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_lzma.cpython-310-darwin.so
+0x0000000101936000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/liblzma.5.dylib
+0x0000000101d0a000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_ctypes.cpython-310-darwin.so
+0x000000010184a000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/libffi.8.dylib
+0x0000000101854000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_json.cpython-310-darwin.so
+0x0000000101d28000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_pickle.cpython-310-darwin.so
+0x0000000102729000 	/Applications/PyCharm.app/Contents/plugins/python/helpers/pydev/_pydevd_bundle/pydevd_cython_darwin_310_64.cpython-310-darwin.so
+0x0000000101d77000 	/Applications/PyCharm.app/Contents/plugins/python/helpers/pydev/_pydevd_frame_eval/pydevd_frame_evaluator_common.cpython-310-darwin.so
+0x0000000101d49000 	/Applications/PyCharm.app/Contents/plugins/python/helpers/pydev/_pydevd_frame_eval/pydevd_frame_evaluator_darwin_310_64.cpython-310-darwin.so
+0x000000010164b000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_contextvars.cpython-310-darwin.so
+0x000000010191f000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_asyncio.cpython-310-darwin.so
+0x000000010169d000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/termios.cpython-310-darwin.so
+0x0000000106279000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/_orekit.cpython-310-darwin.so
+0x0000000103882000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/jre/lib/server/libjvm.dylib
+0x00000001029b6000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/libc++.1.0.dylib
+0x000000010195c000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/jre/lib/libverify.dylib
+0x00000001026b1000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/jre/lib/libjava.dylib
+0x00007ff80bb65000 	/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation
+0x00007ff8123aa000 	/System/Library/PrivateFrameworks/CoreAutoLayout.framework/Versions/A/CoreAutoLayout
+0x00007ff80b876000 	/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration
+0x00007ff815924000 	/usr/lib/libz.1.dylib
+0x00007ff815c8e000 	/usr/lib/libcompression.dylib
+0x00007ff80f708000 	/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork
+0x00007ff81172c000 	/System/Library/Frameworks/DiskArbitration.framework/Versions/A/DiskArbitration
+0x00007ff815b45000 	/usr/lib/libarchive.2.dylib
+0x00007ff81163e000 	/usr/lib/libDiagnosticMessagesClient.dylib
+0x00007ff8123f2000 	/usr/lib/libxml2.2.dylib
+0x00007ff81bc9e000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices
+0x00007ff8142e0000 	/usr/lib/liblangid.dylib
+0x00007ff80d63a000 	/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit
+0x00007ff8142dc000 	/System/Library/PrivateFrameworks/AppleSystemInfo.framework/Versions/A/AppleSystemInfo
+0x00007ff80ccdf000 	/System/Library/Frameworks/Security.framework/Versions/A/Security
+0x00007ff815050000 	/usr/lib/libbsm.0.dylib
+0x00007ff80ed3e000 	/usr/lib/libnetwork.dylib
+0x00007ff80fbb6000 	/usr/lib/libMobileGestalt.dylib
+0x00007ff80fbb5000 	/usr/lib/libenergytrace.dylib
+0x00007ff81599f000 	/usr/lib/system/libkxld.dylib
+0x00007ff814c7e000 	/System/Library/PrivateFrameworks/IOMobileFramebuffer.framework/Versions/A/IOMobileFramebuffer
+0x00007ff8135af000 	/System/Library/Frameworks/IOSurface.framework/Versions/A/IOSurface
+0x00007ffb206f8000 	/usr/lib/libCoreEntitlements.dylib
+0x00007ff8156b8000 	/System/Library/PrivateFrameworks/AppleFSCompression.framework/Versions/A/AppleFSCompression
+0x00007ff815038000 	/usr/lib/libcoretls.dylib
+0x00007ff816179000 	/usr/lib/libcoretls_cfhelpers.dylib
+0x00007ff815c89000 	/usr/lib/libpam.2.dylib
+0x00007ff811079000 	/usr/lib/libsqlite3.dylib
+0x00007ff8161e8000 	/usr/lib/libxar.1.dylib
+0x00007ff81615f000 	/usr/lib/liblzma.5.dylib
+0x00007ff8156c8000 	/usr/lib/libbz2.1.0.dylib
+0x00007ff815a0b000 	/usr/lib/libpcap.A.dylib
+0x00007ff81144e000 	/usr/lib/libdns_services.dylib
+0x00007ff815c58000 	/usr/lib/libapple_nghttp2.dylib
+0x00007ff815a42000 	/usr/lib/libiconv.2.dylib
+0x00007ff815998000 	/usr/lib/libcharset.1.dylib
+0x00007ff812375000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/FSEvents
+0x00007ff80d2d2000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/CarbonCore.framework/Versions/A/CarbonCore
+0x00007ff811691000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/Metadata.framework/Versions/A/Metadata
+0x00007ff8156db000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/OSServices.framework/Versions/A/OSServices
+0x00007ff815bcc000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/SearchKit.framework/Versions/A/SearchKit
+0x00007ff8113e0000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/AE.framework/Versions/A/AE
+0x00007ff80b1e2000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/LaunchServices
+0x00007ff816110000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/DictionaryServices.framework/Versions/A/DictionaryServices
+0x00007ff812382000 	/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/SharedFileList.framework/Versions/A/SharedFileList
+0x00007ff81502c000 	/usr/lib/libCheckFix.dylib
+0x00007ff80fc19000 	/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC
+0x00007ff8142e2000 	/System/Library/PrivateFrameworks/CoreNLP.framework/Versions/A/CoreNLP
+0x00007ff811641000 	/System/Library/PrivateFrameworks/MetadataUtilities.framework/Versions/A/MetadataUtilities
+0x00007ff80b926000 	/usr/lib/libmecabra.dylib
+0x00007ff81bee9000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate
+0x00007ff815060000 	/usr/lib/libmecab.dylib
+0x00007ff80b8f1000 	/usr/lib/libCRFSuite.dylib
+0x00007ff8150bd000 	/usr/lib/libgermantok.dylib
+0x00007ff815c33000 	/usr/lib/libThaiTokenizer.dylib
+0x00007ff811733000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vImage.framework/Versions/A/vImage
+0x00007ff81bc75000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/vecLib
+0x00007ff816229000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libvMisc.dylib
+0x00007ff814a9c000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libvDSP.dylib
+0x00007ff80b55a000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib
+0x00007ff815d6a000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libLAPACK.dylib
+0x00007ff8150c0000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libLinearAlgebra.dylib
+0x00007ff815c71000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libSparseBLAS.dylib
+0x00007ff815d64000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libQuadrature.dylib
+0x00007ff8143cc000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBNNS.dylib
+0x00007ff80b807000 	/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libSparse.dylib
+0x00007ff811610000 	/System/Library/PrivateFrameworks/CoreAnalytics.framework/Versions/A/CoreAnalytics
+0x00007ff8143c5000 	/System/Library/PrivateFrameworks/LinguisticData.framework/Versions/A/LinguisticData
+0x00007ff80b7bc000 	/System/Library/PrivateFrameworks/Lexicon.framework/Versions/A/Lexicon
+0x00007ff816222000 	/usr/lib/libChineseTokenizer.dylib
+0x00007ff80bf20000 	/System/Library/PrivateFrameworks/LanguageModeling.framework/Versions/A/LanguageModeling
+0x00007ff815c35000 	/System/Library/PrivateFrameworks/AppleSauce.framework/Versions/A/AppleSauce
+0x00007ff814c6c000 	/System/Library/PrivateFrameworks/CoreEmoji.framework/Versions/A/CoreEmoji
+0x00007ff815b34000 	/usr/lib/libcmph.dylib
+0x00007ff812359000 	/System/Library/Frameworks/OpenDirectory.framework/Versions/A/Frameworks/CFOpenDirectory.framework/Versions/A/CFOpenDirectory
+0x00007ff81234d000 	/System/Library/Frameworks/OpenDirectory.framework/Versions/A/OpenDirectory
+0x00007ff81617b000 	/System/Library/PrivateFrameworks/APFS.framework/Versions/A/APFS
+0x00007ff814f8d000 	/System/Library/Frameworks/SecurityFoundation.framework/Versions/A/SecurityFoundation
+0x00007ff8161f6000 	/usr/lib/libutil.dylib
+0x00007ff80d5fd000 	/System/Library/PrivateFrameworks/CoreServicesStore.framework/Versions/A/CoreServicesStore
+0x00007ff8123a7000 	/usr/lib/libapp_launch_measurement.dylib
+0x00007ff8161fa000 	/usr/lib/libxslt.1.dylib
+0x00007ff81501a000 	/System/Library/PrivateFrameworks/BackgroundTaskManagement.framework/Versions/A/BackgroundTaskManagement
+0x0000000101d65000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/jre/lib/libzip.dylib
+0x00000001026f4000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/jre/lib/libnio.dylib
+0x000000010296a000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/jre/lib/libnet.dylib
+0x000000010271a000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_hashlib.cpython-310-darwin.so
+0x000000010270c000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_blake2.cpython-310-darwin.so
+0x00000001026aa000 	/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/lib-dynload/_scproxy.cpython-310-darwin.so
+
+VM Arguments:
+java_command: <unknown>
+java_class_path (initial): /Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/orekit-11.1.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-core-2.0.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-fitting-2.0.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-filtering-2.0.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-geometry-2.0.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-ode-2.0.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-optim-2.0.jar:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-stat-2.0.jar
+Launcher Type: generic
+
+Environment Variables:
+JAVA_HOME=/Users/a.aguilar/Documents/GitHub/DMASpy/.env
+PATH=/Users/a.aguilar/.sdkman/candidates/gradle/current/bin:/Users/a.aguilar/Documents/GitHub/DMASpy/.env/bin:/Users/a.aguilar/opt/anaconda3/condabin:/Library/Frameworks/Python.framework/Versions/3.10/bin:/Library/Frameworks/Python.framework/Versions/3.8/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+SHELL=/bin/zsh
+
+Signal Handlers:
+SIGSEGV: [libjvm.dylib+0x5b2935], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_ONSTACK|SA_RESTART|SA_SIGINFO
+SIGBUS: [libjvm.dylib+0x5b2935], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGFPE: [libjvm.dylib+0x4a1701], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGPIPE: [libjvm.dylib+0x4a1701], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGXFSZ: [libjvm.dylib+0x4a1701], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGILL: [libjvm.dylib+0x4a1701], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGUSR1: SIG_DFL, sa_mask[0]=00000000000000000000000000000000, sa_flags=none
+SIGUSR2: [libjvm.dylib+0x4a1ff0], sa_mask[0]=00100000000000000000000000000000, sa_flags=SA_RESTART|SA_SIGINFO
+SIGHUP: [libjvm.dylib+0x4a013f], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGINT: [libjvm.dylib+0x4a013f], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGTERM: [libjvm.dylib+0x4a013f], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+SIGQUIT: [libjvm.dylib+0x4a013f], sa_mask[0]=11111111011111110111111111111111, sa_flags=SA_RESTART|SA_SIGINFO
+
+
+---------------  S Y S T E M  ---------------
+
+OS:Bsduname:Darwin 21.2.0 Darwin Kernel Version 21.2.0: Sun Nov 28 20:28:54 PST 2021; root:xnu-8019.61.5~1/RELEASE_X86_64 x86_64
+rlimit: STACK 8192k, CORE 0k, NPROC 1392, NOFILE 10240, AS infinity
+load average:3.81 4.60 4.52
+
+CPU:total 8 (initial active 8) (4 cores per cpu, 2 threads per core) family 6 model 142 stepping 10, cmov, cx8, fxsr, mmx, sse, sse2, sse3, ssse3, sse4.1, sse4.2, popcnt, avx, avx2, aes, clmul, erms, 3dnowpref, lzcnt, ht, tsc, tscinvbit, bmi1, bmi2, adx
+
+Memory: 4k page, physical 8388608k(135076k free)
+
+/proc/meminfo:
+
+
+vm_info: OpenJDK 64-Bit Server VM (25.312-b07) for bsd-amd64 JRE (Zulu 8.58.0.13-CA-macosx) (1.8.0_312-b07), built on Oct  8 2021 23:50:25 by "zulu_re" with gcc 4.2.1 Compatible Apple LLVM 11.0.0 (clang-1100.0.33.17)
+
+time: Tue Feb 22 13:44:51 2022
+timezone: CST
+elapsed time: 1.901107 seconds (0d 0h 0m 1s)
+

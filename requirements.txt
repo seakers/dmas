@@ -1,2 +1,4 @@
-Jpype1==1.3.0
-pynsim==0.1.5
+JPype1==1.3.0
+orekit==11.1
+orekit-stubs==0.1
+PyNSim==0.1.5
