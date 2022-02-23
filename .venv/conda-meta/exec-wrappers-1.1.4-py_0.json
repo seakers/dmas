@@ -1,0 +1,149 @@
+{
+  "build": "py_0",
+  "build_number": 0,
+  "channel": "https://conda.anaconda.org/conda-forge/noarch",
+  "constrains": [],
+  "depends": [
+    "python"
+  ],
+  "extracted_package_dir": "/Users/a.aguilar/opt/anaconda3/pkgs/exec-wrappers-1.1.4-py_0",
+  "features": "",
+  "files": [
+    "lib/python3.10/site-packages/exec_wrappers-1.1.4-py2.7.egg-info/PKG-INFO",
+    "lib/python3.10/site-packages/exec_wrappers-1.1.4-py2.7.egg-info/SOURCES.txt",
+    "lib/python3.10/site-packages/exec_wrappers-1.1.4-py2.7.egg-info/dependency_links.txt",
+    "lib/python3.10/site-packages/exec_wrappers-1.1.4-py2.7.egg-info/entry_points.txt",
+    "lib/python3.10/site-packages/exec_wrappers-1.1.4-py2.7.egg-info/top_level.txt",
+    "lib/python3.10/site-packages/exec_wrappers/__init__.py",
+    "lib/python3.10/site-packages/exec_wrappers/create_wrappers.py",
+    "lib/python3.10/site-packages/exec_wrappers/templates/conda/run-in",
+    "lib/python3.10/site-packages/exec_wrappers/templates/conda/run-in.bat",
+    "lib/python3.10/site-packages/exec_wrappers/templates/schroot/run-in",
+    "lib/python3.10/site-packages/exec_wrappers/templates/virtualenv/run-in",
+    "lib/python3.10/site-packages/exec_wrappers/templates/virtualenv/run-in.bat",
+    "lib/python3.10/site-packages/exec_wrappers/__pycache__/__init__.cpython-310.pyc",
+    "lib/python3.10/site-packages/exec_wrappers/__pycache__/create_wrappers.cpython-310.pyc",
+    "bin/create-wrappers"
+  ],
+  "fn": "exec-wrappers-1.1.4-py_0.tar.bz2",
+  "license": "MIT",
+  "license_family": "MIT",
+  "link": {
+    "source": "/Users/a.aguilar/opt/anaconda3/pkgs/exec-wrappers-1.1.4-py_0",
+    "type": 1
+  },
+  "md5": "ab6363fd3c8ed0f86f9e58409c2638c9",
+  "name": "exec-wrappers",
+  "noarch": "python",
+  "package_tarball_full_path": "/Users/a.aguilar/opt/anaconda3/pkgs/exec-wrappers-1.1.4-py_0.tar.bz2",
+  "package_type": "noarch_python",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "site-packages/exec_wrappers-1.1.4-py2.7.egg-info/PKG-INFO",
+        "path_type": "hardlink",
+        "sha256": "97a63c0a6ceee082c6cc818212ae8f2ea8737ea7a2a398ebdb7933ef5c3316da",
+        "sha256_in_prefix": "97a63c0a6ceee082c6cc818212ae8f2ea8737ea7a2a398ebdb7933ef5c3316da",
+        "size_in_bytes": 8057
+      },
+      {
+        "_path": "site-packages/exec_wrappers-1.1.4-py2.7.egg-info/SOURCES.txt",
+        "path_type": "hardlink",
+        "sha256": "d439dcffad15452460d8acadbdfece02b0f79563af453b2ac82996f6131d2286",
+        "sha256_in_prefix": "d439dcffad15452460d8acadbdfece02b0f79563af453b2ac82996f6131d2286",
+        "size_in_bytes": 509
+      },
+      {
+        "_path": "site-packages/exec_wrappers-1.1.4-py2.7.egg-info/dependency_links.txt",
+        "path_type": "hardlink",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "sha256_in_prefix": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "size_in_bytes": 1
+      },
+      {
+        "_path": "site-packages/exec_wrappers-1.1.4-py2.7.egg-info/entry_points.txt",
+        "path_type": "hardlink",
+        "sha256": "7998d21d9b329961a0b834cca2f05150867794ebb21cfd046454cc9756044ed2",
+        "sha256_in_prefix": "7998d21d9b329961a0b834cca2f05150867794ebb21cfd046454cc9756044ed2",
+        "size_in_bytes": 72
+      },
+      {
+        "_path": "site-packages/exec_wrappers-1.1.4-py2.7.egg-info/top_level.txt",
+        "path_type": "hardlink",
+        "sha256": "2e5a51dad1256de55f7a34169dddf692888a47dc132416c2d8649a96bdaeecf7",
+        "sha256_in_prefix": "2e5a51dad1256de55f7a34169dddf692888a47dc132416c2d8649a96bdaeecf7",
+        "size_in_bytes": 14
+      },
+      {
+        "_path": "site-packages/exec_wrappers/__init__.py",
+        "path_type": "hardlink",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256_in_prefix": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_in_bytes": 0
+      },
+      {
+        "_path": "site-packages/exec_wrappers/create_wrappers.py",
+        "path_type": "hardlink",
+        "sha256": "173865e0e348b66b0c4df6f5dcff5c649ec81230720c18ac7d4fb2d74f616e3b",
+        "sha256_in_prefix": "173865e0e348b66b0c4df6f5dcff5c649ec81230720c18ac7d4fb2d74f616e3b",
+        "size_in_bytes": 11465
+      },
+      {
+        "_path": "site-packages/exec_wrappers/templates/conda/run-in",
+        "path_type": "hardlink",
+        "sha256": "1a1d5a894a142e1c43de28638c9bf09d2e246703cb6b8f5ef73256b17541f329",
+        "sha256_in_prefix": "1a1d5a894a142e1c43de28638c9bf09d2e246703cb6b8f5ef73256b17541f329",
+        "size_in_bytes": 569
+      },
+      {
+        "_path": "site-packages/exec_wrappers/templates/conda/run-in.bat",
+        "path_type": "hardlink",
+        "sha256": "7555d9cc1a9d987e3f5b5bf671c28c88dd73698f7f59a2030e78c831b21bea22",
+        "sha256_in_prefix": "7555d9cc1a9d987e3f5b5bf671c28c88dd73698f7f59a2030e78c831b21bea22",
+        "size_in_bytes": 682
+      },
+      {
+        "_path": "site-packages/exec_wrappers/templates/schroot/run-in",
+        "path_type": "hardlink",
+        "sha256": "e7bc1366612af027cfc24227adacf23ada6623aff41a350958db3d98d7e7a92c",
+        "sha256_in_prefix": "e7bc1366612af027cfc24227adacf23ada6623aff41a350958db3d98d7e7a92c",
+        "size_in_bytes": 59
+      },
+      {
+        "_path": "site-packages/exec_wrappers/templates/virtualenv/run-in",
+        "path_type": "hardlink",
+        "sha256": "f16f30c9fdfa85187fee34a3c23abe092648a539050e0fde7e0e52775d94bd4c",
+        "sha256_in_prefix": "f16f30c9fdfa85187fee34a3c23abe092648a539050e0fde7e0e52775d94bd4c",
+        "size_in_bytes": 120
+      },
+      {
+        "_path": "site-packages/exec_wrappers/templates/virtualenv/run-in.bat",
+        "path_type": "hardlink",
+        "sha256": "7509d4381d4cf461fe03f1a7941a475bc8c6e22fee7bcc3156531d46c2388a79",
+        "sha256_in_prefix": "7509d4381d4cf461fe03f1a7941a475bc8c6e22fee7bcc3156531d46c2388a79",
+        "size_in_bytes": 264
+      },
+      {
+        "_path": "lib/python3.10/site-packages/exec_wrappers/__pycache__/__init__.cpython-310.pyc",
+        "path_type": "pyc_file"
+      },
+      {
+        "_path": "lib/python3.10/site-packages/exec_wrappers/__pycache__/create_wrappers.cpython-310.pyc",
+        "path_type": "pyc_file"
+      },
+      {
+        "_path": "bin/create-wrappers",
+        "path_type": "unix_python_entry_point"
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "None",
+  "sha256": "4f08411d71fbd93853b446e36c9c584444c2ee9033ccc76c0d00ecfd3cb0253f",
+  "size": 10145,
+  "subdir": "noarch",
+  "timestamp": 1573768777294,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/noarch/exec-wrappers-1.1.4-py_0.tar.bz2",
+  "version": "1.1.4"
+}

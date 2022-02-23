@@ -7,6 +7,8 @@ SEAK Lab - Texas A&M University
 ## Linux and Mac Install
 
 ### Automatic Install
+IN DEVELOPMENT
+
 Create virtual environment and install dependencies dependencies
 ```
 chmod +x ./setup.sh
@@ -36,7 +38,7 @@ conda install -c conda-forge orekit
 
 OPTIONAL: rename terminal prompt
 ```
-conda config --set env_prompt '{ENVORINMENT_NAME}'
+conda config --set env_prompt '({ENVORINMENT_NAME})'
 ```
 
 # DEV ONLY

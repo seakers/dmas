@@ -1,0 +1,1633 @@
+{
+  "build": "py310h9d931ec_3",
+  "build_number": 3,
+  "channel": "https://conda.anaconda.org/conda-forge/osx-64",
+  "constrains": [],
+  "depends": [
+    "libcxx >=12.0.1",
+    "openjdk 8.*",
+    "python >=3.10,<3.11.0a0",
+    "python_abi 3.10.* *_cp310"
+  ],
+  "extracted_package_dir": "/Users/a.aguilar/opt/anaconda3/pkgs/orekit-11.1-py310h9d931ec_3",
+  "features": "",
+  "files": [
+    "etc/conda/activate.d/orekit-activate.sh",
+    "etc/conda/deactivate.d/orekit-deactivate.sh",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/PKG-INFO",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/SOURCES.txt",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/dependency_links.txt",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/native_libs.txt",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/not-zip-safe",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/top_level.txt",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__init__.py",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__pycache__/__init__.cpython-310.pyc",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__pycache__/_orekit.cpython-310.pyc",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__pycache__/pyhelpers.cpython-310.pyc",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/_orekit.cpython-310-darwin.so",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/_orekit.py",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-core-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-filtering-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-fitting-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-geometry-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-ode-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-optim-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-stat-2.0.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/orekit-11.1.jar",
+    "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/pyhelpers.py",
+    "lib/python3.10/site-packages/orekit.pth",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/PKG-INFO",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/SOURCES.txt",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/dependency_links.txt",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/not-zip-safe",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/top_level.txt",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/__init__.py",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/__pycache__/__init__.cpython-310.pyc",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/differentiation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/function/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/integration/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/integration/gauss/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/interpolation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/polynomials/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/solvers/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/complex/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/dfp/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/continuous/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/discrete/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/multivariate/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/exception/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/kalman/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/kalman/extended/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/kalman/linear/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/fitting/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/fraction/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/enclosing/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/oned/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/threed/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/twod/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/twod/hull/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/hull/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/partitioning/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/spherical/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/spherical/oned/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/spherical/twod/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/linear/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/events/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/nonstiff/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/sampling/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/linear/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/scalar/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/scalar/gradient/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/scalar/noderiv/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/vector/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/vector/leastsquares/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/univariate/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/random/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/carlson/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/jacobi/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/legendre/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/correlation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/moment/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/rank/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/summary/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/vector/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/fitting/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/inference/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/interval/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/ranking/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/regression/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/util/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/annotation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/attitudes/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/bodies/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/compiler/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/compiler/plugin/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/data/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/errors/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/iod/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/leastsquares/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/filtering/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/generation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/gnss/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/modifiers/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/sequential/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/definitions/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/adm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/adm/aem/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/adm/apm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/ocm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/oem/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/omm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/opm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/tdm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/section/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/generation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/lexical/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/parsing/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/general/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ilrs/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/sinex/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/sp3/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/drag/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/empirical/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/gravity/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/gravity/potential/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/inertia/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/jacobians/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/propulsion/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/trigger/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/radiation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/frames/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/geometry/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/geometry/fov/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/antenna/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/attitude/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/clock/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/rtcm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/rtcm/ephemeris/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/rtcm/ephemeris/utils/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/ssr/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/ssr/igm/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/ssr/subtype/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/ntrip/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/parser/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/navigation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/atmosphere/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/atmosphere/data/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/displacement/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/ionosphere/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/tessellation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/troposphere/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/weather/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/orbits/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/gnss/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/gnss/data/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/tle/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/conversion/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/events/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/events/handlers/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/integration/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/numerical/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/numerical/cr3bp/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/sampling/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/forces/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/utilities/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/utilities/hansen/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/python/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/time/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/utils/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/utils/units/__init__.pyi",
+    "lib/python3.10/site-packages/orekit_stubs.pth"
+  ],
+  "fn": "orekit-11.1-py310h9d931ec_3.tar.bz2",
+  "license": "Apache-2.0",
+  "license_family": "Apache",
+  "link": {
+    "source": "/Users/a.aguilar/opt/anaconda3/pkgs/orekit-11.1-py310h9d931ec_3",
+    "type": 1
+  },
+  "md5": "ae4c86dbc2aae2a1b1ba32c025c9ed7a",
+  "name": "orekit",
+  "package_tarball_full_path": "/Users/a.aguilar/opt/anaconda3/pkgs/orekit-11.1-py310h9d931ec_3.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "etc/conda/activate.d/orekit-activate.sh",
+        "path_type": "hardlink",
+        "sha256": "e0dad5a8619f3388593dd497fec4fa80130652c7d67de0a7b197722e9f3c2817",
+        "sha256_in_prefix": "e0dad5a8619f3388593dd497fec4fa80130652c7d67de0a7b197722e9f3c2817",
+        "size_in_bytes": 71
+      },
+      {
+        "_path": "etc/conda/deactivate.d/orekit-deactivate.sh",
+        "path_type": "hardlink",
+        "sha256": "e24f4be8eb73aa91c0f20cb60e6feef19b288777f338bf0f47640d45402a3e0e",
+        "sha256_in_prefix": "e24f4be8eb73aa91c0f20cb60e6feef19b288777f338bf0f47640d45402a3e0e",
+        "size_in_bytes": 193
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/PKG-INFO",
+        "path_type": "hardlink",
+        "sha256": "0560ba253c121fa3ea4cfb0ac54a7f059abc0acffeb209c7d949768d1c94adac",
+        "sha256_in_prefix": "0560ba253c121fa3ea4cfb0ac54a7f059abc0acffeb209c7d949768d1c94adac",
+        "size_in_bytes": 137
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/SOURCES.txt",
+        "path_type": "hardlink",
+        "sha256": "0236dbc2d9d267feba285747b353b238e7be207a8cd3c59b97135de9ae638cae",
+        "sha256_in_prefix": "0236dbc2d9d267feba285747b353b238e7be207a8cd3c59b97135de9ae638cae",
+        "size_in_bytes": 170
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/dependency_links.txt",
+        "path_type": "hardlink",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "sha256_in_prefix": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "size_in_bytes": 1
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/native_libs.txt",
+        "path_type": "hardlink",
+        "sha256": "f5a6afae6e73a18509757735b7219ce4ce5604352a9edb02e3d290182ae0dbec",
+        "sha256_in_prefix": "f5a6afae6e73a18509757735b7219ce4ce5604352a9edb02e3d290182ae0dbec",
+        "size_in_bytes": 37
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/not-zip-safe",
+        "path_type": "hardlink",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "sha256_in_prefix": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "size_in_bytes": 1
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/EGG-INFO/top_level.txt",
+        "path_type": "hardlink",
+        "sha256": "bde5debecf776db5bfb877eeb8b81ccc8c6122b689f855454f8fb336a24c8803",
+        "sha256_in_prefix": "bde5debecf776db5bfb877eeb8b81ccc8c6122b689f855454f8fb336a24c8803",
+        "size_in_bytes": 7
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__init__.py",
+        "path_type": "hardlink",
+        "sha256": "36028bb8c4a81a3eb6e4415bd484228aa2d710ba9b5e4f355aef3a41569d4de2",
+        "sha256_in_prefix": "36028bb8c4a81a3eb6e4415bd484228aa2d710ba9b5e4f355aef3a41569d4de2",
+        "size_in_bytes": 1467
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__pycache__/__init__.cpython-310.pyc",
+        "path_type": "hardlink",
+        "sha256": "f9481ae382394923e1206e2d7912305d56c2cb754e52416a6a9c9a80f9a7756c",
+        "sha256_in_prefix": "f9481ae382394923e1206e2d7912305d56c2cb754e52416a6a9c9a80f9a7756c",
+        "size_in_bytes": 1835
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__pycache__/_orekit.cpython-310.pyc",
+        "path_type": "hardlink",
+        "sha256": "3b858332b073f864099d5210b04b9f85c3c11070f599cbc9f2cc49dadfa8b8a8",
+        "sha256_in_prefix": "3b858332b073f864099d5210b04b9f85c3c11070f599cbc9f2cc49dadfa8b8a8",
+        "size_in_bytes": 608
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/__pycache__/pyhelpers.cpython-310.pyc",
+        "path_type": "hardlink",
+        "sha256": "0cac7afc7a776a0ee90868e36c7d501dbf105d17c5664a5299ed8b1101c84d92",
+        "sha256_in_prefix": "0cac7afc7a776a0ee90868e36c7d501dbf105d17c5664a5299ed8b1101c84d92",
+        "size_in_bytes": 5370
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/_orekit.cpython-310-darwin.so",
+        "file_mode": "binary",
+        "path_type": "hardlink",
+        "prefix_placeholder": "/Users/runner/miniforge3/conda-bld/orekit_1645389758075/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pl",
+        "sha256": "49e5b4b775acdcdf067da933c862f2f45b281d3876fee0e8c43c4fe6b433f205",
+        "sha256_in_prefix": "c998fe727fc27118748f01c85e26eb4dc71c8fd03e839b3319b3c9f57455b9c6",
+        "size_in_bytes": 44000648
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/_orekit.py",
+        "path_type": "hardlink",
+        "sha256": "9b4a1c6d4058f49fca2c6b5f2a7e6cca973bbf1cb6dfc92f67351c39562fd4f8",
+        "sha256_in_prefix": "9b4a1c6d4058f49fca2c6b5f2a7e6cca973bbf1cb6dfc92f67351c39562fd4f8",
+        "size_in_bytes": 423
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-core-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "825e9d0ee7a505f3ada619cc36e75a1113589582e05eb52b4eec120eb3218042",
+        "sha256_in_prefix": "825e9d0ee7a505f3ada619cc36e75a1113589582e05eb52b4eec120eb3218042",
+        "size_in_bytes": 1202059
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-filtering-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "4958fd2977427f90fb63bca531bf4665e8c124701ea9a77f6c39b7fde78b7c6a",
+        "sha256_in_prefix": "4958fd2977427f90fb63bca531bf4665e8c124701ea9a77f6c39b7fde78b7c6a",
+        "size_in_bytes": 20413
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-fitting-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "0f4c92a725e6054d79048d5d23d0358a59e18351fa7a30a4105808906295e7a0",
+        "sha256_in_prefix": "0f4c92a725e6054d79048d5d23d0358a59e18351fa7a30a4105808906295e7a0",
+        "size_in_bytes": 31066
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-geometry-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "c18994c8f72a9ca38e01415d9cf13a3e08ba622f3f560bfff6f7f7bb7c3538be",
+        "sha256_in_prefix": "c18994c8f72a9ca38e01415d9cf13a3e08ba622f3f560bfff6f7f7bb7c3538be",
+        "size_in_bytes": 263989
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-ode-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "7447ce9a2b20eb3bb0de7af67fe77116411e9cf56509bc73fac8c92a57b2c1c9",
+        "sha256_in_prefix": "7447ce9a2b20eb3bb0de7af67fe77116411e9cf56509bc73fac8c92a57b2c1c9",
+        "size_in_bytes": 258130
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-optim-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "488ea8fbf8e0d26cb7d8f02e45fa54d68980c0a46496b2d3ef6b06b9d621ad15",
+        "sha256_in_prefix": "488ea8fbf8e0d26cb7d8f02e45fa54d68980c0a46496b2d3ef6b06b9d621ad15",
+        "size_in_bytes": 180401
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/hipparchus-stat-2.0.jar",
+        "path_type": "hardlink",
+        "sha256": "9fa2ca762363c17bc2c3389d782b823460d30b1d3a2434a3b85c1c46bc8b9590",
+        "sha256_in_prefix": "9fa2ca762363c17bc2c3389d782b823460d30b1d3a2434a3b85c1c46bc8b9590",
+        "size_in_bytes": 217782
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/orekit-11.1.jar",
+        "path_type": "hardlink",
+        "sha256": "f26f514fc078a541eb7e9cc69c28589fa2dfce225247a2aab5f9a23e0fc0ec41",
+        "sha256_in_prefix": "f26f514fc078a541eb7e9cc69c28589fa2dfce225247a2aab5f9a23e0fc0ec41",
+        "size_in_bytes": 4820820
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit-11.1-py3.10-macosx-10.9-x86_64.egg/orekit/pyhelpers.py",
+        "path_type": "hardlink",
+        "sha256": "306f742abef3982b666e8bd8a116f5da41f8c9b5fef0ea556f4c626f5a3f1692",
+        "sha256_in_prefix": "306f742abef3982b666e8bd8a116f5da41f8c9b5fef0ea556f4c626f5a3f1692",
+        "size_in_bytes": 6153
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit.pth",
+        "path_type": "hardlink",
+        "sha256": "57606d36e3ef6f9c1a04742ca741784c653931ba004b56a9571665a466faad7f",
+        "sha256_in_prefix": "57606d36e3ef6f9c1a04742ca741784c653931ba004b56a9571665a466faad7f",
+        "size_in_bytes": 44
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/PKG-INFO",
+        "path_type": "hardlink",
+        "sha256": "9b62e5570043cd396242d57ebfef69f5b988a6d9038cbe65575786c584ed6869",
+        "sha256_in_prefix": "9b62e5570043cd396242d57ebfef69f5b988a6d9038cbe65575786c584ed6869",
+        "size_in_bytes": 174
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/SOURCES.txt",
+        "path_type": "hardlink",
+        "sha256": "a0c5ee1847db9762d5859c51b5100dcf8b3149b3f0a0e53ed774d019a2cae4ad",
+        "sha256_in_prefix": "a0c5ee1847db9762d5859c51b5100dcf8b3149b3f0a0e53ed774d019a2cae4ad",
+        "size_in_bytes": 8663
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/dependency_links.txt",
+        "path_type": "hardlink",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "sha256_in_prefix": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "size_in_bytes": 1
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/not-zip-safe",
+        "path_type": "hardlink",
+        "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "sha256_in_prefix": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "size_in_bytes": 1
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/EGG-INFO/top_level.txt",
+        "path_type": "hardlink",
+        "sha256": "85c7edb2fbc85ef26b600deaa79a53b3b1c8b1454478b7cb6de472eefb38a275",
+        "sha256_in_prefix": "85c7edb2fbc85ef26b600deaa79a53b3b1c8b1454478b7cb6de472eefb38a275",
+        "size_in_bytes": 10
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/__init__.py",
+        "path_type": "hardlink",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256_in_prefix": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "size_in_bytes": 0
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "d2fdf13c821b02c57412e36fa2303237270eeca050b5de3336a8205991b84d4e",
+        "sha256_in_prefix": "d2fdf13c821b02c57412e36fa2303237270eeca050b5de3336a8205991b84d4e",
+        "size_in_bytes": 272
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/__pycache__/__init__.cpython-310.pyc",
+        "path_type": "hardlink",
+        "sha256": "2803b63eef0e06dcad3b1ee84f45dcc61e02f35a34fe81bf2847c477c9738fb5",
+        "sha256_in_prefix": "2803b63eef0e06dcad3b1ee84f45dcc61e02f35a34fe81bf2847c477c9738fb5",
+        "size_in_bytes": 171
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "94dc7f6524e6147ccaed2ac6086dd6f9db2235a252b7a834db98d986929fc904",
+        "sha256_in_prefix": "94dc7f6524e6147ccaed2ac6086dd6f9db2235a252b7a834db98d986929fc904",
+        "size_in_bytes": 28791
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8258361ccd07b12ae0eb655509db6d2f2bb5bc2cfabcf06849e843f641feba56",
+        "sha256_in_prefix": "8258361ccd07b12ae0eb655509db6d2f2bb5bc2cfabcf06849e843f641feba56",
+        "size_in_bytes": 35493
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/differentiation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "91448b6718de111d67760a50035fb2ad14b0226379ddaae5ac0a7b830911b764",
+        "sha256_in_prefix": "91448b6718de111d67760a50035fb2ad14b0226379ddaae5ac0a7b830911b764",
+        "size_in_bytes": 378733
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/function/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "dc9812d847ebc9b0cf98933dbe60723e7108bd7fe2dbf2c446a270a1758d899e",
+        "sha256_in_prefix": "dc9812d847ebc9b0cf98933dbe60723e7108bd7fe2dbf2c446a270a1758d899e",
+        "size_in_bytes": 66516
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/integration/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "5f4d0d8a172dad097ffdfe66493e8caf7a5749dd0c02d851b196e26223bfe405",
+        "sha256_in_prefix": "5f4d0d8a172dad097ffdfe66493e8caf7a5749dd0c02d851b196e26223bfe405",
+        "size_in_bytes": 27086
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/integration/gauss/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "93e99b4f0c200c5491c3e2bf47c4430a92890b845edade707c1d33050765e437",
+        "sha256_in_prefix": "93e99b4f0c200c5491c3e2bf47c4430a92890b845edade707c1d33050765e437",
+        "size_in_bytes": 21757
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/interpolation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ff59b26431e58b19489329ce9d22b36fde83a8d845c460ab9fd06a177bcc9e35",
+        "sha256_in_prefix": "ff59b26431e58b19489329ce9d22b36fde83a8d845c460ab9fd06a177bcc9e35",
+        "size_in_bytes": 30933
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/polynomials/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "07b7b3213aa845d59b3a2052fec379bcaac5df061a5ee46f76ca246445ac3d6f",
+        "sha256_in_prefix": "07b7b3213aa845d59b3a2052fec379bcaac5df061a5ee46f76ca246445ac3d6f",
+        "size_in_bytes": 38836
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/analysis/solvers/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "dcd1d3c6bd5f03ce5ec8bc02d7bf5e220a4347160fef502452114da6e80235d5",
+        "sha256_in_prefix": "dcd1d3c6bd5f03ce5ec8bc02d7bf5e220a4347160fef502452114da6e80235d5",
+        "size_in_bytes": 64402
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/complex/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "23b8337ff7e9aaad79143bd3e51884d1c206e01e30768d76f7bd8efe860957a4",
+        "sha256_in_prefix": "23b8337ff7e9aaad79143bd3e51884d1c206e01e30768d76f7bd8efe860957a4",
+        "size_in_bytes": 114543
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/dfp/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "c4e9cd1553fcac8ed00631d78dce54507d291314d91f0fb3d41dfa61ead89ad6",
+        "sha256_in_prefix": "c4e9cd1553fcac8ed00631d78dce54507d291314d91f0fb3d41dfa61ead89ad6",
+        "size_in_bytes": 35274
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1a13af39fce14dad8bbb96b7e3675a4c34f79dfa5d7f864a8e122e7d54d8ec93",
+        "sha256_in_prefix": "1a13af39fce14dad8bbb96b7e3675a4c34f79dfa5d7f864a8e122e7d54d8ec93",
+        "size_in_bytes": 16922
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/continuous/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b467ddf87ad0a1ed4a7c57100ee24829498e1694983a701e45d2c4f7c98f9f0c",
+        "sha256_in_prefix": "b467ddf87ad0a1ed4a7c57100ee24829498e1694983a701e45d2c4f7c98f9f0c",
+        "size_in_bytes": 123762
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/discrete/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "39006f4bdb19aafb4a60b510f65d5b645f14b8fa26b1df5ef1186b3f92ea559f",
+        "sha256_in_prefix": "39006f4bdb19aafb4a60b510f65d5b645f14b8fa26b1df5ef1186b3f92ea559f",
+        "size_in_bytes": 44628
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/distribution/multivariate/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ca9e1770c662a29d2fe7534f8b384772b3da1207974e4c15a4ad6bcce8a2006f",
+        "sha256_in_prefix": "ca9e1770c662a29d2fe7534f8b384772b3da1207974e4c15a4ad6bcce8a2006f",
+        "size_in_bytes": 9283
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/exception/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1164a3e36dc30d8ee6f474bcac8d69763cadd091c1ede30c13f438aba255fd41",
+        "sha256_in_prefix": "1164a3e36dc30d8ee6f474bcac8d69763cadd091c1ede30c13f438aba255fd41",
+        "size_in_bytes": 29119
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "62fc8569a076276bce8a70571d4063c2837b3cc2ca710e2f06e3698cf8223e0a",
+        "sha256_in_prefix": "62fc8569a076276bce8a70571d4063c2837b3cc2ca710e2f06e3698cf8223e0a",
+        "size_in_bytes": 262
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/kalman/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "2c3b35a2e05c89e0815de191417a8dfadff7ac7539bfc73ac19fe761d8c935c5",
+        "sha256_in_prefix": "2c3b35a2e05c89e0815de191417a8dfadff7ac7539bfc73ac19fe761d8c935c5",
+        "size_in_bytes": 7086
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/kalman/extended/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a947907bcea9e2d696440deaff95166ed83d15a00ed3406b0f2155c694f3d34c",
+        "sha256_in_prefix": "a947907bcea9e2d696440deaff95166ed83d15a00ed3406b0f2155c694f3d34c",
+        "size_in_bytes": 5708
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/filtering/kalman/linear/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "92e913dceb1f769daa5949010b874ec3ce97559eb58a493cdc177cc1291feb87",
+        "sha256_in_prefix": "92e913dceb1f769daa5949010b874ec3ce97559eb58a493cdc177cc1291feb87",
+        "size_in_bytes": 4881
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/fitting/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "826b803b53b3f8b86993c1fd111568c7a04b3109b5b732df83fd0d96bdd0c69f",
+        "sha256_in_prefix": "826b803b53b3f8b86993c1fd111568c7a04b3109b5b732df83fd0d96bdd0c69f",
+        "size_in_bytes": 7647
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/fraction/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "6f592a8ce0ded922ac9e87e9713cd26d192a4e11a7ba6d2c36d3bcf8dea50f97",
+        "sha256_in_prefix": "6f592a8ce0ded922ac9e87e9713cd26d192a4e11a7ba6d2c36d3bcf8dea50f97",
+        "size_in_bytes": 69624
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a67408d377e0662b2aa569b10bc230814c4af64e3a0793f16b5fbeea4b684ecf",
+        "sha256_in_prefix": "a67408d377e0662b2aa569b10bc230814c4af64e3a0793f16b5fbeea4b684ecf",
+        "size_in_bytes": 14184
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/enclosing/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "2c515bce2621dd45ea40ce976b649b3957bac42aded61418a43eb317623c91b9",
+        "sha256_in_prefix": "2c515bce2621dd45ea40ce976b649b3957bac42aded61418a43eb317623c91b9",
+        "size_in_bytes": 6857
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "6da46a18e75d411380208a7a78e0e8edeabe8b2826f1e5bf298c69cf543749bd",
+        "sha256_in_prefix": "6da46a18e75d411380208a7a78e0e8edeabe8b2826f1e5bf298c69cf543749bd",
+        "size_in_bytes": 519
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/oned/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "7bc483cd178dd21e03278ca997baa3d709e73899b3f697567fe2cdd052894095",
+        "sha256_in_prefix": "7bc483cd178dd21e03278ca997baa3d709e73899b3f697567fe2cdd052894095",
+        "size_in_bytes": 28714
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/threed/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "6939ecb3a2c14ae07507d93281c5a2f4303070fa4498168485f1412656b5607c",
+        "sha256_in_prefix": "6939ecb3a2c14ae07507d93281c5a2f4303070fa4498168485f1412656b5607c",
+        "size_in_bytes": 112575
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/twod/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b586cdb93e7961672546594679ae952d58693b13105b7045817e729700fbfd45",
+        "sha256_in_prefix": "b586cdb93e7961672546594679ae952d58693b13105b7045817e729700fbfd45",
+        "size_in_bytes": 75067
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/euclidean/twod/hull/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "25868e688a1514be48bf4b192ac82704430fc2e07043fb2d3e0e306a541045e2",
+        "sha256_in_prefix": "25868e688a1514be48bf4b192ac82704430fc2e07043fb2d3e0e306a541045e2",
+        "size_in_bytes": 6029
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/hull/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "82252e19e163c1969376d5662f50ef1cb8caca2ada5a70aff48bed6f39d3505f",
+        "sha256_in_prefix": "82252e19e163c1969376d5662f50ef1cb8caca2ada5a70aff48bed6f39d3505f",
+        "size_in_bytes": 2164
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/partitioning/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b9f198532e8a63a717f523cb332f2fceeb15d2c7e0073b4efc9e2da49ff243d3",
+        "sha256_in_prefix": "b9f198532e8a63a717f523cb332f2fceeb15d2c7e0073b4efc9e2da49ff243d3",
+        "size_in_bytes": 38236
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/spherical/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "feb858e227e14e2f6e48e9f1ce668b9f86826369fcfe6659fb738ffe0b5b9a15",
+        "sha256_in_prefix": "feb858e227e14e2f6e48e9f1ce668b9f86826369fcfe6659fb738ffe0b5b9a15",
+        "size_in_bytes": 398
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/spherical/oned/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "231a7ba79962cb49d99bbe2f959fe919b6a3b394d255e7b78073e438b5fab9a7",
+        "sha256_in_prefix": "231a7ba79962cb49d99bbe2f959fe919b6a3b394d255e7b78073e438b5fab9a7",
+        "size_in_bytes": 20087
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/geometry/spherical/twod/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a97bbd9fb09c204c6a15882899626fd6cff163aa6b8826406701c14ce38011c6",
+        "sha256_in_prefix": "a97bbd9fb09c204c6a15882899626fd6cff163aa6b8826406701c14ce38011c6",
+        "size_in_bytes": 25650
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/linear/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8aa9cd6795a2468dab28203eabedcd477faaf50c1c3bf047c8bba94773062279",
+        "sha256_in_prefix": "8aa9cd6795a2468dab28203eabedcd477faaf50c1c3bf047c8bba94773062279",
+        "size_in_bytes": 374557
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ab0364a13042e121f00306ee452234f7e7a250cc12ec81db00808cef0c27c54e",
+        "sha256_in_prefix": "ab0364a13042e121f00306ee452234f7e7a250cc12ec81db00808cef0c27c54e",
+        "size_in_bytes": 115197
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/events/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "5201b36dd80368101a9f7ca830b0d2a5f4a1a002ea3f1fd1b7effa3a8e303e2c",
+        "sha256_in_prefix": "5201b36dd80368101a9f7ca830b0d2a5f4a1a002ea3f1fd1b7effa3a8e303e2c",
+        "size_in_bytes": 41587
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/nonstiff/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "3ca5b9cc1fe2d61fec4e79b8b4daf0710ce2b1e562f7510e30dbdf8e923c1944",
+        "sha256_in_prefix": "3ca5b9cc1fe2d61fec4e79b8b4daf0710ce2b1e562f7510e30dbdf8e923c1944",
+        "size_in_bytes": 131458
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/ode/sampling/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e1cfeb5bc76dc1ec4d770af185827c356540585fd7d0ae19b233805449329873",
+        "sha256_in_prefix": "e1cfeb5bc76dc1ec4d770af185827c356540585fd7d0ae19b233805449329873",
+        "size_in_bytes": 36800
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "9eb4936a9ad389c33bcd0225fc49793a467f7f88f303f354a5b0509ba18c9748",
+        "sha256_in_prefix": "9eb4936a9ad389c33bcd0225fc49793a467f7f88f303f354a5b0509ba18c9748",
+        "size_in_bytes": 22418
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/linear/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "4e882ff55f57f1a9e4be1dd286c605b65e3c31c5fa44b25174fdfd40df16c647",
+        "sha256_in_prefix": "4e882ff55f57f1a9e4be1dd286c605b65e3c31c5fa44b25174fdfd40df16c647",
+        "size_in_bytes": 16803
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e9fc1383426d6fd93a7a077ea5fa9c016040f7b180ddc013178e692575223f26",
+        "sha256_in_prefix": "e9fc1383426d6fd93a7a077ea5fa9c016040f7b180ddc013178e692575223f26",
+        "size_in_bytes": 395
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/scalar/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "eb9571af0b15ed90c2d7021d91ae2e1d9e1377fc402ae7dd5ed74eb5ad6434f8",
+        "sha256_in_prefix": "eb9571af0b15ed90c2d7021d91ae2e1d9e1377fc402ae7dd5ed74eb5ad6434f8",
+        "size_in_bytes": 15867
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/scalar/gradient/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "66044f96713f8245c3c884f88bd39f141a5f76d5abf6e61e032f3f0b46dd0531",
+        "sha256_in_prefix": "66044f96713f8245c3c884f88bd39f141a5f76d5abf6e61e032f3f0b46dd0531",
+        "size_in_bytes": 3844
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/scalar/noderiv/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "47936dc56379b49031f61a985bb2d98267a95792826473a5d1a53497682d5bd1",
+        "sha256_in_prefix": "47936dc56379b49031f61a985bb2d98267a95792826473a5d1a53497682d5bd1",
+        "size_in_bytes": 7209
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/vector/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "18b807a959307ed96638c362aacbe30f90f56dcbd981b18c661da00af1be2132",
+        "sha256_in_prefix": "18b807a959307ed96638c362aacbe30f90f56dcbd981b18c661da00af1be2132",
+        "size_in_bytes": 319
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/nonlinear/vector/leastsquares/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8af428828683a9487e14905fbf43aecc937da19dc76025e513dadf6613ed5ad4",
+        "sha256_in_prefix": "8af428828683a9487e14905fbf43aecc937da19dc76025e513dadf6613ed5ad4",
+        "size_in_bytes": 32075
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/optim/univariate/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "620e9da93ba0cea76638cbf9eda18e0f2f153e04433a46f8fcff1504995bb94e",
+        "sha256_in_prefix": "620e9da93ba0cea76638cbf9eda18e0f2f153e04433a46f8fcff1504995bb94e",
+        "size_in_bytes": 8246
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/random/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "748955f3feaf38cd99d1119ea161c8ef75508fc1d923fe809cdaa27a903ed42b",
+        "sha256_in_prefix": "748955f3feaf38cd99d1119ea161c8ef75508fc1d923fe809cdaa27a903ed42b",
+        "size_in_bytes": 84767
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "92d79fcc7dbaf0b45fec1bc1966625cfd43b379a5ca8f8a78b1f4fc7b59d7090",
+        "sha256_in_prefix": "92d79fcc7dbaf0b45fec1bc1966625cfd43b379a5ca8f8a78b1f4fc7b59d7090",
+        "size_in_bytes": 7681
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "faaa93bfc5e37038db14dcb246ce48f9b91cab9fc1642fc133c8fea82882546b",
+        "sha256_in_prefix": "faaa93bfc5e37038db14dcb246ce48f9b91cab9fc1642fc133c8fea82882546b",
+        "size_in_bytes": 526
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/carlson/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "061e80b280005d1c76164bd9228e4f57b3bd2be62279cd0484e564c632aca898",
+        "sha256_in_prefix": "061e80b280005d1c76164bd9228e4f57b3bd2be62279cd0484e564c632aca898",
+        "size_in_bytes": 6030
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/jacobi/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "79e35c23e708a0752daa9f6525d631d187b5f5ef7fb3441597cc3681b3eb4cbe",
+        "sha256_in_prefix": "79e35c23e708a0752daa9f6525d631d187b5f5ef7fb3441597cc3681b3eb4cbe",
+        "size_in_bytes": 20493
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/special/elliptic/legendre/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "9908dc6c3af19bca3768aadc0e6732a1bb0f7a06755aa1eb8dd9fd36f0f35730",
+        "sha256_in_prefix": "9908dc6c3af19bca3768aadc0e6732a1bb0f7a06755aa1eb8dd9fd36f0f35730",
+        "size_in_bytes": 9711
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "54faca1770a9a9ae90367a32256945d76147120d7ca3caac08872f25a312e009",
+        "sha256_in_prefix": "54faca1770a9a9ae90367a32256945d76147120d7ca3caac08872f25a312e009",
+        "size_in_bytes": 19465
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/correlation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "107d54d47e00e722d3180bebb4fc5d6c0faa1ddecade39e103244943ba3d0bd2",
+        "sha256_in_prefix": "107d54d47e00e722d3180bebb4fc5d6c0faa1ddecade39e103244943ba3d0bd2",
+        "size_in_bytes": 12475
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "629aa19bf6ca1288b0e4faa39d51660859f5c32c3dd6362da2b3670f19a885ae",
+        "sha256_in_prefix": "629aa19bf6ca1288b0e4faa39d51660859f5c32c3dd6362da2b3670f19a885ae",
+        "size_in_bytes": 60559
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/moment/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "d157eb17fff0e79346f7b3d0fdf7e15a101e7f491b169615e00a4d6307d2042a",
+        "sha256_in_prefix": "d157eb17fff0e79346f7b3d0fdf7e15a101e7f491b169615e00a4d6307d2042a",
+        "size_in_bytes": 49559
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/rank/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ce87380b1f44e6d849d7d2bbc91522b950138669442eac721389603a067ccf96",
+        "sha256_in_prefix": "ce87380b1f44e6d849d7d2bbc91522b950138669442eac721389603a067ccf96",
+        "size_in_bytes": 44488
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/summary/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "eadeffb1d1b408a058f2401f4a548cbb256cc0dc2236d912cd4b88ed708cd239",
+        "sha256_in_prefix": "eadeffb1d1b408a058f2401f4a548cbb256cc0dc2236d912cd4b88ed708cd239",
+        "size_in_bytes": 25127
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/descriptive/vector/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "f3f0ac54315f9b1322f93a076dedb87e4c742f6f7591220f44f7fb8f720e36bf",
+        "sha256_in_prefix": "f3f0ac54315f9b1322f93a076dedb87e4c742f6f7591220f44f7fb8f720e36bf",
+        "size_in_bytes": 4829
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/fitting/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "29b145c76f5f52604f5d620a87832f7e44d3119e9cfb6f5a46948a6461249392",
+        "sha256_in_prefix": "29b145c76f5f52604f5d620a87832f7e44d3119e9cfb6f5a46948a6461249392",
+        "size_in_bytes": 3115
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/inference/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "9774a03d6a21e18f6e0082f30d01b7c1a222bc35577f6bca1f025c60d6d5d370",
+        "sha256_in_prefix": "9774a03d6a21e18f6e0082f30d01b7c1a222bc35577f6bca1f025c60d6d5d370",
+        "size_in_bytes": 44067
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/interval/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1a1c53c5cec4d7057139bc6bb75e87a0259073566e10bce025c93874c003f1c7",
+        "sha256_in_prefix": "1a1c53c5cec4d7057139bc6bb75e87a0259073566e10bce025c93874c003f1c7",
+        "size_in_bytes": 2167
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/ranking/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8f80c28a3d6c878873f0f3ffe333ccc25745bc4f06003400aae555d3323d0d69",
+        "sha256_in_prefix": "8f80c28a3d6c878873f0f3ffe333ccc25745bc4f06003400aae555d3323d0d69",
+        "size_in_bytes": 9808
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/stat/regression/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b16f3c8962f10814a53f04bd96c714eab65001c7a70c8f522ac74c95088da46d",
+        "sha256_in_prefix": "b16f3c8962f10814a53f04bd96c714eab65001c7a70c8f522ac74c95088da46d",
+        "size_in_bytes": 21591
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/hipparchus/util/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "f74a6dc4f5810deed536a34d2aa9250ab1934cdcabd151d54cc7cf7346918a63",
+        "sha256_in_prefix": "f74a6dc4f5810deed536a34d2aa9250ab1934cdcabd151d54cc7cf7346918a63",
+        "size_in_bytes": 173999
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "bcbd64230423bad51b3dbc883c6a1637d5766ba2430ef3683e1a9b30d8abc875",
+        "sha256_in_prefix": "bcbd64230423bad51b3dbc883c6a1637d5766ba2430ef3683e1a9b30d8abc875",
+        "size_in_bytes": 1531
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/annotation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a464b180627370e2a652925310cbf4081be2681f286b147f31a6fdf605470491",
+        "sha256_in_prefix": "a464b180627370e2a652925310cbf4081be2681f286b147f31a6fdf605470491",
+        "size_in_bytes": 775
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/attitudes/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "d439a250039e101ba35ec48a152603a256b93e81d4ffae1514177f617287b4bb",
+        "sha256_in_prefix": "d439a250039e101ba35ec48a152603a256b93e81d4ffae1514177f617287b4bb",
+        "size_in_bytes": 126849
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/bodies/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "cf961e6ef71a34b54e47564698723cd7e7da345ffc9637ce4f0533960d2ef370",
+        "sha256_in_prefix": "cf961e6ef71a34b54e47564698723cd7e7da345ffc9637ce4f0533960d2ef370",
+        "size_in_bytes": 116299
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/compiler/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b5056d8ad3cbb9f84244fdbdfea3fcb3bb094824256ade6d6654c2a40391691d",
+        "sha256_in_prefix": "b5056d8ad3cbb9f84244fdbdfea3fcb3bb094824256ade6d6654c2a40391691d",
+        "size_in_bytes": 247
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/compiler/plugin/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ee260eeecaf7fa4d0e61ed960ad26ddd1173d55e1d62ab45ade74617ba43f950",
+        "sha256_in_prefix": "ee260eeecaf7fa4d0e61ed960ad26ddd1173d55e1d62ab45ade74617ba43f950",
+        "size_in_bytes": 170
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/data/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "42f316e7dfeeb94ef6763b45fc3b9e5d3160faddfefa23e221ab2c53b3771f83",
+        "sha256_in_prefix": "42f316e7dfeeb94ef6763b45fc3b9e5d3160faddfefa23e221ab2c53b3771f83",
+        "size_in_bytes": 119793
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/errors/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a630d1fe96c09b73067e1298c5f9ba1fa371938cc520c32a30fd7f40cf358d83",
+        "sha256_in_prefix": "a630d1fe96c09b73067e1298c5f9ba1fa371938cc520c32a30fd7f40cf358d83",
+        "size_in_bytes": 44563
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "2e856ce527c91bdcf1ce6309ac462d7123db5f6c22e2b601f93c1ddcfe2d6f78",
+        "sha256_in_prefix": "2e856ce527c91bdcf1ce6309ac462d7123db5f6c22e2b601f93c1ddcfe2d6f78",
+        "size_in_bytes": 583
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/iod/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "7a8bc0ae3f488141791312f4f53d8793115321f4eaa0f4895fbe0ead25cfb2c0",
+        "sha256_in_prefix": "7a8bc0ae3f488141791312f4f53d8793115321f4eaa0f4895fbe0ead25cfb2c0",
+        "size_in_bytes": 21887
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/leastsquares/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1efd036d2ac8e999479635ad47ffb1e3aab148a314c66630e0f5640bf53c56d8",
+        "sha256_in_prefix": "1efd036d2ac8e999479635ad47ffb1e3aab148a314c66630e0f5640bf53c56d8",
+        "size_in_bytes": 38857
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b2e058f89580a06819102bc0a3e11378d61b6b4ae5d554a843667187d5ec00b6",
+        "sha256_in_prefix": "b2e058f89580a06819102bc0a3e11378d61b6b4ae5d554a843667187d5ec00b6",
+        "size_in_bytes": 84642
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/filtering/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "53b9e3bea7fb27817820ae6bfff092daaa10e251c34b2a420f7fdcd5ceb84582",
+        "sha256_in_prefix": "53b9e3bea7fb27817820ae6bfff092daaa10e251c34b2a420f7fdcd5ceb84582",
+        "size_in_bytes": 4789
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/generation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e025de2072ed6fa2b9d9d264ea7d7f1af82fbebf3a8dde6d39c0d2af85392110",
+        "sha256_in_prefix": "e025de2072ed6fa2b9d9d264ea7d7f1af82fbebf3a8dde6d39c0d2af85392110",
+        "size_in_bytes": 37624
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/gnss/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "592e6bcd16b884d5095ba38c429a97968fcdfe8ea923488cb47933b676aacf9d",
+        "sha256_in_prefix": "592e6bcd16b884d5095ba38c429a97968fcdfe8ea923488cb47933b676aacf9d",
+        "size_in_bytes": 66589
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/measurements/modifiers/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "837c59db60fc457658d4a5ebda0e168dd66b9236b36dc7cd5ec3f74adc3ae362",
+        "sha256_in_prefix": "837c59db60fc457658d4a5ebda0e168dd66b9236b36dc7cd5ec3f74adc3ae362",
+        "size_in_bytes": 52326
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/estimation/sequential/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "27aa21aa3d6651238afc10ebc1e915e11a6f73e6f30f87896fd73d057050104f",
+        "sha256_in_prefix": "27aa21aa3d6651238afc10ebc1e915e11a6f73e6f30f87896fd73d057050104f",
+        "size_in_bytes": 94875
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "9e168ed1ca739dea979cb967cc9ed0e2ff03ae1c40464c162d50d80aafd5dfcc",
+        "sha256_in_prefix": "9e168ed1ca739dea979cb967cc9ed0e2ff03ae1c40464c162d50d80aafd5dfcc",
+        "size_in_bytes": 568
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ed138af7147b6dc5a9935a8ab8e86e6708433e58a48b8ae724cb7dd681896b70",
+        "sha256_in_prefix": "ed138af7147b6dc5a9935a8ab8e86e6708433e58a48b8ae724cb7dd681896b70",
+        "size_in_bytes": 559
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/definitions/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1c75ee0c70f07607d75195724d5cd5352c6a10ecf515a382e11644c60edf47cc",
+        "sha256_in_prefix": "1c75ee0c70f07607d75195724d5cd5352c6a10ecf515a382e11644c60edf47cc",
+        "size_in_bytes": 44531
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ab4887e97bc3f17702b02dabc9e0b23a9312b761fc81828ffa146abf94d2f8c1",
+        "sha256_in_prefix": "ab4887e97bc3f17702b02dabc9e0b23a9312b761fc81828ffa146abf94d2f8c1",
+        "size_in_bytes": 28459
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/adm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "20f4f201179c343d7036ac35e8bea95d91d9bc480ebb961ec71284468b1d3945",
+        "sha256_in_prefix": "20f4f201179c343d7036ac35e8bea95d91d9bc480ebb961ec71284468b1d3945",
+        "size_in_bytes": 33073
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/adm/aem/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "46ae1cf47d0ada3f0f2205d8e8bc9c2fe1b0013552808f58e860b4d89282e4a2",
+        "sha256_in_prefix": "46ae1cf47d0ada3f0f2205d8e8bc9c2fe1b0013552808f58e860b4d89282e4a2",
+        "size_in_bytes": 43009
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/adm/apm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e6747b35bce763f4c0066e770291c4f01d30a5794df240d11958ac6361c6f4f1",
+        "sha256_in_prefix": "e6747b35bce763f4c0066e770291c4f01d30a5794df240d11958ac6361c6f4f1",
+        "size_in_bytes": 53630
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "20995687ec6abaf743f36642d01f27d7ce6d10ad0baba829cf6d50ca9c72b274",
+        "sha256_in_prefix": "20995687ec6abaf743f36642d01f27d7ce6d10ad0baba829cf6d50ca9c72b274",
+        "size_in_bytes": 57122
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/ocm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "87781f48fb857c4d9cdae0d2462dc3e49d31f25ac72fab56055b8dde44b4e4c6",
+        "sha256_in_prefix": "87781f48fb857c4d9cdae0d2462dc3e49d31f25ac72fab56055b8dde44b4e4c6",
+        "size_in_bytes": 225273
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/oem/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a0ddd888f687a985f33f3533c453f29d063b102efb4b8a482d2e4379820d61e1",
+        "sha256_in_prefix": "a0ddd888f687a985f33f3533c453f29d063b102efb4b8a482d2e4379820d61e1",
+        "size_in_bytes": 39987
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/omm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "719dd4d51e3ac832b980ecd1ba9e8d78682453a37d78d2424745a64f924aafde",
+        "sha256_in_prefix": "719dd4d51e3ac832b980ecd1ba9e8d78682453a37d78d2424745a64f924aafde",
+        "size_in_bytes": 27251
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/odm/opm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "3577ad8c6463a8d763b66f1908503fac4a44263fb4ac96140edd34a8075f005d",
+        "sha256_in_prefix": "3577ad8c6463a8d763b66f1908503fac4a44263fb4ac96140edd34a8075f005d",
+        "size_in_bytes": 24225
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/ndm/tdm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8044e3065d685822160aaad6bce4cdbdaf1d456afaefd6770077d1237c41d685",
+        "sha256_in_prefix": "8044e3065d685822160aaad6bce4cdbdaf1d456afaefd6770077d1237c41d685",
+        "size_in_bytes": 80384
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/section/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ad941762cd6f58ed30a7b16e58f3b36c7e7cfeb2e76696c6de8be0947c92f11e",
+        "sha256_in_prefix": "ad941762cd6f58ed30a7b16e58f3b36c7e7cfeb2e76696c6de8be0947c92f11e",
+        "size_in_bytes": 30415
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e831aec86d86f929fd7bca8cf52792d90a8122f2facc05f47c2aa27a18bc6bdb",
+        "sha256_in_prefix": "e831aec86d86f929fd7bca8cf52792d90a8122f2facc05f47c2aa27a18bc6bdb",
+        "size_in_bytes": 6337
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/generation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "76b7effc4ea6cf7c4dd0c134c508c6921350a7d1aa787646d42a3186ce6441ec",
+        "sha256_in_prefix": "76b7effc4ea6cf7c4dd0c134c508c6921350a7d1aa787646d42a3186ce6441ec",
+        "size_in_bytes": 31453
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/lexical/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "86b14fc32702a0e05ffb502c98ab4673070642456ac130be61f0ba5f05e3886c",
+        "sha256_in_prefix": "86b14fc32702a0e05ffb502c98ab4673070642456ac130be61f0ba5f05e3886c",
+        "size_in_bytes": 41565
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ccsds/utils/parsing/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "aab50ed32f2883477cdb509d1a6e39aea67a755c82e4464fb75769fa076b2fd7",
+        "sha256_in_prefix": "aab50ed32f2883477cdb509d1a6e39aea67a755c82e4464fb75769fa076b2fd7",
+        "size_in_bytes": 19383
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/general/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "86a9ef8842431a2b01e269d20f00dfc4f860eca5173564f1941668cb5c992e74",
+        "sha256_in_prefix": "86a9ef8842431a2b01e269d20f00dfc4f860eca5173564f1941668cb5c992e74",
+        "size_in_bytes": 32753
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/ilrs/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "6583db958fa11448ed3b7364af68391f979150138a82c37b5e4ca9b4f8e44e50",
+        "sha256_in_prefix": "6583db958fa11448ed3b7364af68391f979150138a82c37b5e4ca9b4f8e44e50",
+        "size_in_bytes": 54237
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/sinex/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "cab4bfb8ca1c57420d45b156a863018feeae2a5c98abc782675345103cc17ca1",
+        "sha256_in_prefix": "cab4bfb8ca1c57420d45b156a863018feeae2a5c98abc782675345103cc17ca1",
+        "size_in_bytes": 10732
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/files/sp3/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "7b228cf808ff469349d29cad56b1e85f54404ec0a2c2dd5ac07b387fc136a317",
+        "sha256_in_prefix": "7b228cf808ff469349d29cad56b1e85f54404ec0a2c2dd5ac07b387fc136a317",
+        "size_in_bytes": 16098
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1c6044581eb96bd4eec4d5c8c0475db472fa405580bbaa9ada6a5771af11ce55",
+        "sha256_in_prefix": "1c6044581eb96bd4eec4d5c8c0475db472fa405580bbaa9ada6a5771af11ce55",
+        "size_in_bytes": 41172
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/drag/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "bb5f2160090dd750fe4ea05a75d547469d42fbf0585e1e2fe03ffeee6470d42c",
+        "sha256_in_prefix": "bb5f2160090dd750fe4ea05a75d547469d42fbf0585e1e2fe03ffeee6470d42c",
+        "size_in_bytes": 25720
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/empirical/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "dc08529f07c5ffa581702fba3cfe9251dbe5e77ea319e2279df348159c54637c",
+        "sha256_in_prefix": "dc08529f07c5ffa581702fba3cfe9251dbe5e77ea319e2279df348159c54637c",
+        "size_in_bytes": 22045
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/gravity/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b62fd13384f04bad5f25f63befc63ca66f20ff6d8713a9d2b62e0d09c1539504",
+        "sha256_in_prefix": "b62fd13384f04bad5f25f63befc63ca66f20ff6d8713a9d2b62e0d09c1539504",
+        "size_in_bytes": 42932
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/gravity/potential/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e9c46c60c527e6342912f07e1d161e12310a8e73ef701b80053aa706cb3ab0df",
+        "sha256_in_prefix": "e9c46c60c527e6342912f07e1d161e12310a8e73ef701b80053aa706cb3ab0df",
+        "size_in_bytes": 98560
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/inertia/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "7a0406121ee2a31b29b3e96c2e9166b1a84281fb2a888157d50ea84aefcab0bf",
+        "sha256_in_prefix": "7a0406121ee2a31b29b3e96c2e9166b1a84281fb2a888157d50ea84aefcab0bf",
+        "size_in_bytes": 4610
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8f181f0efbe31f60435291930de42155e5465eaa5d732e8e08773bf01199ed09",
+        "sha256_in_prefix": "8f181f0efbe31f60435291930de42155e5465eaa5d732e8e08773bf01199ed09",
+        "size_in_bytes": 30417
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/jacobians/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "d064d1855a07746017acddc0d7bbcc5ba74ca15e7dfe5d96820ea590b49bd58e",
+        "sha256_in_prefix": "d064d1855a07746017acddc0d7bbcc5ba74ca15e7dfe5d96820ea590b49bd58e",
+        "size_in_bytes": 17082
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/propulsion/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "3a6678c8705cbc2b3f23a51999047622f62e777cc312ccf4fbe741f70928f2ee",
+        "sha256_in_prefix": "3a6678c8705cbc2b3f23a51999047622f62e777cc312ccf4fbe741f70928f2ee",
+        "size_in_bytes": 70602
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/maneuvers/trigger/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "4edd574acee42a7298276962ca3b142818be39e7f3d79b2eca6610c002cce366",
+        "sha256_in_prefix": "4edd574acee42a7298276962ca3b142818be39e7f3d79b2eca6610c002cce366",
+        "size_in_bytes": 47600
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/forces/radiation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "cc2a8f6e77e49785a413835a937766dbe44209c5aef0496fe665ea890312a361",
+        "sha256_in_prefix": "cc2a8f6e77e49785a413835a937766dbe44209c5aef0496fe665ea890312a361",
+        "size_in_bytes": 48208
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/frames/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1fa12c2c687351ae3370a00c029ae6cea9576be14aea42b2a3c6a10afec6827e",
+        "sha256_in_prefix": "1fa12c2c687351ae3370a00c029ae6cea9576be14aea42b2a3c6a10afec6827e",
+        "size_in_bytes": 172397
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/geometry/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "69ad847e32893660a40a6ac09a620d0b5ca70dbb8c61e6a0b3f5a870ee95c35e",
+        "sha256_in_prefix": "69ad847e32893660a40a6ac09a620d0b5ca70dbb8c61e6a0b3f5a870ee95c35e",
+        "size_in_bytes": 238
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/geometry/fov/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "be8612aadb5b19fdb80adbd31fcb3121377f080cea3a79f8f72459c4e52b9deb",
+        "sha256_in_prefix": "be8612aadb5b19fdb80adbd31fcb3121377f080cea3a79f8f72459c4e52b9deb",
+        "size_in_bytes": 38178
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "7849d14bd4f0330172ccdeb5c878741610fb0169bef019dfe3d576caa29d471b",
+        "sha256_in_prefix": "7849d14bd4f0330172ccdeb5c878741610fb0169bef019dfe3d576caa29d471b",
+        "size_in_bytes": 73958
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/antenna/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "495a46a0e53ac33b4cbf4763ed4e79a64020a609b47a6a34d2771bea42e0dc3a",
+        "sha256_in_prefix": "495a46a0e53ac33b4cbf4763ed4e79a64020a609b47a6a34d2771bea42e0dc3a",
+        "size_in_bytes": 15087
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/attitude/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "fdb4124d0d51bb90a7bd04e9eaee4251dc00a15c18d96c9b9dc8cf5100afac7b",
+        "sha256_in_prefix": "fdb4124d0d51bb90a7bd04e9eaee4251dc00a15c18d96c9b9dc8cf5100afac7b",
+        "size_in_bytes": 14732
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/clock/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "1db3e076099522d710a2d007ef326263ab86c70a90b17411ba6d64b6501f727e",
+        "sha256_in_prefix": "1db3e076099522d710a2d007ef326263ab86c70a90b17411ba6d64b6501f727e",
+        "size_in_bytes": 20702
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "6f3735b4a075ebf5dcdec5ba7d6f21135d95c76999af779619e4cbae513e5432",
+        "sha256_in_prefix": "6f3735b4a075ebf5dcdec5ba7d6f21135d95c76999af779619e4cbae513e5432",
+        "size_in_bytes": 457
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "a9b661891723319005c332675f15b637c12f6b299e8a91ac6d5ff44446ed76d3",
+        "sha256_in_prefix": "a9b661891723319005c332675f15b637c12f6b299e8a91ac6d5ff44446ed76d3",
+        "size_in_bytes": 829
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/rtcm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "9e869e4637ea3e22143f6a512d5c278f8bd59778522a00a2b7b6e3b3a2b7c04b",
+        "sha256_in_prefix": "9e869e4637ea3e22143f6a512d5c278f8bd59778522a00a2b7b6e3b3a2b7c04b",
+        "size_in_bytes": 1208
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/rtcm/ephemeris/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "06445a9b53b2f9e5960d1d9a24b4b92e1fd2dcd8360b8b19c0b9fc194852e695",
+        "sha256_in_prefix": "06445a9b53b2f9e5960d1d9a24b4b92e1fd2dcd8360b8b19c0b9fc194852e695",
+        "size_in_bytes": 33110
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/rtcm/ephemeris/utils/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "35e09a6433b344d8227c69b98deee8c6f5300d34fcb2a3d4de0d5bc686648086",
+        "sha256_in_prefix": "35e09a6433b344d8227c69b98deee8c6f5300d34fcb2a3d4de0d5bc686648086",
+        "size_in_bytes": 4843
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/ssr/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "4bcd049d99573e0d395468b164a6e675ff893cf832c0d16f34ee1cf353fa3596",
+        "sha256_in_prefix": "4bcd049d99573e0d395468b164a6e675ff893cf832c0d16f34ee1cf353fa3596",
+        "size_in_bytes": 5014
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/ssr/igm/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "bc6414121f5205b531da696cca3f3f0a01bb0e51ecfe6f5f6765f067a1affde7",
+        "sha256_in_prefix": "bc6414121f5205b531da696cca3f3f0a01bb0e51ecfe6f5f6765f067a1affde7",
+        "size_in_bytes": 28902
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/messages/ssr/subtype/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "d171eceff77b13954080a8266fea8dc24373b8631d1f8cb39b77a370affc4806",
+        "sha256_in_prefix": "d171eceff77b13954080a8266fea8dc24373b8631d1f8cb39b77a370affc4806",
+        "size_in_bytes": 5823
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/ntrip/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "e40944193708669e47707d06ad41ea0a13f63126b0c8c104612ebf9b8a172f86",
+        "sha256_in_prefix": "e40944193708669e47707d06ad41ea0a13f63126b0c8c104612ebf9b8a172f86",
+        "size_in_bytes": 43205
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/metric/parser/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "3d3aab0b683c496ba1512d03700c89de77de8bc42f5fec868b8d555afdea9556",
+        "sha256_in_prefix": "3d3aab0b683c496ba1512d03700c89de77de8bc42f5fec868b8d555afdea9556",
+        "size_in_bytes": 31063
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/gnss/navigation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "2f2cbd72c1c649811d54141266e9342dfe911495f89169ddc35c2162c6a6d290",
+        "sha256_in_prefix": "2f2cbd72c1c649811d54141266e9342dfe911495f89169ddc35c2162c6a6d290",
+        "size_in_bytes": 15535
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "c4f36b88c66fb30c7e808874b12b96cf944d08f60aa73a6fe95217928e5f86a1",
+        "sha256_in_prefix": "c4f36b88c66fb30c7e808874b12b96cf944d08f60aa73a6fe95217928e5f86a1",
+        "size_in_bytes": 2453
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "61dec94cd67bb0370c523dd37c3e8416132565037213e206ec5df79c97a51ac2",
+        "sha256_in_prefix": "61dec94cd67bb0370c523dd37c3e8416132565037213e206ec5df79c97a51ac2",
+        "size_in_bytes": 65836
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/atmosphere/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "0ceda2d69e3178fc0f1645b7df56152659b9d3d4c8aecbd3c034152706032a56",
+        "sha256_in_prefix": "0ceda2d69e3178fc0f1645b7df56152659b9d3d4c8aecbd3c034152706032a56",
+        "size_in_bytes": 63844
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/atmosphere/data/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "2955b3e1bfea409f8c2f45ac158e5a2c99d16a3c4a857c95ad1e7676357b6b52",
+        "sha256_in_prefix": "2955b3e1bfea409f8c2f45ac158e5a2c99d16a3c4a857c95ad1e7676357b6b52",
+        "size_in_bytes": 28357
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/displacement/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b8d65ae943d60d8ab7ed542560e6066cb5853baa79b82e50b758e2c772b3a004",
+        "sha256_in_prefix": "b8d65ae943d60d8ab7ed542560e6066cb5853baa79b82e50b758e2c772b3a004",
+        "size_in_bytes": 24819
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/ionosphere/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "67c5d957a33714e35baa65e230722119ee78150e6d86dad0c9b4e5e423384b69",
+        "sha256_in_prefix": "67c5d957a33714e35baa65e230722119ee78150e6d86dad0c9b4e5e423384b69",
+        "size_in_bytes": 55981
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/tessellation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "bc977034ff46e5c7f47f2f0500173bd269fac1baf760cbbc89875a6e908a1856",
+        "sha256_in_prefix": "bc977034ff46e5c7f47f2f0500173bd269fac1baf760cbbc89875a6e908a1856",
+        "size_in_bytes": 13527
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/troposphere/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "cbfb12e1c77a4e83dcbf64ee8b3d418ae233c8b514b5bace07e2fa710d20f389",
+        "sha256_in_prefix": "cbfb12e1c77a4e83dcbf64ee8b3d418ae233c8b514b5bace07e2fa710d20f389",
+        "size_in_bytes": 71722
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/models/earth/weather/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "143440e9936c17484d0b6e5382f1127f9426ee26917b26ccb5a3394843617bfd",
+        "sha256_in_prefix": "143440e9936c17484d0b6e5382f1127f9426ee26917b26ccb5a3394843617bfd",
+        "size_in_bytes": 10151
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/orbits/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "23603b28e0475fdb8f7c876736b568031d3ae71060dd956b5b0ca3c00bb68d28",
+        "sha256_in_prefix": "23603b28e0475fdb8f7c876736b568031d3ae71060dd956b5b0ca3c00bb68d28",
+        "size_in_bytes": 247435
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "eeda332a741d7019b1fb9d002fab3ad40829bfa447bbd4f81fc7fcb7e4fcb50c",
+        "sha256_in_prefix": "eeda332a741d7019b1fb9d002fab3ad40829bfa447bbd4f81fc7fcb7e4fcb50c",
+        "size_in_bytes": 188840
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "19b065c21da9b9dfb59dcaaf4096e526738289cc36b89d11a9bf6e9f8555d97b",
+        "sha256_in_prefix": "19b065c21da9b9dfb59dcaaf4096e526738289cc36b89d11a9bf6e9f8555d97b",
+        "size_in_bytes": 85006
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/gnss/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b80533466fe34d1c54496d99295102876373cb98a32d0f76412a9b74460b4d47",
+        "sha256_in_prefix": "b80533466fe34d1c54496d99295102876373cb98a32d0f76412a9b74460b4d47",
+        "size_in_bytes": 23547
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/gnss/data/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ba059cbdeb61fd8fcc5e391b47972fff4317b94c281115b2472201184825b671",
+        "sha256_in_prefix": "ba059cbdeb61fd8fcc5e391b47972fff4317b94c281115b2472201184825b671",
+        "size_in_bytes": 106531
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/analytical/tle/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "74dbe000d3e61abba7690d01bb84da38baa4007e387185e70e6d7cf9b347076a",
+        "sha256_in_prefix": "74dbe000d3e61abba7690d01bb84da38baa4007e387185e70e6d7cf9b347076a",
+        "size_in_bytes": 66685
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/conversion/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "31327447e07c24ba8110df913cb536fe41a68b1be9ace5d5925bc955eeada0be",
+        "sha256_in_prefix": "31327447e07c24ba8110df913cb536fe41a68b1be9ace5d5925bc955eeada0be",
+        "size_in_bytes": 81191
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/events/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ef3fae190bcd773af772826f66cca464eda9688890b586dc19db0b5bc19d9648",
+        "sha256_in_prefix": "ef3fae190bcd773af772826f66cca464eda9688890b586dc19db0b5bc19d9648",
+        "size_in_bytes": 212097
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/events/handlers/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "460bc5d79da4c69c6023d567574018b782237f46828cd938d35cad565c995cd7",
+        "sha256_in_prefix": "460bc5d79da4c69c6023d567574018b782237f46828cd938d35cad565c995cd7",
+        "size_in_bytes": 37520
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/integration/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "d1cf0e80a1f96ce68ae72053ced7e79d17c566a43ec343018da872af481da48e",
+        "sha256_in_prefix": "d1cf0e80a1f96ce68ae72053ced7e79d17c566a43ec343018da872af481da48e",
+        "size_in_bytes": 97405
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/numerical/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "8b0de7786cbfafe8bfd14d1caa7d90675876950505991debc36f75c89e20fb04",
+        "sha256_in_prefix": "8b0de7786cbfafe8bfd14d1caa7d90675876950505991debc36f75c89e20fb04",
+        "size_in_bytes": 82592
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/numerical/cr3bp/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "5de241a64af0034ca81a392514d1120e8e891f60e464bffd6485e63068c6c5fd",
+        "sha256_in_prefix": "5de241a64af0034ca81a392514d1120e8e891f60e464bffd6485e63068c6c5fd",
+        "size_in_bytes": 13424
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/sampling/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "2d57a090a7cff2236a31242fa75159f590fa9aaf6d92967f2fb1f4fc5049f717",
+        "sha256_in_prefix": "2d57a090a7cff2236a31242fa75159f590fa9aaf6d92967f2fb1f4fc5049f717",
+        "size_in_bytes": 46823
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "b6e4b2016eb3b447758f732be8a3bb7302a4668d91973cbeb0f975c1cbce68b8",
+        "sha256_in_prefix": "b6e4b2016eb3b447758f732be8a3bb7302a4668d91973cbeb0f975c1cbce68b8",
+        "size_in_bytes": 295
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "83586e37617c86f4ffe4d4fa11e4a71d4e5b0839d11f3f97be0f83fe662a9c8c",
+        "sha256_in_prefix": "83586e37617c86f4ffe4d4fa11e4a71d4e5b0839d11f3f97be0f83fe662a9c8c",
+        "size_in_bytes": 62137
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/forces/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "bb533019dbc97600127969c3bd74dc2390eb7b3210381541216f6aabfc7d827a",
+        "sha256_in_prefix": "bb533019dbc97600127969c3bd74dc2390eb7b3210381541216f6aabfc7d827a",
+        "size_in_bytes": 123227
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/utilities/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "f2397f7e9552dc48f17cffe9b3cae93537b1fcfb3debc71fb1bccfe6f9212e21",
+        "sha256_in_prefix": "f2397f7e9552dc48f17cffe9b3cae93537b1fcfb3debc71fb1bccfe6f9212e21",
+        "size_in_bytes": 69593
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/propagation/semianalytical/dsst/utilities/hansen/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "06facfba005dcae84e902883874f54dd6d72d8434dfeb9491d95615fa1f77379",
+        "sha256_in_prefix": "06facfba005dcae84e902883874f54dd6d72d8434dfeb9491d95615fa1f77379",
+        "size_in_bytes": 20203
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/python/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "82df2c489233ceffdf8d495c9d6ba03f78517ee4cae026c28bb07634a966f828",
+        "sha256_in_prefix": "82df2c489233ceffdf8d495c9d6ba03f78517ee4cae026c28bb07634a966f828",
+        "size_in_bytes": 2199
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/time/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "ebea3644e11c15aae6803115cdb94e7b431fef0bb9b4869d80139d41b2069f3a",
+        "sha256_in_prefix": "ebea3644e11c15aae6803115cdb94e7b431fef0bb9b4869d80139d41b2069f3a",
+        "size_in_bytes": 298248
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/utils/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "773ab8284d70881c9709c56322980eb9bc32e017f362e280f09b0f3f9f3044e5",
+        "sha256_in_prefix": "773ab8284d70881c9709c56322980eb9bc32e017f362e280f09b0f3f9f3044e5",
+        "size_in_bytes": 264237
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs-0.1-py3.10.egg/org-stubs/orekit/utils/units/__init__.pyi",
+        "path_type": "hardlink",
+        "sha256": "56c6e18969d494c7048928f7a0df0689c290628707acddeee6ee66206d5dc8c4",
+        "sha256_in_prefix": "56c6e18969d494c7048928f7a0df0689c290628707acddeee6ee66206d5dc8c4",
+        "size_in_bytes": 24433
+      },
+      {
+        "_path": "lib/python3.10/site-packages/orekit_stubs.pth",
+        "path_type": "hardlink",
+        "sha256": "2085fdcf0c3ba2bd745a5288a361d47e6539e3a32949cadc1dcb4521fb728e1d",
+        "sha256_in_prefix": "2085fdcf0c3ba2bd745a5288a361d47e6539e3a32949cadc1dcb4521fb728e1d",
+        "size_in_bytes": 30
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "orekit",
+  "sha256": "d9d56ea731e1d7d147a3070759cc2a3f4fa0dea992f3e6e07ca3486c46d91829",
+  "size": 38790348,
+  "subdir": "osx-64",
+  "timestamp": 1645391763209,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/osx-64/orekit-11.1-py310h9d931ec_3.tar.bz2",
+  "version": "11.1"
+}

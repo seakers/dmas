@@ -1,0 +1,2 @@
+#!/bin/sh
+"./.venv/tmp/run-in" "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/bin/2to3-3.10" "$@"

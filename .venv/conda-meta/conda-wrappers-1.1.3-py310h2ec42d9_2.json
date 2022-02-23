@@ -1,0 +1,54 @@
+{
+  "build": "py310h2ec42d9_2",
+  "build_number": 2,
+  "channel": "https://conda.anaconda.org/conda-forge/osx-64",
+  "constrains": [],
+  "depends": [
+    "exec-wrappers >=1.1,<2",
+    "python >=3.10,<3.11.0a0",
+    "python_abi 3.10.* *_cp310"
+  ],
+  "extracted_package_dir": "/Users/a.aguilar/opt/anaconda3/pkgs/conda-wrappers-1.1.3-py310h2ec42d9_2",
+  "features": "",
+  "files": [
+    "bin/.conda-wrappers-post-link.sh",
+    "bin/.conda-wrappers-pre-unlink.sh"
+  ],
+  "fn": "conda-wrappers-1.1.3-py310h2ec42d9_2.tar.bz2",
+  "license": "MIT",
+  "license_family": "MIT",
+  "link": {
+    "source": "/Users/a.aguilar/opt/anaconda3/pkgs/conda-wrappers-1.1.3-py310h2ec42d9_2",
+    "type": 1
+  },
+  "md5": "837d041b2e2391304bf486d3461d74e2",
+  "name": "conda-wrappers",
+  "package_tarball_full_path": "/Users/a.aguilar/opt/anaconda3/pkgs/conda-wrappers-1.1.3-py310h2ec42d9_2.tar.bz2",
+  "paths_data": {
+    "paths": [
+      {
+        "_path": "bin/.conda-wrappers-post-link.sh",
+        "path_type": "hardlink",
+        "sha256": "1c395bb84be222f360d0ceaa8efd09ade634b516b6bfdd2e3ee357cdab4f2cb0",
+        "sha256_in_prefix": "1c395bb84be222f360d0ceaa8efd09ade634b516b6bfdd2e3ee357cdab4f2cb0",
+        "size_in_bytes": 1078
+      },
+      {
+        "_path": "bin/.conda-wrappers-pre-unlink.sh",
+        "path_type": "hardlink",
+        "sha256": "1b5fdc7523eb07b86d033559d1480be84a589e599ed45d44630c57aaabade6c1",
+        "sha256_in_prefix": "1b5fdc7523eb07b86d033559d1480be84a589e599ed45d44630c57aaabade6c1",
+        "size_in_bytes": 1109
+      }
+    ],
+    "paths_version": 1
+  },
+  "requested_spec": "conda-wrappers",
+  "sha256": "bba36ae3c3120aecf8ded914d71582de7e4ebb0b7f0198384edc6a595aacb0b3",
+  "size": 4903,
+  "subdir": "osx-64",
+  "timestamp": 1635780971520,
+  "track_features": "",
+  "url": "https://conda.anaconda.org/conda-forge/osx-64/conda-wrappers-1.1.3-py310h2ec42d9_2.tar.bz2",
+  "version": "1.1.3"
+}

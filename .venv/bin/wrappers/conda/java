@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/bin/wrappers/conda/run-in" "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/bin/java" "$@"

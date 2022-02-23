@@ -2,7 +2,9 @@
     TEST SCRIPT FOR LIBRARY IMPORTS
 '''
 import orekit
-orekit.initVM()
+vm = orekit.initVM()
+# print ('Java version:',vm.java_version)
+# print ('Orekit version:', orekit.VERSION)
 
 from orekit import JArray_double
 from orekit.pyhelpers import setup_orekit_curdir
@@ -22,7 +24,7 @@ from org.orekit.time import AbsoluteDate;
 from org.orekit.time import TimeScalesFactory;
 from org.orekit.utils import Constants;
 
-setup_orekit_curdir(filename="./orekit/orekit-data.zip")   # orekit-data.zip shall be in current dir
+setup_orekit_curdir("./src/orekit-data.zip")   # orekit-data.zip shall be in current dir
 
 # Floats are needed to be specific in the orekit interface
 a = 800000.0 + Constants.WGS84_EARTH_EQUATORIAL_RADIUS;
@@ -63,21 +65,27 @@ propagator.addEventDetector(node1);
 propagator.addEventDetector(node2);
 
 # First propagation
-propagator.setEphemerisMode();
+# propagator.setEphemerisMode();
 propagator.propagate(finalDate);
 
 assert 2==logger1.getLoggedEvents().size()
 assert 2== logger2.getLoggedEvents().size();
 
+for event in logger1.getLoggedEvents():
+    print(event.getDate(), event.isIncreasing())
+
+# print(logger1.getLoggedEvents())
+# print(logger2.getLoggedEvents())
+
 logger1.clearLoggedEvents();
 logger2.clearLoggedEvents();
 
-postpro = propagator.getGeneratedEphemeris();
-
-# Post-processing
-postpro.addEventDetector(node1);
-postpro.addEventDetector(node2);
-postpro.propagate(finalDate);
-
-assert 2==logger1.getLoggedEvents().size()
-assert 2==logger2.getLoggedEvents().size()
+# postpro = propagator.getGeneratedEphemeris();
+#
+# # Post-processing
+# postpro.addEventDetector(node1);
+# postpro.addEventDetector(node2);
+# postpro.propagate(finalDate);
+#
+# assert 2==logger1.getLoggedEvents().size()
+# assert 2==logger2.getLoggedEvents().size()

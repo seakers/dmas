@@ -1,0 +1,3 @@
+[console_scripts]
+create-wrappers = exec_wrappers.create_wrappers:main
+
