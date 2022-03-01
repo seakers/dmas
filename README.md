@@ -7,7 +7,7 @@ SEAK Lab - Texas A&M University
 ## Linux and Mac Install
 
 ### Automatic Install
-IN DEVELOPMENT
+UNDER DEVELOPMENT
 
 Create virtual environment and install dependencies dependencies
 ```
@@ -35,6 +35,8 @@ TEMP: Install Orekit (will be replaced with OrbitPy upon release)
 ```
 conda install -c conda-forge orekit
 ```
+
+Set your IDE's interpreter as `./.env/bin/python3.10`
 
 OPTIONAL: rename terminal prompt
 ```

@@ -35,3 +35,23 @@
 +conda-forge/noarch::exec-wrappers-1.1.4-py_0
 +conda-forge/osx-64::conda-wrappers-1.1.3-py310h2ec42d9_2
 # update specs: ['conda-wrappers']
+==> 2022-02-22 20:39:25 <==
+# cmd: /Users/a.aguilar/opt/anaconda3/bin/conda install -p /Users/a.aguilar/Documents/GitHub/DMASpy/.venv numpy==1.22.2 -y
+# conda version: 4.11.0
++conda-forge/osx-64::libblas-3.9.0-13_osx64_openblas
++conda-forge/osx-64::libcblas-3.9.0-13_osx64_openblas
++conda-forge/osx-64::libgfortran-5.0.0-9_3_0_h6c81a4c_23
++conda-forge/osx-64::libgfortran5-9.3.0-h6c81a4c_23
++conda-forge/osx-64::liblapack-3.9.0-13_osx64_openblas
++conda-forge/osx-64::libopenblas-0.3.18-openmp_h3351f45_0
++conda-forge/osx-64::llvm-openmp-13.0.1-hda6cdc1_0
++conda-forge/osx-64::numpy-1.22.2-py310hfbbbacf_0
+# update specs: ['numpy==1.22.2']
+==> 2022-02-22 20:39:51 <==
+# cmd: /Users/a.aguilar/opt/anaconda3/bin/conda install -p /Users/a.aguilar/Documents/GitHub/DMASpy/.venv pandas==1.4.1 -y
+# conda version: 4.11.0
++conda-forge/noarch::python-dateutil-2.8.2-pyhd8ed1ab_0
++conda-forge/noarch::pytz-2021.3-pyhd8ed1ab_0
++conda-forge/noarch::six-1.16.0-pyh6c4a22f_0
++conda-forge/osx-64::pandas-1.4.1-py310hdd25497_0
+# update specs: ['pandas==1.4.1']
