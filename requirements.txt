@@ -15,3 +15,5 @@ pyparsing==3.0.7
 python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/python-dateutil_1626286286081/work
 pytz @ file:///home/conda/feedstock_root/build_artifacts/pytz_1633452062248/work
 six @ file:///home/conda/feedstock_root/build_artifacts/six_1620240208055/work
+
+mesa~=0.9.0
