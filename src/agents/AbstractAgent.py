@@ -1,6 +1,7 @@
 from mesa import Agent
 from src.agents.components.Battery import Battery
 from src.agents.components.Comms import Comms
+from src.agents.components.Instrument import Instrument
 
 
 class AbstractAgent(Agent):
@@ -47,6 +48,7 @@ class AbstractAgent(Agent):
         -Updates power, data, and attitude states
         -Sends updated information to planner, which returns next action to be performed
         """
+        # If agent is not active, do nothing
         if not self.alive:
             pass
 
@@ -78,9 +80,15 @@ class AbstractAgent(Agent):
         pass
 
     def update_power_state(self):
+        """
+        Updates energy levels in the agent's batteries based on active subsystems and active power generators
+        :return: None
+        """
+        # If agent is not active, do nothing
         if not self.alive:
             pass
 
+        # Check all components and track their power consumption and generation
         power_in = 0
         power_out = 0
         for component in self.component_list:
@@ -110,49 +118,89 @@ class AbstractAgent(Agent):
 
             for battery in battery_list:
                 battery.update_energy_storage(power_in=power_total/n_batteries)
+        return
 
-    def update_data_state(self):
+    def update_data_state(self) -> None:
+        """
+        Updates data contained in its memory by checking incoming and outgoing messages along with active instruments
+        :return: None
+        """
+        # If agent is not active, do nothing
         if not self.alive:
             pass
 
+        # Check all components and track their data generation
         data_in = 0
         data_out = 0
-        for incoming_message in self.incoming_messages:
-            data_in += incoming_message.get_data_rate()
-
         for component in self.component_list:
             if component.is_on():
                 info = component.get_data_info()
                 data_generation = info[0]
                 data_in += data_generation
 
+        # Check all incoming and outgoing messages and their data rates
+        for incoming_message in self.incoming_messages:
+            data_in += incoming_message.get_data_rate()
+
         for outgoing_message in self.outgoing_messages:
             data_out += outgoing_message.get_data_rate()
 
         data_rate = data_in - data_out
 
+        # Check for data storage with room for incoming data
         data_storage = self.get_comms(empty=True)
         n_storage = len(data_storage)
 
         if n_storage < 1 and data_rate > 0.0:
-            # Not enough storage available for incoming data. Dropping incoming messages
-            data_storage_all = self.get_comms()
-            top_message = self.incoming_messages.pop()
-            data_to_delete = top_message.bits
+            # Not enough storage available for incoming data.
 
-            for comms in data_storage_all:
-                if comms.data_storage - data_to_delete >= 0:
-                    comms.add_data(-data_to_delete)
-                    break
-                else:
-                    comms.empty_data_storage()
-                    data_to_delete -= comms.data_capacity
+            if len(self.incoming_messages) > 0:
+                # Dropping latest incoming message to make room for incoming data
+                data_storage_all = self.get_comms()
+                top_message = self.incoming_messages.pop()
+                data_to_delete = top_message.bits
+
+                for comms in data_storage_all:
+                    if comms.data_storage - data_to_delete >= 0:
+                        comms.add_data(-data_to_delete)
+                        break
+                    else:
+                        comms.empty_data_storage()
+                        data_to_delete -= comms.data_capacity
+            else:
+                # No incoming messages available to be dropped. Deactivating instrument.
+                instruments = self.get_instruments(active=True)
+                if len(instruments) > 0:
+                    instruments[0].turn_off()
         else:
             for storage in data_storage:
                 storage.update_data_storage(data_rate=data_rate)
 
-    def update_attitude_state(self):
+        return
+
+    def update_attitude_state(self) -> None:
+        """
+        Abstract functio nthat updates current agent's attitude based on the agent's active actuators.
+        Must be implemented by each specific implementation of the AbstractAgent class
+        :return: None
+        """
         pass
+
+    def get_instruments(self, active=False) -> list:
+        """
+        Returns the list of instruments contained in this agent's component list
+        :param active: boolean toggle that, if true, only returns instruments that are active
+        :return: list of instruments contained in agent
+        """
+        instruments = []
+        for component in self.component_list:
+            if type(component) is type (Instrument):
+                if active and component.is_on():
+                    instruments.append(component)
+                elif not active:
+                    instruments.append(component)
+
+        return instruments
 
     def get_comms(self, empty=False) -> list:
         """
