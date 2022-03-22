@@ -10,12 +10,15 @@
       "info" : {
         "instrument" : "L",
         "angle" : 34,
-        "targets" : [195112, 195113, 195114, 195115, 195116]
+        "targets" : [195112, 195113, 195114, 195115, 195116],
+        "energy" : 518400.0
       }
     },
     {
       "sat_id" : 2,
       "type" : "slew",
+      "start" : 0,
+      "end" : 1,
       "info" : {
         "starting_angle" : 35,
         "target_angle" : 34
