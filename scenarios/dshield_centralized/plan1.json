@@ -1,0 +1,25 @@
+{
+  "horizon_start" : 0,
+  "horizon_end" : 3600,
+  "actions" : [
+    {
+      "sat_id" : 2,
+      "type" : "measurement",
+      "start" : 0,
+      "end" : 1,
+      "info" : {
+        "instrument" : "L",
+        "angle" : 34,
+        "targets" : [195112, 195113, 195114, 195115, 195116]
+      }
+    },
+    {
+      "sat_id" : 2,
+      "type" : "slew",
+      "info" : {
+        "starting_angle" : 35,
+        "target_angle" : 34
+      }
+    }
+  ]
+}

@@ -9,10 +9,12 @@ class AbstractAgent(Agent):
     Abstract Class representing an agent in the simulation. Must be implemented as a satellite or a ground station
     """
 
-    def __init__(self, unique_id, component_list=None, planner=None, model=None):
+    def __init__(self, unique_id, start_epoc=0, time_step=1, component_list=None, planner=None, model=None):
         """
         Constructor for and Abstract Agent
         :param unique_id: id integer used to identify this agent
+        :param start_epoc: starting epoc in [s]
+        :param time_step: simulation time-step in [s]
         :param component_list: list of components contained in the agent
         :param planner: planner being used for this agent
         :param model: multi agent model being used in the simulation
@@ -20,6 +22,9 @@ class AbstractAgent(Agent):
         super().__init__(unique_id=unique_id, model=model)
 
         self.alive = True
+
+        self.epoc = start_epoc
+        self.dt = time_step
 
         self.message_counter = 0
         self.incoming_messages = []
@@ -48,6 +53,9 @@ class AbstractAgent(Agent):
         -Updates power, data, and attitude states
         -Sends updated information to planner, which returns next action to be performed
         """
+        # Update internal clock
+        self.epoc += self.dt
+
         # If agent is not active, do nothing
         if not self.alive:
             pass
@@ -60,24 +68,23 @@ class AbstractAgent(Agent):
         self.update_data_state()
         self.update_attitude_state()
 
-        # Create Plan
-        self.plan = []
-        self.plan = self.planner.update_plan(self.component_list, self.received_messages)
-        pass
+        # Update Plan
+        self.planner.update_plan(self.component_list, self.received_messages, self.epoc)
+        self.plan = self.planner.get_plan()
+        return
 
     def advance(self) -> None:
         """
-        Agent performs actions on self and the environment
+        Agent performs actions on self and the environment. Abstract function and must be implemented.
+
         Actions allowed:
         -Turn components on and off
         -Transmit messages to other agents
+        -Delete received message from memory
         -Perform Measurements
         -Perform Maneuver
         """
-        if not self.alive:
-            pass
-
-        pass
+        return
 
     def update_power_state(self):
         """
@@ -180,7 +187,7 @@ class AbstractAgent(Agent):
 
     def update_attitude_state(self) -> None:
         """
-        Abstract functio nthat updates current agent's attitude based on the agent's active actuators.
+        Abstract function that updates current agent's attitude based on the agent's active actuators.
         Must be implemented by each specific implementation of the AbstractAgent class
         :return: None
         """
