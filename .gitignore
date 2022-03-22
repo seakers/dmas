@@ -1,3 +1,5 @@
 .idea
 .env
 ./src/**.log
+./.idea/DMASpy.iml
+./.idea/misc.xml
