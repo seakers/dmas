@@ -1,7 +1,16 @@
 from src.agents.planners.AbstractPlanner import AbstractPlanner
 
+class CentralizedPlannerGS(AbstractPlanner):
+    def __init__(self, scenario, start_epoc=0, time_step=1):
+        super().__init__(start_epoc=start_epoc, time_step=time_step)
 
-class CentralizedPlanner(AbstractPlanner):
+        # Load in all pre-calculated plans from scenario
+        directory = './scenarios/' + scenario + '/plans/'
+
+    def update_plan(self, component_list, received_messages, epoc):
+        super().update_plan(component_list, received_messages, epoc)
+
+class CentralizedPlannerSat(AbstractPlanner):
     def __init__(self, start_epoc=0, time_step=1):
         super().__init__(start_epoc=start_epoc, time_step=time_step)
 

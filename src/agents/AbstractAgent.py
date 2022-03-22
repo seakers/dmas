@@ -9,15 +9,15 @@ class AbstractAgent(Agent):
     Abstract Class representing an agent in the simulation. Must be implemented as a satellite or a ground station
     """
 
-    def __init__(self, unique_id, start_epoc=0, time_step=1, component_list=None, planner=None, model=None):
+    def __init__(self, unique_id, planner, model, start_epoc=0, time_step=1, component_list=None):
         """
         Constructor for and Abstract Agent
         :param unique_id: id integer used to identify this agent
+        :param planner: planner being used for this agent
+        :param model: multi agent model being used in the simulation
         :param start_epoc: starting epoc in [s]
         :param time_step: simulation time-step in [s]
         :param component_list: list of components contained in the agent
-        :param planner: planner being used for this agent
-        :param model: multi agent model being used in the simulation
         """
         super().__init__(unique_id=unique_id, model=model)
 

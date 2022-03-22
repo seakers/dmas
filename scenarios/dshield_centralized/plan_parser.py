@@ -87,12 +87,10 @@ def measurement_action(sline):
     action['end'] = end
     action['info'] = info
 
-    # action_json = json.dumps(action)
     return action
 
 def parse_plan(filename):
     with open(filename, 'r') as file:
-        # file_contents = file.read()
         actions = []
         sat_id = ''
         for line in file.readlines():
@@ -100,8 +98,6 @@ def parse_plan(filename):
 
             if line is '\n':
                 continue
-
-            print(line)
 
             action_json = None
             if sline[0][0] is '[' and len(sline) > 3 and sline[3] == 'slew:':
@@ -115,12 +111,14 @@ def parse_plan(filename):
             if action_json is not None:
                 actions.append(action_json)
 
-        output = json.dumps(actions)
+        data = {}
+        data['plan'] = actions
 
-        pretty_print_json = pprint.pformat(actions).replace("'", '"')
+
+        pretty_print_json = pprint.pformat(data).replace("'", '"')
 
         name = filename[0:(len(filename)-4)]
-        with open('./plans' +name + '.json', 'w') as f:
+        with open('./plans/' + name + '.json', 'w') as f:
             f.write(pretty_print_json)
 
 
