@@ -3,3 +3,5 @@
 ./src/**.log
 ./.idea/DMASpy.iml
 ./.idea/misc.xml
+.idea/DMASpy.iml
+.idea/misc.xml
