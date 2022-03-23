@@ -37,7 +37,7 @@ class AbstractAgent(Agent):
                 self.component_list.append(component.copy())
 
         self.plan = []
-        self.planner = planner.copy()
+        self.planner = planner
 
         eps = 1.0
         while eps + 1 > 1:
@@ -53,8 +53,6 @@ class AbstractAgent(Agent):
         -Updates power, data, and attitude states
         -Sends updated information to planner, which returns next action to be performed
         """
-        # Update internal clock
-        self.epoc += self.dt
 
         # If agent is not active, do nothing
         if not self.alive:
@@ -84,6 +82,9 @@ class AbstractAgent(Agent):
         -Perform Measurements
         -Perform Maneuver
         """
+        # Update internal clock
+        self.epoc += self.dt
+
         return
 
     def update_power_state(self):
@@ -257,5 +258,6 @@ class AbstractAgent(Agent):
         for message in self.incoming_messages:
             message.update_transmission_step()
             if message.is_eof():
+                message.set_receipt_epoc(self.epoc)
                 self.received_messages.append(message)
                 self.incoming_messages.remove(message)

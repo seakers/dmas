@@ -1,6 +1,6 @@
 
-class AbstractMessage():
-    def __init__(self, sender_id, receiver_id, sent_epoc, data_rate, size=0, content=None):
+class AbstractMessage:
+    def __init__(self, sender_id, receiver_id, sent_epoc, data_rate, size, content=None):
         self.sender_id = sender_id
         self.receiver_id = receiver_id
         self.sent_epoc = sent_epoc
@@ -35,3 +35,7 @@ class AbstractMessage():
             return (self.bits - self.size) / dt
 
         return self.data_rate
+
+class CentralPlannerMessage(AbstractMessage):
+    def __init__(self, sender_id, receiver_id, sent_epoc, data_rate, size=1, content=None):
+        super().__init__(sender_id, receiver_id, sent_epoc, data_rate, size=size, content=content)

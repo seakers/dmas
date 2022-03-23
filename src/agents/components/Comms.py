@@ -6,18 +6,19 @@ class Comms(Component):
     Class that describes the communications module of a satellite
     Is an implementation of the Abstract Components Class
     """
-    def __init__(self, mass=0, xdim=0, ydim=0, zdim=0, rf_power=0, data_rate=0, data_capacity=0, frequency=None):
+    def __init__(self, name, rf_power, data_rate, data_capacity, mass=0, xdim=0, ydim=0, zdim=0,frequency=None):
         """
+        :param name: module's name
+        :param rf_power: module's peak power consumed in [W]
+        :param data_rate: module's data output rate in [Mbps]
+        :param data_capacity: module's data capacity in [Mb]
         :param mass: module's mass in [kg]
         :param xdim: module's dimension in the x-axis in [m]
         :param ydim: module's dimension in the y-axis in [m]
         :param zdim: module's dimension in the z-axis in [m]
-        :param rf_power: module's peak power consumed in [W]
-        :param data_rate: module's data output rate in [Mbps]
-        :param data_capacity: module's data capacity in [Mb]
         :param frequency: module's communication frequency or frequencies
         """
-        super().__init__(False, mass=mass, xdim=xdim, ydim=ydim, zdim=zdim,
+        super().__init__(name, status=False, mass=mass, xdim=xdim, ydim=ydim, zdim=zdim,
                          power_generation=0, power_usage=rf_power, power_storage=0, power_capacity=0,
                          data_generation=0, data_usage=data_rate, data_storage=0, data_capacity=data_capacity)
         self.rf_power = rf_power

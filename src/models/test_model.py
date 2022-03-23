@@ -18,13 +18,13 @@ class TestModel(Model):
             a = AbstractAgent(i, planner, self, component_list=None)
             self.schedule.add(a)
 
-        self.datacollector = DataCollector(
-            model_reporters={}, agent_reporters={"x": "x"}
-        )
+        # self.datacollector = DataCollector(
+        #     model_reporters={}, agent_reporters={"x": "x"}
+        # )
 
     def step(self):
         """Advance the model by one step."""
-        self.datacollector.collect(self)
+        # self.datacollector.collect(self)
         self.schedule.step()
 
 testModel = TestModel(1)

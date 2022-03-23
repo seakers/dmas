@@ -4,11 +4,12 @@ class Component:
     Abstract class describing a satellite's component. Provides mass property information long with power and data usage.
     """
 
-    def __init__(self, status=False, mass=0, xdim=0, ydim=0, zdim=0,
+    def __init__(self, name, status=False, mass=0, xdim=0, ydim=0, zdim=0,
                  power_generation=0, power_usage=0, power_storage=0, power_capacity=0,
                  data_generation=0, data_usage=0, data_storage=0, data_capacity=0):
         """
         Initializes an abstract component. All values default to 0
+        :param name: component name
         :param status: operational status of the component. 'True' for 'On' and 'False' for 'Off'
         :param mass: component's mass in [kg]
         :param xdim: component's dimension in the x-axis in [m]
@@ -23,6 +24,7 @@ class Component:
         :param data_storage: how much data is currently stored in this component in [Mb]
         :param data_capacity: how much data can be stored in this component in [Mb]
         """
+        self.name = name
         self.status = status
         self.mass = mass
         self.dims = [xdim, ydim, zdim]
@@ -81,4 +83,5 @@ class Component:
         """
         return [self.data_generation, self.data_usage, self.data_storage, self.data_capacity]
 
-
+    def get_name(self):
+        return self.name
