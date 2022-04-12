@@ -34,7 +34,9 @@ class Battery(Component):
         :return: None
         """
         power_out = 0
-        if self.status:
+        # if self.status:
+        #     power_out = self.power_generation
+        if power_in == 0 and self.status:
             power_out = self.power_generation
 
         power_total = power_in - power_out

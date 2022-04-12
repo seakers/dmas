@@ -4,7 +4,10 @@ from mesa.time import SimultaneousActivation
 from pandas import DataFrame
 
 from src.agents.AbstractAgent import AbstractAgent
-from src.agents.planners.CentralizedPlanner import CentralizedPlannerGS
+from src.agents.components.Battery import Battery
+from src.agents.components.Comms import Comms
+from src.agents.planners.CentralizedPlanner import CentralizedPlannerGS, CentralizedPlannerSat
+from src.agents.planners.TestPlanner import CommsTestPlanner
 
 
 class TestModel(Model):
@@ -14,8 +17,15 @@ class TestModel(Model):
         self.schedule = SimultaneousActivation(self)
         # Create agents
         for i in range(self.num_agents):
-            planner = CentralizedPlannerGS('dshield_centralized', start_epoc=start_epoc, time_step=time_step)
-            a = AbstractAgent(i, planner, self, component_list=None)
+            # if i == 0:
+                # planner = CentralizedPlannerGS('dshield_centralized', i, start_epoc=start_epoc, time_step=time_step)
+            # else:
+                # planner = CentralizedPlannerSat(i, start_epoc=start_epoc, time_step=time_step)
+            planner = CommsTestPlanner(i, 0, 1)
+            battery = Battery('testBattery', 0, 2, 20, 1)
+            # battery.turn_on()
+            comms = Comms("testComms", 1, 1, 10)
+            a = AbstractAgent(i, planner, self, component_list=[comms, battery])
             self.schedule.add(a)
 
         # self.datacollector = DataCollector(
@@ -27,8 +37,9 @@ class TestModel(Model):
         # self.datacollector.collect(self)
         self.schedule.step()
 
-testModel = TestModel(1)
-for i in range(10):
+testModel = TestModel(3)
+for i in range(20):
+    print("TICK: " + str(i))
     testModel.step()
 
 y = testModel.datacollector.get_agent_vars_dataframe()

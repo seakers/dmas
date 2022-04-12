@@ -33,6 +33,9 @@ class Comms(Component):
         """
         self.data_storage += data_rate*step_size + data
 
+    def get_data_rate(self):
+        return self.data_usage
+
     def set_storage_to_max_cap(self) -> None:
         self.data_storage = self.data_capacity
 

@@ -2,7 +2,7 @@ class AbstractPlanner:
     """
     Abstract Class representing an agent's planner
     """
-    def __init__(self, start_epoc=0, time_step=1):
+    def __init__(self, unique_id, start_epoc=0, time_step=1):
         """
         Constructor
         :param start_epoc: starting epoc for the planner
@@ -10,6 +10,7 @@ class AbstractPlanner:
         """
         self.epoc = start_epoc
         self.dt = time_step
+        self.unique_id = unique_id
         self.plan = []
 
     def __copy__(self):

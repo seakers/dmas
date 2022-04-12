@@ -1,5 +1,5 @@
 from src.agents.planners.TimeInterval import TimeInterval
-from src.messages.Message import CentralPlannerMessage
+from src.messages.Message import CentralPlannerMessage, AbstractMessage
 
 
 class AbstractAction:
@@ -15,6 +15,7 @@ class AbstractAction:
         """
         self.type = type
         self.time_interval = TimeInterval(start, end)
+        self.status = False
 
     def is_active(self, epoc) -> bool:
         """
@@ -30,7 +31,10 @@ class AbstractAction:
         :param epoc: epoc to be evaluated
         :return: True if action has passed, False if not
         """
-        return self.time_interval.in_interval(epoc) == 1
+        return self.time_interval.in_interval(epoc) == 1 or self.status
+
+    def set_complete(self):
+        self.status = True
 
     def copy(self):
         return self.__copy__()
@@ -47,16 +51,27 @@ class TransmitAction(AbstractAction):
         self.data_rate = data_rate
         self.size = size
         self.content = content
+        self.message = AbstractMessage(self.sender_id, self.target_id, self.time_interval.start,
+                                       self.data_rate, self.size, self.content)
+
+    def get_message_size(self):
+        return self.size
 
     def get_target_id(self):
         return self.target_id
 
     def get_message(self):
-        return CentralPlannerMessage(self.sender_id, self.target_id, self.time_interval.start,
-                                     self.data_rate, self.size, self.content)
+        return self.message
 
 
 class ActuateAction(AbstractAction):
-    def __init__(self, instrument_name, start):
+    def __init__(self, component_name, start, status=True):
         super().__init__(type='actuate', start=start, end=start+1)
-        self.instrument_name = instrument_name
+        self.component_name = component_name
+        self.actuationStatus = status
+
+    def get_component_name(self):
+        return self.component_name
+
+    def get_actuation_status(self):
+        return self.actuationStatus

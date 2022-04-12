@@ -6,7 +6,7 @@ class AbstractMessage:
         self.sent_epoc = sent_epoc
         self.receipt_epoc = None
         self.data_rate = data_rate
-        self.size = 0
+        self.size = size
         self.bits = 0
         self.eof = False
         self.content = content
@@ -35,6 +35,10 @@ class AbstractMessage:
             return (self.bits - self.size) / dt
 
         return self.data_rate
+
+    def copy(self):
+        return AbstractMessage(self.sender_id, self.receiver_id, self.sent_epoc,
+                               self.data_rate, self.size, self.content)
 
 class CentralPlannerMessage(AbstractMessage):
     def __init__(self, sender_id, receiver_id, sent_epoc, data_rate, size=1, content=None):
