@@ -18,10 +18,10 @@ class AbstractPlanner:
         Copy constructor
         :return: deep copy of the current planner
         """
-        new_plan = AbstractPlanner(start_epoc=self.epoc)
+        new_plan = AbstractPlanner(unique_id=self.unique_id, start_epoc=self.epoc, time_step=self.dt)
         for action in self.plan:
             new_plan.plan.append(action.copy())
-        return
+        return new_plan
 
     def copy(self):
         return self.__copy__()

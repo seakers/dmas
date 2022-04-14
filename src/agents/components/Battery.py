@@ -40,9 +40,9 @@ class Battery(Component):
             power_out = self.power_generation
 
         power_total = power_in - power_out
-        self.power_storage += power_total*step_size
+        self.power_stored += power_total * step_size
 
-        if self.power_storage > self.power_capacity:
+        if self.power_stored > self.power_capacity:
             self.power_storage = self.power_capacity
         elif self.power_storage/self.power_capacity < (1 - self.dod):
             # If battery is discharged below its dod, it will turn itself off and will only be able to be charged

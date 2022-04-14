@@ -69,9 +69,6 @@ class AbstractAgent(Agent):
         # Read Incoming Messages
         self.read_incoming_messages()
 
-        if self.epoc == 4:
-            x = 1
-
         # Update Plan
         self.planner.update_plan(self.component_list, self.received_messages, self.epoc)
         self.plan = self.planner.get_plan()
@@ -231,7 +228,7 @@ class AbstractAgent(Agent):
                 data_to_delete = top_message.bits + top_message.get_data_rate() * self.dt
 
                 for comms in data_storage_all:
-                    if comms.data_storage - data_to_delete >= 0:
+                    if comms.data_stored - data_to_delete >= 0:
                         comms.add_data(-data_to_delete)
                         break
                     else:
@@ -270,7 +267,7 @@ class AbstractAgent(Agent):
                     data_to_delete = top_message.bits + top_message.get_data_rate() * self.dt
 
                     for comms in data_storage_all:
-                        if comms.data_storage - data_to_delete >= 0:
+                        if comms.data_stored - data_to_delete >= 0:
                             comms.add_data(-data_to_delete)
                             break
                         else:

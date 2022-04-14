@@ -75,3 +75,40 @@ class ActuateAction(AbstractAction):
 
     def get_actuation_status(self):
         return self.actuationStatus
+
+
+class AgentActuateAction(AbstractAction):
+    def __init__(self, start, status=True):
+        super().__init__(type='agentActuate', start=start, end=start+1)
+        self.actuationStatus = status
+
+    def get_actuation_status(self):
+        return self.actuationStatus
+
+class BatteryRechargeAction(AbstractAction):
+    def __init__(self, battery_name, power_in, start):
+        super().__init__(type='recharge', start=start, end=start + 1)
+        self.battery_name = battery_name
+        self.power_in = power_in
+
+    def get_battery_name(self):
+        return self.battery_name
+
+    def get_power_in(self):
+        return self.power_in
+
+class DropMessageAction(AbstractAction):
+    def __init__(self, message, start):
+        super().__init__(type='dropMessage', start=start, end=start+1)
+        self.message = message
+
+    def get_message(self):
+        return self.message
+
+class DataUpdateAction(AbstractAction):
+    def __init__(self, data_in, start):
+        super().__init__(type='dataUpdate', start=start, end=start+1)
+        self.data_in = data_in
+
+    def get_data(self):
+        return self.data_in
