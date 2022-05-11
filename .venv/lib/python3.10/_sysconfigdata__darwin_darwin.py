@@ -92,7 +92,7 @@ build_time_vars = {'ABIFLAGS': '',
                 "'--with-tcltk-libs=-L/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib "
                 "-ltcl8.6 -ltk8.6''--with-platlibdir=lib''--with-lto'"
                 "'--enable-optimizations'"
-                "'-oldincludedir=/Users/runner/miniforge3/conda-bld/python-split_1643743122473/_build_env/x86_64-apple-darwin13.4.0/sysroot/usr/include'"
+                "'-oldincludedir=/Users/runner/miniforge3/conda-bld/python-split_1648143140203/_build_env/x86_64-apple-darwin13.4.0/sysroot/usr/include'"
                 "'--disable-shared''PROFILE_TASK=-m test --pgo'"
                 "'build_alias=x86_64-apple-darwin13.4.0'"
                 "'host_alias=x86_64-apple-darwin13.4.0''MACHDEP=darwin'"
@@ -119,12 +119,12 @@ build_time_vars = {'ABIFLAGS': '',
  'CONFINCLUDEDIR': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include',
  'CONFINCLUDEPY': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include/python3.10',
  'COREPYTHONPATH': '',
- 'COVERAGE_INFO': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/build-static/coverage.info',
- 'COVERAGE_REPORT': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/build-static/lcov-report',
+ 'COVERAGE_INFO': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/build-static/coverage.info',
+ 'COVERAGE_REPORT': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/build-static/lcov-report',
  'COVERAGE_REPORT_OPTIONS': '--no-branch-coverage --title "CPython lcov '
                             'report"',
  'CPPFLAGS': '-IObjects -IInclude -IPython -I. '
-             '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include '
+             '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include '
              ''
              ''
              '-D_FORTIFY_SOURCE=2 -isystem '
@@ -366,6 +366,7 @@ build_time_vars = {'ABIFLAGS': '',
  'HAVE_LIBUUID': 0,
  'HAVE_LINK': 1,
  'HAVE_LINKAT': 1,
+ 'HAVE_LINUX_AUXVEC_H': 0,
  'HAVE_LINUX_CAN_BCM_H': 0,
  'HAVE_LINUX_CAN_H': 0,
  'HAVE_LINUX_CAN_J1939_H': 0,
@@ -528,6 +529,7 @@ build_time_vars = {'ABIFLAGS': '',
  'HAVE_SYSCONF': 1,
  'HAVE_SYSEXITS_H': 1,
  'HAVE_SYS_AUDIOIO_H': 0,
+ 'HAVE_SYS_AUXV_H': 0,
  'HAVE_SYS_BSDTTY_H': 0,
  'HAVE_SYS_DEVPOLL_H': 0,
  'HAVE_SYS_DIR_H': 0,
@@ -671,7 +673,7 @@ build_time_vars = {'ABIFLAGS': '',
  'LIPO_INTEL64_FLAGS': '',
  'LLVM_PROF_ERR': 'no',
  'LLVM_PROF_FILE': 'LLVM_PROFILE_FILE="code-%p.profclangr"',
- 'LLVM_PROF_MERGER': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/_build_env/bin/llvm-profdata '
+ 'LLVM_PROF_MERGER': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/_build_env/bin/llvm-profdata '
                      'merge -output=code.profclangd *.profclangr',
  'LN': 'ln',
  'LOCALMODLIBS': '',
@@ -682,9 +684,9 @@ build_time_vars = {'ABIFLAGS': '',
  'MAINCC': 'clang',
  'MAJOR_IN_MKDEV': 0,
  'MAJOR_IN_SYSMACROS': 0,
- 'MAKESETUP': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Modules/makesetup',
+ 'MAKESETUP': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Modules/makesetup',
  'MANDIR': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/share/man',
- 'MKDIR_P': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/install-sh '
+ 'MKDIR_P': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/install-sh '
             '-c -d',
  'MODBUILT_NAMES': 'posix  errno  pwd  _sre  _codecs  _weakref  _functools  '
                    '_operator  _collections  _abc  itertools  atexit  _signal  '
@@ -774,9 +776,9 @@ build_time_vars = {'ABIFLAGS': '',
                              '-Werror=implicit-function-declaration '
                              '-fvisibility=hidden '
                              '-fprofile-instr-use=code.profclangd '
-                             '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include/internal '
+                             '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include/internal '
                              '-IObjects -IInclude -IPython -I. '
-                             '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include '
+                             '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include '
                              ''
                              ''
                              '-D_FORTIFY_SOURCE=2 -isystem '
@@ -811,7 +813,7 @@ build_time_vars = {'ABIFLAGS': '',
                      '-Wstrict-prototypes '
                      '-Werror=implicit-function-declaration '
                      '-fvisibility=hidden -fprofile-instr-use=code.profclangd '
-                     '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include/internal',
+                     '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include/internal',
  'PY_COERCE_C_LOCALE': 1,
  'PY_CORE_CFLAGS': '-Wno-unused-result -Wsign-compare -Wunreachable-code '
                    '-DNDEBUG -fwrapv -O2 -Wall '
@@ -832,9 +834,9 @@ build_time_vars = {'ABIFLAGS': '',
                    '-Wno-unused-parameter -Wno-missing-field-initializers '
                    '-Wstrict-prototypes -Werror=implicit-function-declaration '
                    '-fvisibility=hidden -fprofile-instr-use=code.profclangd '
-                   '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include/internal '
+                   '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include/internal '
                    '-IObjects -IInclude -IPython -I. '
-                   '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include '
+                   '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include '
                    ''
                    ''
                    '-D_FORTIFY_SOURCE=2 -isystem '
@@ -862,7 +864,7 @@ build_time_vars = {'ABIFLAGS': '',
                     '-L/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib '
                     '-Wl,-export_dynamic -g',
  'PY_CPPFLAGS': '-IObjects -IInclude -IPython -I. '
-                '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include '
+                '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include '
                 ''
                 ''
                 '-D_FORTIFY_SOURCE=2 -isystem '
@@ -915,9 +917,9 @@ build_time_vars = {'ABIFLAGS': '',
                         '-Werror=implicit-function-declaration '
                         '-fvisibility=hidden '
                         '-fprofile-instr-use=code.profclangd '
-                        '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include/internal '
+                        '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include/internal '
                         '-IObjects -IInclude -IPython -I. '
-                        '-I/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Include '
+                        '-I/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Include '
                         ''
                         ''
                         '-D_FORTIFY_SOURCE=2 -isystem '
@@ -967,7 +969,7 @@ build_time_vars = {'ABIFLAGS': '',
  'SIZEOF__BOOL': 1,
  'SOABI': 'cpython-310-darwin',
  'SRCDIRS': 'Parser Objects Python Modules Modules/_io Programs',
- 'SRC_GDB_HOOKS': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Tools/gdb/libpython.py',
+ 'SRC_GDB_HOOKS': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Tools/gdb/libpython.py',
  'STATIC_LIBPYTHON': 1,
  'STDC_HEADERS': 1,
  'STRICT_SYSV_CURSES': "/* Don't use ncurses extensions */",
@@ -984,7 +986,7 @@ build_time_vars = {'ABIFLAGS': '',
  'TESTPYTHON': './python.exe',
  'TESTPYTHONOPTS': '',
  'TESTRUNNER': './python.exe '
-               '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Tools/scripts/run_tests.py',
+               '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Tools/scripts/run_tests.py',
  'TESTSUBDIRS': 'ctypes/test \\',
  'TESTTIMEOUT': 1200,
  'TEST_MODULES': 'yes',
@@ -995,10 +997,10 @@ build_time_vars = {'ABIFLAGS': '',
  'TZPATH': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/share/zoneinfo:/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/share/tzinfo',
  'UNICODE_DEPS': '\\',
  'UNIVERSALSDK': '',
- 'UPDATE_FILE': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/Tools/scripts/update_file.py',
+ 'UPDATE_FILE': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/Tools/scripts/update_file.py',
  'USE_COMPUTED_GOTOS': 1,
  'VERSION': '3.10',
- 'VPATH': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work',
+ 'VPATH': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work',
  'WHEEL_PKG_DIR': '',
  'WINDOW_HAS_FLAGS': 1,
  'WITH_DECIMAL_CONTEXTVAR': 1,
@@ -1012,9 +1014,9 @@ build_time_vars = {'ABIFLAGS': '',
  'WITH_VALGRIND': 0,
  'X87_DOUBLE_ROUNDING': 0,
  'XMLLIBSUBDIRS': 'xml xml/dom xml/etree xml/parsers xml/sax',
- 'abs_builddir': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/build-static',
- 'abs_srcdir': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work',
+ 'abs_builddir': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/build-static',
+ 'abs_srcdir': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work',
  'datarootdir': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/share',
  'exec_prefix': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv',
  'prefix': '/Users/a.aguilar/Documents/GitHub/DMASpy/.venv',
- 'srcdir': '/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work'}
+ 'srcdir': '/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work'}

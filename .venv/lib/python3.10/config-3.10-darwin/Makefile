@@ -28,17 +28,17 @@ MODLIBS=           $(LOCALMODLIBS) $(BASEMODLIBS)
 
 # === Variables set by configure
 VERSION=	3.10
-srcdir=		/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work
-VPATH=		/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work
-abs_srcdir=	/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work
-abs_builddir=	/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/build-static
+srcdir=		/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work
+VPATH=		/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work
+abs_srcdir=	/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work
+abs_builddir=	/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/build-static
 
 
 CC=		x86_64-apple-darwin13.4.0-clang
 CXX=		x86_64-apple-darwin13.4.0-clang++
 MAINCC=		$(CC)
 LINKCC=		$(PURIFY) $(MAINCC)
-AR=		/Users/runner/miniforge3/conda-bld/python-split_1643743122473/_build_env/bin/x86_64-apple-darwin13.4.0-llvm-ar
+AR=		/Users/runner/miniforge3/conda-bld/python-split_1648143140203/_build_env/bin/x86_64-apple-darwin13.4.0-llvm-ar
 READELF=	:
 SOABI=		cpython-310-darwin
 LDVERSION=	$(VERSION)$(ABIFLAGS)
@@ -48,7 +48,7 @@ GITTAG=
 GITBRANCH=	
 PGO_PROF_GEN_FLAG=-fprofile-instr-generate
 PGO_PROF_USE_FLAG=-fprofile-instr-use=code.profclangd
-LLVM_PROF_MERGER=/Users/runner/miniforge3/conda-bld/python-split_1643743122473/_build_env/bin/llvm-profdata merge -output=code.profclangd *.profclangr
+LLVM_PROF_MERGER=/Users/runner/miniforge3/conda-bld/python-split_1648143140203/_build_env/bin/llvm-profdata merge -output=code.profclangd *.profclangr
 LLVM_PROF_FILE=LLVM_PROFILE_FILE="code-%p.profclangr"
 LLVM_PROF_ERR=no
 DTRACE=         
@@ -73,7 +73,7 @@ INSTALL_DATA=	${INSTALL} -m 644
 # rather than figuring out exactly which, we always give them executable mode.
 INSTALL_SHARED= ${INSTALL} -m 755
 
-MKDIR_P=	/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work/install-sh -c -d
+MKDIR_P=	/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work/install-sh -c -d
 
 MAKESETUP=      $(srcdir)/Modules/makesetup
 
@@ -81,7 +81,7 @@ MAKESETUP=      $(srcdir)/Modules/makesetup
 OPT=		-DNDEBUG -fwrapv -O2 -Wall
 BASECFLAGS=	 -Wno-unused-result -Wsign-compare -Wunreachable-code
 BASECPPFLAGS=	-IObjects -IInclude -IPython
-CONFIGURE_CFLAGS=	-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -march=core2 -mtune=haswell -mssse3 -ftree-vectorize -fPIC -fPIE -fstack-protector-strong -O2 -pipe -isystem /Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include -fdebug-prefix-map=/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work=/usr/local/src/conda/python-3.10.2 -fdebug-prefix-map=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv=/usr/local/src/conda-prefix 
+CONFIGURE_CFLAGS=	-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -march=core2 -mtune=haswell -mssse3 -ftree-vectorize -fPIC -fPIE -fstack-protector-strong -O2 -pipe -isystem /Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include -fdebug-prefix-map=/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work=/usr/local/src/conda/python-3.10.4 -fdebug-prefix-map=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv=/usr/local/src/conda-prefix 
 # CFLAGS_NODIST is used for building the interpreter and stdlib C extensions.
 # Use it when a compiler flag should _not_ be part of the distutils CFLAGS
 # once Python is installed (Issue #21121).
@@ -217,7 +217,7 @@ EXEMODE=	755
 FILEMODE=	644
 
 # configure script arguments
-CONFIG_ARGS=	 '--prefix=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv' '--build=x86_64-apple-darwin13.4.0' '--host=x86_64-apple-darwin13.4.0' '--enable-ipv6' '--with-ensurepip=no' '--with-tzpath=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/share/zoneinfo' '--with-computed-gotos' '--with-system-ffi' '--enable-loadable-sqlite-extensions' '--with-tcltk-includes=-I/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include' '--with-tcltk-libs=-L/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib -ltcl8.6 -ltk8.6' '--with-platlibdir=lib' '--with-lto' '--enable-optimizations' '-oldincludedir=/Users/runner/miniforge3/conda-bld/python-split_1643743122473/_build_env/x86_64-apple-darwin13.4.0/sysroot/usr/include' '--disable-shared' 'PROFILE_TASK=-m test --pgo' 'build_alias=x86_64-apple-darwin13.4.0' 'host_alias=x86_64-apple-darwin13.4.0' 'MACHDEP=darwin' 'CC=x86_64-apple-darwin13.4.0-clang' 'CFLAGS=-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -march=core2 -mtune=haswell -mssse3 -ftree-vectorize -fPIC -fPIE -fstack-protector-strong -O2 -pipe -isystem /Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include -fdebug-prefix-map=/Users/runner/miniforge3/conda-bld/python-split_1643743122473/work=/usr/local/src/conda/python-3.10.2 -fdebug-prefix-map=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv=/usr/local/src/conda-prefix ' 'LDFLAGS=-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -Wl,-pie -Wl,-headerpad_max_install_names -Wl,-dead_strip_dylibs -Wl,-rpath,/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib -L/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib' 'CPPFLAGS=-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -D_FORTIFY_SOURCE=2 -isystem /Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include -mmacosx-version-min=10.9 -I/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include' 'PKG_CONFIG_PATH=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib/pkgconfig'
+CONFIG_ARGS=	 '--prefix=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv' '--build=x86_64-apple-darwin13.4.0' '--host=x86_64-apple-darwin13.4.0' '--enable-ipv6' '--with-ensurepip=no' '--with-tzpath=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/share/zoneinfo' '--with-computed-gotos' '--with-system-ffi' '--enable-loadable-sqlite-extensions' '--with-tcltk-includes=-I/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include' '--with-tcltk-libs=-L/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib -ltcl8.6 -ltk8.6' '--with-platlibdir=lib' '--with-lto' '--enable-optimizations' '-oldincludedir=/Users/runner/miniforge3/conda-bld/python-split_1648143140203/_build_env/x86_64-apple-darwin13.4.0/sysroot/usr/include' '--disable-shared' 'PROFILE_TASK=-m test --pgo' 'build_alias=x86_64-apple-darwin13.4.0' 'host_alias=x86_64-apple-darwin13.4.0' 'MACHDEP=darwin' 'CC=x86_64-apple-darwin13.4.0-clang' 'CFLAGS=-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -march=core2 -mtune=haswell -mssse3 -ftree-vectorize -fPIC -fPIE -fstack-protector-strong -O2 -pipe -isystem /Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include -fdebug-prefix-map=/Users/runner/miniforge3/conda-bld/python-split_1648143140203/work=/usr/local/src/conda/python-3.10.4 -fdebug-prefix-map=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv=/usr/local/src/conda-prefix ' 'LDFLAGS=-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -Wl,-pie -Wl,-headerpad_max_install_names -Wl,-dead_strip_dylibs -Wl,-rpath,/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib -L/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib' 'CPPFLAGS=-isysroot /Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk -D_FORTIFY_SOURCE=2 -isystem /Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include -mmacosx-version-min=10.9 -I/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/include' 'PKG_CONFIG_PATH=/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/lib/pkgconfig'
 
 
 # Subdirectories with code

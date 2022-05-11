@@ -8,20 +8,16 @@ SEAK Lab - Texas A&M University
 
 ### Automatic Install
 UNDER DEVELOPMENT
-
-Create virtual environment and install dependencies dependencies
 ```
-chmod +x ./setup.sh
-./setup.sh
+ python setup.py install
 ```
-Set your IDE's interpreter as `./.env/bin/python3.10`
 
 ### Manual Install
-`{ENVORINMENT_NAME}`: user-defined environment name (`/.env` recommended)
+`{ENVORINMENT_NAME}`: user-defined environment name (`.env` directory name recommended)
 
 Create and activate conda virtual environment
 ```
-conda create -p ./{ENVORINMENT_NAME}
+conda create -p ./{ENVORINMENT_NAME} python=3.10
 conda activate ./{ENVORINMENT_NAME}
 conda install pip
 ```
@@ -30,12 +26,6 @@ Install dependencies
 ```
 ./{ENVORINMENT_NAME}/bin/pip install -r requirements.txt
 ```
-
-TEMP: Install Orekit (will be replaced with OrbitPy upon release)
-```
-conda install -c conda-forge orekit
-```
-
 Set your IDE's interpreter as `./.env/bin/python3.10`
 
 OPTIONAL: rename terminal prompt
