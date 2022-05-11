@@ -5,8 +5,8 @@ class Component:
     """
 
     def __init__(self, name, status=False, mass=0, xdim=0, ydim=0, zdim=0,
-                 power_generation=0, power_usage=0, power_storage=0, power_capacity=0,
-                 data_generation=0, data_usage=0, data_storage=0, data_capacity=0):
+                 power_generation=0, power_usage=0, power_stored=0, power_capacity=0,
+                 data_generation=0, data_usage=0, data_stored=0, data_capacity=0):
         """
         Initializes an abstract component. All values default to 0
         :param name: component name
@@ -30,11 +30,11 @@ class Component:
         self.dims = [xdim, ydim, zdim]
         self.power_generation = power_generation
         self.power_usage = power_usage
-        self.power_stored = power_storage
+        self.power_stored = power_stored
         self.power_capacity = power_capacity
         self.data_generation = data_generation
         self.data_usage = data_usage
-        self.data_stored = data_storage
+        self.data_stored = data_stored
         self.data_capacity = data_capacity
 
     def copy(self):
@@ -42,7 +42,7 @@ class Component:
         Creates a deep copy of this component
         :return:
         """
-        return Component(self.status, self.mass, self.dims[0], self.dims[1], self.dims[2],
+        return Component(self.name, self.status, self.mass, self.dims[0], self.dims[1], self.dims[2],
                          self.power_generation, self.power_usage, self.power_stored, self.power_capacity,
                          self.data_generation, self.data_usage, self.data_stored, self.data_capacity)
 

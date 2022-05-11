@@ -19,8 +19,8 @@ class Comms(Component):
         :param frequency: module's communication frequency or frequencies
         """
         super().__init__(name, status=False, mass=mass, xdim=xdim, ydim=ydim, zdim=zdim,
-                         power_generation=0, power_usage=rf_power, power_storage=0, power_capacity=0,
-                         data_generation=0, data_usage=data_rate, data_storage=0, data_capacity=data_capacity)
+                         power_generation=0, power_usage=rf_power, power_stored=0, power_capacity=0,
+                         data_generation=0, data_usage=data_rate, data_stored=0, data_capacity=data_capacity)
         self.rf_power = rf_power
         self.frequency = frequency
 
@@ -31,24 +31,24 @@ class Comms(Component):
         :param step_size:
         :return: None
         """
-        self.data_storage += data_rate*step_size + data
+        self.data_stored += data_rate*step_size + data
 
     def get_data_rate(self):
         return self.data_usage
 
     def set_storage_to_max_cap(self) -> None:
-        self.data_storage = self.data_capacity
+        self.data_stored = self.data_capacity
 
     def is_full(self) -> bool:
-        return self.data_storage >= self.data_capacity
+        return self.data_stored >= self.data_capacity
 
     def get_overflow(self) -> float:
         if self.is_full():
-            return self.data_storage - self.data_capacity
+            return self.data_stored - self.data_capacity
         return 0.0
 
     def add_data(self, data=0) -> None:
-        self.data_storage += data
+        self.data_stored += data
 
     def empty_data_storage(self) -> None:
-        self.data_storage = 0.0
+        self.data_stored = 0.0

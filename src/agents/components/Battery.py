@@ -18,8 +18,8 @@ class Battery(Component):
         :param zdim: component's dimension in the z-axis in [m]
         """
         super().__init__(name, False, mass=mass, xdim=xdim, ydim=ydim, zdim=zdim,
-                         power_generation=power_output, power_usage=0, power_storage=power_capacity, power_capacity=power_capacity,
-                         data_generation=0, data_usage=0, data_storage=0, data_capacity=0)
+                         power_generation=power_output, power_usage=0, power_stored=power_capacity, power_capacity=power_capacity,
+                         data_generation=0, data_usage=0, data_stored=0, data_capacity=0)
         self.max_output = power_output
         self.dod = dod
 
@@ -43,8 +43,8 @@ class Battery(Component):
         self.power_stored += power_total * step_size
 
         if self.power_stored > self.power_capacity:
-            self.power_storage = self.power_capacity
-        elif self.power_storage/self.power_capacity < (1 - self.dod):
+            self.power_stored = self.power_capacity
+        elif self.power_stored/self.power_capacity < (1 - self.dod):
             # If battery is discharged below its dod, it will turn itself off and will only be able to be charged
             self.status = False
 
@@ -53,8 +53,8 @@ class Battery(Component):
         Turns on battery for discharge only if power storage is over depht-of-discharge
         :return: None
         """
-        if self.power_storage/self.power_capacity > (1 - self.dod):
+        if self.power_stored/self.power_capacity > (1 - self.dod):
             self.status = True
 
     def is_full(self) -> bool:
-        return self.power_storage >= self.power_capacity
+        return self.power_stored >= self.power_capacity

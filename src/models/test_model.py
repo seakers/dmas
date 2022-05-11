@@ -4,6 +4,7 @@ from mesa.time import SimultaneousActivation
 from pandas import DataFrame
 
 from src.agents.AbstractAgent import AbstractAgent
+from src.agents.Agents import SimulationAgent
 from src.agents.components.Battery import Battery
 from src.agents.components.Comms import Comms
 from src.agents.planners.CentralizedPlanner import CentralizedPlannerGS, CentralizedPlannerSat
@@ -21,7 +22,9 @@ class TestModel(Model):
             planner = TestPlanner(i, start_epoc)
             battery = Battery('testBattery', 0, 2, 20, 1)
             comms = Comms('testComms', 1, 1, 10)
-            a = AbstractAgent(i, planner, self, component_list=[comms, battery])
+            # a = AbstractAgent(i, planner, self, component_list=[comms, battery])
+            a = SimulationAgent(i, planner, self, component_list=[comms, battery])
+            # (self, unique_id, planner, model, start_epoc=0, time_step=1, component_list=None)
             self.schedule.add(a)
 
         # self.datacollector = DataCollector(
