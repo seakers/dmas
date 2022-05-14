@@ -8,10 +8,10 @@ class Action:
         self.end = end
 
     def is_active(self, t):
-        return self.start <= t <= self.end
+        return self.start <= t < self.end
 
     def is_done(self, t):
-        return self.end < t
+        return self.end <= t
 
 
 class ChargeAction(Action):
@@ -27,3 +27,16 @@ class TransmitAction(Action):
         self.dst = dst
         message_id = "S{}D{}".format(src.unique_id, dst.unique_id)
         self.msg = Message(start, size, rate, message_id, content=None, src=src, dst=dst, flow_id=0)
+
+
+class ActuateComponentAction(Action):
+    def __init__(self, component, start, status=True):
+        super().__init__('actuate_component', start, start+1)
+        self.component = component
+        self.status = status
+
+
+class ActuateAgentAction(Action):
+    def __init__(self, start, status=True):
+        super().__init__('actuate_agent', start, start + 1)
+        self.status = status

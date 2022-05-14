@@ -1,3 +1,4 @@
+from src.agents.components.components import PowerGenerator
 from src.planners.actions import *
 
 
@@ -37,7 +38,7 @@ class PingPlanner(Planner):
             transmit = TransmitAction(parent_agent, dst, start, size, rate)
             self.plan.append(transmit)
 
-        elif len(parent_agent.data_storage.mailbox.items) > 0:
+        elif len(parent_agent.data_storage.mailbox.items) > 0 and parent_agent.unique_id == 1:
             msg = parent_agent.data_storage.mailbox.get().value
             dst = msg.src
             start = t
@@ -47,3 +48,21 @@ class PingPlanner(Planner):
             self.plan.append(transmit)
 
             parent_agent.data_storage.data_stored -= msg.size
+
+
+class StationKeepingPlanner(Planner):
+    def __init__(self):
+        super().__init__()
+
+    def update(self, state, t):
+        _, power_generation, energy_stored, energy_capacity, \
+        data_rate, data_stored, data_capacity = state.get_last_state()
+
+        if power_generation > 0:
+            if energy_stored >= energy_capacity:
+                power_generator = None
+                for component in self.parent_agent.component_list:
+                    if type(component) == PowerGenerator:
+                        # turn off generator
+                        action = ActuateComponentAction
+
