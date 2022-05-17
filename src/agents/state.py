@@ -1,79 +1,64 @@
+from typing import Union
+
+from src.agents.agent import AbstractAgent
+from src.agents.components.components import *
+
+
 class State:
-    def __init__(self, agent, component_list, t):
-        self.agent = agent
-        self.status = True
-        self.health = True
+    def __init__(self, agent: AbstractAgent, component_list, t: Union[int,float]):
+        self.data_rate_in = []
+        self.data_rate_out = []
+        self.data_rate_total = []
 
-        # Initialize state arrays
-        self.t = []
+        self.data_buffer_in = []
+        self.data_memory = []
+        self.data_buffer_out = []
+        self.data_capacity = agent.on_board_computer.data_capacity
 
-        self.power_deficit = []
         self.power_in = []
         self.power_out = []
+        self.power_tot = []
+
         self.energy_stored = []
-        self.energy_capacity = 0
+        self.energy_capacity = agent.battery.data_capacity
 
-        self.data_rate = []
-        self.data_stored = []
-        self.data_capacity = 0
-
-        # Check for initial state
-        for component in component_list:
-            # power
-            self.energy_capacity += component.energy_capacity
-
-            # data memory
-            self.data_capacity += component.data_capacity
-
-        self.update(component_list, t)
-
-    def update(self, component_list, t):
-        power_deficit = 0
-        power_in = 0
-        power_out = 0
-        energy_stored = 0
-
-        data_rate = 0
-        data_stored = 0
-        for component in component_list:
-            # power
-            power_deficit += component.power_generation
-            if component.power_generation > 0:
-                power_in += component.power_generation
-            else:
-                power_out -= component.power_generation
-
-            energy_stored += component.energy_stored
-
-            # data memory
-            data_rate += component.data_rate
-            data_stored += component.data_stored
-
-        # Save to state arrays
+        self.t = []
         self.t.append(t)
 
-        self.power_deficit.append(power_deficit)
+        self.isOn = dict.fromkeys(component_list,[])
+
+        self.update(agent, component_list, t)
+
+    def update(self, agent: AbstractAgent, component_list, t: Union[int, float]):
+        data_rate_in = 0
+        power_out = 0
+        power_in = 0
+        power_tot = 0
+        for component in component_list:
+            self.isOn[component].append(component.is_on())
+
+            if (component.is_on()
+                    and type(component) != Transmitter
+                    and type(component) != Receiver):
+                data_rate_in += component.data_rate
+            if component.is_on():
+                if component.power > 0:
+                    power_in += component.power
+                else:
+                    power_out -= component.power
+                power_tot += component.power
+
+        self.data_rate_in.append(data_rate_in)
+        self.data_rate_out.append(agent.transmitter.data_rate)
+
+        self.data_buffer_in.append(agent.receiver.data_stored.level)
+        self.data_memory.append(agent.on_board_computer.data_stored.level)
+        self.data_buffer_out.append(agent.transmitter.data_stored.level)
+
         self.power_in.append(power_in)
         self.power_out.append(power_out)
-        self.energy_stored.append(energy_stored)
+        self.power_tot.append(power_tot)
 
-        self.data_rate.append(data_rate)
-        self.data_stored.append(data_stored)
+        self.energy_stored.append(agent.battery.energy_stored)
 
-    def get_last_state(self):
-        i = len(self.t) - 1
-
-        t = self.t[i]
-        power_deficit = self.power_deficit[i]
-        power_in = self.power_in[i]
-        power_out = self.power_out[i]
-        energy_stored = self.energy_stored[i]
-        energy_capacity = self.energy_capacity
-
-        data_rate = self.data_rate[i]
-        data_stored = self.data_stored[i]
-        data_capacity = self.data_capacity
-
-        return t, power_deficit, power_in, power_out, energy_stored, \
-               energy_capacity, data_rate, data_stored, data_capacity
-
+        self.t.append(t)
