@@ -11,6 +11,7 @@ class Planner:
         self.knowledge_base = knowledge_base
 
     def update(self, state, t):
+        # must consider current state, time, knowledge, and previously done or interrupted actions
         pass
 
     def get_plan(self, t):

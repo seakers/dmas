@@ -108,6 +108,7 @@ class AbstractAgent:
     '''
     ==========MAINTENANCE ACTIONS==========
     '''
+
     def perform_maintenance_actions(self, actions):
         for action in actions:
             if type(action) == ActuateAgentAction:
@@ -119,7 +120,7 @@ class AbstractAgent:
             else:
                 raise Exception(f"Maintenance task of type {type(action)} not yet supported.")
 
-            self.planner.completed_action(action)
+            self.planner.completed_action(action, self.env.now)
 
     def actuate_agent(self, action):
         # turn agent on or off
@@ -159,6 +160,7 @@ class AbstractAgent:
     '''
     ==========TASK ACTIONS==========
     '''
+
     def measure(self, action: MeasurementAction):
         try:
             # un package measurement information
@@ -177,6 +179,9 @@ class AbstractAgent:
 
             # inform planner of task completion
             self.planner.completed_action(action, self.env.now)
+
+            # update system status
+            return self.update_system()
         except simpy.Interrupt:
             # measurement interrupted
             instrument_list = action.instrument_list
@@ -189,7 +194,10 @@ class AbstractAgent:
         msg_timeout = self.env.process(self.env.timeout(msg.timeout))
         msg_transmission = self.env.process(self.transmitter.send_message(self.env, msg))
 
-        # TODO ADD CONTACT TIME RESTRICTIONS TO SEND MESSAGE
+        # TODO ADD CONTACT-TIME RESTRICTIONS TO SEND MESSAGE
+        #   wait_for_access = env.timeout(self.orbit_data.next_access(msg.dst) - self.env.now)
+        #   yield wait_for_access | timeout
+        #   only continue if wait is done but not timeout
 
         yield msg_timeout | msg_transmission
 
@@ -200,13 +208,18 @@ class AbstractAgent:
             self.planner.message_received(msg, self.env.now)
             if not msg_timeout:
                 msg_timeout.interrupt("Message successfully received!")
-        return
+
+        # integrate current state
+        return self.update_system()
 
     def charge(self, action):
         try:
             self.battery.charging = True
             self.env.timeout(action.end - action.start)
             self.battery.charging = False
+
+            # integrate current state
+            return self.update_system()
         except simpy.Interrupt:
             self.battery.charging = False
             self.planner.interrupted_action(action, self.env.now)
@@ -214,6 +227,7 @@ class AbstractAgent:
     '''
     ==========BACKGROUND ACTIONS==========
     '''
+
     def listening(self):
         if len(self.transmitter.received_messages) > 0:
             msg = self.transmitter.received_messages.pop()
@@ -235,32 +249,82 @@ class AbstractAgent:
         return
 
     def system_check(self):
-        pass
+        while True:
+            # check if system state is critical
+            if self.is_in_critical_state():
+                if self.state.is_critical():
+                    # if state is still critical after planner changes, kill agent
+                    kill = ActuateAgentAction(self.env.now, status=False)
+                    self.actuate_agent(kill)
+                else:
+                    self.state.critical = True
+                break
+            else:
+                self.state.critical = False
 
-    # def system_check(self):
-    #     while True:
-    #         # update components
-    #         self.update_components()
-    #
-    #         # update state
-    #         self.state.update(self.component_list, self.env.now)
-    #
-    #         # check for warnings, break if warning is found
-    #         t, power_deficit, power_in, power_out, energy_stored, \
-    #         energy_capacity, data_rate, data_stored, data_capacity = self.state.get_last_state()
-    #
-    #         # POWER CHECK
-    #         if power_deficit > 0 and not self.power_storage.charging:
-    #             break
-    #         elif power_deficit < 0:
-    #             break
-    #
-    #         # DATA CHECK
-    #         if data_rate > 0 and data_stored >= data_capacity:
-    #             break
-    #
-    #         # wait for one timestep
-    #         yield self.env.timeout(1)
+            # wait 1 second and continue
+            yield self.env.timeout(1)
+
+            # integrate current state at new time
+            self.update_system()
+
+    def update_system(self):
+        # count power and data usage
+        data_rate_in = 0
+        power_out = 0
+        power_in = 0
+        for component in self.component_list:
+            if component.is_on():
+                if component.power <= 0:
+                    power_out -= component.power
+                if type(component) != Receiver and type(component) != Transmitter:
+                    data_rate_in += component.data_rate
+                if type(component) == Receiver and type(component) == Transmitter:
+                    power_in += component.power
+        power_dif = power_in - power_out
+
+        # calculate time-step
+        dt = self.env.now - self.state.get_last_update_time()
+
+        # update values
+        # -data
+        yield self.on_board_computer.data_stored.put(data_rate_in * dt)
+        yield self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
+
+        # -power
+        power_charging = 0
+        if self.battery.is_charging() and power_dif >= 0:
+            power_charging += power_dif
+        if self.battery.is_on():
+            power_charging -= self.battery.power
+        self.battery.energy_stored.put(power_charging * dt)
+
+        # update in state tracking
+        self.state.update(self, self.component_list, self.env.now)
+
+    def is_in_critical_state(self):
+        data_rate_in, data_rate_out, data_rate_tot, \
+        data_buffer_in, data_buffer_out, data_memory, data_capacity, \
+        power_in, power_out, power_tot, energy_stored, energy_capacity, \
+        t, critical = self.state.get_latest_state()
+
+        if (1 - self.battery.energy_stored.level / self.battery.energy_capacity) > self.battery.dod:
+            # battery has reached its maximum depth-of-discharge level
+            return True
+        elif self.battery.energy_stored.level == self.battery.energy_capacity and self.battery.is_on():
+            # battery is full and is still charging
+            return True
+        elif power_tot < 0:
+            # insufficient power being generated
+            return True
+        elif power_tot > 0 and not self.battery.is_on():
+            # excess power being generated and not being used for charging
+            return True
+        elif self.on_board_computer.data_stored.level == self.on_board_computer.data_capacity and data_rate_in > 0:
+            # on-board memory full and data is coming in faster than it is leaving
+            return True
+
+        return False
 
     def set_other_agents(self, others):
         for other in others:

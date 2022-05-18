@@ -5,7 +5,7 @@ from src.agents.components.components import *
 
 
 class State:
-    def __init__(self, agent: AbstractAgent, component_list, t: Union[int,float]):
+    def __init__(self, agent: AbstractAgent, component_list, t: Union[int, float]):
         self.data_rate_in = []
         self.data_rate_out = []
         self.data_rate_total = []
@@ -25,7 +25,8 @@ class State:
         self.t = []
         self.t.append(t)
 
-        self.isOn = dict.fromkeys(component_list,[])
+        self.isOn = dict.fromkeys(component_list, [])
+        self.critical = False
 
         self.update(agent, component_list, t)
 
@@ -65,3 +66,32 @@ class State:
 
     def get_last_update_time(self):
         return self.t[-1]
+
+    def is_critical(self):
+        return self.critical
+
+    def get_latest_state(self):
+        data_rate_in = self.data_rate_in[-1]
+        data_rate_out = self.data_rate_out[-1]
+        data_rate_tot = self.data_rate_total[-1]
+
+        data_buffer_in = self.data_buffer_in[-1]
+        data_memory = self.data_memory[-1]
+        data_buffer_out = self.data_buffer_out[-1]
+        data_capacity = self.data_capacity
+
+        power_in = self.power_in[-1]
+        power_out = self.power_out[-1]
+        power_tot = self.power_tot[-1]
+
+        energy_stored = self.energy_stored[-1]
+        energy_capacity = self.energy_capacity
+
+        t = self.t[-1]
+
+        critical = self.critical
+
+        return data_rate_in, data_rate_out, data_rate_tot, \
+               data_buffer_in, data_buffer_out, data_memory, data_capacity, \
+               power_in, power_out, power_tot, energy_stored, energy_capacity, \
+               t, critical
