@@ -1,6 +1,5 @@
 import simpy
 from simpy import Environment
-
 from src.network.messages import Message
 
 
@@ -157,7 +156,7 @@ class Receiver(Component):
         self.inbox = simpy.Store(env)
         self.received_messages = []
 
-    def receive(self, env, msg, memory: OnBoardComputer):
+    def receive(self, env, msg, on_board_computer: OnBoardComputer):
         try:
             if self.data_rate + msg.data_rate > self.max_data_rate:
                 # The message being received requests a data-rate higher than the maximum
@@ -171,10 +170,11 @@ class Receiver(Component):
             msg.reception_time = env.now
             self.received_messages.append(msg)
 
-            yield memory.data_stored.put(msg.size)
+            yield on_board_computer.data_stored.put(msg.size)
 
             self.received_messages.remove(msg)
             self.data_stored.get(msg.size)
+
         except simpy.Interrupt:
             self.data_stored.get(msg.size)
             return

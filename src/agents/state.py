@@ -62,3 +62,6 @@ class State:
         self.energy_stored.append(agent.battery.energy_stored)
 
         self.t.append(t)
+
+    def get_last_update_time(self):
+        return self.t[-1]

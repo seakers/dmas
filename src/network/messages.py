@@ -1,7 +1,11 @@
+import math
+
+
 class Message:
-    def __init__(self, size, data_rate, message_id, content=None, src=None, dst=None):
+    def __init__(self, size, data_rate, message_id, timeout=math.inf, content=None, src=None, dst=None):
         self.start_time = -1
         self.reception_time = -1
+        self.timeout = timeout
         self.size = size
         self.data_rate = data_rate
         self.message_id = message_id
