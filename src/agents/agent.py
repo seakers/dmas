@@ -456,6 +456,27 @@ class AbstractAgent:
     '''
     MISCELANEOUS HELPING METHODS
     '''
+    def print_state(self):
+        """
+        Prints state history to csv file
+        :return:
+        """
+        filename = f'A{self.unique_id}_state.csv'
+        file_path = self.results_dir + filename
+
+        with open(file_path, 'w') as f:
+            for i in range(len(self.state.t)):
+                data_rate_in, data_rate_out, data_rate_tot, \
+                data_buffer_in, data_buffer_out, data_memory, data_capacity, \
+                power_in, power_out, power_tot, energy_stored, energy_capacity, \
+                t, critical = self.state.get_state_by_index(i)
+
+                f.write(f'{t}\t{self.unique_id}\t{power_in}\t{power_out}\t{power_tot}'
+                        f'\t{energy_stored}\t{energy_capacity}\t{energy_stored/energy_capacity}'
+                        f'\t{data_rate_in}\t{data_rate_out}\t{data_rate_tot}'
+                        f'\t{data_buffer_in}\t{data_buffer_out}\t{data_memory}\t{data_capacity}'
+                        f'\t{data_memory/data_capacity}\n')
+        f.close()
 
     def create_results_directory(self, unique_id):
         """

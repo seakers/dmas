@@ -7,8 +7,6 @@ from src.agents.components.components import *
 from src.agents.components.instruments import *
 from src.planners.planner import *
 
-
-
 n = 2
 env = simpy.Environment()
 agents = []
@@ -30,3 +28,8 @@ for agent in agents:
     env.process(agent.live())
 
 env.run()
+
+for agent in agents:
+    agent.print_state()
+
+

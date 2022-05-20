@@ -69,24 +69,24 @@ class State:
     def is_critical(self):
         return self.critical
 
-    def get_latest_state(self):
-        data_rate_in = self.data_rate_in[-1]
-        data_rate_out = self.data_rate_out[-1]
-        data_rate_tot = self.data_rate_total[-1]
+    def get_state_by_index(self, i):
+        data_rate_in = self.data_rate_in[i]
+        data_rate_out = self.data_rate_out[i]
+        data_rate_tot = self.data_rate_total[i]
 
-        data_buffer_in = self.data_buffer_in[-1]
-        data_memory = self.data_memory[-1]
-        data_buffer_out = self.data_buffer_out[-1]
+        data_buffer_in = self.data_buffer_in[i]
+        data_memory = self.data_memory[i]
+        data_buffer_out = self.data_buffer_out[i]
         data_capacity = self.data_capacity
 
-        power_in = self.power_in[-1]
-        power_out = self.power_out[-1]
-        power_tot = self.power_tot[-1]
+        power_in = self.power_in[i]
+        power_out = self.power_out[i]
+        power_tot = self.power_tot[i]
 
-        energy_stored = self.energy_stored[-1]
+        energy_stored = self.energy_stored[i]
         energy_capacity = self.energy_capacity
 
-        t = self.t[-1]
+        t = self.t[i]
 
         critical = self.critical
 
@@ -94,3 +94,6 @@ class State:
                data_buffer_in, data_buffer_out, data_memory, data_capacity, \
                power_in, power_out, power_tot, energy_stored, energy_capacity, \
                t, critical
+
+    def get_latest_state(self):
+        return self.get_state_by_index(-1)
