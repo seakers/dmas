@@ -53,7 +53,7 @@ class Transmitter(Component):
 
     def send_message(self, env: Environment, msg: Message, logger: Logger):
         '''
-        This function attempts to send a message to the destination specified in the message.
+        Attempts to send a message to the destination specified in the message.
         It waits for the transmitter to have enough room in its buffer to move message from
         the agent's on-board computer to the transmitter. It then requests a transmission and
         reception channel and waits until they are granted. The function then finally waits for
@@ -127,9 +127,6 @@ class Transmitter(Component):
             logger.debug(f'T{env.now}:\tReleasing reception channel...')
             receiver.channels.release(req_rcr)
 
-            self.data_rate -= msg.data_rate
-            if self.channels.count == 0:
-                self.turn_off()
             logger.debug(f'T{env.now}:\tTransmission protocol done!')
 
         except simpy.Interrupt:
@@ -146,13 +143,13 @@ class Transmitter(Component):
                 return
             elif channels_established and not transmission_started:
                 # transmission interrupted while waiting for receiver buffer allocation
+                logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
                 self.channels.release(req_trs)
                 receiver.channels.release(req_rcr)
                 self.data_stored.get(msg.size)
                 return
             else:
                 # transmission interrupted while broadcasting
-
                 # release channels used
                 self.channels.release(req_trs)
                 receiver.channels.release(req_rcr)

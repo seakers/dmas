@@ -241,6 +241,10 @@ class AbstractAgent:
             msg_transmission.interrupt("Message transmission timed out. Dropping packet")
             self.planner.interrupted_message(msg, self.env.now)
         elif msg_transmission.triggered:
+            self.transmitter.data_rate -= msg.data_rate
+            if self.transmitter.channels.count == 0:
+                self.transmitter.turn_off()
+
             self.planner.message_received(msg, self.env.now)
             self.logger.debug(f'T{self.env.now}:\tMessage transmitted successfully!')
 
@@ -248,7 +252,7 @@ class AbstractAgent:
                 msg_timeout.interrupt("Message transmitted successfully!")
 
         # integrate current state
-        return self.update_system()
+        self.update_system()
 
     def charge(self, action):
         try:
@@ -326,8 +330,10 @@ class AbstractAgent:
 
         # update values
         # -data
-        yield self.on_board_computer.data_stored.put(data_rate_in * dt)
-        yield self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
+        if data_rate_in > 0:
+            yield self.on_board_computer.data_stored.put(data_rate_in * dt)
+        if self.transmitter.data_rate > 0:
+            yield self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
 
         # -power
         power_charging = 0
@@ -335,7 +341,11 @@ class AbstractAgent:
             power_charging += power_dif
         if self.battery.is_on():
             power_charging -= self.battery.power
-        self.battery.energy_stored.put(power_charging * dt)
+
+        if power_charging > 0:
+            self.battery.energy_stored.put(power_charging * dt)
+        elif power_charging < 0:
+            self.battery.energy_stored.get(power_charging * dt)
 
         # update in state tracking
         self.state.update(self, self.component_list, self.env.now)
