@@ -1,3 +1,6 @@
+import logging
+import os
+
 from simpy import AllOf, AnyOf
 
 from src.agents.components.components import *
@@ -8,6 +11,10 @@ from src.planners.planner import Planner
 
 class AbstractAgent:
     def __init__(self, env, unique_id, component_list=None, planner: Planner = None):
+
+        self.results_dir = self.create_results_directory(unique_id)
+        self.logger = self.setup_logger(unique_id)
+
         self.alive = True
 
         self.env = env
@@ -37,6 +44,14 @@ class AbstractAgent:
         self.state = State(self, component_list, env.now)
 
     def live(self, env):
+        '''
+        self.logger.warning(f'T{self.env.now}:\tHello world!')
+        self.logger.debug(f'T{self.env.now}:\tPerforming a process...')
+        yield self.env.timeout(1)
+        self.logger.debug(f'T{self.env.now}:\tProcess Done!')
+        self.logger.warning(f'T{self.env.now}:\tKilling Agent. Goodnight.')
+        '''
+
         while self.alive:
             # update planner
             self.planner.update(self.state, env.now)
@@ -121,11 +136,17 @@ class AbstractAgent:
                 raise Exception(f"Maintenance task of type {type(action)} not yet supported.")
 
             self.planner.completed_action(action, self.env.now)
+        if len(actions) > 0:
+            self.logger.debug(f'T{self.env.now}:\tCompleted all maintenance actions.')
 
     def actuate_agent(self, action):
         # turn agent on or off
         status = action.status
         self.alive = status
+
+        self.logger.debug(f'T{self.env.now}:\tSetting life status to: {status}')
+        if not status:
+            self.logger.debug(f'T{self.env.now}:\tKilling agent...')
 
     def actuate_component(self, action):
         # actuate component described in action
@@ -134,28 +155,31 @@ class AbstractAgent:
 
         for component in self.component_list:
             if component == component_actuate:
-                component.status = status
+                if status:
+                    component.turn_on()
+                    self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
+                else:
+                    component.turn_off()
+                    self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}.')
                 break
 
     def delete_msg(self, action):
         # remove message from on-board memory and inform planner
         msg = action.msg
         self.on_board_computer.data_stored.get(msg.size)
-        self.planner.message_deleted(msg)
+        self.planner.message_deleted(msg, self.env.now)
+
+        self.logger.debug(f'T{self.env.now}:\tDeleted message of size {msg.size}')
 
     def turn_on_components(self, component_list):
-        for component_i in component_list:
-            for component_j in self.component_list:
-                if component_i == component_j:
-                    component_j.turn_on()
-                    break
+        for component in component_list:
+            actuate_action = ActuateComponentAction(component, self.env.now, status=True)
+            self.actuate_component(actuate_action)
 
     def turn_off_components(self, component_list):
-        for component_i in component_list:
-            for component_j in self.component_list:
-                if component_i == component_j:
-                    component_j.turn_off()
-                    break
+        for component in component_list:
+            actuate_action = ActuateComponentAction(component, self.env.now, status=False)
+            self.actuate_component(actuate_action)
 
     '''
     ==========TASK ACTIONS==========
@@ -163,14 +187,21 @@ class AbstractAgent:
 
     def measure(self, action: MeasurementAction):
         try:
+            self.logger.debug(f'T{self.env.now}:\tPreparing form measurement...')
+
             # un package measurement information
             instrument_list = action.instrument_list
             target = action.target
 
             # turn on components, collect information, and turn off components
             self.turn_on_components(instrument_list)
+            self.logger.debug(f'T{self.env.now}:\tAll instruments ready for measurement. Starting measurement...')
+
             yield self.env.timeout(action.end - action.start)
+            self.logger.debug(f'T{self.env.now}:\tCompleted measurement successfully!')
+
             self.turn_off_components(instrument_list)
+            self.logger.debug(f'T{self.env.now}:\tTurned off all instruments used measurement.')
 
             # process captured data
             # TODO ADD MEASUREMENT RESULTS TO PLANNER KNOWLEDGE BASE:
@@ -187,12 +218,16 @@ class AbstractAgent:
             instrument_list = action.instrument_list
             self.turn_off_components(instrument_list)
             self.planner.interrupted_action(action, self.env.now)
+            self.logger.debug(f'T{self.env.now}:\tMeasurement interrupted. '
+                              f'Turning off all instruments and waiting for further instructions.')
 
     def transmit(self, action):
+        self.logger.debug(f'T{self.env.now}:\tPreparing form transmission...')
+
         msg = action.msg
 
         msg_timeout = self.env.process(self.env.timeout(msg.timeout))
-        msg_transmission = self.env.process(self.transmitter.send_message(self.env, msg))
+        msg_transmission = self.env.process(self.transmitter.send_message(self.env, msg, self.logger))
 
         # TODO ADD CONTACT-TIME RESTRICTIONS TO SEND MESSAGE
         #   wait_for_access = env.timeout(self.orbit_data.next_access(msg.dst) - self.env.now)
@@ -202,12 +237,15 @@ class AbstractAgent:
         yield msg_timeout | msg_transmission
 
         if msg_timeout.triggered and not msg_transmission.triggered:
+            self.logger.debug(f'T{self.env.now}:\tMessage transmission timed out.')
             msg_transmission.interrupt("Message transmission timed out. Dropping packet")
             self.planner.interrupted_message(msg, self.env.now)
         elif msg_transmission.triggered:
             self.planner.message_received(msg, self.env.now)
+            self.logger.debug(f'T{self.env.now}:\tMessage transmitted successfully!')
+
             if not msg_timeout:
-                msg_timeout.interrupt("Message successfully received!")
+                msg_timeout.interrupt("Message transmitted successfully!")
 
         # integrate current state
         return self.update_system()
@@ -334,3 +372,37 @@ class AbstractAgent:
     def print_string(self, string):
         format_string = f"A{self.unique_id}-T{self.env.now}:\t"
         print(format_string + string)
+
+    '''
+    MISCELANEOUS HELPING METHODS
+    '''
+    def create_results_directory(self, unique_id):
+        directory_path = os.getcwd()
+        results_dir = directory_path + '/results/'
+
+        if not os.path.isdir(results_dir):
+            os.mkdir(results_dir)
+
+        if os.path.exists(results_dir + f'Agent{unique_id}.log'):
+            os.remove(results_dir + f'Agent{unique_id}.log')
+
+        return results_dir
+
+    def setup_logger(self, unique_id):
+        logger = logging.getLogger(f'A{unique_id}')
+        logger.setLevel(logging.DEBUG)
+
+        formatter = logging.Formatter('%(name)s-%(message)s')
+
+        file_handler = logging.FileHandler(self.results_dir + f'Agent{unique_id}.log')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.WARNING)
+        stream_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)
+
+        return logger

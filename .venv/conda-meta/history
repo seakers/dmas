@@ -19,3 +19,10 @@
 +conda-forge/osx-64::xz-5.2.5-haf1e3a3_1
 +conda-forge/osx-64::zlib-1.2.11-h6c3fc93_1014
 # update specs: ['python=3.10']
+==> 2022-05-19 10:23:18 <==
+# cmd: /Users/a.aguilar/opt/anaconda3/bin/conda install -p /Users/a.aguilar/Documents/GitHub/DMASpy/.venv certifi==2021.10.8 -y
+# conda version: 4.11.0
+-conda-forge/osx-64::ca-certificates-2021.10.8-h033912b_0
++conda-forge/osx-64::ca-certificates-2022.5.18-h033912b_0
++conda-forge/osx-64::certifi-2021.10.8-py310h2ec42d9_2
+# update specs: ['certifi==2021.10.8']

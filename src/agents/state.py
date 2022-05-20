@@ -1,11 +1,10 @@
 from typing import Union
 
-from src.agents.agent import AbstractAgent
 from src.agents.components.components import *
 
 
 class State:
-    def __init__(self, agent: AbstractAgent, component_list, t: Union[int, float]):
+    def __init__(self, agent, component_list, t: Union[int, float]):
         self.data_rate_in = []
         self.data_rate_out = []
         self.data_rate_total = []
@@ -30,7 +29,7 @@ class State:
 
         self.update(agent, component_list, t)
 
-    def update(self, agent: AbstractAgent, component_list, t: Union[int, float]):
+    def update(self, agent, component_list, t: Union[int, float]):
         data_rate_in = 0
         power_out = 0
         power_in = 0

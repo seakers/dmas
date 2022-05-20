@@ -1,3 +1,5 @@
+from logging import Logger
+
 import simpy
 from simpy import Environment
 from src.network.messages import Message
@@ -11,12 +13,12 @@ class Component:
         self.health = True
 
         self.power = power
-        if data_capacity > 0:
+        if energy_capacity > 0:
             self.energy_stored = simpy.Container(env, energy_capacity, energy_stored)
         self.energy_capacity = energy_capacity
 
         self.data_rate = data_rate
-        if energy_capacity > 0:
+        if data_capacity > 0:
             self.data_stored = simpy.Container(env, data_capacity, data_stored)
         self.data_capacity = data_capacity
 
@@ -49,7 +51,7 @@ class Transmitter(Component):
         self.num_channels = num_channels
         self.channels = simpy.Resource(env, num_channels)
 
-    def send_message(self, env: Environment, msg: Message):
+    def send_message(self, env: Environment, msg: Message, logger: Logger):
         '''
         This function attempts to send a message to the destination specified in the message.
         It waits for the transmitter to have enough room in its buffer to move message from
@@ -66,12 +68,17 @@ class Transmitter(Component):
         if msg.data_rate > self.max_data_rate:
             # The message being sent requests a data-rate higher than the maximum available
             # for this transmitter. Dropping packet.
+            logger.debug(f'T{env.now}:\tThe message being sent requests a data-rate higher than '
+                         f'the maximum available for this transmitter. Dropping packet.')
             return
 
         try:
             # request transmitter to allocate outgoing message into its buffer
+            logger.debug(f'T{env.now}:\tMoving message from internal memory to outgoing buffer...')
             yield self.data_stored.put(msg.size)
+            logger.debug(f'T{env.now}:\tMessage successfully moved to outgoing buffer.')
         except simpy.Interrupt:
+            logger.debug(f'T{env.now}:\tCould not move message to outgoing buffer.')
             return
 
         transmission_channel_established = False
@@ -83,15 +90,20 @@ class Transmitter(Component):
             req_trs = self.channels.request()
             req_rcr = receiver.channels.request()
 
+            logger.debug(f'T{env.now}:\tRequesting transmission channel...')
             yield req_trs
             transmission_channel_established = True
+            logger.debug(f'T{env.now}:\tTransmission channel obtained! Requesting reception channel...')
             yield req_rcr
             reception_channel_established = True
+            logger.debug(f'T{env.now}:\tReception channel obtained! Connection established.')
 
             channels_established = True
 
             # request receiver to allocate outgoing message into its buffer
+            logger.debug(f'T{env.now}:\tRequesting receiver to allocate message size in buffer...')
             yield receiver.data_stored.put(msg.size)
+            logger.debug(f'T{env.now}:\tBuffer memory allocated! Starting transmission...')
 
             # starting transmission
             transmission_started = True
@@ -103,23 +115,32 @@ class Transmitter(Component):
             if self.is_on():
                 self.data_rate += msg.data_rate
                 yield env.timeout(msg.size / msg.data_rate - (env.now - msg.start_time))
+                logger.debug(f'T{env.now}:\tTransmission complete!')
             else:
                 # Transmitter is not on after being told to do so. Must be faulty. Dropping packet
                 yield self.data_stored.get(msg.size)
+                logger.debug(f'T{env.now}:\tTransmitter will not turn on. Must be faulty. Dropping packet.')
 
             # end transmission
+            logger.debug(f'T{env.now}:\tReleasing transmission channel...')
             self.channels.release(req_trs)
+            logger.debug(f'T{env.now}:\tReleasing reception channel...')
             receiver.channels.release(req_rcr)
+
             self.data_rate -= msg.data_rate
             if self.channels.count == 0:
                 self.turn_off()
+            logger.debug(f'T{env.now}:\tTransmission protocol done!')
 
         except simpy.Interrupt:
+            logger.debug(f'T{env.now}:\tTransmission Interrupted. Dropping packet.')
             if not channels_established and not transmission_started:
                 # transmission interrupted during channel request
                 if transmission_channel_established:
+                    logger.debug(f'T{env.now}:\tReleasing transmission channel.')
                     self.channels.release(req_trs)
                 if reception_channel_established:
+                    logger.debug(f'T{env.now}:\tReleasing reception channel...')
                     receiver.channels.release(req_rcr)
                 self.data_stored.get(msg.size)
                 return
