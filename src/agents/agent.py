@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Union
 
 from simpy import AllOf, AnyOf
 
@@ -10,8 +11,18 @@ from src.planners.planner import Planner
 
 
 class AbstractAgent:
-    def __init__(self, env, unique_id, component_list=None, planner: Planner = None):
+    '''
 
+    '''
+
+    def __init__(self, env, unique_id, component_list=None, planner: Planner = None):
+        """
+        Abstract agent class.
+        :param env: Simulation environment
+        :param unique_id: id for agent
+        :param component_list: list of components of the agent
+        :param planner: planner used by the agent for assigning tasks
+        """
         self.results_dir = self.create_results_directory(unique_id)
         self.logger = self.setup_logger(unique_id)
 
@@ -39,22 +50,27 @@ class AbstractAgent:
             elif type(component) == Battery:
                 self.battery = component
 
+        if (self.transmitter is None or self.receiver is None or self.on_board_computer is None
+                or self.power_generator is None or self.battery is None):
+            raise Exception('Agent requires at least one of each of the following components:'
+                            ' transmitter, receiver, on-board computer, power generator, and battery')
+
         self.planner = planner
 
         self.state = State(self, component_list, env.now)
 
-    def live(self, env):
-        '''
-        self.logger.warning(f'T{self.env.now}:\tHello world!')
-        self.logger.debug(f'T{self.env.now}:\tPerforming a process...')
-        yield self.env.timeout(1)
-        self.logger.debug(f'T{self.env.now}:\tProcess Done!')
-        self.logger.warning(f'T{self.env.now}:\tKilling Agent. Goodnight.')
-        '''
-
+    def live(self):
+        """
+        Main function for agent.
+        This function cycles through receiving information from other agents and its environment, process
+        this information through the agent's planner, and performs the actions instructed by the planner. If a message
+        is received or if a critical state is detected by the agent, it will halt any concurrent actions and will
+        reassess its actions with its planner.
+        :return:
+        """
         while self.alive:
             # update planner
-            self.planner.update(self.state, env.now)
+            self.planner.update(self.state, self.env.now)
             plan = self.planner.update(self.state, self)
 
             # perform actions from planner
@@ -93,38 +109,18 @@ class AbstractAgent:
                 system_check.interrupt("Completed all planner tasks! Updating plan...")
                 listening.interrupt("Completed all planner tasks! Updating plan...")
 
-    def plan_to_events(self, actions):
-        events = []
-        maintenance = []
-        for action in actions:
-            action_event = None
-            mnt_event = None
-            if type(action) == ActuateAgentAction:
-                mnt_event = action
-            elif type(action) == ActuateComponentAction:
-                mnt_event = action
-            elif type(action) == DeleteMessageAction:
-                mnt_event = action
-
-            elif type(action) == MeasurementAction:
-                action_event = self.env.process(self.measure(action))
-            elif type(action) == TransmitAction:
-                action_event = self.env.process(self.transmit(action))
-            elif type(action) == ChargeAction:
-                action_event = self.env.process(self.charge(action))
-
-            if action_event is not None:
-                events.append(action_event)
-            if mnt_event is not None:
-                maintenance.append(mnt_event)
-
-        return events, maintenance
-
     '''
     ==========MAINTENANCE ACTIONS==========
     '''
 
     def perform_maintenance_actions(self, actions):
+        """
+        Performs a list of maintenance actions before performing other tasks. Maintenance tasks include actuating
+        components, actuating the agent, or deleting previously received messages to clear up space in the internal
+        memory of the agent's on-board computer
+        :param actions: List of actions to be performed by the agent
+        :return:
+        """
         for action in actions:
             if type(action) == ActuateAgentAction:
                 self.actuate_agent(action)
@@ -139,7 +135,12 @@ class AbstractAgent:
         if len(actions) > 0:
             self.logger.debug(f'T{self.env.now}:\tCompleted all maintenance actions.')
 
-    def actuate_agent(self, action):
+    def actuate_agent(self, action: ActuateAgentAction):
+        """
+        Turns agent on or off.
+        :param action: Action instruction from the planner indicating the state of the agent
+        :return:
+        """
         # turn agent on or off
         status = action.status
         self.alive = status
@@ -148,22 +149,42 @@ class AbstractAgent:
         if not status:
             self.logger.debug(f'T{self.env.now}:\tKilling agent...')
 
-    def actuate_component(self, action):
+    def actuate_component(self, action: Union[ActuateComponentAction, ActuatePowerComponentAction]):
+        """
+        Turns components on and off.
+        :param action: Action instruction from the planner indicating which component to actuate
+        :return:
+        """
         # actuate component described in action
         component_actuate = action.component
         status = action.status
 
         for component in self.component_list:
             if component == component_actuate:
-                if status:
-                    component.turn_on()
-                    self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
+                if type(action) == ActuatePowerComponentAction:
+                    power = action.power
+                    if status:
+                        component.turn_on_generator(power)
+                        self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
+                    else:
+                        component.turn_off_generator()
+                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}.')
+                    break
                 else:
-                    component.turn_off()
-                    self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}.')
-                break
+                    if status:
+                        component.turn_on()
+                        self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
+                    else:
+                        component.turn_off()
+                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}.')
+                    break
 
-    def delete_msg(self, action):
+    def delete_msg(self, action: DeleteMessageAction):
+        """
+        Deletes a message from the agent's internal on-board memory
+        :param action:
+        :return:
+        """
         # remove message from on-board memory and inform planner
         msg = action.msg
         self.on_board_computer.data_stored.get(msg.size)
@@ -186,6 +207,11 @@ class AbstractAgent:
     '''
 
     def measure(self, action: MeasurementAction):
+        """
+        Performs a measurement of a given ground point.
+        :param action: Action instruction from the planner indicating what measurement to perform with which instruments
+        :return:
+        """
         try:
             self.logger.debug(f'T{self.env.now}:\tPreparing form measurement...')
 
@@ -221,7 +247,16 @@ class AbstractAgent:
             self.logger.debug(f'T{self.env.now}:\tMeasurement interrupted. '
                               f'Turning off all instruments and waiting for further instructions.')
 
-    def transmit(self, action):
+    def transmit(self, action: TransmitAction):
+        """
+        Sends a message to another agent. The method forwards a copy of the message to its outgoing buffer and waits to
+        establish communications channels with the receiver agent. Once established it will start the transmission. The
+        method keeps track of the time between the start and end of the transmission. If the transmission takes longer
+        than the predetermined message timeout period, it will stop the transmission and drop the packet.
+
+        :param action: Action instruction from the planner indicating what message will be transmitted
+        :return:
+        """
         self.logger.debug(f'T{self.env.now}:\tPreparing form transmission...')
 
         msg = action.msg
@@ -254,7 +289,13 @@ class AbstractAgent:
         # integrate current state
         self.update_system()
 
-    def charge(self, action):
+    def charge(self, action: ChargeAction):
+        """
+        Turns on battery charge status. This will inform update_system() to re-route any excess power being generated
+        into the battery so it may be charged at every time-step.
+        :param action: Action instruction from the planner indicating start and end time to charging procedure
+        :return:
+        """
         try:
             self.battery.charging = True
             self.env.timeout(action.end - action.start)
@@ -271,13 +312,20 @@ class AbstractAgent:
     '''
 
     def listening(self):
+        """
+        Background tasks that listens for incoming messages. Once a header file is received, it will wait for the rest
+        of the message to be received in its incoming buffer so it can pass it to the agent's internal memory. The
+        method will wait if there is no memory available in the internal memory. If the wait time goes over a message's
+        timeout period it will drop said packet to make room for other incoming packets.
+        :return:
+        """
         if len(self.transmitter.received_messages) > 0:
             msg = self.transmitter.received_messages.pop()
         else:
             msg = (yield self.receiver.inbox.get())
 
         msg_timeout = self.env.process(self.env.timeout(msg.timeout))
-        msg_reception = self.env.process(self.receiver.receive(self.env, msg, self.on_board_computer))
+        msg_reception = self.env.process(self.receiver.receive(self.env, msg, self.on_board_computer, self.logger))
 
         yield msg_timeout | msg_reception
 
@@ -291,6 +339,14 @@ class AbstractAgent:
         return
 
     def system_check(self):
+        """
+        Background task that checks the agent's system every second. If it detects that the agent is in a critical
+        state, it will terminate and inform the agent, forcing it to reevaluate its state and ask the planner how it
+        should react to the system state.
+        If the planner is unable to fix the critical state, this method will order the agent to deactivate and end its
+        mission.
+        :return:
+        """
         while True:
             # check if system state is critical
             if self.is_in_critical_state():
@@ -311,6 +367,13 @@ class AbstractAgent:
             self.update_system()
 
     def update_system(self):
+        """
+        Updates the amount of data and energy stored in the on-board computer, transmitter and receiver buffers,
+        and battery. Sums the rates coming in for both data and power and integrates using the last state's time and
+        the current time to determine the time-step of integration.
+        Once this agent's components have been updated, it records this state in the agent's state property.
+        :return:
+        """
         # count power and data usage
         data_rate_in = 0
         power_out = 0
@@ -351,6 +414,12 @@ class AbstractAgent:
         self.state.update(self, self.component_list, self.env.now)
 
     def is_in_critical_state(self):
+        """
+        Checks if current state is a critical state. Checks for batteries being below their maximum depth-of-discharge
+        or being overcharged, checks to see if power is being properly supplied to other components, and checks if there
+        is a memory overflow in the internal memory.
+        :return:
+        """
         data_rate_in, data_rate_out, data_rate_tot, \
         data_buffer_in, data_buffer_out, data_memory, data_capacity, \
         power_in, power_out, power_tot, energy_stored, energy_capacity, \
@@ -375,18 +444,26 @@ class AbstractAgent:
         return False
 
     def set_other_agents(self, others):
+        """
+        Gives the agent a list of all of the other agents that exist in this simulation
+        :param others: list of other agents
+        :return:
+        """
         for other in others:
             if other is not self:
                 self.other_agents.append(other)
 
-    def print_string(self, string):
-        format_string = f"A{self.unique_id}-T{self.env.now}:\t"
-        print(format_string + string)
-
     '''
     MISCELANEOUS HELPING METHODS
     '''
+
     def create_results_directory(self, unique_id):
+        """
+        Creates a results directory for this particular scenario if it has not been created yet. Initializes a new
+        logger report for this particular agent
+        :param unique_id: agent's unique ID
+        :return:
+        """
         directory_path = os.getcwd()
         results_dir = directory_path + '/results/'
 
@@ -399,6 +476,11 @@ class AbstractAgent:
         return results_dir
 
     def setup_logger(self, unique_id):
+        """
+        Sets up logger for this agent
+        :param unique_id: agent's unique ID
+        :return:
+        """
         logger = logging.getLogger(f'A{unique_id}')
         logger.setLevel(logging.DEBUG)
 
@@ -416,3 +498,35 @@ class AbstractAgent:
         logger.addHandler(stream_handler)
 
         return logger
+
+    def plan_to_events(self, actions):
+        """
+        Converts planner actions to executable events
+        :param actions: list of actions to be performed
+        :return:
+        """
+        events = []
+        maintenance = []
+        for action in actions:
+            action_event = None
+            mnt_event = None
+            if type(action) == ActuateAgentAction:
+                mnt_event = action
+            elif type(action) == ActuateComponentAction:
+                mnt_event = action
+            elif type(action) == DeleteMessageAction:
+                mnt_event = action
+
+            elif type(action) == MeasurementAction:
+                action_event = self.env.process(self.measure(action))
+            elif type(action) == TransmitAction:
+                action_event = self.env.process(self.transmit(action))
+            elif type(action) == ChargeAction:
+                action_event = self.env.process(self.charge(action))
+
+            if action_event is not None:
+                events.append(action_event)
+            if mnt_event is not None:
+                maintenance.append(mnt_event)
+
+        return events, maintenance

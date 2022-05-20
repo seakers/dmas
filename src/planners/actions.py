@@ -27,6 +27,12 @@ class ActuateComponentAction(Action):
         self.status = status
 
 
+class ActuatePowerComponentAction(ActuateComponentAction):
+    def __init__(self, component, start, power):
+        super().__init__(component, start)
+        self.power = power
+
+
 class DeleteMessageAction(Action):
     def __init__(self, msg, start):
         super().__init__('delete_message', start, start + 1)
