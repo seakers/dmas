@@ -71,7 +71,7 @@ class AbstractAgent:
         while self.alive:
             # update planner
             self.planner.update(self.state, self.env.now)
-            plan = self.planner.update(self.state, self)
+            plan = self.planner.get_plan(self.env.now)
 
             # perform actions from planner
             tasks, maintenance_actions = self.plan_to_events(plan)
@@ -160,10 +160,10 @@ class AbstractAgent:
         status = action.status
 
         for component in self.component_list:
-            if component == component_actuate:
+            if component.name == component_actuate.name:
                 if type(action) == ActuatePowerComponentAction:
                     power = action.power
-                    if status:
+                    if power > 0:
                         component.turn_on_generator(power)
                         self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
                     else:
@@ -238,11 +238,11 @@ class AbstractAgent:
             self.planner.completed_action(action, self.env.now)
 
             # update system status
-            return self.update_system()
-        except simpy.Interrupt:
+            yield self.env.process(self.update_components())
+            return
+        except simpy.Interrupt as i:
             # measurement interrupted
-            instrument_list = action.instrument_list
-            self.turn_off_components(instrument_list)
+            # self.turn_off_components(action.instrument_list)
             self.planner.interrupted_action(action, self.env.now)
             self.logger.debug(f'T{self.env.now}:\tMeasurement interrupted. '
                               f'Turning off all instruments and waiting for further instructions.')
@@ -287,7 +287,8 @@ class AbstractAgent:
                 msg_timeout.interrupt("Message transmitted successfully!")
 
         # integrate current state
-        self.update_system()
+        yield self.env.process(self.update_components())
+        return
 
     def charge(self, action: ChargeAction):
         """
@@ -298,12 +299,13 @@ class AbstractAgent:
         """
         try:
             self.battery.charging = True
-            self.env.timeout(action.end - action.start)
+            yield self.env.timeout(action.end - action.start)
             self.battery.charging = False
 
             # integrate current state
-            return self.update_system()
-        except simpy.Interrupt:
+            yield self.env.process( self.update_components())
+            return
+        except simpy.Interrupt as i:
             self.battery.charging = False
             self.planner.interrupted_action(action, self.env.now)
 
@@ -319,8 +321,8 @@ class AbstractAgent:
         timeout period it will drop said packet to make room for other incoming packets.
         :return:
         """
-        if len(self.transmitter.received_messages) > 0:
-            msg = self.transmitter.received_messages.pop()
+        if len(self.receiver.received_messages) > 0:
+            msg = self.receiver.received_messages.pop()
         else:
             msg = (yield self.receiver.inbox.get())
 
@@ -348,8 +350,15 @@ class AbstractAgent:
         :return:
         """
         while True:
+            self.logger.debug(f'T{self.env.now}:\tPerforming system check.')
+
+            # integrate current state at new time
+            yield self.env.process(self.update_components())
+
             # check if system state is critical
             if self.is_in_critical_state():
+                self.logger.debug(f'T{self.env.now}:\tCritical state reached!')
+
                 if self.state.is_critical():
                     # if state is still critical after planner changes, kill agent
                     kill = ActuateAgentAction(self.env.now, status=False)
@@ -363,10 +372,8 @@ class AbstractAgent:
             # wait 1 second and continue
             yield self.env.timeout(1)
 
-            # integrate current state at new time
-            self.update_system()
-
-    def update_system(self):
+    def update_components(self):
+        # return 1
         """
         Updates the amount of data and energy stored in the on-board computer, transmitter and receiver buffers,
         and battery. Sums the rates coming in for both data and power and integrates using the last state's time and
@@ -384,7 +391,7 @@ class AbstractAgent:
                     power_out -= component.power
                 if type(component) != Receiver and type(component) != Transmitter:
                     data_rate_in += component.data_rate
-                if type(component) == Receiver and type(component) == Transmitter:
+                if type(component) == Battery and type(component) == PowerGenerator:
                     power_in += component.power
         power_dif = power_in - power_out
 
@@ -393,9 +400,9 @@ class AbstractAgent:
 
         # update values
         # -data
-        if data_rate_in > 0:
+        if data_rate_in * dt > 0:
             yield self.on_board_computer.data_stored.put(data_rate_in * dt)
-        if self.transmitter.data_rate > 0:
+        if self.transmitter.data_rate * dt > 0:
             yield self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
 
         # -power
@@ -412,6 +419,7 @@ class AbstractAgent:
 
         # update in state tracking
         self.state.update(self, self.component_list, self.env.now)
+        return
 
     def is_in_critical_state(self):
         """
@@ -423,7 +431,7 @@ class AbstractAgent:
         data_rate_in, data_rate_out, data_rate_tot, \
         data_buffer_in, data_buffer_out, data_memory, data_capacity, \
         power_in, power_out, power_tot, energy_stored, energy_capacity, \
-        t, critical = self.state.get_latest_state()
+        t, critical, isOn = self.state.get_latest_state()
 
         if (1 - self.battery.energy_stored.level / self.battery.energy_capacity) > self.battery.dod:
             # battery has reached its maximum depth-of-discharge level
@@ -512,7 +520,7 @@ class AbstractAgent:
         file_handler.setFormatter(formatter)
 
         stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(logging.WARNING)
+        stream_handler.setLevel(logging.DEBUG)
         stream_handler.setFormatter(formatter)
 
         logger.addHandler(file_handler)

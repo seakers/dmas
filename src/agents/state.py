@@ -22,7 +22,6 @@ class State:
         self.energy_capacity = agent.battery.data_capacity
 
         self.t = []
-        self.t.append(t)
 
         self.isOn = dict.fromkeys(component_list, [])
         self.critical = False
@@ -35,7 +34,12 @@ class State:
         power_in = 0
         power_tot = 0
         for component in component_list:
-            self.isOn[component].append(component.is_on())
+            #   TODO FIX Does not store values correctly:
+            content = []
+            for status in self.isOn[component]:
+                content.append(status)
+            content.append(component.is_on())
+            self.isOn[component] = content
 
             if (component.is_on()
                     and type(component) != Transmitter
@@ -50,6 +54,7 @@ class State:
 
         self.data_rate_in.append(data_rate_in)
         self.data_rate_out.append(agent.transmitter.data_rate)
+        self.data_rate_total.append(data_rate_in - agent.transmitter.data_rate)
 
         self.data_buffer_in.append(agent.receiver.data_stored.level)
         self.data_memory.append(agent.on_board_computer.data_stored.level)
@@ -59,7 +64,7 @@ class State:
         self.power_out.append(power_out)
         self.power_tot.append(power_tot)
 
-        self.energy_stored.append(agent.battery.energy_stored)
+        self.energy_stored.append(agent.battery.energy_stored.level)
 
         self.t.append(t)
 
@@ -90,10 +95,25 @@ class State:
 
         critical = self.critical
 
+        isOn = dict.fromkeys(self.isOn.keys())
+        for key in self.isOn.keys():
+            isOn[key] = self.isOn[key][i]
+
         return data_rate_in, data_rate_out, data_rate_tot, \
                data_buffer_in, data_buffer_out, data_memory, data_capacity, \
                power_in, power_out, power_tot, energy_stored, energy_capacity, \
-               t, critical
+               t, critical, isOn
 
     def get_latest_state(self):
         return self.get_state_by_index(-1)
+
+    def __str__(self):
+        data_rate_in, data_rate_out, data_rate_tot, \
+        data_buffer_in, data_buffer_out, data_memory, data_capacity, \
+        power_in, power_out, power_tot, energy_stored, energy_capacity, \
+        t, critical, isOn = self.get_latest_state()
+
+        return f'Data Rates: {data_rate_in}, {data_rate_out}, {data_rate_tot}\n' \
+               f'Data Stored: {data_buffer_in}, {data_buffer_out}, {data_memory}, {data_capacity} \n' \
+               f'Power: {power_in}, {power_out}, {power_tot}\n' \
+               f'Energy Stored: {energy_stored}, {energy_capacity}'

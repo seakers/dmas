@@ -59,6 +59,9 @@ class Component:
         """
         self.status = False
 
+    def __str__(self):
+        return f"{(self.name).capitalize()}"
+
 
 class OnBoardComputer(Component):
     def __init__(self, env, power, memory_size):
@@ -222,7 +225,7 @@ class Receiver(Component):
         """
         super().__init__(env=env, name='receiver', power=-power, energy_stored=0, energy_capacity=0,
                          data_rate=0, data_stored=0, data_capacity=buffer_size,
-                         status=False)
+                         status=True)
         self.max_data_rate = max_data_rate
         self.num_channels = num_channels
         self.channels = simpy.Resource(env, num_channels)
@@ -241,6 +244,7 @@ class Receiver(Component):
         :return:
         '''
         try:
+            # TODO only allow for message reception when component is on
             if self.data_rate + msg.data_rate > self.max_data_rate:
                 # The message being received requests a data-rate higher than the maximum
                 # available for this transmitter. Dropping packet.
@@ -276,17 +280,19 @@ class PowerGenerator(Component):
         :param env: Simulated environment
         :param power_generation: Maximum power to be generated
         """
-        super().__init__(env, name='generator', power=power_generation, energy_stored=0,
+        super().__init__(env, name='generator', power=0, energy_stored=0,
                          energy_capacity=0, data_rate=0, data_stored=0, data_capacity=0,
-                         status=True)
+                         status=False)
         self.max_power_generation = power_generation
 
     def turn_on_generator(self, power_out):
+        if power_out <= 0:
+            raise ArithmeticError("Power generated must be greater than 0")
         if self.health:
             if power_out <= self.max_power_generation:
                 self.power = power_out
             else:
-                self.power = power_out
+                self.power = self.max_power_generation
 
     def turn_off_generator(self):
         self.power = 0
@@ -302,7 +308,7 @@ class Battery(Component):
         :param dod: Maximum depth-of-discharge allowed.
             TODO: if charge is below DOD then set battery health to False. Should prevent it from charging in the future.
         """
-        super().__init__(env=env, name='battery', power=max_power_generation,
+        super().__init__(env=env, name='battery', power=0,
                          energy_stored=energy_capacity, energy_capacity=energy_capacity,
                          data_rate=0, data_stored=0, data_capacity=0, status=False)
         self.charging = False
@@ -315,11 +321,13 @@ class Battery(Component):
         return self.charging
 
     def turn_on_generator(self, power_out):
+        if power_out <= 0:
+            raise ArithmeticError("Power generated must be greater than 0")
         if self.health:
             if power_out <= self.max_power_generation:
                 self.power = power_out
             else:
-                self.power = power_out
+                self.power = self.max_power_generation
 
     def turn_off_generator(self):
         self.power = 0
