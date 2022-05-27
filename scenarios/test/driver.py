@@ -25,9 +25,9 @@ for i in range(n):
 
 for agent in agents:
     agent.set_other_agents(agents)
-    env.process(agent.live())
+    # env.process(agent.live())
 
-env.run()
+env.run(10)
 
 for agent in agents:
     agent.print_state()

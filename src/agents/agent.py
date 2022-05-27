@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Union
 
+import simpy
 from simpy import AllOf, AnyOf
 
 from src.agents.components.components import *
@@ -56,8 +57,12 @@ class AbstractAgent:
                             ' transmitter, receiver, on-board computer, power generator, and battery')
 
         self.planner = planner
+        self.plan = simpy.Store(self.env)
+        self.actions = []
 
         self.state = State(self, component_list, env.now)
+
+        # self.live_proc = self.env.process(self.live())
 
     def live(self):
         """
@@ -68,46 +73,100 @@ class AbstractAgent:
         reassess its actions with its planner.
         :return:
         """
-        while self.alive:
-            # update planner
-            self.planner.update(self.state, self.env.now)
-            plan = self.planner.get_plan(self.env.now)
+        try:
+            while self.alive:
+                # update planner
+                self.planner.update(self.state, self.env.now)
 
-            # perform actions from planner
-            tasks, maintenance_actions = self.plan_to_events(plan)
-            listening = self.env.process(self.listening())
-            system_check = self.env.process(self.system_check())
+                # perform background tasks
+                listening = self.env.process(self.listening())
+                system_check = self.env.process(self.system_check())
+                planner_wait = self.env.process(self.wait_for_plan())
 
-            # -perform maintenance actions first
-            self.perform_maintenance_actions(maintenance_actions)
+                # request planner for next actions to perform
+                yield planner_wait | listening | system_check
 
-            # -check if agent is still alive after maintenance actions
-            if not self.alive:
-                break
+                if system_check.triggered:
+                    self.planner.update(self.state, self.env.now)
 
-            # -performs other actions while listening for incoming
-            #  messages and performing system checks
-            if len(tasks) > 0:
-                yield AllOf(self.env, tasks) | listening | system_check
-            else:
-                yield listening | system_check
+                    timeout = self.env.timeout(1)
+                    yield planner_wait | timeout
+                    if timeout.triggered and not planner_wait.triggered:
+                        # if state is critical and planner proposes no changes, kill agent
+                        kill = ActuateAgentAction(self.env.now, status=False)
+                        self.actuate_agent(kill)
 
-            # -interrupt all actions being performed in case a message
-            #  is received or a critical system state is detected
-            if listening.triggered or system_check.triggered:
-                for task in tasks:
-                    if not task.triggered:
-                        if listening.triggered:
-                            task.interrupt("New message received! Reevaluating plan...")
-                        elif system_check.triggered:
-                            task.interrupt("WARING - Critical system state reached! Reevaluating plan...")
-            if listening.triggered and not system_check.triggered:
-                system_check.interrupt("New message received! Reevaluating plan...")
-            elif not listening.triggered and system_check.triggered:
-                listening.interrupt("WARING - Critical system state reached! Reevaluating plan...")
-            elif not listening.triggered and not system_check.triggered:
-                system_check.interrupt("Completed all planner tasks! Updating plan...")
-                listening.interrupt("Completed all planner tasks! Updating plan...")
+                if planner_wait.triggered:
+                    # received actions from planner
+                    tasks, maintenance_actions = self.plan_to_events()
+
+                    # -perform maintenance actions first
+                    self.perform_maintenance_actions(maintenance_actions)
+
+                    # -check if agent is still alive after maintenance actions
+                    if not self.alive:
+                        break
+                    elif system_check.triggered:
+                        system_check = self.env.process(self.system_check())
+
+                    # -performs other actions while listening for incoming
+                    #  messages and performing system checks
+                    if len(tasks) > 0:
+                        yield AllOf(self.env, tasks) | listening | system_check
+
+                        # -interrupt all actions being performed in case a message
+                        #  is received or a critical system state is detected
+                        if listening.triggered or system_check.triggered:
+                            for task in tasks:
+                                if not task.triggered:
+                                    if listening.triggered:
+                                        task.interrupt("New message received! Reevaluating plan...")
+                                    elif system_check.triggered:
+                                        task.interrupt("WARING - Critical system state reached! Reevaluating plan...")
+                                yield task
+
+                        if listening.triggered and not system_check.triggered:
+                            system_check.interrupt("New message received! Reevaluating plan...")
+                            yield system_check
+                        elif not listening.triggered and system_check.triggered:
+                            listening.interrupt("WARNING - Critical system state reached! Reevaluating plan...")
+                            yield listening
+                        elif not listening.triggered and not system_check.triggered:
+                            system_check.interrupt("Completed all planner tasks! Updating plan...")
+                            listening.interrupt("Completed all planner tasks! Updating plan...")
+                            yield system_check & listening
+
+                        # if system_check.triggered:
+                        #     self.planner.update(self.state, self.env.now)
+                        #
+                        #     planner_wait = self.env.process(self.wait_for_plan())
+                        #
+                        #     timeout = self.env.timeout(1)
+                        #     yield planner_wait | timeout
+                        #     if timeout.triggered and not planner_wait.triggered:
+                        #         # if state is critical and planner proposes no changes, kill agent
+                        #         kill = ActuateAgentAction(self.env.now, status=False)
+                        #         self.actuate_agent(kill)
+                        #
+                        #     # received actions from planner
+                        #     tasks, maintenance_actions = self.plan_to_events()
+                        #
+                        #     # -perform maintenance actions first
+                        #     self.perform_maintenance_actions(maintenance_actions)
+
+                    # -if only maintenance actions were performed, continue to next step
+                    elif not listening.triggered and not system_check.triggered:
+                        system_check.interrupt("Completed all planner tasks! Updating plan...")
+                        listening.interrupt("Completed all planner tasks! Updating plan...")
+                        yield system_check & listening
+
+                if listening.triggered and not system_check.triggered and not planner_wait.triggered:
+                    planner_wait.interrupt("New message received! Reevaluating plan...")
+                    system_check.interrupt("New message received! Reevaluating plan...")
+                    yield system_check & planner_wait
+
+        except simpy.Interrupt:
+            self.logger.debug(f'T{self.env.now}: good night!')
 
     '''
     ==========MAINTENANCE ACTIONS==========
@@ -124,16 +183,17 @@ class AbstractAgent:
         for action in actions:
             if type(action) == ActuateAgentAction:
                 self.actuate_agent(action)
-            elif type(action) == ActuateComponentAction:
+            elif type(action) == ActuateComponentAction or type(action) == ActuatePowerComponentAction:
                 self.actuate_component(action)
             elif type(action) == DeleteMessageAction:
                 self.delete_msg(action)
             else:
                 raise Exception(f"Maintenance task of type {type(action)} not yet supported.")
 
-            self.planner.completed_action(action, self.env.now)
+            self.planner.completed_action(action, self.state, self.env.now)
         if len(actions) > 0:
             self.logger.debug(f'T{self.env.now}:\tCompleted all maintenance actions.')
+            self.update_components()
 
     def actuate_agent(self, action: ActuateAgentAction):
         """
@@ -164,19 +224,24 @@ class AbstractAgent:
                 if type(action) == ActuatePowerComponentAction:
                     power = action.power
                     if power > 0:
+                        prev_status = component.status
                         component.turn_on_generator(power)
-                        self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
+                        if not prev_status:
+                            self.logger.debug(f'T{self.env.now}:\tTurning on {component.name} with power {component.power}W...')
+                        else:
+                            self.logger.debug(
+                                f'T{self.env.now}:\tRegulating {component.name} power to {component.power}W...')
                     else:
                         component.turn_off_generator()
-                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}.')
+                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}...')
                     break
                 else:
                     if status:
                         component.turn_on()
-                        self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}.')
+                        self.logger.debug(f'T{self.env.now}:\tTurning on {component.name}...')
                     else:
                         component.turn_off()
-                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}.')
+                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}...')
                     break
 
     def delete_msg(self, action: DeleteMessageAction):
@@ -213,18 +278,20 @@ class AbstractAgent:
         :return:
         """
         try:
-            self.logger.debug(f'T{self.env.now}:\tPreparing form measurement...')
+            self.logger.debug(f'T{self.env.now}:\tPreparing for measurement...')
 
             # un package measurement information
             instrument_list = action.instrument_list
             target = action.target
 
             # turn on components, collect information, and turn off components
-            self.turn_on_components(instrument_list)
-            self.logger.debug(f'T{self.env.now}:\tAll instruments ready for measurement. Starting measurement...')
+            # self.turn_on_components(instrument_list)
+            # self.logger.debug(f'T{self.env.now}:\tAll instruments ready for measurement. Starting measurement...')
 
             yield self.env.timeout(action.end - action.start)
             self.logger.debug(f'T{self.env.now}:\tCompleted measurement successfully!')
+
+            self.update_components()
 
             self.turn_off_components(instrument_list)
             self.logger.debug(f'T{self.env.now}:\tTurned off all instruments used measurement.')
@@ -235,15 +302,15 @@ class AbstractAgent:
             #   planner.update_knowledge_base(measurement_results=results)
 
             # inform planner of task completion
-            self.planner.completed_action(action, self.env.now)
+            self.planner.completed_action(action, self.state, self.env.now)
 
             # update system status
-            yield self.env.process(self.update_components())
+            self.update_components()
             return
         except simpy.Interrupt as i:
             # measurement interrupted
             # self.turn_off_components(action.instrument_list)
-            self.planner.interrupted_action(action, self.env.now)
+            self.planner.interrupted_action(action, self.state, self.env.now)
             self.logger.debug(f'T{self.env.now}:\tMeasurement interrupted. '
                               f'Turning off all instruments and waiting for further instructions.')
 
@@ -287,7 +354,7 @@ class AbstractAgent:
                 msg_timeout.interrupt("Message transmitted successfully!")
 
         # integrate current state
-        yield self.env.process(self.update_components())
+        self.update_components()
         return
 
     def charge(self, action: ChargeAction):
@@ -303,15 +370,31 @@ class AbstractAgent:
             self.battery.charging = False
 
             # integrate current state
-            yield self.env.process( self.update_components())
+            self.update_components()
             return
         except simpy.Interrupt as i:
             self.battery.charging = False
-            self.planner.interrupted_action(action, self.env.now)
+            self.planner.interrupted_action(action, self.state, self.env.now)
 
     '''
     ==========BACKGROUND ACTIONS==========
     '''
+    def wait_for_plan(self):
+        """
+        Background task that waits for the planner's next instructions
+        :return:
+        """
+        try:
+            action = yield self.plan.get()
+            self.actions.append(action)
+
+            while len(self.plan.items) > 0:
+                action = yield self.plan.get()
+                self.actions.append(action)
+
+            self.logger.debug(f'T{self.env.now}:\tReceived actions from planner!')
+        except simpy.Interrupt:
+            return
 
     def listening(self):
         """
@@ -321,59 +404,123 @@ class AbstractAgent:
         timeout period it will drop said packet to make room for other incoming packets.
         :return:
         """
-        if len(self.receiver.received_messages) > 0:
-            msg = self.receiver.received_messages.pop()
-        else:
-            msg = (yield self.receiver.inbox.get())
+        self.logger.debug(f'T{self.env.now}:\tWaiting for any incoming transmission...')
+        try:
+            if len(self.receiver.received_messages) > 0:
+                msg = self.receiver.received_messages.pop()
+            else:
+                msg = (yield self.receiver.inbox.get())
 
-        msg_timeout = self.env.process(self.env.timeout(msg.timeout))
-        msg_reception = self.env.process(self.receiver.receive(self.env, msg, self.on_board_computer, self.logger))
+            msg_timeout = self.env.process(self.env.timeout(msg.timeout))
+            msg_reception = self.env.process(self.receiver.receive(self.env, msg, self.on_board_computer, self.logger))
 
-        yield msg_timeout | msg_reception
+            self.logger.debug(f'T{self.env.now}:\tStarting message reception from A{msg.src.unique_id}!')
+            yield msg_timeout | msg_reception
 
-        if msg_timeout.triggered and not msg_reception.triggered:
-            msg_reception.interrupt("Message reception timed out. Dropping packet")
-        if msg_reception.triggered:
-            self.planner.measurement_received(msg)
-            if not msg_timeout.triggered:
-                msg_timeout.interrupt("Message successfully received!")
+            if msg_timeout.triggered and not msg_reception.triggered:
+                msg_reception.interrupt("Message reception timed out. Dropping packet")
+                self.logger.debug(f'T{self.env.now}:\tMessage reception from A{msg.src.unique_id} timed out. Dropping packet...')
+            if msg_reception.triggered:
+                self.planner.measurement_received(msg)
+                self.logger.debug(f'T{self.env.now}:\tReceived message from A{msg.src.unique_id}!')
+                if not msg_timeout.triggered:
+                    msg_timeout.interrupt("Message successfully received!")
+        except simpy.Interrupt as i:
+            self.logger.debug(f'T{self.env.now}:\tMessage reception paused.')
 
         return
 
     def system_check(self):
         """
-        Background task that checks the agent's system every second. If it detects that the agent is in a critical
-        state, it will terminate and inform the agent, forcing it to reevaluate its state and ask the planner how it
-        should react to the system state.
-        If the planner is unable to fix the critical state, this method will order the agent to deactivate and end its
-        mission.
+        Background task that checks the agent's system is in a critical state. If not, it will estimate its next possible
+        critical state will be if the current state of use is maintained and will wait until those times have passed. If
+        they have, it will check if the system is in fact critical. If this is not the case, it will check every second
+        until it detects a critical state occurring.
         :return:
         """
-        while True:
+        try:
+            # while True:
             self.logger.debug(f'T{self.env.now}:\tPerforming system check.')
 
             # integrate current state at new time
-            yield self.env.process(self.update_components())
+            self.update_components()
 
             # check if system state is critical
-            if self.is_in_critical_state():
-                self.logger.debug(f'T{self.env.now}:\tCritical state reached!')
+            critical, cause = self.is_in_critical_state()
+            if critical:
+                self.logger.debug(f'T{self.env.now}:\tCritical state reached! {cause}')
 
-                if self.state.is_critical():
-                    # if state is still critical after planner changes, kill agent
-                    kill = ActuateAgentAction(self.env.now, status=False)
-                    self.actuate_agent(kill)
-                else:
-                    self.state.critical = True
-                break
+                # if self.state.is_critical():
+                #     kill = ActuateAgentAction(self.env.now, status=False)
+                #     self.actuate_agent(kill)
+
+                self.state.critical = True
+
             else:
                 self.state.critical = False
 
-            # wait 1 second and continue
-            yield self.env.timeout(1)
+                data_rate_in, data_rate_out, data_rate_tot, \
+                data_buffer_in, data_buffer_out, data_memory, data_capacity, \
+                power_in, power_out, power_tot, energy_stored, energy_capacity, \
+                t, critical, isOn = self.state.get_latest_state()
+
+                timers = []
+                # check when battery will reach full charge
+                if self.battery.is_charging():
+                    dx = self.battery.energy_capacity-self.battery.energy_stored.level
+                    dxdt = power_tot - self.battery.power
+                    if dxdt > 0:
+                        dt = dx / dxdt
+                        battery_charging_timer = self.env.timeout(dt)
+                        timers.append(battery_charging_timer)
+
+                # check when battery will go below DOD
+                if self.battery.is_on():
+                    dx = self.battery.energy_capacity * (1 - self.battery.dod) - self.battery.energy_stored.level
+                    dxdt = power_tot - self.battery.power
+                    dt = dx / dxdt
+                    if dt > 0:
+                        battery_dod_timer = self.env.timeout(dt)
+                        timers.append(battery_dod_timer)
+
+                # check when memory will fill up
+                dx = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
+                dxdt = data_rate_in + self.receiver.data_rate - self.transmitter.data_rate
+                if dxdt > 0:
+                    dt = dx / dxdt
+                    memory_full_timer = self.env.timeout(dt)
+                    timers.append(memory_full_timer)
+
+                # check when memory will empty
+                dx = -self.on_board_computer.data_stored.level
+                dxdt = data_rate_in + self.receiver.data_rate - self.transmitter.data_rate
+                if dxdt < 0:
+                    dt = dx / dxdt
+                    memory_empty_timer = self.env.timeout(dt)
+                    timers.append(memory_empty_timer)
+
+                yield AnyOf(self.env, timers)
+
+                self.update_components()
+                critical, cause = self.is_in_critical_state()
+
+                while not critical:
+                    yield self.env.timeout(1)
+                    self.update_components()
+                    critical, cause = self.is_in_critical_state()
+
+                self.state.critical = True
+
+        except simpy.Interrupt:
+            # if not self.state.critical:
+            #     for timer in timers:
+            #         timer.interrupt('kill')
+
+            self.state.critical = False
+            self.logger.debug(f'T{self.env.now}:\tSystem check paused.')
+            return
 
     def update_components(self):
-        # return 1
         """
         Updates the amount of data and energy stored in the on-board computer, transmitter and receiver buffers,
         and battery. Sums the rates coming in for both data and power and integrates using the last state's time and
@@ -401,9 +548,17 @@ class AbstractAgent:
         # update values
         # -data
         if data_rate_in * dt > 0:
-            yield self.on_board_computer.data_stored.put(data_rate_in * dt)
-        if self.transmitter.data_rate * dt > 0:
-            yield self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
+            dD = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
+            if dD > data_rate_in * dt:
+                self.on_board_computer.data_stored.put(data_rate_in * dt)
+            else:
+                self.on_board_computer.data_stored.put(dD)
+
+        if self.transmitter.data_rate * dt > 0 and self.transmitter.data_stored.level > 0:
+            if self.transmitter.data_stored.level >= self.transmitter.data_rate * dt:
+                self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
+            else:
+                self.transmitter.data_stored.get(self.transmitter.data_stored.level)
 
         # -power
         power_charging = 0
@@ -419,6 +574,9 @@ class AbstractAgent:
 
         # update in state tracking
         self.state.update(self, self.component_list, self.env.now)
+
+        # debuggind output
+        # self.logger.debug(f'T{self.env.now}:\n{self.state}')
         return
 
     def is_in_critical_state(self):
@@ -428,28 +586,31 @@ class AbstractAgent:
         is a memory overflow in the internal memory.
         :return:
         """
+        criticalState = False
+        cause = ''
+
         data_rate_in, data_rate_out, data_rate_tot, \
         data_buffer_in, data_buffer_out, data_memory, data_capacity, \
         power_in, power_out, power_tot, energy_stored, energy_capacity, \
         t, critical, isOn = self.state.get_latest_state()
 
         if (1 - self.battery.energy_stored.level / self.battery.energy_capacity) > self.battery.dod:
-            # battery has reached its maximum depth-of-discharge level
-            return True
+            cause = 'Battery has reached its maximum depth-of-discharge level'
+            criticalState = True
         elif self.battery.energy_stored.level == self.battery.energy_capacity and self.battery.is_on():
-            # battery is full and is still charging
-            return True
+            cause = 'Battery is full and is still charging.'
+            criticalState = True
         elif power_tot < 0:
-            # insufficient power being generated
-            return True
+            cause = f'Insufficient power being generated (P_in={power_in}, P_out={power_out})'
+            criticalState = True
         elif power_tot > 0 and not self.battery.is_on():
-            # excess power being generated and not being used for charging
-            return True
+            cause = f'Excess power being generated and is not being used for charging (P_in={power_in}, P_out={power_out})'
+            criticalState = True
         elif self.on_board_computer.data_stored.level == self.on_board_computer.data_capacity and data_rate_in > 0:
-            # on-board memory full and data is coming in faster than it is leaving
-            return True
+            cause = f'Pn-board memory full and data is coming in faster than it is leaving.'
+            criticalState = True
 
-        return False
+        return criticalState, cause
 
     def set_other_agents(self, others):
         """
@@ -473,17 +634,19 @@ class AbstractAgent:
         file_path = self.results_dir + filename
 
         with open(file_path, 'w') as f:
+            f.write('t,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_out,d_mem,d_cap,d_ptg\n')
+
             for i in range(len(self.state.t)):
                 data_rate_in, data_rate_out, data_rate_tot, \
                 data_buffer_in, data_buffer_out, data_memory, data_capacity, \
                 power_in, power_out, power_tot, energy_stored, energy_capacity, \
-                t, critical = self.state.get_state_by_index(i)
+                t, critical, isOn = self.state.get_state_by_index(i)
 
-                f.write(f'{t}\t{self.unique_id}\t{power_in}\t{power_out}\t{power_tot}'
-                        f'\t{energy_stored}\t{energy_capacity}\t{energy_stored/energy_capacity}'
-                        f'\t{data_rate_in}\t{data_rate_out}\t{data_rate_tot}'
-                        f'\t{data_buffer_in}\t{data_buffer_out}\t{data_memory}\t{data_capacity}'
-                        f'\t{data_memory/data_capacity}\n')
+                f.write(f'{t},{self.unique_id},{power_in},{power_out},{power_tot}'
+                        f',{energy_stored},{energy_capacity}'
+                        f',{data_rate_in},{data_rate_out},{data_rate_tot}'
+                        f',{data_buffer_in},{data_buffer_out},{data_memory},{data_capacity}'
+                        f',{data_memory/data_capacity}\n')
         f.close()
 
     def create_results_directory(self, unique_id):
@@ -528,7 +691,7 @@ class AbstractAgent:
 
         return logger
 
-    def plan_to_events(self, actions):
+    def plan_to_events(self):
         """
         Converts planner actions to executable events
         :param actions: list of actions to be performed
@@ -536,18 +699,26 @@ class AbstractAgent:
         """
         events = []
         maintenance = []
-        for action in actions:
+        for action in self.actions:
             action_event = None
             mnt_event = None
             if type(action) == ActuateAgentAction:
                 mnt_event = action
             elif type(action) == ActuateComponentAction:
                 mnt_event = action
+            elif type(action) == ActuatePowerComponentAction:
+                mnt_event = action
             elif type(action) == DeleteMessageAction:
                 mnt_event = action
 
             elif type(action) == MeasurementAction:
                 action_event = self.env.process(self.measure(action))
+
+                for instrument in action.instrument_list:
+                    mnt_event = ActuateComponentAction(instrument, self.env.now, status=True)
+                    maintenance.append(mnt_event)
+                mnt_event = None
+
             elif type(action) == TransmitAction:
                 action_event = self.env.process(self.transmit(action))
             elif type(action) == ChargeAction:
@@ -557,5 +728,7 @@ class AbstractAgent:
                 events.append(action_event)
             if mnt_event is not None:
                 maintenance.append(mnt_event)
+
+        self.actions = []
 
         return events, maintenance

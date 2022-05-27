@@ -5,6 +5,8 @@ from src.agents.components.components import *
 
 class State:
     def __init__(self, agent, component_list, t: Union[int, float]):
+        self.parent_agent = agent
+
         self.data_rate_in = []
         self.data_rate_out = []
         self.data_rate_total = []
@@ -19,7 +21,7 @@ class State:
         self.power_tot = []
 
         self.energy_stored = []
-        self.energy_capacity = agent.battery.data_capacity
+        self.energy_capacity = agent.battery.energy_capacity
 
         self.t = []
 

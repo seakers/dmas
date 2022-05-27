@@ -293,6 +293,7 @@ class PowerGenerator(Component):
                 self.power = power_out
             else:
                 self.power = self.max_power_generation
+            self.turn_on()
 
     def turn_off_generator(self):
         self.power = 0
