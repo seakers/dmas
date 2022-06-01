@@ -25,7 +25,7 @@ class State:
 
         self.t = []
 
-        self.isOn = dict.fromkeys(component_list, [])
+        self.is_on = dict.fromkeys(component_list, [])
         self.critical = False
 
         self.update(agent, component_list, t)
@@ -38,10 +38,10 @@ class State:
         for component in component_list:
             #   TODO FIX Does not store values correctly:
             content = []
-            for status in self.isOn[component]:
+            for status in self.is_on[component]:
                 content.append(status)
             content.append(component.is_on())
-            self.isOn[component] = content
+            self.is_on[component] = content
 
             if (component.is_on()
                     and type(component) != Transmitter
@@ -97,14 +97,14 @@ class State:
 
         critical = self.critical
 
-        isOn = dict.fromkeys(self.isOn.keys())
-        for key in self.isOn.keys():
-            isOn[key] = self.isOn[key][i]
+        is_on = dict.fromkeys(self.is_on.keys())
+        for key in self.is_on.keys():
+            is_on[key] = self.is_on[key][i]
 
         return data_rate_in, data_rate_out, data_rate_tot, \
                data_buffer_in, data_buffer_out, data_memory, data_capacity, \
                power_in, power_out, power_tot, energy_stored, energy_capacity, \
-               t, critical, isOn
+               t, critical, is_on
 
     def get_latest_state(self):
         return self.get_state_by_index(-1)
@@ -113,7 +113,7 @@ class State:
         data_rate_in, data_rate_out, data_rate_tot, \
         data_buffer_in, data_buffer_out, data_memory, data_capacity, \
         power_in, power_out, power_tot, energy_stored, energy_capacity, \
-        t, critical, isOn = self.get_latest_state()
+        t, critical, is_on = self.get_latest_state()
 
         return f'Data Rates: {data_rate_in}, {data_rate_out}, {data_rate_tot}\n' \
                f'Data Stored: {data_buffer_in}, {data_buffer_out}, {data_memory}, {data_capacity} \n' \

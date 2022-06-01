@@ -4,7 +4,7 @@ from src.agents.state import State
 
 
 class StatePredictor:
-    def predict_state(self, init_state: State, t_f):
+    def predict_future_state(self, init_state: State, is_on, t_f):
         """
         predicts future state at time t
         :param init_state: initial state
@@ -38,7 +38,8 @@ class StatePredictor:
 
         # check when battery will go below DOD
         if parent_agent.battery.is_on():
-            dx = parent_agent.battery.energy_capacity * (1 - parent_agent.battery.dod) - parent_agent.battery.energy_stored.level
+            dx = parent_agent.battery.energy_capacity * (
+                    1 - parent_agent.battery.dod) - parent_agent.battery.energy_stored.level
             dxdt = power_tot - parent_agent.battery.power
             dt = dx / dxdt
             if dt > 0:

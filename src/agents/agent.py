@@ -200,7 +200,9 @@ class AbstractAgent:
         self.logger.debug(f'T{self.env.now}:\tSetting life status to: {status}')
         if not status:
             self.logger.debug(f'T{self.env.now}:\tKilling agent...')
-        self.update_components()
+            self.turn_off_components(self.component_list)
+
+        self.update_system()
 
     def actuate_component(self, action: Union[ActuateComponentAction, ActuatePowerComponentAction]):
         """
@@ -212,7 +214,7 @@ class AbstractAgent:
         component_actuate = action.component
         status = action.status
 
-        self.update_components()
+        self.update_system()
         for component in self.component_list:
             if component.name == component_actuate.name:
                 if type(action) == ActuatePowerComponentAction:
@@ -237,7 +239,7 @@ class AbstractAgent:
                         component.turn_off()
                         self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}...')
                     break
-        self.update_components()
+        self.update_system()
 
     def delete_msg(self, action: DeleteMessageAction):
         """
@@ -279,14 +281,8 @@ class AbstractAgent:
             instrument_list = action.instrument_list
             target = action.target
 
-            # turn on components, collect information, and turn off components
-            # self.turn_on_components(instrument_list)
-            # self.logger.debug(f'T{self.env.now}:\tAll instruments ready for measurement. Starting measurement...')
-
             yield self.env.timeout(action.end - action.start)
             self.logger.debug(f'T{self.env.now}:\tCompleted measurement successfully!')
-
-            # self.update_components()
 
             self.turn_off_components(instrument_list)
             self.logger.debug(f'T{self.env.now}:\tTurned off all instruments used measurement.')
@@ -438,7 +434,7 @@ class AbstractAgent:
             self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
 
             # integrate current state at new time
-            self.update_components()
+            self.update_system()
 
             # check if system state is critical
             critical, cause = self.is_in_critical_state()
@@ -454,12 +450,12 @@ class AbstractAgent:
 
                 yield timer
 
-                self.update_components()
+                self.update_system()
                 critical, cause = self.is_in_critical_state()
 
                 while not critical:
                     yield self.env.timeout(1)
-                    self.update_components()
+                    self.update_system()
                     critical, cause = self.is_in_critical_state()
 
                 self.state.critical = True
@@ -473,7 +469,7 @@ class AbstractAgent:
             self.logger.debug(f'T{self.env.now}:\tSystem check paused. {i.cause}')
             return
 
-    def update_components(self):
+    def update_system(self):
         """
         Updates the amount of data and energy stored in the on-board computer, transmitter and receiver buffers,
         and battery. Sums the rates coming in for both data and power and integrates using the last state's time and
@@ -529,7 +525,7 @@ class AbstractAgent:
         self.state.update(self, self.component_list, self.env.now)
 
         # debugging output
-        self.logger.debug(f'T{self.env.now}:\tUpdated component status.')
+        self.logger.debug(f'T{self.env.now}:\tUpdated system status.')
         return
 
     def is_in_critical_state(self):
@@ -587,19 +583,27 @@ class AbstractAgent:
         file_path = self.results_dir + filename
 
         with open(file_path, 'w') as f:
-            f.write('t,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_out,d_mem,d_cap,d_ptg\n')
+            f.write('t,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_out,d_mem,d_cap,d_ptg')
+            comp_names = self.state.is_on.keys()
+            for comp_name in comp_names:
+                f.write(f',{comp_name.name}')
+            f.write('\n')
 
             for i in range(len(self.state.t)):
                 data_rate_in, data_rate_out, data_rate_tot, \
                 data_buffer_in, data_buffer_out, data_memory, data_capacity, \
                 power_in, power_out, power_tot, energy_stored, energy_capacity, \
-                t, critical, isOn = self.state.get_state_by_index(i)
+                t, critical, is_on = self.state.get_state_by_index(i)
 
                 f.write(f'{t},{self.unique_id},{power_in},{power_out},{power_tot}'
                         f',{energy_stored},{energy_capacity}'
                         f',{data_rate_in},{data_rate_out},{data_rate_tot}'
                         f',{data_buffer_in},{data_buffer_out},{data_memory},{data_capacity}'
-                        f',{data_memory/data_capacity}\n')
+                        f',{data_memory/data_capacity}')
+                for comp_name in comp_names:
+                    f.write(f',{int(is_on[comp_name] == True)}')
+                f.write('\n')
+
         f.close()
 
     def create_results_directory(self, unique_id):

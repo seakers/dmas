@@ -28,15 +28,18 @@ class PowerTracking(Planner):
                 self.instrument = component
 
     def update(self, state, t):
-        if self.scenario == 1:
+        if self.scenario <= 2:
             if t == 0 and len(self.plan) == 0:
                 measurement = MeasurementAction([self.instrument], None, 1, 8.5)
                 measurement_prc = self.env.process(self.schedule_action(measurement, state, t))
                 self.plan.append(measurement_prc)
 
-                # kill = ActuateAgentAction(20.0, status=False)
-                # kill_prc = self.env.process(self.schedule_action(kill, state, t))
+                # kill = ActuateAgentAction(10.0)
+                # kill_prc = self.env.process(self.schedule_action(measurement_prc, state, t))
                 # self.plan.append(kill_prc)
+        elif self.scenario <= 3:
+            if t == 0 and len(self.plan) == 0:
+                pass
         else:
             raise ImportError(f'Power Unit Testing scenario number {self.scenario} not yet supported.')
 
@@ -88,6 +91,5 @@ class PowerTracking(Planner):
         return
 
     def interrupted_action(self, action: Action, state: State, t):
-        if self.scenario == 1:
-            action_prc = self.env.process(self.schedule_action(action, state, t))
-            self.plan.append(action_prc)
+        action_prc = self.env.process(self.schedule_action(action, state, t))
+        self.plan.append(action_prc)
