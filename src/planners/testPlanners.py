@@ -33,6 +33,10 @@ class PowerTracking(Planner):
                 measurement = MeasurementAction([self.instrument], None, 1, 8.5)
                 measurement_prc = self.env.process(self.schedule_action(measurement, state, t))
                 self.plan.append(measurement_prc)
+
+                # kill = ActuateAgentAction(20.0, status=False)
+                # kill_prc = self.env.process(self.schedule_action(kill, state, t))
+                # self.plan.append(kill_prc)
         else:
             raise ImportError(f'Power Unit Testing scenario number {self.scenario} not yet supported.')
 

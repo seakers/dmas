@@ -300,23 +300,27 @@ class PowerGenerator(Component):
         self.turn_off()
 
 class Battery(Component):
-    def __init__(self, env, max_power_generation, energy_capacity, dod):
+    def __init__(self, env, max_power_generation, energy_capacity, dod=1, initial_charge=1):
         """
         Battery component in charge of storing energy and providing power when actuated
         :param env: Simulation environment
         :param max_power_generation: Maximum power provided by battery when turned on
         :param energy_capacity: Maximum power storage capacity of the battery
         :param dod: Maximum depth-of-discharge allowed.
+        :param initial_charge: Initial charge
             TODO: if charge is below DOD then set battery health to False. Should prevent it from charging in the future.
         """
         super().__init__(env=env, name='battery', power=0,
-                         energy_stored=energy_capacity, energy_capacity=energy_capacity,
+                         energy_stored=initial_charge*energy_capacity, energy_capacity=energy_capacity,
                          data_rate=0, data_stored=0, data_capacity=0, status=False)
+
         self.charging = False
         self.max_power_generation = max_power_generation
         self.dod = dod
         if not (0 <= dod <= 1):
             raise IOError("Depth-of-Discharge can only be a value between 0 and 1.")
+        elif not (0 <= initial_charge <= 1):
+            raise IOError("Initial charge can only be a value between 0 and 1.")
 
     def is_charging(self):
         return self.charging
@@ -329,6 +333,7 @@ class Battery(Component):
                 self.power = power_out
             else:
                 self.power = self.max_power_generation
+            self.turn_on()
 
     def turn_off_generator(self):
         self.power = 0
