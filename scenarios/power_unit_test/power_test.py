@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # SIMULATION SETUP
 T = 30
 n = 1
-scenario = 1
+scenario = 3
 env = simpy.Environment()
 agents = []
 component_list = None
@@ -41,7 +41,7 @@ for i in range(n):
         generator = PowerGenerator(env, 10)
         battery = Battery(env, 10, 100, initial_charge=0.5)
         onboardcomp = OnBoardComputer(env, 1, 100)
-        ins = Instrument(env, 'instrument', 8, 1)
+        ins = Instrument(env, 'instrument', 18, 1)
 
     else:
         raise Exception("Scenario not yet supported")

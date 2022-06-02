@@ -17,8 +17,8 @@ class Planner:
         # must consider current state, time, knowledge, and previously done or interrupted actions
         pass
 
-    def schedule_action(self, action: Action, state: State, t):
-        duration = action.start - t
+    def schedule_action(self, action: Action, state: State, t_curr):
+        duration = action.start - t_curr
         if duration < 0:
             duration = 0
 

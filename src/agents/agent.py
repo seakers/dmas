@@ -362,10 +362,20 @@ class AbstractAgent:
         :return:
         """
         try:
+            self.logger.debug(f'T{self.env.now}:\tStarting battery charging. Initial charge of '
+                              f'{self.battery.energy_stored.level/self.battery.energy_capacity*100}%')
             yield self.env.timeout(action.end - action.start)
+
+            self.update_system()
+
             self.battery.turn_off_charge()
+            self.logger.debug(f'T{self.env.now}:\tSuccessfully completed battery charging! Final charge of '
+                              f'{self.battery.energy_stored.level / self.battery.energy_capacity * 100}%')
             return
         except simpy.Interrupt as i:
+            self.update_system()
+            self.logger.debug(f'T{self.env.now}:\tPaused battery charging! {i.cause} Current charge of '
+                              f'{self.battery.energy_stored.level / self.battery.energy_capacity * 100}%')
             self.battery.turn_off_charge()
             self.planner.interrupted_action(action, self.state, self.env.now)
 
@@ -659,6 +669,12 @@ class AbstractAgent:
         events = []
         maintenance = []
         for action in self.actions:
+            if action.start != self.env.now:
+                self.logger.debug(f'T{self.env.now}:\tAttempting to perform action of type '
+                                  f'{type(action)} past its start time t_start={action.start}. '
+                                  f'Skipping action.')
+                continue
+
             action_event = None
             mnt_event = None
             if type(action) == ActuateAgentAction:
