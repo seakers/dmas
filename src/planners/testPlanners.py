@@ -34,12 +34,11 @@ class PowerTracking(Planner):
                 measurement_prc = self.env.process(self.schedule_action(measurement, state, t))
                 self.plan.append(measurement_prc)
 
-                # kill = ActuateAgentAction(10.0)
-                # kill_prc = self.env.process(self.schedule_action(measurement_prc, state, t))
-                # self.plan.append(kill_prc)
         elif self.scenario <= 3:
             if t == 0 and len(self.plan) == 0:
-                pass
+                power_on = ActuatePowerComponentAction(self.power_generator, 1, self.power_generator.max_power_generation)
+                power_on_prc = self.env.process(self.schedule_action(power_on, state, t))
+                self.plan.append(power_on_prc)
         else:
             raise ImportError(f'Power Unit Testing scenario number {self.scenario} not yet supported.')
 
@@ -67,10 +66,11 @@ class PowerTracking(Planner):
                 # power surplus
                 power_off = None
                 if (self.battery.energy_stored.level < self.battery.energy_capacity
-                        and self.battery.power < power_tot):
+                        and self.battery.power < power_tot and not self.battery.is_charging()):
                     # if battery not up to capacity, charge batteries
                     start = t
                     dt = (self.battery.energy_capacity - self.battery.energy_stored.level)/(power_tot - self.battery.power)
+                    # dt = 30
                     end = start + dt
 
                     power_off = ChargeAction(start, end)
@@ -91,5 +91,8 @@ class PowerTracking(Planner):
         return
 
     def interrupted_action(self, action: Action, state: State, t):
-        action_prc = self.env.process(self.schedule_action(action, state, t))
-        self.plan.append(action_prc)
+        if self.scenario <= 2:
+            action_prc = self.env.process(self.schedule_action(action, state, t))
+            self.plan.append(action_prc)
+        else:
+            pass

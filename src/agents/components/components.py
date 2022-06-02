@@ -322,6 +322,12 @@ class Battery(Component):
         elif not (0 <= initial_charge <= 1):
             raise IOError("Initial charge can only be a value between 0 and 1.")
 
+    def turn_on_charge(self):
+        self.charging = True
+
+    def turn_off_charge(self):
+        self.charging = False
+
     def is_charging(self):
         return self.charging
 

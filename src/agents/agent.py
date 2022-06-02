@@ -147,6 +147,12 @@ class AbstractAgent:
                                     elif system_check.triggered:
                                         task.interrupt("Critical system state detected!")
                                 yield task
+
+                            # restart background tasks when needed
+                            if system_check.triggered:
+                                system_check = self.env.process(self.system_check())
+                            if listening.triggered:
+                                listening = self.env.process(self.listening())
                         else:
                             # all planner tasks completed and state is nominal. restarting system check
                             system_check.interrupt("Completed planner instructions.")
@@ -356,15 +362,11 @@ class AbstractAgent:
         :return:
         """
         try:
-            self.battery.charging = True
             yield self.env.timeout(action.end - action.start)
-            self.battery.charging = False
-
-            # integrate current state
-            # self.update_components()
+            self.battery.turn_off_charge()
             return
         except simpy.Interrupt as i:
-            self.battery.charging = False
+            self.battery.turn_off_charge()
             self.planner.interrupted_action(action, self.state, self.env.now)
 
     '''
@@ -446,7 +448,7 @@ class AbstractAgent:
                 dt_min = self.state_predictor.predict_next_critical_sate(self.state)
                 timer = self.env.timeout(dt_min)
 
-                self.logger.debug(f'T{self.env.now}:\tState nominal. Next predicted critical state in T-{dt_min}s')
+                self.logger.debug(f'T{self.env.now}:\tState nominal. Next predicted critical state at T{self.env.now + dt_min}')
 
                 yield timer
 
@@ -487,7 +489,7 @@ class AbstractAgent:
                     power_out -= component.power
                 if type(component) != Receiver and type(component) != Transmitter:
                     data_rate_in += component.data_rate
-                if type(component) == Battery and type(component) == PowerGenerator:
+                if type(component) == Battery or type(component) == PowerGenerator:
                     power_in += component.power
         power_dif = power_in - power_out
 
@@ -678,7 +680,9 @@ class AbstractAgent:
 
             elif type(action) == TransmitAction:
                 action_event = self.env.process(self.transmit(action))
+
             elif type(action) == ChargeAction:
+                self.battery.charging = True
                 action_event = self.env.process(self.charge(action))
 
             if action_event is not None:

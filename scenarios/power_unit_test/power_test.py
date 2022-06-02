@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # SIMULATION SETUP
 T = 30
 n = 1
-scenario = 3
+scenario = 1
 env = simpy.Environment()
 agents = []
 component_list = None
@@ -23,7 +23,7 @@ for i in range(n):
         transmitter = Transmitter(env, 1, 1, 10, 1)
         receiver = Receiver(env, 1, 1, 10, 1)
         generator = PowerGenerator(env, 10)
-        battery = Battery(env, 0, 100, initial_charge=1)
+        battery = Battery(env, 0, 100)
         onboardcomp = OnBoardComputer(env, 1, 100)
         ins = Instrument(env, 'instrument', 8, 1)
 
@@ -31,7 +31,7 @@ for i in range(n):
         transmitter = Transmitter(env, 1, 1, 10, 1)
         receiver = Receiver(env, 1, 1, 10, 1)
         generator = PowerGenerator(env, 0)
-        battery = Battery(env, 10, 100, initial_charge=1)
+        battery = Battery(env, 10, 100)
         onboardcomp = OnBoardComputer(env, 1, 100)
         ins = Instrument(env, 'instrument', 8, 1)
 
