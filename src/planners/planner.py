@@ -6,7 +6,7 @@ from src.planners.actions import *
 class Planner:
     def __init__(self, env, knowledge_base=None):
         self.env = env
-        self.plan = []
+        self.plan = {}
         self.active_plan = []
         self.completed_plan = []
         self.interrupted_plan = []
@@ -27,20 +27,28 @@ class Planner:
         state.parent_agent.plan.put(action)
 
     def completed_action(self, action: Action, state: State, t):
-        # self.active_plan.remove(action)
+        if type(action) == TransmitAction:
+            delete = DeleteMessageAction(action.msg, t)
+            delete_prc = self.env.process(self.schedule_action(delete, state, t))
+            self.plan[delete] = delete_prc
+
+        action.complete()
+        self.plan.pop(action)
         self.completed_plan.append((action, t))
 
     def interrupted_action(self, action: Action, state: State, t):
-        # self.active_plan.remove(action)
+        self.plan.pop(action)
         self.interrupted_plan.append((action, t))
 
-    def interrupted_message(self, msg, t):
+    def interrupted_message(self, msg, state: State, t):
         pass
 
-    def timed_out_message(self, msg, t):
+    def timed_out_message(self, msg, state: State, t):
         pass
 
-    def message_received(self, msg, t):
+    def message_received(self, msg, state: State, t):
+        delete = DeleteMessageAction(msg, t)
+        self.schedule_action(delete, state, t)
         pass
 
     def message_deleted(self, msg, t):

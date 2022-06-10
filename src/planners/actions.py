@@ -6,12 +6,23 @@ class Action:
         self.action_type = action_type
         self.start = start
         self.end = end
+        self.started = False
+        self.completed = False
+
+    def begin(self):
+        self.started = True
+
+    def has_started(self):
+        return self.started
 
     def is_active(self, t):
-        return self.start <= t < self.end
+        return self.start <= t < self.end and self.has_started()
+
+    def complete(self):
+        self.completed = True
 
     def is_done(self, t):
-        return self.end <= t
+        return self.completed
 
 
 class ActuateAgentAction(Action):
@@ -54,7 +65,7 @@ class TransmitAction(Action):
         self.src = src
         self.dst = dst
         message_id = f"S{src.unique_id}D{dst.unique_id}"
-        self.msg = Message(self, size, rate, message_id, timeout=timeout, content=content, src=src, dst=dst)
+        self.msg = Message(size, rate, message_id, timeout=timeout, content=content, src=src, dst=dst)
 
 
 class ChargeAction(Action):

@@ -3,45 +3,54 @@ from typing import Union
 from src.agents.components.components import *
 
 
+class StateHistory:
+    def __init__(self, agent, component_list, t: Union[int, float]):
+        self.states = []
+        self.update(agent, component_list, t)
+        self.parent_agent = agent
+
+    def update(self, agent, component_list, t: Union[int, float]):
+        self.states.append(State(agent, component_list, t))
+
+    def get_latest_state(self):
+        return self.states[-1]
+
+    def get_state(self, i):
+        return self.states[i]
+
+
+    def __str__(self):
+        out = ''
+        if len(self.states) > 0:
+            out = 't,id,p_in,p_out,p_tot,e_str,e_cap,' \
+                  'r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap'
+
+            component_list = self.states[0].is_on.keys()
+            for component in component_list:
+                out += f',{component.name}'
+
+            out += '\n'
+
+            for state in self.states:
+                out += str(state)
+                for component in component_list:
+                    out += f',{int(state.is_on[component] == True)}'
+                out += '\n'
+        return out
+
+
 class State:
     def __init__(self, agent, component_list, t: Union[int, float]):
         self.parent_agent = agent
 
-        self.data_rate_in = []
-        self.data_rate_out = []
-        self.data_rate_total = []
-
-        self.data_buffer_in = []
-        self.data_memory = []
-        self.data_buffer_out = []
-        self.data_capacity = agent.on_board_computer.data_capacity
-
-        self.power_in = []
-        self.power_out = []
-        self.power_tot = []
-
-        self.energy_stored = []
-        self.energy_capacity = agent.battery.energy_capacity
-
-        self.t = []
-
-        self.is_on = dict.fromkeys(component_list, [])
-        self.critical = False
-
-        self.update(agent, component_list, t)
-
-    def update(self, agent, component_list, t: Union[int, float]):
         data_rate_in = 0
         power_out = 0
         power_in = 0
         power_tot = 0
+        self.is_on = dict.fromkeys(component_list, False)
+
         for component in component_list:
-            #   TODO FIX Does not store values correctly:
-            content = []
-            for status in self.is_on[component]:
-                content.append(status)
-            content.append(component.is_on())
-            self.is_on[component] = content
+            self.is_on[component] = component.status
 
             if (component.is_on()
                     and type(component) != Transmitter
@@ -54,68 +63,66 @@ class State:
                     power_out -= component.power
                 power_tot += component.power
 
-        self.data_rate_in.append(data_rate_in)
-        self.data_rate_out.append(agent.transmitter.data_rate)
-        self.data_rate_total.append(data_rate_in - agent.transmitter.data_rate)
+        self.dod = agent.battery.dod
+        self.charging = agent.battery.is_charging()
+        self.buffer_in_capacity = agent.receiver.data_capacity
+        self.buffer_out_capacity = agent.transmitter.data_capacity
 
-        self.data_buffer_in.append(agent.receiver.data_stored.level)
-        self.data_memory.append(agent.on_board_computer.data_stored.level)
-        self.data_buffer_out.append(agent.transmitter.data_stored.level)
+        self.data_rate_in = data_rate_in
+        self.data_rate_out = agent.transmitter.data_rate
+        self.data_rate_tot = data_rate_in - agent.transmitter.data_rate
 
-        self.power_in.append(power_in)
-        self.power_out.append(power_out)
-        self.power_tot.append(power_tot)
+        self.data_buffer_in = agent.receiver.data_stored.level
+        self.data_memory = agent.on_board_computer.data_stored.level
+        self.data_buffer_out = agent.transmitter.data_stored.level
+        self.data_capacity = agent.on_board_computer.data_capacity
 
-        self.energy_stored.append(agent.battery.energy_stored.level)
+        self.power_in = power_in
+        self.power_out = power_out
+        self.power_tot = power_tot
+        self.energy_capacity = agent.battery.energy_capacity
 
-        self.t.append(t)
+        self.energy_stored = agent.battery.energy_stored.level
 
-    def get_last_update_time(self):
-        return self.t[-1]
+        self.t = t
 
-    def is_critical(self):
-        return self.critical
-
-    def get_state_by_index(self, i):
-        data_rate_in = self.data_rate_in[i]
-        data_rate_out = self.data_rate_out[i]
-        data_rate_tot = self.data_rate_total[i]
-
-        data_buffer_in = self.data_buffer_in[i]
-        data_memory = self.data_memory[i]
-        data_buffer_out = self.data_buffer_out[i]
-        data_capacity = self.data_capacity
-
-        power_in = self.power_in[i]
-        power_out = self.power_out[i]
-        power_tot = self.power_tot[i]
-
-        energy_stored = self.energy_stored[i]
-        energy_capacity = self.energy_capacity
-
-        t = self.t[i]
-
-        critical = self.critical
-
-        is_on = dict.fromkeys(self.is_on.keys())
-        for key in self.is_on.keys():
-            is_on[key] = self.is_on[key][i]
-
-        return data_rate_in, data_rate_out, data_rate_tot, \
-               data_buffer_in, data_buffer_out, data_memory, data_capacity, \
-               power_in, power_out, power_tot, energy_stored, energy_capacity, \
-               t, critical, is_on
-
-    def get_latest_state(self):
-        return self.get_state_by_index(-1)
+        self.critical = False
 
     def __str__(self):
-        data_rate_in, data_rate_out, data_rate_tot, \
-        data_buffer_in, data_buffer_out, data_memory, data_capacity, \
-        power_in, power_out, power_tot, energy_stored, energy_capacity, \
-        t, critical, is_on = self.get_latest_state()
+        """
+        Prints state in the following format:
+        t,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap
+        """
+        return f'{self.t},{self.parent_agent.unique_id},{self.power_in},{self.power_out},{self.power_tot},' \
+               f'{self.energy_stored},{self.energy_capacity},' \
+               f'{self.data_rate_in},{self.data_rate_out},{self.data_rate_tot},' \
+               f'{self.data_buffer_in},{self.buffer_in_capacity},{self.data_buffer_out},{self.buffer_out_capacity}' \
+               f',{self.data_memory},{self.data_capacity}'
 
-        return f'Data Rates: {data_rate_in}, {data_rate_out}, {data_rate_tot}\n' \
-               f'Data Stored: {data_buffer_in}, {data_buffer_out}, {data_memory}, {data_capacity} \n' \
-               f'Power: {power_in}, {power_out}, {power_tot}\n' \
-               f'Energy Stored: {energy_stored}, {energy_capacity}'
+    def is_critical(self):
+        """
+        Checks if it is a critical state. Checks for batteries being below their maximum depth-of-discharge
+        or being overcharged, checks to see if power is being properly supplied to other components, and checks if there
+        is a memory overflow in the internal memory.
+        :return:
+        """
+        critical = False
+        cause = ''
+
+        if (1 - self.energy_stored / self.energy_capacity) >= self.dod:
+            cause = 'Battery has reached its maximum depth-of-discharge level'
+            critical = True
+        elif self.energy_stored == self.energy_capacity and self.charging:
+            cause = 'Battery is full and is still charging.'
+            critical = True
+        elif self.power_tot < 0:
+            cause = f'Insufficient power being generated (P_in={self.power_in}, P_out={self.power_out})'
+            critical = True
+        elif self.power_tot > 0 and not self.charging:
+            cause = f'Excess power being generated and is not being used for charging (P_in={self.power_in}, P_out={self.power_out})'
+            critical = True
+        elif self.data_memory == self.data_capacity and self.data_rate_in > 0:
+            cause = f'Pn-board memory full and data is coming in faster than it is leaving.'
+            critical = True
+
+        return critical, cause
