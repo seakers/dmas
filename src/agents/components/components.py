@@ -94,6 +94,14 @@ class Transmitter(Component):
         self.max_data_rate = max_data_rate
         self.num_channels = num_channels
         self.channels = simpy.Resource(env, num_channels)
+        self.transmitting = False
+
+    def is_transmitting(self):
+        return self.transmitting
+
+    def turn_off(self):
+        super().turn_off()
+        self.transmitting = False
 
     def allocate_buffer_memory(self, env: Environment, msg: Message, logger: Logger):
         if msg.data_rate + self.data_rate > self.max_data_rate:
@@ -102,7 +110,7 @@ class Transmitter(Component):
             raise simpy.Interrupt('The message being sent requests a data-rate higher than '
                                   f'the maximum available for this transmitter.')
 
-        msg.start_time = env.now
+        msg.timeout_start = env.now
 
         try:
             # request transmitter to allocate outgoing message into its buffer
@@ -171,15 +179,21 @@ class Transmitter(Component):
             yield receiver.inbox.put(msg)
 
             # begin transmission
+            self.transmitting = True
             self.data_rate += msg.data_rate
-            yield env.timeout(msg.size / msg.data_rate - (env.now - msg.start_time))
+
+            if msg.transmission_start == -1:
+                msg.transmission_start = env.now
+
+            yield env.timeout(msg.size / msg.data_rate - (env.now - msg.transmission_start))
+            msg.transmission_end_event.succeed()
+            msg.transmission_end = env.now
             logger.debug(f'T{env.now}:\tTransmission complete!')
 
             # end transmission
             logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
             self.channels.release(req_trs)
             receiver.channels.release(req_rcr)
-            self.data_rate -= msg.data_rate
 
             logger.debug(f'T{env.now}:\tTransmission protocol complete!')
 
@@ -190,10 +204,8 @@ class Transmitter(Component):
             self.channels.release(req_trs)
             receiver.channels.release(req_rcr)
 
-            # drop packet and turn off transmitter
-            logger.debug(f'T{env.now}:\tDropping packet...')
-            yield self.data_stored.get(msg.size - (env.now - msg.start_time) * msg.data_rate)
-            self.data_rate -= msg.data_rate
+            # stopping transmission event
+            msg.transmission_end_event.succeed()
 
     def send_message(self, env: Environment, msg: Message, logger: Logger):
         allocate_memory = None
@@ -212,17 +224,31 @@ class Transmitter(Component):
             return
 
         except simpy.Interrupt as i:
-            if allocate_memory.triggered:
-                # deallocate memory
-                logger.debug(f'T{env.now}:\tRemoving message from outgoing buffer.')
-                yield self.data_stored.get(msg.size)
-
             if allocate_memory is not None and not allocate_memory.triggered:
+                logger.debug(f'T{env.now}:\tInterrupting memory allocation...')
                 allocate_memory.interrupt(i)
-            elif request_channel is not None and not request_channel.triggered:
+            if request_channel is not None and not request_channel.triggered:
+                logger.debug(f'T{env.now}:\tInterrupting channel requests...')
                 request_channel.interrupt(i)
-            elif transmit is not None and not transmit.triggered:
+            if transmit is not None and not transmit.triggered:
+                logger.debug(f'T{env.now}:\tInterrupting transmission...')
                 transmit.interrupt(i)
+
+            # drop packet
+            logger.debug(f'T{env.now}:\tDropping packet...')
+
+            if msg.transmission_start < 0:
+                yield self.data_stored.get(msg.size)
+            else:
+                rem_size = msg.size - (env.now - msg.transmission_start) * msg.data_rate
+                if rem_size > 0:
+                    yield self.data_stored.get(rem_size)
+
+            if self.transmitting:
+                # reducing data-rate
+                self.data_rate -= msg.data_rate
+                self.transmitting = False
+
 
 class Receiver(Component):
     def __init__(self, env, power, max_data_rate, buffer_size, num_channels=1):
@@ -266,19 +292,22 @@ class Receiver(Component):
 
             self.data_rate += msg.data_rate
 
-            logger.debug(f'T{env.now}:\tStarting reception...')
-            yield env.timeout(msg.size / msg.data_rate)
-            logger.debug(f'T{env.now}:\tReception complete! Awaiting ...')
+            msg.reception_start = env.now
+            yield msg.transmission_end_event
+            msg.reception_end = env.now
 
-            msg.reception_time = env.now
-            self.received_messages.append(msg)
-
-            logger.debug(f'T{env.now}:\tRequesting on-board computer to allocate message size in internal memory...')
-            yield on_board_computer.data_stored.put(msg.size)
-            logger.debug(f'T{env.now}:\tInternal memory allocated! Removing message from receiver buffer...')
-
-            self.received_messages.remove(msg)
-            self.data_stored.get(msg.size)
+            data_received = (msg.reception_end - msg.reception_start) * msg.data_rate
+            if data_received < msg.size:
+                # insufficient data was received. wait for timeout
+                logger.debug(f'T{env.now}:\tStopped receiving transmission from A{msg.src.unique_id}.')
+                self.data_rate -= msg.data_rate
+                t_left = msg.reception_start + msg.timeout - env.now
+                yield env.timeout(t_left*2)
+            else:
+                # successfully received the complete message
+                self.received_messages.append(msg)
+                logger.debug(f'T{env.now}:\tReception complete! ')
+                self.received_messages.remove(msg)
 
         except simpy.Interrupt:
             self.data_stored.get(msg.size)

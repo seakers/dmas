@@ -1,3 +1,4 @@
+matplotlib
 certifi==2022.5.18.1
 cycler @ file:///home/conda/feedstock_root/build_artifacts/cycler_1635519461629/work
 fonttools @ file:///Users/runner/miniforge3/conda-bld/fonttools_1651017784092/work

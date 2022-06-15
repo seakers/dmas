@@ -9,6 +9,7 @@ from simpy import AllOf, AnyOf
 from src.agents.components.components import *
 from src.agents.models.systemModel import StatePredictor
 from src.agents.state import StateHistory
+from src.network.messages import MessageHistory
 from src.planners.actions import *
 from src.planners.planner import Planner
 
@@ -27,7 +28,7 @@ class AbstractAgent:
         :param planner: planner used by the agent for assigning tasks
         """
         self.results_dir = self.create_results_directory(unique_id)
-        self.logger = self.setup_logger(unique_id)
+        self.logger = self.setup_agent_logger(unique_id)
 
         self.alive = True
 
@@ -62,10 +63,13 @@ class AbstractAgent:
         self.plan = simpy.Store(self.env)
         self.actions = []
 
-        # self.state = State(self, component_list, env.now)
+        # State history
         self.state_history = StateHistory(self, component_list, env.now)
         self.state_predictor = StatePredictor()
         self.critical_state = env.event()
+
+        # Message history
+        self.message_history = MessageHistory()
 
     def live(self):
         """
@@ -98,8 +102,8 @@ class AbstractAgent:
                     # read instructions from planner
                     tasks, maintenance_actions = self.plan_to_events()
 
-                    # # perform manual systems check prior to any actions
-                    # self.systems_check()
+                    # # perform manual systems check prior to performing any actions
+                    self.systems_check()
 
                     # perform maintenance actions
                     self.perform_maintenance_actions(maintenance_actions)
@@ -134,6 +138,7 @@ class AbstractAgent:
                 if listening.triggered:
                     # restart listening process and update plan
                     listening = self.env.process(self.listening())
+                    self.systems_check()
 
                 if self.critical_state.triggered:
                     self.critical_state = self.env.event()
@@ -200,7 +205,8 @@ class AbstractAgent:
                         prev_status = component.status
                         component.turn_on_generator(power)
                         if not prev_status:
-                            self.logger.debug(f'T{self.env.now}:\tTurning on {component.name} with power {component.power}W...')
+                            self.logger.debug(
+                                f'T{self.env.now}:\tTurning on {component.name} with power {component.power}W...')
                         else:
                             self.logger.debug(
                                 f'T{self.env.now}:\tRegulating {component.name} power to {component.power}W...')
@@ -268,8 +274,8 @@ class AbstractAgent:
 
             # process captured data
             # TODO ADD MEASUREMENT RESULTS TO PLANNER KNOWLEDGE BASE:
-            #   results = measurementSimulator(target, instrument_list)
-            #   planner.update_knowledge_base(measurement_results=results)
+            #   utils = measurementSimulator(target, instrument_list)
+            #   planner.update_knowledge_base(measurement_results=utils)
 
             # inform planner of task completion
             self.planner.completed_action(action, self.state_history.get_latest_state(), self.env.now)
@@ -291,7 +297,8 @@ class AbstractAgent:
         :return:
         """
         self.logger.debug(f'T{self.env.now}:\tPreparing form transmission...')
-
+        msg_timeout = None
+        send_message = None
         try:
             if not self.transmitter.is_on():
                 raise simpy.Interrupt('Transmitter has not been turned on.')
@@ -303,24 +310,34 @@ class AbstractAgent:
 
             yield msg_timeout | send_message
 
-            if msg_timeout.triggered and not send_message.triggered:
-                self.logger.debug(f'T{self.env.now}:\tMessage transmission timed out.')
-                send_message.interrupt("Message transmission timed out.")
-                self.planner.interrupted_message(msg, self.env.now)
-            elif send_message.triggered:
-                self.transmitter.data_rate -= msg.data_rate
-
+            if send_message.triggered:
                 self.planner.completed_action(action, self.state_history.get_latest_state(), self.env.now)
                 self.logger.debug(f'T{self.env.now}:\tMessage transmitted successfully!')
 
-                if not msg_timeout:
+                if not msg_timeout.triggered:
                     msg_timeout.interrupt("Message transmitted successfully!")
+
+                self.update_system()
+
+                self.transmitter.data_rate -= msg.data_rate
 
                 if self.transmitter.channels.count == 0:
                     self.transmitter.turn_off()
+
+            else:
+                self.logger.debug(f'T{self.env.now}:\tMessage transmission timed out.')
+                self.update_system()
+                send_message.interrupt("Message transmission timed out.")
+                self.planner.interrupted_action(action, self.state_history.get_latest_state(), self.env.now)
+
         except simpy.Interrupt as i:
-            self.planner.interrupted_action(action, self.state_history.get_latest_state(), self.env.now)
             self.logger.debug(f'T{self.env.now}:\tCancelled Transmission! {i.cause}')
+            if msg_timeout is not None and not msg_timeout.triggered:
+                msg_timeout.interrupt(i.cause)
+            if send_message is not None and not send_message.triggered:
+                send_message.interrupt(i.cause)
+
+            self.planner.interrupted_action(action, self.state_history.get_latest_state(), self.env.now)
         return
 
     def charge(self, action: ChargeAction):
@@ -332,7 +349,7 @@ class AbstractAgent:
         """
         try:
             self.logger.debug(f'T{self.env.now}:\tStarting battery charging. Initial charge of '
-                              f'{self.battery.energy_stored.level/self.battery.energy_capacity*100}%')
+                              f'{self.battery.energy_stored.level / self.battery.energy_capacity * 100}%')
             self.battery.turn_on_charge()
 
             yield self.env.timeout(action.end - action.start)
@@ -353,6 +370,7 @@ class AbstractAgent:
     '''
     ==========BACKGROUND TASKS==========
     '''
+
     def wait_for_plan(self):
         """
         Background task that waits for the planner's next instructions
@@ -385,34 +403,47 @@ class AbstractAgent:
             else:
                 msg = (yield self.receiver.inbox.get())
 
+            self.update_system()
             msg_timeout = self.env.timeout(msg.timeout)
             msg_reception = self.env.process(self.receiver.receive(self.env, msg, self.on_board_computer, self.logger))
 
             self.logger.debug(f'T{self.env.now}:\tStarting message reception from A{msg.src.unique_id}!')
             yield msg_timeout | msg_reception
 
-            if msg_timeout.triggered:
-                if not msg_reception.triggered:
-                    msg_reception.interrupt("Message reception timed out. Dropping packet")
+            if msg_reception.triggered:
+                self.logger.debug(f'T{self.env.now}:\tReceived message from A{msg.src.unique_id}!')
+                # msg_timeout.interrupt("Message successfully received!")
+                msg.reception_time = self.env.now
+
+                self.update_system()
+
+                self.receiver.data_rate -= msg.data_rate
+
+                # move message from buffer to internal memory
+                self.logger.debug(f'T{self.env.now}:\tMoving data from buffer to internal memory...')
+                yield self.on_board_computer.data_stored.put(msg.size) | msg_timeout
+                yield self.receiver.data_stored.get(msg.size)
+
+                if msg_timeout.triggered:
+                    self.logger.debug(f'T{self.env.now}:\tMessage reception from A{msg.src.unique_id} timed out. '
+                                      f'Dropping packet...')
+                    self.planner.timed_out_message(msg, self.state_history.get_latest_state(), self.env.now)
+                    self.message_history.dropped_received_message(msg)
+
+                else:
+                    # inform planner of message reception
+                    self.planner.message_received(msg, self.state_history.get_latest_state(), self.env.now)
+                    self.message_history.received_message(msg)
+
+            else:
+                msg_reception.interrupt("Message reception timed out. Dropping packet")
                 self.logger.debug(f'T{self.env.now}:\tMessage reception from A{msg.src.unique_id} timed out. '
                                   f'Dropping packet...')
                 self.planner.timed_out_message(msg, self.state_history.get_latest_state(), self.env.now)
-            elif msg_reception.triggered:
-                self.logger.debug(f'T{self.env.now}:\tReceived message from A{msg.src.unique_id}!')
-                msg_timeout.interrupt("Message successfully received!")
-                msg.reception_time = self.env.now
+                self.message_history.dropped_received_message(msg)
 
-                # move message from buffer to internal memory
-                self.logger.debug(f'T{self.env.now}:\tMoving data from buffer to internal memory!')
-                yield self.on_board_computer.data_stored.put(msg.size)
-                yield self.receiver.data_stored.get(msg.size)
-
-                # inform planner of message reception
-                self.planner.message_received(msg, self.state_history.get_latest_state(), self.env.now)
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}:\tMessage reception paused. {i.cause}')
-
-        return
 
     def systems_check(self):
         # integrate current state at new time
@@ -484,7 +515,9 @@ class AbstractAgent:
             else:
                 self.on_board_computer.data_stored.put(dD)
 
-        if self.transmitter.data_rate * dt > 0 and self.transmitter.data_stored.level > 0:
+        if (self.transmitter.data_rate * dt > 0
+                and self.transmitter.data_stored.level > 0
+                and self.transmitter.is_transmitting()):
             if self.transmitter.data_stored.level >= self.transmitter.data_rate * dt:
                 self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
             else:
@@ -522,6 +555,7 @@ class AbstractAgent:
     '''
     MISCELANEOUS HELPING METHODS
     '''
+
     def print_state(self):
         """
         Prints state history to csv file
@@ -535,9 +569,22 @@ class AbstractAgent:
 
         f.close()
 
+    def print_planner_history(self):
+        filename = f'A{self.unique_id}_completed_plan.log'
+        file_path = self.results_dir + filename
+
+        with open(file_path, 'w') as f:
+            f.write('type,t_start,t_end\n')
+            for action_tuple in self.planner.completed_plan:
+                action, t = action_tuple
+                f.write(str(action))
+                f.write('\n')
+
+        f.close()
+
     def create_results_directory(self, unique_id):
         """
-        Creates a results directory for this particular scenario if it has not been created yet. Initializes a new
+        Creates a utils directory for this particular scenario if it has not been created yet. Initializes a new
         logger report for this particular agent
         :param unique_id: agent's unique ID
         :return:
@@ -553,7 +600,7 @@ class AbstractAgent:
 
         return results_dir
 
-    def setup_logger(self, unique_id):
+    def setup_agent_logger(self, unique_id):
         """
         Sets up logger for this agent
         :param unique_id: agent's unique ID

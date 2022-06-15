@@ -24,6 +24,8 @@ class Action:
     def is_done(self, t):
         return self.completed
 
+    def __str__(self):
+        return f'{self.action_type},{self.start},{self.end}'
 
 class ActuateAgentAction(Action):
     def __init__(self, start, status=True):
@@ -65,7 +67,7 @@ class TransmitAction(Action):
         self.src = src
         self.dst = dst
         message_id = f"S{src.unique_id}D{dst.unique_id}"
-        self.msg = Message(size, rate, message_id, timeout=timeout, content=content, src=src, dst=dst)
+        self.msg = Message(size, rate, message_id, timeout, src, dst, content=content)
 
 
 class ChargeAction(Action):

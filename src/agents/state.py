@@ -53,8 +53,7 @@ class State:
             self.is_on[component] = component.status
 
             if (component.is_on()
-                    and type(component) != Transmitter
-                    and type(component) != Receiver):
+                    and type(component) != Transmitter):
                 data_rate_in += component.data_rate
             if component.is_on():
                 if component.power > 0:
