@@ -22,7 +22,7 @@ env = simpy.Environment()
 agents = []
 component_list = None
 
-n = -1
+n = None
 if scenario <= 3:
     n = 1
 elif scenario <= 4:
@@ -92,12 +92,6 @@ for i in range(n):
         battery = Battery(env, 0, 100)
         onboardcomp = OnBoardComputer(env, 1, 5)
         ins = Instrument(env, 'instrument', 8, 1)
-    # elif scenario == 7.5:
-    #     # two agents send a message to the same agent and wait for memory to be allocated in the receiver's
-    #     # on board computer.
-    #     # One times out and drops message
-    #     pass
-
     else:
         raise Exception("Scenario not yet supported")
 
@@ -131,18 +125,3 @@ plot_data_rate_state(results_dir, n)
 # -Data Plot
 plot_data_state(results_dir, n)
 
-# # -Component Status
-# figure, axis = plt.subplots(len(component_list), 1)
-#
-# for i in range(len(component_list)):
-#     component = component_list[i]
-#     axis[i].step(df['t'], df[component.name])
-#     axis[i].set_title(f'{component.name} Status')
-#     axis[i].grid(True)
-#     plt.ylim([0, 1])
-#
-# # Combine all the operations and
-# plt.subplots_adjust(wspace=0.4,
-#                     hspace=0.9)
-# # plt.xticks(np.arange(0, T, 1))
-# plt.show()

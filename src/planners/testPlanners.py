@@ -157,6 +157,3 @@ class PowerTracking(Planner):
             else:
                 action_prc = self.env.process(self.schedule_action(action, state, t))
                 self.plan[action] = action_prc
-
-    def completed_action(self, action: Action, state: State, t):
-        super().completed_action(action, state, t)
