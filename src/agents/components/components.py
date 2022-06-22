@@ -123,7 +123,7 @@ class Transmitter(Component):
     def request_channel(self, env: Environment, msg: Message, logger: Logger):
         # unpack message
         dst = msg.dst
-        receiver = dst.receiver
+        receiver = dst.platform.receiver
 
         # initialize indicators
         transmission_channel_established = False
@@ -172,7 +172,7 @@ class Transmitter(Component):
         :return:
         '''
         dst = msg.dst
-        receiver = dst.receiver
+        receiver = dst.platform.receiver
 
         try:
             # place message in receivers inbox

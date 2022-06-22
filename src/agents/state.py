@@ -1,16 +1,23 @@
 from typing import Union
 
 from src.agents.components.components import *
+from src.agents.models.platform import Platform
 
 
 class StateHistory:
-    def __init__(self, agent, component_list, t: Union[int, float]):
+    def __init__(self, agent, platform: Platform, t: Union[int, float]):
         self.states = []
-        self.update(agent, component_list, t)
+        self.update(agent, platform, t)
         self.parent_agent = agent
 
-    def update(self, agent, component_list, t: Union[int, float]):
-        self.states.append(State(agent, component_list, t))
+    def update(self, agent, platform: Platform, t: Union[int, float]):
+        state = State(agent, platform, t)
+
+        for prev_state in self.states:
+            if prev_state == state:
+                return
+
+        self.states.append(state)
 
     def get_latest_state(self):
         return self.states[-1]
@@ -40,8 +47,10 @@ class StateHistory:
 
 
 class State:
-    def __init__(self, agent, component_list, t: Union[int, float]):
+    def __init__(self, agent, platform: Platform, t: Union[int, float]):
         self.parent_agent = agent
+
+        component_list = platform.component_list
 
         data_rate_in = 0
         power_out = 0
@@ -62,30 +71,63 @@ class State:
                     power_out -= component.power
                 power_tot += component.power
 
-        self.dod = agent.battery.dod
-        self.charging = agent.battery.is_charging()
-        self.buffer_in_capacity = agent.receiver.data_capacity
-        self.buffer_out_capacity = agent.transmitter.data_capacity
+        self.dod = platform.battery.dod
+        self.charging = platform.battery.is_charging()
+        self.buffer_in_capacity = platform.receiver.data_capacity
+        self.buffer_out_capacity = platform.transmitter.data_capacity
 
         self.data_rate_in = data_rate_in
-        self.data_rate_out = agent.transmitter.data_rate
-        self.data_rate_tot = data_rate_in - agent.transmitter.data_rate
+        self.data_rate_out = platform.transmitter.data_rate
+        self.data_rate_tot = data_rate_in - platform.transmitter.data_rate
 
-        self.data_buffer_in = agent.receiver.data_stored.level
-        self.data_memory = agent.on_board_computer.data_stored.level
-        self.data_buffer_out = agent.transmitter.data_stored.level
-        self.data_capacity = agent.on_board_computer.data_capacity
+        self.data_buffer_in = platform.receiver.data_stored.level
+        self.data_memory = platform.on_board_computer.data_stored.level
+        self.data_buffer_out = platform.transmitter.data_stored.level
+        self.data_capacity = platform.on_board_computer.data_capacity
 
         self.power_in = power_in
         self.power_out = power_out
         self.power_tot = power_tot
-        self.energy_capacity = agent.battery.energy_capacity
+        self.energy_capacity = platform.battery.energy_capacity
 
-        self.energy_stored = agent.battery.energy_stored.level
+        self.energy_stored = platform.battery.energy_stored.level
 
         self.t = t
 
+        self.pos = [-1, -1, -1]
+        self.vel = [-1, -1, -1]
+        for i in range(3):
+            self.pos[i] = platform.pos[i]
+            self.vel[i] = platform.vel[i]
+        self.eclipse = platform.eclipse
+
         self.critical = False
+
+    def __eq__(self, other):
+        same_agent = self.parent_agent == other.parent_agent
+        same_component_status = True
+
+        for component in self.is_on.keys():
+            if self.is_on[component] != other.is_on[component]:
+                same_component_status = False
+                break
+
+        same_dod = self.dod == other.dod
+        same_charging_status = self.charging == other.charging
+        same_buffer_in_capacity = self.buffer_in_capacity == other.buffer_in_capacity
+        same_buffer_out_capacity = self.buffer_out_capacity == other.buffer_out_capacity
+
+        same_data_rate_in = self.data_rate_in == other.data_rate_in
+        same_date_rate_out = self.data_rate_out == other.data_rate_out
+        same_data_rate_tot = self.data_rate_tot == other.data_rate_tot
+
+        same_data_buffer_in = self.data_buffer_in == other.data_buffer_in
+        same_data_memory = self.data_memory == other.data_memory
+        same_data_buffer_out = self.data_buffer_out == other.data_buffer_out
+
+
+
+        pass
 
     def __str__(self):
         """

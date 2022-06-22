@@ -2,12 +2,11 @@ import logging
 import os
 from typing import Union
 
-import numpy as np
-import simpy
-from simpy import AllOf, AnyOf
+from simpy import AllOf
 
 from src.agents.components.components import *
 from src.agents.models.systemModel import StatePredictor
+from src.agents.models.platform import Platform
 from src.agents.state import StateHistory
 from src.network.messages import MessageHistory
 from src.planners.actions import *
@@ -35,36 +34,15 @@ class AbstractAgent:
         self.env = env
         self.unique_id = unique_id
         self.other_agents = []
-        self.component_list = component_list
 
-        self.transmitter = None
-        self.receiver = None
-        self.on_board_computer = None
-        self.power_generator = None
-        self.battery = None
-        for component in component_list:
-            if type(component) == Transmitter:
-                self.transmitter = component
-            if type(component) == Receiver:
-                self.receiver = component
-            elif type(component) == OnBoardComputer:
-                self.on_board_computer = component
-            elif type(component) == PowerGenerator:
-                self.power_generator = component
-            elif type(component) == Battery:
-                self.battery = component
-
-        if (self.transmitter is None or self.receiver is None or self.on_board_computer is None
-                or self.power_generator is None or self.battery is None):
-            raise Exception('Agent requires at least one of each of the following components:'
-                            ' transmitter, receiver, on-board computer, power generator, and battery')
+        self.platform = Platform(env, component_list)
 
         self.planner = planner
-        self.plan = simpy.Store(self.env)
+        self.plan = simpy.Store(env)
         self.actions = []
 
         # State history
-        self.state_history = StateHistory(self, component_list, env.now)
+        self.state_history = StateHistory(self, self.platform, env.now)
         self.state_predictor = StatePredictor()
         self.critical_state = env.event()
 
@@ -185,7 +163,7 @@ class AbstractAgent:
         self.logger.debug(f'T{self.env.now}:\tSetting life status to: {status}')
         if not status:
             self.logger.debug(f'T{self.env.now}:\tKilling agent...')
-            self.turn_off_components(self.component_list)
+            self.turn_off_components(self.platform.component_list)
 
     def actuate_component(self, action: Union[ActuateComponentAction, ActuatePowerComponentAction]):
         """
@@ -197,7 +175,7 @@ class AbstractAgent:
         component_actuate = action.component
         status = action.status
 
-        for component in self.component_list:
+        for component in self.platform.component_list:
             if component.name == component_actuate.name:
                 if type(action) == ActuatePowerComponentAction:
                     power = action.power
@@ -231,7 +209,7 @@ class AbstractAgent:
         """
         # remove message from on-board memory and inform planner
         msg = action.msg
-        self.on_board_computer.data_stored.get(msg.size)
+        self.platform.on_board_computer.data_stored.get(msg.size)
         self.planner.message_deleted(msg, self.env.now)
 
         self.logger.debug(f'T{self.env.now}:\tDeleted message of size {msg.size}')
@@ -300,13 +278,13 @@ class AbstractAgent:
         msg_timeout = None
         send_message = None
         try:
-            if not self.transmitter.is_on():
+            if not self.platform.transmitter.is_on():
                 raise simpy.Interrupt('Transmitter has not been turned on.')
 
             msg = action.msg
 
             msg_timeout = self.env.timeout(msg.timeout)
-            send_message = self.env.process(self.transmitter.send_message(self.env, msg, self.logger))
+            send_message = self.env.process(self.platform.transmitter.send_message(self.env, msg, self.logger))
 
             yield msg_timeout | send_message
 
@@ -319,10 +297,10 @@ class AbstractAgent:
 
                 self.update_system()
 
-                self.transmitter.data_rate -= msg.data_rate
+                self.platform.transmitter.data_rate -= msg.data_rate
 
-                if self.transmitter.channels.count == 0:
-                    self.transmitter.turn_off()
+                if self.platform.transmitter.channels.count == 0:
+                    self.platform.transmitter.turn_off()
 
             else:
                 self.logger.debug(f'T{self.env.now}:\tMessage transmission timed out.')
@@ -349,22 +327,22 @@ class AbstractAgent:
         """
         try:
             self.logger.debug(f'T{self.env.now}:\tStarting battery charging. Initial charge of '
-                              f'{self.battery.energy_stored.level / self.battery.energy_capacity * 100}%')
-            self.battery.turn_on_charge()
+                              f'{self.platform.battery.energy_stored.level / self.platform.battery.energy_capacity * 100}%')
+            self.platform.battery.turn_on_charge()
 
             yield self.env.timeout(action.end - action.start)
 
             self.update_system()
-            self.battery.turn_off_charge()
+            self.platform.battery.turn_off_charge()
 
             self.logger.debug(f'T{self.env.now}:\tSuccessfully completed battery charging action! Final charge of '
-                              f'{self.battery.energy_stored.level / self.battery.energy_capacity * 100}%')
+                              f'{self.platform.battery.energy_stored.level / self.platform.battery.energy_capacity * 100}%')
             return
         except simpy.Interrupt as i:
             self.update_system()
             self.logger.debug(f'T{self.env.now}:\tPaused battery charging! {i.cause} Current charge of '
-                              f'{self.battery.energy_stored.level / self.battery.energy_capacity * 100}%')
-            self.battery.turn_off_charge()
+                              f'{self.platform.battery.energy_stored.level / self.platform.battery.energy_capacity * 100}%')
+            self.platform.battery.turn_off_charge()
             self.planner.interrupted_action(action, self.state_history.get_latest_state(), self.env.now)
 
     '''
@@ -398,14 +376,16 @@ class AbstractAgent:
         """
         self.logger.debug(f'T{self.env.now}:\tWaiting for any incoming transmission...')
         try:
-            if len(self.receiver.received_messages) > 0:
-                msg = self.receiver.received_messages.pop()
+            if len(self.platform.receiver.received_messages) > 0:
+                msg = self.platform.receiver.received_messages.pop()
             else:
-                msg = (yield self.receiver.inbox.get())
+                msg = (yield self.platform.receiver.inbox.get())
 
             self.update_system()
             msg_timeout = self.env.timeout(msg.timeout)
-            msg_reception = self.env.process(self.receiver.receive(self.env, msg, self.on_board_computer, self.logger))
+            msg_reception = self.env.process(
+                self.platform.receiver.receive(self.env, msg, self.platform.on_board_computer, self.logger)
+            )
 
             self.logger.debug(f'T{self.env.now}:\tStarting message reception from A{msg.src.unique_id}!')
             yield msg_timeout | msg_reception
@@ -417,12 +397,12 @@ class AbstractAgent:
 
                 self.update_system()
 
-                self.receiver.data_rate -= msg.data_rate
+                self.platform.receiver.data_rate -= msg.data_rate
 
                 # move message from buffer to internal memory
                 self.logger.debug(f'T{self.env.now}:\tMoving data from buffer to internal memory...')
-                yield self.on_board_computer.data_stored.put(msg.size) | msg_timeout
-                yield self.receiver.data_stored.get(msg.size)
+                yield self.platform.on_board_computer.data_stored.put(msg.size) | msg_timeout
+                yield self.platform.receiver.data_stored.get(msg.size)
 
                 if msg_timeout.triggered:
                     self.logger.debug(f'T{self.env.now}:\tMessage reception from A{msg.src.unique_id} timed out. '
@@ -489,57 +469,24 @@ class AbstractAgent:
         Once this agent's components have been updated, it records this state in the agent's state property.
         :return:
         """
-        # count power and data usage
-        data_rate_in = 0
-        power_out = 0
-        power_in = 0
-        for component in self.component_list:
-            if component.is_on():
-                if component.power <= 0:
-                    power_out -= component.power
-                if type(component) != Receiver and type(component) != Transmitter:
-                    data_rate_in += component.data_rate
-                if type(component) == Battery or type(component) == PowerGenerator:
-                    power_in += component.power
-        power_dif = power_in - power_out
+        # check orbital information
+        t = self.env.now
+        # eclipse = self.env.is_eclipse(self, t)
+        # pos = self.env.get_position(self, t)
+        # vel = self.env.get_velocity(self, t)
+        eclipse = False
+        pos = [-1, -1, -1]
+        vel = [-1, -1, -1]
 
-        # calculate time-step
-        dt = self.env.now - self.state_history.get_latest_state().t
-
-        # update values
-        # -data
-        if data_rate_in * dt > 0:
-            dD = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
-            if dD > data_rate_in * dt:
-                self.on_board_computer.data_stored.put(data_rate_in * dt)
-            else:
-                self.on_board_computer.data_stored.put(dD)
-
-        if (self.transmitter.data_rate * dt > 0
-                and self.transmitter.data_stored.level > 0
-                and self.transmitter.is_transmitting()):
-            if self.transmitter.data_stored.level >= self.transmitter.data_rate * dt:
-                self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
-            else:
-                self.transmitter.data_stored.get(self.transmitter.data_stored.level)
-
-        # -power
-        power_charging = 0
-        if self.battery.is_charging() and power_dif >= 0:
-            power_charging += power_dif
-        if self.battery.is_on():
-            power_charging -= self.battery.power
-
-        if power_charging * dt > 0:
-            self.battery.energy_stored.put(power_charging * dt)
-        elif power_charging * dt < 0:
-            self.battery.energy_stored.get(-power_charging * dt)
+        # update platform
+        self.platform.update(self.state_history.get_latest_state(), pos, vel, eclipse, t)
 
         # update in state tracking
-        self.state_history.update(self, self.component_list, self.env.now)
+        self.state_history.update(self, self.platform, self.env.now)
 
         # debugging output
         self.logger.debug(f'T{self.env.now}:\tUpdated system status.')
+
         return
 
     def set_other_agents(self, others):
@@ -657,7 +604,7 @@ class AbstractAgent:
             elif type(action) == TransmitAction:
                 action_event = self.env.process(self.transmit(action))
             elif type(action) == ChargeAction:
-                self.battery.charging = True
+                self.platform.battery.charging = True
                 action_event = self.env.process(self.charge(action))
 
             if action_event is not None:
