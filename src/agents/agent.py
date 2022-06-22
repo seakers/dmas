@@ -35,7 +35,7 @@ class AbstractAgent:
         self.unique_id = unique_id
         self.other_agents = []
 
-        self.platform = Platform(env, component_list)
+        self.platform = Platform(self, env, component_list)
 
         self.planner = planner
         self.plan = simpy.Store(env)
@@ -45,6 +45,8 @@ class AbstractAgent:
         self.state_history = StateHistory(self, self.platform, env.now)
         self.state_predictor = StatePredictor()
         self.critical_state = env.event()
+
+        self.t_critical = -1
 
         # Message history
         self.message_history = MessageHistory()
@@ -80,8 +82,8 @@ class AbstractAgent:
                     # read instructions from planner
                     tasks, maintenance_actions = self.plan_to_events()
 
-                    # # perform manual systems check prior to performing any actions
-                    self.systems_check()
+                    # update system status prior to performing any actions
+                    self.update_system()
 
                     # perform maintenance actions
                     self.perform_maintenance_actions(maintenance_actions)
@@ -160,10 +162,11 @@ class AbstractAgent:
         status = action.status
         self.alive = status
 
-        self.logger.debug(f'T{self.env.now}:\tSetting life status to: {status}')
         if not status:
             self.logger.debug(f'T{self.env.now}:\tKilling agent...')
             self.turn_off_components(self.platform.component_list)
+        else:
+            self.logger.debug(f'T{self.env.now}:\tRestarting agent...')
 
     def actuate_component(self, action: Union[ActuateComponentAction, ActuatePowerComponentAction]):
         """
@@ -425,9 +428,12 @@ class AbstractAgent:
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}:\tMessage reception paused. {i.cause}')
 
-    def systems_check(self):
+    def systems_check(self, update=False):
         # integrate current state at new time
-        self.update_system()
+        if update:
+            self.update_system()
+        else:
+            self.state_history.update(self, self.platform, self.env.now)
 
         # check if system state is critical
         self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
@@ -438,6 +444,10 @@ class AbstractAgent:
             if not self.critical_state.triggered:
                 self.logger.debug(f'T{self.env.now}:\tCritical state reached! {cause}')
                 self.critical_state.succeed()
+                self.t_critical = self.env.now
+            elif self.env.now > self.t_critical:
+                kill = ActuateAgentAction(self.env.now, status=False)
+                self.actuate_agent(kill)
         else:
             # state is nominal
             self.logger.debug(f'T{self.env.now}:\tState nominal.')
@@ -454,7 +464,6 @@ class AbstractAgent:
         try:
             while True:
                 self.systems_check()
-
                 yield self.env.timeout(1)
 
         except simpy.Interrupt as i:
@@ -469,17 +478,9 @@ class AbstractAgent:
         Once this agent's components have been updated, it records this state in the agent's state property.
         :return:
         """
-        # check orbital information
-        t = self.env.now
-        # eclipse = self.env.is_eclipse(self, t)
-        # pos = self.env.get_position(self, t)
-        # vel = self.env.get_velocity(self, t)
-        eclipse = False
-        pos = [-1, -1, -1]
-        vel = [-1, -1, -1]
-
         # update platform
-        self.platform.update(self.state_history.get_latest_state(), pos, vel, eclipse, t)
+        self.platform.update(self.env.now)
+        self.platform.action_event.succeed()
 
         # update in state tracking
         self.state_history.update(self, self.platform, self.env.now)

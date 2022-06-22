@@ -341,6 +341,23 @@ class PowerGenerator(Component):
         self.turn_off()
 
 
+class SolarPanelArray(PowerGenerator):
+    def __init__(self, env, power_generation):
+        super().__init__(env, power_generation)
+        self.in_eclipse = False
+        self.name = 'solar_generator'
+
+    def turn_on_generator(self, power_out):
+        if power_out <= 0:
+            raise ArithmeticError("Power generated must be greater than 0")
+        if self.health and not self.in_eclipse:
+            if power_out <= self.max_power_generation:
+                self.power = power_out
+            else:
+                self.power = self.max_power_generation
+            self.turn_on()
+
+
 class Battery(Component):
     def __init__(self, env, max_power_generation, energy_capacity, dod=1, initial_charge=1):
         """
@@ -359,13 +376,15 @@ class Battery(Component):
         self.charging = False
         self.max_power_generation = max_power_generation
         self.dod = dod
+        self.can_hold_charge = True
         if not (0 <= dod <= 1):
             raise IOError("Depth-of-Discharge can only be a value between 0 and 1.")
         elif not (0 <= initial_charge <= 1):
             raise IOError("Initial charge can only be a value between 0 and 1.")
 
     def turn_on_charge(self):
-        self.charging = True
+        if self.can_hold_charge:
+            self.charging = True
 
     def turn_off_charge(self):
         self.charging = False

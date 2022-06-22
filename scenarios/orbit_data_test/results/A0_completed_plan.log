@@ -1,0 +1,8 @@
+type,t_start,t_end
+actuate_component,0,1
+actuate_component,0,1
+actuate_component,1,2
+actuate_component,1,2
+measurement,1,8.5
+actuate_component,8.5,9.5
+actuate_component,8.5,9.5
