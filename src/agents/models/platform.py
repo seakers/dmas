@@ -39,20 +39,24 @@ class Platform:
         self.eclipse = False
 
         # events
-        self.action_event = simpy.Event(env)
+        self.agent_update = simpy.Event(env)
+        self.updated = simpy.Event(env)
         self.t_prev = self.env.now
+        self.event_tracker = None
 
     def sim(self):
         critical_state_event = self.env.process(self.wait_for_critical_state())
         eclipse_event = self.env.process(self.wait_for_eclipse_event())
         periodic_update = self.env.process(self.periodic_update())
 
+        self.updated.succeed()
         while True:
-            yield critical_state_event | eclipse_event | self.action_event | periodic_update
+            yield critical_state_event | eclipse_event | self.agent_update | periodic_update
+            self.updated = simpy.Event(self.env)
+
             # update component status
             t_curr = self.env.now
             self.update(t_curr)
-            print(f'System updated at T{t_curr}')
 
             # update component capabilities
             if type(self.power_generator) == SolarPanelArray:
@@ -82,18 +86,25 @@ class Platform:
                 yield eclipse_event
             eclipse_event = self.env.process(self.wait_for_eclipse_event())
 
-            if self.action_event.triggered:
-                self.action_event = simpy.Event(self.env)
+            if self.agent_update.triggered:
+                self.agent_update = simpy.Event(self.env)
+
+            self.updated.succeed()
 
     def periodic_update(self):
         while True:
             yield self.env.timeout(1)
+            if self.updated.triggered:
+                self.updated = simpy.Event(self.env)
+
             # update component status
             t_curr = self.env.now
             self.update(t_curr)
-            print(f'System updated at T{t_curr}')
+
+            self.updated.succeed()
 
     def update(self, t):
+        # print(f'System updated at T{t}')
         dt = t - self.t_prev
 
         # count power and data usage
@@ -145,6 +156,8 @@ class Platform:
         self.vel = self.env.get_velocity(self.parent_agent, t)
 
         self.t_prev = t
+
+        # print(f'dt={dt}, R_in={data_rate_in}, D={self.on_board_computer.data_stored.level}')
         return
 
     def wait_for_critical_state(self):

@@ -5,6 +5,7 @@ import numpy as np
 from src.agents.agent import AbstractAgent
 from src.agents.components.components import *
 from src.agents.components.instruments import *
+from src.environment import SimulationEnvironment
 from src.planners.planner import *
 from src.planners.testPlanners import PowerTracking
 import pandas as pd
@@ -16,9 +17,9 @@ from src.utils.state_plots import *
 
 T = 30
 
-scenario = 7
+scenario = 2
 
-env = simpy.Environment()
+env = SimulationEnvironment()
 agents = []
 component_list = None
 
@@ -102,10 +103,11 @@ for i in range(n):
 
 for agent in agents:
     agent.set_other_agents(agents)
-    env.process(agent.live())
+
+env.add_agents(agents)
 
 # RUN SIMULATION
-env.run(until=T)
+env.simulate(T)
 
 # PRINT AGENT STATE HISTORY
 for agent in agents:

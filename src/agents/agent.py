@@ -83,13 +83,22 @@ class AbstractAgent:
                     tasks, maintenance_actions = self.plan_to_events()
 
                     # update system status prior to performing any actions
-                    self.update_system()
+                    self.systems_check()
 
                     # perform maintenance actions
                     self.perform_maintenance_actions(maintenance_actions)
 
                     # perform manual systems check
                     self.systems_check()
+
+                    if self.critical_state.triggered:
+                        if self.env.now > self.t_critical:
+                            self.t_critical = self.env.now
+                        else:
+                            # agent is still in critical state and planner did not address it. killing agent
+                            kill = ActuateAgentAction(self.env.now, status=False)
+                            self.actuate_agent(kill)
+                            continue
 
                     # perform planner task instructions
                     if len(tasks) > 0:
@@ -260,6 +269,8 @@ class AbstractAgent:
 
             # inform planner of task completion
             self.planner.completed_action(action, self.state_history.get_latest_state(), self.env.now)
+
+            self.update_system()
             return
 
         except simpy.Interrupt as i:
@@ -429,14 +440,10 @@ class AbstractAgent:
             self.logger.debug(f'T{self.env.now}:\tMessage reception paused. {i.cause}')
 
     def systems_check(self, update=False):
-        # integrate current state at new time
-        if update:
-            self.update_system()
-        else:
-            self.state_history.update(self, self.platform, self.env.now)
-
         # check if system state is critical
         self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
+
+        self.state_history.update(self, self.platform, self.env.now)
         critical, cause = self.state_history.get_latest_state().is_critical()
 
         if critical:
@@ -444,10 +451,6 @@ class AbstractAgent:
             if not self.critical_state.triggered:
                 self.logger.debug(f'T{self.env.now}:\tCritical state reached! {cause}')
                 self.critical_state.succeed()
-                self.t_critical = self.env.now
-            elif self.env.now > self.t_critical:
-                kill = ActuateAgentAction(self.env.now, status=False)
-                self.actuate_agent(kill)
         else:
             # state is nominal
             self.logger.debug(f'T{self.env.now}:\tState nominal.')
@@ -463,6 +466,7 @@ class AbstractAgent:
         """
         try:
             while True:
+                yield self.platform.updated
                 self.systems_check()
                 yield self.env.timeout(1)
 
@@ -479,11 +483,12 @@ class AbstractAgent:
         :return:
         """
         # update platform
-        self.platform.update(self.env.now)
-        self.platform.action_event.succeed()
+
+        self.platform.agent_update.succeed()
 
         # update in state tracking
-        self.state_history.update(self, self.platform, self.env.now)
+        # self.state_history.update(self, self.platform, self.env.now)
+        # print(self.state_history.get_latest_state())
 
         # debugging output
         self.logger.debug(f'T{self.env.now}:\tUpdated system status.')

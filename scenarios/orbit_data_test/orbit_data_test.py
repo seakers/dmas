@@ -42,10 +42,10 @@ directory_path = os.getcwd()
 results_dir = directory_path + '/results/'
 
 # -Power Plot
-plot_power_state(results_dir, n)
-
-# -Data-rate Plot
-plot_data_rate_state(results_dir, n)
+# plot_power_state(results_dir, n)
+#
+# # -Data-rate Plot
+# plot_data_rate_state(results_dir, n)
 
 # -Data Plot
 plot_data_state(results_dir, n)
