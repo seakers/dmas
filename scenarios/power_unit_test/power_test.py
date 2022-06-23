@@ -17,7 +17,7 @@ from src.utils.state_plots import *
 
 T = 30
 
-scenario = 2
+scenario = 3
 
 env = SimulationEnvironment()
 agents = []
@@ -46,7 +46,7 @@ for i in range(n):
         transmitter = Transmitter(env, 1, 1, 10, 1)
         receiver = Receiver(env, 1, 1, 10, 1)
         generator = PowerGenerator(env, 0)
-        battery = Battery(env, 10, 100)
+        battery = Battery(env, 10, 50)
         onboardcomp = OnBoardComputer(env, 1, 100)
         ins = Instrument(env, 'instrument', 8, 1)
 

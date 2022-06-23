@@ -16,21 +16,47 @@ class Planner:
     def update(self, state: State, t):
         # schedules next actions to be given to agent or reconsiders plan
         # must consider current state, time, knowledge, and previously done or interrupted actions
+        p_tot = state.power_tot
         if state.is_critical():
-            if state.power_tot < 0:
+            if p_tot < 0:
                 # power deficiency detected
                 power_on = None
                 if self.power_generator.power < self.power_generator.max_power_generation:
                     # if power generator is not up to its maximum power generation, turn on and provide power
-                    power_on = ActuatePowerComponentAction(self.power_generator, t,
-                                                           -state.power_tot + self.power_generator.power)
-                elif self.battery.power < self.battery.max_power_generation:
-                    # else if battery is not up to its maximum power generation, turn on and provide power
-                    power_on = ActuatePowerComponentAction(self.battery, t, -state.power_tot + self.battery.power)
+                    # power_on = ActuatePowerComponentAction(self.power_generator, t,
+                    #                                        -p_tot + self.power_generator.power)
+                    dif = self.power_generator.power - self.power_generator.max_power_generation
+                    if p_tot >= dif:
+                        power_on = ActuatePowerComponentAction(self.power_generator, t,
+                                                               -p_tot + self.power_generator.power)
+                        p_tot = 0
+                    else:
+                        power_on = ActuatePowerComponentAction(self.power_generator, t,
+                                                               -dif + self.power_generator.power)
+                        p_tot -= dif
 
-                if power_on is not None:
-                    power_on_prc = self.env.process(self.schedule_action(power_on, state, t))
-                    self.plan[power_on] = power_on_prc
+                    if power_on is not None:
+                        power_on_prc = self.env.process(self.schedule_action(power_on, state, t))
+                        self.plan[power_on] = power_on_prc
+
+                if self.battery.power < self.battery.max_power_generation and p_tot < 0:
+                    # else if battery is not up to its maximum power generation, turn on and provide power
+                    # power_on = ActuatePowerComponentAction(self.battery, t, -state.power_tot + self.battery.power)
+
+                    dif = self.battery.power - self.battery.max_power_generation
+                    if p_tot >= dif:
+                        power_on = ActuatePowerComponentAction(self.battery, t,
+                                                               -p_tot + self.battery.power)
+                        p_tot = 0
+                    else:
+                        power_on = ActuatePowerComponentAction(self.battery, t,
+                                                               -dif + self.battery.power)
+                        p_tot -= dif
+
+                    if power_on is not None:
+                        power_on_prc = self.env.process(self.schedule_action(power_on, state, t))
+                        self.plan[power_on] = power_on_prc
+
 
             elif state.power_tot > 0:
                 # power surplus
