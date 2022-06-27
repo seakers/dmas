@@ -46,7 +46,7 @@ class AbstractAgent:
         self.state_predictor = StatePredictor()
         self.critical_state = env.event()
 
-        self.t_critical = -1
+        self.t_crit = -1
 
         #orbit info
         self.eclipse_intervals = []
@@ -68,7 +68,7 @@ class AbstractAgent:
         """
         try:
             # initialize background tasks
-            self.env.process(self.periodical_systems_check())
+            periodical_systems_check = self.env.process(self.periodical_systems_check())
             listening = self.env.process(self.listening())
             planner_wait = self.env.process(self.wait_for_plan())
 
@@ -88,23 +88,27 @@ class AbstractAgent:
                     # read instructions from planner
                     tasks, maintenance_actions = self.plan_to_events()
 
-                    # update system status prior to performing any actions
+                    # perform manual systems check prior to performing any actions
                     self.systems_check()
 
                     # perform maintenance actions
                     self.perform_maintenance_actions(maintenance_actions)
 
                     # perform manual systems check
+                    self.update_system()
                     self.systems_check()
 
                     if self.critical_state.triggered:
-                        if self.env.now > self.t_critical:
-                            self.t_critical = self.env.now
-                        else:
+                        if -1 < self.t_crit:
                             # agent is still in critical state and planner did not address it. killing agent
                             kill = ActuateAgentAction(self.env.now, status=False)
                             self.actuate_agent(kill)
+                            self.logger.debug(f'T{self.env.now}:\tTERMINATING DOING PHASE!')
                             continue
+                        self.t_crit = self.env.now
+                    else:
+                        self.t_crit = -1
+
 
                     # perform planner task instructions
                     if len(tasks) > 0:
@@ -138,6 +142,8 @@ class AbstractAgent:
                 if self.critical_state.triggered:
                     self.critical_state = self.env.event()
 
+            periodical_systems_check.interrupt('Agent dead')
+            self.logger.debug(f'T{self.env.now}:\t...good night!')
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}: {i.cause} good night!')
 
@@ -472,7 +478,7 @@ class AbstractAgent:
         """
         try:
             while True:
-                yield self.platform.updated
+                yield self.platform.updated_periodically
                 self.systems_check()
                 yield self.env.timeout(1)
 
@@ -489,11 +495,15 @@ class AbstractAgent:
         :return:
         """
         # update platform
+        self.platform.update(self.env.now)
 
+        if self.platform.agent_update.triggered:
+            self.platform.agent_update = simpy.Event(self.env)
         self.platform.agent_update.succeed()
 
+
         # update in state tracking
-        # self.state_history.update(self, self.platform, self.env.now)
+        self.state_history.update(self, self.platform, self.env.now)
         # print(self.state_history.get_latest_state())
 
         # debugging output

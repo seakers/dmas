@@ -382,6 +382,29 @@ class Battery(Component):
         elif not (0 <= initial_charge <= 1):
             raise IOError("Initial charge can only be a value between 0 and 1.")
 
+    def update_charge(self, power_in, dt):
+        power_charging = 0
+        if self.is_charging() and power_in >= 0:
+            power_charging += power_in
+        if self.is_on():
+            power_charging -= self.power
+
+        if power_charging * dt > 0:
+            dif = self.energy_capacity - self.energy_stored.level
+            if dif < power_charging * dt:
+                self.energy_stored.put(dif)
+            else:
+                self.energy_stored.put(power_charging * dt)
+        elif power_charging * dt < 0:
+            if self.energy_stored.level > 0:
+                if -power_charging * dt >= self.energy_stored.level:
+                    self.energy_stored.get(self.energy_stored.level)
+                    self.turn_off_generator()
+                else:
+                    self.energy_stored.get(-power_charging * dt)
+            else:
+                self.turn_off_generator()
+
     def turn_on_charge(self):
         if self.can_hold_charge:
             self.charging = True
@@ -395,7 +418,7 @@ class Battery(Component):
     def turn_on_generator(self, power_out):
         if power_out <= 0:
             raise ArithmeticError("Power generated must be greater than 0")
-        if self.health:
+        if self.health and self.energy_stored.level > 0:
             if power_out <= self.max_power_generation:
                 self.power = power_out
             else:
