@@ -48,6 +48,12 @@ class AbstractAgent:
 
         self.t_critical = -1
 
+        #orbit info
+        self.eclipse_intervals = []
+        self.position = []
+        self.velocity = []
+        self.time_step = 1
+
         # Message history
         self.message_history = MessageHistory()
 

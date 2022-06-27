@@ -1,17 +1,48 @@
 import numpy as np
+import os
+import os.path
+import shutil
+import pandas as pd
 from simpy.core import SimTime
+#import orekit
 
 from src.agents.agent import AbstractAgent
 
 
 class OrbitData:
+    def parse_data(self, root, id):
+        agent_folder = "\sat" + str(id)
+        eclipse_file = root + agent_folder + "\eclipses.csv"
+        cartesian_file = root + agent_folder + "\state_cartesian.csv"
+        eclipse_data = pd.read_csv(eclipse_file, skiprows=[0, 1, 2])
+        cartesian_data = pd.read_csv(cartesian_file, skiprows=[0, 1, 2, 3])
+        a = np.asarray(eclipse_data)
+        b = np.asarray(cartesian_data)
+        time_str = np.asarray(pd.read_csv(cartesian_file, nrows=3))[1][0]
+        x = time_str.split(' ')
+        t = x[-1] #step size in seconds --> used to index correct time
+        return a, b, t
+
     def __init__(self, agent: AbstractAgent):
         self.parent_agent = agent
-        # self.eclipse_intervals = [(4.5, 6.5)]
+        #get data from files
+        root = os.getcwd() + "\input"
+        eclipse_data, cartesian_data, step = self.parse_data(root, agent.unique_id)
+        #assign eclipse data
         self.eclipse_intervals = []
+        for i in eclipse_data:
+            self.eclipse_intervals.append(i)
+        #assign attitude data
+        agent.position = []
+        agent .velocity = []
+        for i in cartesian_data:
+            agent.position.append(i[1:4])
+            agent.velocity.append(i[4:])
+        self.time_step = step
         return
 
     def get_next_eclipse(self, t: SimTime):
+        #t = int(t * self.time_step)
         for interval in self.eclipse_intervals:
             t_start, t_end = interval
             if t_end <= t:
@@ -23,6 +54,7 @@ class OrbitData:
         return np.Infinity
 
     def is_eclipse(self, t: SimTime):
+        t = int(t*self.time_step)
         for interval in self.eclipse_intervals:
             t_start, t_end = interval
             if t_start <= t <= t_end:
@@ -30,7 +62,9 @@ class OrbitData:
         return False
 
     def get_position(self, t: SimTime):
-        return [-1, -1, -1]
+        t = int(t * self.time_step)
+        return self.position[t]
 
     def get_velocity(self, t: SimTime):
-        return [-1, -1, -1]
+        t = int(t * self.time_step)
+        return self.velocity[t]
