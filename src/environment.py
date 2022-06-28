@@ -30,6 +30,7 @@ class SimulationEnvironment(Environment):
         self.run(until)
 
         for agent in self.agent_list:
+            agent.update_system()
             agent.print_state()
             agent.print_planner_history()
 

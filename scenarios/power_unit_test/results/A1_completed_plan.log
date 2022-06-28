@@ -1,14 +1,2 @@
 type,t_start,t_end
 actuate_component,0,1
-actuate_component,0,1
-actuate_component,1,2
-actuate_component,1,2
-measurement,1,5
-actuate_component,5,6
-actuate_component,5,6
-actuate_component,6,7
-actuate_component,6,7
-transmit,6,10.0
-delete_message,14.0,15.0
-actuate_component,14.0,15.0
-actuate_component,14.0,15.0

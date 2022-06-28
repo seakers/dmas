@@ -1,7 +1,38 @@
+import logging
+import os
+
 import numpy as np
 
 from src.agents.components.components import *
 from src.planners.actions import ActuateAgentAction
+
+
+def setup_platform_logger(unique_id):
+    """
+    Sets up logger for this platform simulator
+    :param agent: parent agent for this platform
+    :return:
+    """
+    directory_path = os.getcwd()
+    results_dir = directory_path + '/results/'
+
+    logger = logging.getLogger(f'A{unique_id}P')
+    logger.setLevel(logging.DEBUG)
+
+    formatter = logging.Formatter('%(name)s-%(message)s')
+
+    file_handler = logging.FileHandler(results_dir + f'A{unique_id}_Platform.log')
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(stream_handler)
+
+    return logger
 
 
 class Platform:
@@ -47,21 +78,26 @@ class Platform:
         self.t_crit = -1
         self.event_tracker = None
 
+        # logger
+        self.logger = setup_platform_logger(parent_agent.unique_id)
+
     def sim(self):
         critical_state_event = self.env.process(self.wait_for_critical_state())
         eclipse_event = self.env.process(self.wait_for_eclipse_event())
         periodic_update = self.env.process(self.periodic_update())
 
-        self.updated_manually.succeed()
+        # self.updated_manually.succeed()
         while True:
             yield critical_state_event | eclipse_event | self.agent_update | periodic_update
+            if self.updated_manually.triggered:
+                self.updated_manually = simpy.Event(self.env)
 
             # update component status
             t_curr = self.env.now
             self.update(t_curr)
 
             # inform agent of critical event
-            if critical_state_event.triggered or eclipse_event.triggered:
+            if (critical_state_event.triggered or eclipse_event.triggered) and self.parent_agent.alive:
                 self.parent_agent.systems_check()
 
             # reset parallel processes as needed
@@ -78,10 +114,7 @@ class Platform:
             if self.agent_update.triggered:
                 self.agent_update = simpy.Event(self.env)
 
-            # self.updated.succeed()
-
-    def is_death_state(self):
-        pass
+            # self.updated_manually.succeed()
 
     def periodic_update(self):
         self.updated_periodically.succeed()
@@ -159,6 +192,8 @@ class Platform:
         # update times
         self.t_prev = t
         self.updated_manually.succeed()
+
+        self.logger.debug(f'T{t}:\t{str(self)}')
 
     def is_critical(self):
         # count power and data usage
@@ -251,23 +286,48 @@ class Platform:
                 dt_min = dt
 
         try:
-            # print(f'Next predicted failure: T{dt_min}')
+            self.logger.debug(f'T{self.t_prev}: Next projected critical state will be at T{self.env.now + dt_min}.')
             yield self.env.timeout(dt_min)
         except simpy.Interrupt as i:
             return
-
 
     def wait_for_eclipse_event(self):
         """
         Predicts next eclipse event and waits for it to arrive.
         :return:
         """
-        t = self.env.now
-        t_eclipse = self.env.orbit_data[self.parent_agent].get_next_eclipse(t)
-
-        dt = t_eclipse - t
-
         try:
+            t = self.env.now
+            t_eclipse = self.env.orbit_data[self.parent_agent].get_next_eclipse(t)
+            dt = t_eclipse - t
+            self.logger.debug(f'T{self.t_prev}: Next projected eclipse event will be at T{t_eclipse}.')
             yield self.env.timeout(dt)
         except simpy.Interrupt as i:
             return
+
+    def __str__(self):
+        """
+        format:
+        't,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap'
+        :return:
+        """
+
+        # count power and data usage
+        data_rate_in = 0
+        power_out = 0
+        power_in = 0
+        for component in self.component_list:
+            if component.is_on():
+                if component.power <= 0:
+                    power_out -= component.power
+                if type(component) != Receiver and type(component) != Transmitter:
+                    data_rate_in += component.data_rate
+                if type(component) == Battery or type(component) == PowerGenerator:
+                    power_in += component.power
+        power_tot = power_in - power_out
+
+        return f'{self.t_prev},{power_in},{power_out},{power_tot},{self.battery.energy_stored.level},' \
+               f'{self.battery.energy_capacity},{data_rate_in},{self.transmitter.data_rate},' \
+               f'{data_rate_in - self.transmitter.data_rate},{self.receiver.data_stored.level},' \
+               f'{self.receiver.data_capacity},{self.transmitter.data_stored.level},{self.transmitter.data_capacity},' \
+               f'{self.on_board_computer.data_stored.level},{self.on_board_computer.data_capacity}'

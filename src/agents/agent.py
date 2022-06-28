@@ -5,7 +5,6 @@ from typing import Union
 from simpy import AllOf
 
 from src.agents.components.components import *
-from src.agents.models.systemModel import StatePredictor
 from src.agents.models.platform import Platform
 from src.agents.state import StateHistory
 from src.network.messages import MessageHistory
@@ -35,18 +34,17 @@ class AbstractAgent:
         self.unique_id = unique_id
         self.other_agents = []
 
+        # Platform Simulator
         self.platform = Platform(self, env, component_list)
 
+        # Planner
         self.planner = planner
         self.plan = simpy.Store(env)
         self.actions = []
 
         # State history
         self.state_history = StateHistory(self, self.platform, env.now)
-        self.state_predictor = StatePredictor()
         self.critical_state = env.event()
-
-        self.t_crit = -1
 
         # Message history
         self.message_history = MessageHistory()
@@ -62,7 +60,6 @@ class AbstractAgent:
         """
         try:
             # initialize background tasks
-            periodical_systems_check = self.env.process(self.periodical_systems_check())
             listening = self.env.process(self.listening())
             planner_wait = self.env.process(self.wait_for_plan())
 
@@ -83,7 +80,27 @@ class AbstractAgent:
                     tasks, maintenance_actions = self.plan_to_events()
 
                     # perform manual systems check prior to performing any actions
-                    self.systems_check()
+                    self.update_system()
+
+                    if self.critical_state.triggered and len(maintenance_actions) < 1:
+                        # agent is still in critical state and planner did not address it. killing agent
+                        self.logger.debug(f'T{self.env.now}:\tAgent is still in critical state and planner did not '
+                                          f'address it.')
+                        kill = ActuateAgentAction(self.env.now, status=False)
+                        self.actuate_agent(kill)
+                        self.logger.debug(f'T{self.env.now}:\tTERMINATING DOING PHASE!')
+
+                        # terminate all tasks
+                        if not listening.triggered:
+                            listening.interrupt('Agent is dead.')
+                            yield listening
+
+                        for task in tasks:
+                            if not task.triggered:
+                                task.interrupt("Agent is dead.")
+                            yield task
+
+                        continue
 
                     # perform maintenance actions
                     self.perform_maintenance_actions(maintenance_actions)
@@ -92,30 +109,29 @@ class AbstractAgent:
                     self.update_system()
                     self.systems_check()
 
-                    if self.critical_state.triggered:
-                        if -1 < self.t_crit:
-                            # agent is still in critical state and planner did not address it. killing agent
-                            kill = ActuateAgentAction(self.env.now, status=False)
-                            self.actuate_agent(kill)
-                            self.logger.debug(f'T{self.env.now}:\tTERMINATING DOING PHASE!')
-                            continue
-                        self.t_crit = self.env.now
-                    else:
-                        self.t_crit = -1
-
+                    # resetting planner wait background task
+                    planner_wait = self.env.process(self.wait_for_plan())
 
                     # perform planner task instructions
                     if len(tasks) > 0:
-                        yield AllOf(self.env, tasks) | listening | self.critical_state
+                        if self.critical_state.triggered:
+                            for task in tasks:
+                                if not task.triggered:
+                                    task.interrupt("Critical system state detected!")
+                                    yield task
 
-                        if listening.triggered or self.critical_state.triggered:
-                            # critical state or new transmission detected. Reconsider plan
+                        yield AllOf(self.env, tasks) | listening | planner_wait | self.critical_state
+
+                        if listening.triggered or self.critical_state.triggered or planner_wait.triggered:
+                            # critical state or new transmission or new plan detected. Reconsider actions
                             for task in tasks:
                                 if not task.triggered:
                                     if listening.triggered:
                                         task.interrupt("New message received.")
                                     elif self.critical_state.triggered:
                                         task.interrupt("Critical system state detected!")
+                                    elif planner_wait.triggered:
+                                        task.interrupt("Updated plan received!")
                                 yield task
 
                             # restart background tasks when needed
@@ -123,10 +139,13 @@ class AbstractAgent:
                                 listening = self.env.process(self.listening())
 
                         # perform manual systems check after all actions have been performed
-                        self.systems_check()
+                        self.update_system()
+                        # self.systems_check()
 
-                    planner_wait = self.env.process(self.wait_for_plan())
-                    self.logger.debug(f'T{self.env.now}:\tDOING PHASE COMPLETE!')
+                    if not (listening.triggered or self.critical_state.triggered):
+                        self.logger.debug(f'T{self.env.now}:\tDOING PHASE COMPLETE!')
+                    else:
+                        self.logger.debug(f'T{self.env.now}:\tDOING PHASE INTERRUPTED!')
 
                 if listening.triggered:
                     # restart listening process and update plan
@@ -136,7 +155,6 @@ class AbstractAgent:
                 if self.critical_state.triggered:
                     self.critical_state = self.env.event()
 
-            periodical_systems_check.interrupt('Agent dead')
             self.logger.debug(f'T{self.env.now}:\t...good night!')
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}: {i.cause} good night!')
@@ -144,7 +162,6 @@ class AbstractAgent:
     '''
     ==========MAINTENANCE ACTIONS==========
     '''
-
     def perform_maintenance_actions(self, actions):
         """
         Performs a list of maintenance actions before performing other tasks. Maintenance tasks include actuating
@@ -166,6 +183,8 @@ class AbstractAgent:
             self.planner.completed_action(action, self.state_history.get_latest_state(), self.env.now)
         if len(actions) > 0:
             self.logger.debug(f'T{self.env.now}:\tCompleted all maintenance actions.')
+        else:
+            self.logger.debug(f'T{self.env.now}:\tNo maintenance actions to complete.')
 
     def actuate_agent(self, action: ActuateAgentAction):
         """
@@ -245,7 +264,6 @@ class AbstractAgent:
     '''
     ==========TASK ACTIONS==========
     '''
-
     def measure(self, action: MeasurementAction):
         """
         Performs a measurement of a given ground point.
@@ -276,7 +294,9 @@ class AbstractAgent:
             # inform planner of task completion
             self.planner.completed_action(action, self.state_history.get_latest_state(), self.env.now)
 
+            # update system
             self.update_system()
+            self.systems_check()
             return
 
         except simpy.Interrupt as i:
@@ -315,12 +335,16 @@ class AbstractAgent:
                 if not msg_timeout.triggered:
                     msg_timeout.interrupt("Message transmitted successfully!")
 
+                # update system
                 self.update_system()
 
                 self.platform.transmitter.data_rate -= msg.data_rate
 
                 if self.platform.transmitter.channels.count == 0:
                     self.platform.transmitter.turn_off()
+                    self.update_system()
+
+                self.systems_check()
 
             else:
                 self.logger.debug(f'T{self.env.now}:\tMessage transmission timed out.')
@@ -355,8 +379,14 @@ class AbstractAgent:
             self.update_system()
             self.platform.battery.turn_off_charge()
 
+
             self.logger.debug(f'T{self.env.now}:\tSuccessfully completed battery charging action! Final charge of '
                               f'{self.platform.battery.energy_stored.level / self.platform.battery.energy_capacity * 100}%')
+
+            # update system
+            self.update_system()
+            self.systems_check()
+
             return
         except simpy.Interrupt as i:
             self.update_system()
@@ -382,7 +412,13 @@ class AbstractAgent:
                 action = yield self.plan.get()
                 self.actions.append(action)
 
-            self.logger.debug(f'T{self.env.now}:\tReceived instructions from planner!')
+            types = ''
+            for action in self.actions:
+                if action != self.actions[0]:
+                    types += ', '
+                types += action.action_type
+
+            self.logger.debug(f'T{self.env.now}:\tReceived instructions from planner! Instructions include: {types}')
         except simpy.Interrupt:
             return
 
@@ -411,12 +447,14 @@ class AbstractAgent:
             yield msg_timeout | msg_reception
 
             if msg_reception.triggered:
+                # log reception
                 self.logger.debug(f'T{self.env.now}:\tReceived message from A{msg.src.unique_id}!')
-                # msg_timeout.interrupt("Message successfully received!")
                 msg.reception_time = self.env.now
 
+                # update system
                 self.update_system()
 
+                # update receiver data-rate
                 self.platform.receiver.data_rate -= msg.data_rate
 
                 # move message from buffer to internal memory
@@ -435,6 +473,9 @@ class AbstractAgent:
                     self.planner.message_received(msg, self.state_history.get_latest_state(), self.env.now)
                     self.message_history.received_message(msg)
 
+                # update system
+                self.update_system()
+
             else:
                 msg_reception.interrupt("Message reception timed out. Dropping packet")
                 self.logger.debug(f'T{self.env.now}:\tMessage reception from A{msg.src.unique_id} timed out. '
@@ -445,40 +486,25 @@ class AbstractAgent:
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}:\tMessage reception paused. {i.cause}')
 
-    def systems_check(self, update=False):
+    def systems_check(self):
         # check if system state is critical
-        self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
+        # self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
 
-        self.state_history.update(self, self.platform, self.env.now)
+        self.state_history.update(self.platform, self.env.now)
         critical, cause = self.state_history.get_latest_state().is_critical()
 
         if critical:
             # if critical, trigger critical state event
             if not self.critical_state.triggered:
-                self.logger.debug(f'T{self.env.now}:\tCritical state reached! {cause}')
+                self.logger.debug(f'T{self.env.now}:\tPerforming system check... Critical state reached! {cause}')
                 self.critical_state.succeed()
         else:
             # state is nominal
-            self.logger.debug(f'T{self.env.now}:\tState nominal.')
+            self.logger.debug(f'T{self.env.now}:\tPerforming system check... State nominal.')
             if self.critical_state.triggered:
                 # if critical state was previously detected, reset event to nominal
                 self.critical_state = self.env.event()
         return
-
-    def periodical_systems_check(self):
-        """
-        Background task that periodically checks the agent's system is in a critical state.
-        :return:
-        """
-        try:
-            while True:
-                yield self.platform.updated_periodically
-                self.systems_check()
-                yield self.env.timeout(1)
-
-        except simpy.Interrupt as i:
-            self.logger.debug(f'T{self.env.now}:\tPeriodic systems check paused. {i.cause}')
-            return
 
     def update_system(self):
         """
@@ -495,10 +521,10 @@ class AbstractAgent:
             self.platform.agent_update = simpy.Event(self.env)
         self.platform.agent_update.succeed()
 
+        # yield self.platform.updated_manually
 
         # update in state tracking
-        self.state_history.update(self, self.platform, self.env.now)
-        # print(self.state_history.get_latest_state())
+        self.state_history.update(self.platform, self.env.now)
 
         # debugging output
         self.logger.debug(f'T{self.env.now}:\tUpdated system status.')
@@ -516,9 +542,8 @@ class AbstractAgent:
                 self.other_agents.append(other)
 
     '''
-    MISCELANEOUS HELPING METHODS
+    MISCELLANEOUS HELPING METHODS
     '''
-
     def print_state(self):
         """
         Prints state history to csv file
@@ -558,8 +583,9 @@ class AbstractAgent:
         if not os.path.isdir(results_dir):
             os.mkdir(results_dir)
 
-        if os.path.exists(results_dir + f'Agent{unique_id}.log'):
-            os.remove(results_dir + f'Agent{unique_id}.log')
+        if os.path.exists(results_dir + f'A{unique_id}.log'):
+            os.remove(results_dir + f'A{unique_id}.log')
+            os.remove(results_dir + f'A{unique_id}_Platform.log')
 
         return results_dir
 
@@ -574,7 +600,7 @@ class AbstractAgent:
 
         formatter = logging.Formatter('%(name)s-%(message)s')
 
-        file_handler = logging.FileHandler(self.results_dir + f'Agent{unique_id}.log')
+        file_handler = logging.FileHandler(self.results_dir + f'A{unique_id}.log')
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
 

@@ -7,11 +7,12 @@ from src.agents.models.platform import Platform
 class StateHistory:
     def __init__(self, agent, platform: Platform, t: Union[int, float]):
         self.states = []
-        self.update(agent, platform, t)
         self.parent_agent = agent
+        self.update(platform, t)
+        self.t_critical = -1
 
-    def update(self, agent, platform: Platform, t: Union[int, float]):
-        state = State(agent, platform, t)
+    def update(self, platform: Platform, t: Union[int, float]):
+        state = State(self.parent_agent, platform, t)
 
         for prev_state in self.states:
             if prev_state == state:
@@ -20,11 +21,10 @@ class StateHistory:
         self.states.append(state)
 
     def get_latest_state(self):
-        return self.states[-1]
+        return self.get_state(-1)
 
     def get_state(self, i):
         return self.states[i]
-
 
     def __str__(self):
         out = ''
