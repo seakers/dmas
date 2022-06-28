@@ -22,7 +22,7 @@ env = SimulationEnvironment()
 agents = []
 component_list = None
 n = 1
-T = 30
+T = 60*24
 
 for i in range(n):
     transmitter = Transmitter(env, 1, 1, 10, 1)
