@@ -6,6 +6,14 @@ from src.agents.components.instruments import Instrument
 from src.environment import SimulationEnvironment
 from src.planners.planner import Planner
 from src.planners.testPlanners import PowerTracking
+import subprocess
+
+
+#RUN ORBITPY
+print('Starting OrbitPy\n')
+subprocess.run(['python', 'scenarios/orbit_data_test/input/run_mission.py', 'scenarios/orbit_data_test/input/'])
+print('\nOrbitPy Complete\n\n\n\n')
+
 
 # SET-UP SIMULATION
 from src.utils.state_plots import *
@@ -33,6 +41,8 @@ for agent in agents:
     agent.set_other_agents(agents)
 
 env.add_agents(agents)
+
+
 
 # RUN SIMULATION
 env.simulate(T)

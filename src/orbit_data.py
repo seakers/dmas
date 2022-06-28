@@ -11,9 +11,9 @@ from src.agents.agent import AbstractAgent
 
 class OrbitData:
     def parse_data(self, root, id):
-        agent_folder = "\sat" + str(id)
-        eclipse_file = root + agent_folder + "\eclipses.csv"
-        cartesian_file = root + agent_folder + "\state_cartesian.csv"
+        agent_folder = "/sat" + str(id)
+        eclipse_file = root + agent_folder + "/eclipses.csv"
+        cartesian_file = root + agent_folder + "/state_cartesian.csv"
         eclipse_data = pd.read_csv(eclipse_file, skiprows=[0, 1, 2])
         cartesian_data = pd.read_csv(cartesian_file, skiprows=[0, 1, 2, 3])
         a = np.asarray(eclipse_data)
@@ -26,7 +26,7 @@ class OrbitData:
     def __init__(self, agent: AbstractAgent):
         self.parent_agent = agent
         #get data from files
-        root = os.getcwd() + "\input"
+        root = os.getcwd() + "/scenarios/orbit_data_test/input"
         eclipse_data, cartesian_data, step = self.parse_data(root, agent.unique_id)
         #assign eclipse data
         self.eclipse_intervals = []
