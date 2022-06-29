@@ -29,6 +29,7 @@ class AbstractAgent:
         self.logger = self.setup_agent_logger(unique_id)
 
         self.alive = True
+        self.safe_mode = False
 
         self.env = env
         self.unique_id = unique_id
@@ -83,31 +84,63 @@ class AbstractAgent:
                     self.update_system()
 
                     if self.critical_state.triggered and len(maintenance_actions) < 1:
-                        # agent is still in critical state and planner did not address it. killing agent
-                        self.logger.debug(f'T{self.env.now}:\tAgent is still in critical state and planner did not '
-                                          f'address it.')
-                        kill = ActuateAgentAction(self.env.now, status=False)
-                        self.actuate_agent(kill)
-                        self.logger.debug(f'T{self.env.now}:\tTERMINATING DOING PHASE!')
+                        critical, _ = self.state_history.get_latest_state().is_critical()
+                        if not self.safe_mode and critical:
+                            '''
+                            Agent is still in critical state and planner did not address it. Placing agent in safe-mode
+                            Safe-mode:
+                                Turns off all components except the receiver and on-board computer.
+                                -Terminates all action tasks
+                                -Waits for incoming messages or planner for instructions  
+                                -Planner only performs power regulating tasks
+                            '''
+                            self.logger.debug(f'T{self.env.now}:\tPlanner did not address the agent\'s critical state. '
+                                              f'Placing agent in safe-mode...')
 
-                        # terminate all tasks
-                        if not listening.triggered:
-                            listening.interrupt('Agent is dead.')
-                            yield listening
+                            self.logger.debug(f'T{self.env.now}:\tTERMINATING DOING PHASE!')
 
-                        for task in tasks:
-                            if not task.triggered:
-                                task.interrupt("Agent is dead.")
-                            yield task
+                            # turn off all components
+                            for component in self.platform.component_list:
+                                if type(component) == OnBoardComputer or type(component) == Receiver:
+                                    action = ActuateComponentAction(component, self.env.now, status=True)
+                                else:
+                                    action = ActuateComponentAction(component, self.env.now, status=False)
+                                self.actuate_component(action)
 
-                        continue
+                            # resetting background tasks
+                            if not listening.triggered:
+                                listening.interrupt('Agent entering safe-mode...')
+                                yield listening
+                            listening = self.env.process(self.listening())
+
+                            if not planner_wait.triggered:
+                                planner_wait.interrupt('Agent entering safe-mode...')
+                                yield planner_wait
+                            planner_wait = self.env.process(self.wait_for_plan())
+
+                            self.critical_state = self.env.event()
+
+                            # terminate all action tasks
+                            for task in tasks:
+                                if not task.triggered:
+                                    task.interrupt("Agent entering safe-mode...")
+                                yield task
+
+                            # informs planner of safe-mode
+                            self.planner.enter_safe_mode()
+
+                            while len(self.plan.items) > 0:
+                                self.plan.get()
+
+                            self.safe_mode = True
+                            continue
 
                     # perform maintenance actions
                     self.perform_maintenance_actions(maintenance_actions)
 
                     # perform manual systems check
                     self.update_system()
-                    self.systems_check()
+                    self.system_check()
 
                     # resetting planner wait background task
                     planner_wait = self.env.process(self.wait_for_plan())
@@ -138,10 +171,6 @@ class AbstractAgent:
                             if listening.triggered:
                                 listening = self.env.process(self.listening())
 
-                        # perform manual systems check after all actions have been performed
-                        self.update_system()
-                        # self.systems_check()
-
                     if not (listening.triggered or self.critical_state.triggered):
                         self.logger.debug(f'T{self.env.now}:\tDOING PHASE COMPLETE!')
                     else:
@@ -150,10 +179,20 @@ class AbstractAgent:
                 if listening.triggered:
                     # restart listening process and update plan
                     listening = self.env.process(self.listening())
-                    self.systems_check()
+                    self.system_check()
 
                 if self.critical_state.triggered:
-                    self.critical_state = self.env.event()
+                    if self.alive:
+                        self.critical_state = self.env.event()
+                    else:
+                        if not listening.triggered:
+                            listening.interrupt('Agent is dead.')
+                            yield listening
+
+                        if not planner_wait.triggered:
+                            planner_wait.interrupt('Agent is dead.')
+                            yield planner_wait
+                        break
 
             self.logger.debug(f'T{self.env.now}:\t...good night!')
         except simpy.Interrupt as i:
@@ -162,6 +201,7 @@ class AbstractAgent:
     '''
     ==========MAINTENANCE ACTIONS==========
     '''
+
     def perform_maintenance_actions(self, actions):
         """
         Performs a list of maintenance actions before performing other tasks. Maintenance tasks include actuating
@@ -258,12 +298,14 @@ class AbstractAgent:
 
     def turn_off_components(self, component_list):
         for component in component_list:
-            actuate_action = ActuateComponentAction(component, self.env.now, status=False)
-            self.actuate_component(actuate_action)
+            if component.is_on():
+                actuate_action = ActuateComponentAction(component, self.env.now, status=False)
+                self.actuate_component(actuate_action)
 
     '''
     ==========TASK ACTIONS==========
     '''
+
     def measure(self, action: MeasurementAction):
         """
         Performs a measurement of a given ground point.
@@ -296,7 +338,7 @@ class AbstractAgent:
 
             # update system
             self.update_system()
-            self.systems_check()
+            self.system_check()
             return
 
         except simpy.Interrupt as i:
@@ -344,7 +386,7 @@ class AbstractAgent:
                     self.platform.transmitter.turn_off()
                     self.update_system()
 
-                self.systems_check()
+                self.system_check()
 
             else:
                 self.logger.debug(f'T{self.env.now}:\tMessage transmission timed out.')
@@ -379,15 +421,15 @@ class AbstractAgent:
             self.update_system()
             self.platform.battery.turn_off_charge()
 
-
+            self.planner.completed_action(action, self.state_history.get_latest_state(), self.env.now)
             self.logger.debug(f'T{self.env.now}:\tSuccessfully completed battery charging action! Final charge of '
                               f'{self.platform.battery.energy_stored.level / self.platform.battery.energy_capacity * 100}%')
 
             # update system
             self.update_system()
-            self.systems_check()
-
+            # self.systems_check()
             return
+
         except simpy.Interrupt as i:
             self.update_system()
             self.logger.debug(f'T{self.env.now}:\tPaused battery charging! {i.cause} Current charge of '
@@ -486,7 +528,7 @@ class AbstractAgent:
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}:\tMessage reception paused. {i.cause}')
 
-    def systems_check(self):
+    def system_check(self):
         # check if system state is critical
         # self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
 
@@ -494,8 +536,19 @@ class AbstractAgent:
         critical, cause = self.state_history.get_latest_state().is_critical()
 
         if critical:
+            all_off = True
+            for component in self.platform.component_list:
+                if component.is_on():
+                    all_off = False
+                    break
+
+            if all_off:
+                self.logger.debug(f'T{self.env.now}:\tPerforming system check... All platform systems off line.')
+                kill = ActuateAgentAction(self.env.now, status=False)
+                self.actuate_agent(kill)
+
             # if critical, trigger critical state event
-            if not self.critical_state.triggered:
+            elif not self.critical_state.triggered:
                 self.logger.debug(f'T{self.env.now}:\tPerforming system check... Critical state reached! {cause}')
                 self.critical_state.succeed()
         else:
@@ -544,6 +597,7 @@ class AbstractAgent:
     '''
     MISCELLANEOUS HELPING METHODS
     '''
+
     def print_state(self):
         """
         Prints state history to csv file
@@ -585,7 +639,7 @@ class AbstractAgent:
 
         if os.path.exists(results_dir + f'A{unique_id}.log'):
             os.remove(results_dir + f'A{unique_id}.log')
-            os.remove(results_dir + f'A{unique_id}_Platform.log')
+            os.remove(results_dir + f'P{unique_id}.log')
 
         return results_dir
 
@@ -622,7 +676,7 @@ class AbstractAgent:
         events = []
         maintenance = []
         for action in self.actions:
-            if action.start != self.env.now and not action.is_active(self.env.now):
+            if action.start < self.env.now and not action.is_active(self.env.now):
                 self.logger.debug(f'T{self.env.now}:\tAttempting to perform action of type '
                                   f'{type(action)} past its start time t_start={action.start}. '
                                   f'Skipping action.')

@@ -17,7 +17,7 @@ from src.utils.state_plots import *
 
 T = 30
 
-scenario = 3
+scenario = 6
 
 env = SimulationEnvironment()
 agents = []

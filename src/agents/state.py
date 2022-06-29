@@ -125,10 +125,6 @@ class State:
         same_data_memory = self.data_memory == other.data_memory
         same_data_buffer_out = self.data_buffer_out == other.data_buffer_out
 
-
-
-        pass
-
     def __str__(self):
         """
         Prints state in the following format:
@@ -165,5 +161,16 @@ class State:
         elif self.data_memory == self.data_capacity and self.data_rate_in > 0:
             cause = f'Pn-board memory full and data is coming in faster than it is leaving.'
             critical = True
+
+        if not critical:
+            all_off = True
+            for component in self.parent_agent.platform.component_list:
+                if component.is_on():
+                    all_off = False
+                    break
+
+            if all_off:
+                cause = f'All components are off. Agent platform is off-line.'
+                critical = True
 
         return critical, cause

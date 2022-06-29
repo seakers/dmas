@@ -140,6 +140,10 @@ class PowerTracking(Planner):
 
     def interrupted_action(self, action: Action, state: State, t):
         super().interrupted_action(action, state, t)
+
+        if self.safe_mode:
+            return
+
         if type(action) == MeasurementAction:
             action_prc = self.env.process(self.schedule_action(action, state, t))
             self.plan[action] = action_prc

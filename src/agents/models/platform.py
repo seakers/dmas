@@ -16,12 +16,12 @@ def setup_platform_logger(unique_id):
     directory_path = os.getcwd()
     results_dir = directory_path + '/results/'
 
-    logger = logging.getLogger(f'A{unique_id}P')
+    logger = logging.getLogger(f'P{unique_id}')
     logger.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter('%(name)s-%(message)s')
 
-    file_handler = logging.FileHandler(results_dir + f'A{unique_id}_Platform.log')
+    file_handler = logging.FileHandler(results_dir + f'P{unique_id}.log')
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 
@@ -76,6 +76,7 @@ class Platform:
         self.updated_manually = simpy.Event(env)
         self.t_prev = self.env.now
         self.t_crit = -1
+        self.crit_counter = 0
         self.event_tracker = None
 
         # logger
@@ -97,8 +98,36 @@ class Platform:
             self.update(t_curr)
 
             # inform agent of critical event
-            if (critical_state_event.triggered or eclipse_event.triggered) and self.parent_agent.alive:
-                self.parent_agent.systems_check()
+            if ((critical_state_event.triggered or eclipse_event.triggered or self.is_critical())
+                    and self.parent_agent.alive):
+                self.crit_counter += 1
+
+                if not self.parent_agent.critical_state.triggered:
+                    self.parent_agent.system_check()
+            else:
+                self.crit_counter = 0
+
+            # if critical state persists after 3 iterations, kill platform and agent
+            if self.crit_counter > 3:
+                self.logger.debug(f'T{self.env.now}:\tCritical state persisting. Platform going off-line...')
+
+                # turn off all components
+                for component in self.component_list:
+                    if component.is_on():
+                        self.logger.debug(f'T{self.env.now}:\tTurning off {component.name}...')
+                        component.turn_off()
+
+                # terminate all background processes
+                if not critical_state_event.triggered:
+                    critical_state_event.interrupt('Platform off-line.')
+                if not eclipse_event.triggered:
+                    eclipse_event.interrupt('Platform off-line.')
+                if not periodic_update.triggered:
+                    periodic_update.interrupt('Platform off-line.')
+
+                # flag agent for status
+                self.parent_agent.system_check()
+                break
 
             # reset parallel processes as needed
             if not critical_state_event.triggered:
@@ -115,19 +144,6 @@ class Platform:
                 self.agent_update = simpy.Event(self.env)
 
             # self.updated_manually.succeed()
-
-    def periodic_update(self):
-        self.updated_periodically.succeed()
-        while True:
-            yield self.env.timeout(1)
-            if self.updated_periodically.triggered:
-                self.updated_periodically = simpy.Event(self.env)
-
-            # update component status
-            t_curr = self.env.now
-            self.update(t_curr)
-
-            self.updated_periodically.succeed()
 
     def update(self, t):
         # print(f'Performed system update at T{t}')
@@ -227,6 +243,22 @@ class Platform:
 
         return critical
 
+    def periodic_update(self):
+        try:
+            self.updated_periodically.succeed()
+            while True:
+                yield self.env.timeout(1)
+                if self.updated_periodically.triggered:
+                    self.updated_periodically = simpy.Event(self.env)
+
+                # update component status
+                t_curr = self.env.now
+                self.update(t_curr)
+
+                self.updated_periodically.succeed()
+        except simpy.Interrupt as i:
+            return
+
     def wait_for_critical_state(self):
         """
         Predicts next critical state and waits for it to arrive.
@@ -286,7 +318,7 @@ class Platform:
                 dt_min = dt
 
         try:
-            self.logger.debug(f'T{self.t_prev}: Next projected critical state will be at T{self.env.now + dt_min}.')
+            self.logger.debug(f'T{self.t_prev}:\tNext projected critical state will be at T{self.env.now + dt_min}.')
             yield self.env.timeout(dt_min)
         except simpy.Interrupt as i:
             return
@@ -300,7 +332,7 @@ class Platform:
             t = self.env.now
             t_eclipse = self.env.orbit_data[self.parent_agent].get_next_eclipse(t)
             dt = t_eclipse - t
-            self.logger.debug(f'T{self.t_prev}: Next projected eclipse event will be at T{t_eclipse}.')
+            self.logger.debug(f'T{self.t_prev}:\tNext projected eclipse event will be at T{t_eclipse}.')
             yield self.env.timeout(dt)
         except simpy.Interrupt as i:
             return

@@ -146,6 +146,7 @@ class Transmitter(Component):
 
             # request receiver to allocate outgoing message into its buffer
             logger.debug(f'T{env.now}:\tRequesting receiver to allocate message size in buffer...')
+            dst.update_system()
             yield receiver.data_stored.put(msg.size)
             logger.debug(f'T{env.now}:\tReceiver buffer memory allocated! Starting transmission...')
 
