@@ -35,10 +35,10 @@ class SimulationEnvironment(Environment):
             agent.print_planner_history()
 
     def is_eclipse(self, agent: AbstractAgent, t: SimTime):
-        return False
+        return self.orbit_data[agent].is_eclipse(t)
 
     def get_position(self, agent: AbstractAgent, t: SimTime):
-        return [-1, -1, -1]
+        return self.orbit_data[agent].get_position(t)
 
     def get_velocity(self, agent: AbstractAgent, t: SimTime):
-        return [-1, -1, -1]
+        return self.orbit_data[agent].get_velocity(t)

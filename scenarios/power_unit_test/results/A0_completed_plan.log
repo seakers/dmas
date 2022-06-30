@@ -1,12 +1,6 @@
 type,t_start,t_end
-actuate_component,0,1,True,True,generator,True,generator,2
-actuate_component,1,2,True,True,instrument,True
-actuate_component,1,2,True,True,generator,True,generator,10
-measurement,1,5,True,True,instrument,None
-actuate_component,5,6,True,True,instrument,False
-actuate_component,5,6,True,True,generator,True,generator,2
-actuate_component,6,7,True,True,transmitter,True
-actuate_component,6,7,True,True,generator,True,generator,3
-transmit,6,10.0,True,True,<src.agents.agent.AbstractAgent object at 0x0000029226319948>,<src.agents.agent.AbstractAgent object at 0x00000292236112C8>
-delete_message,10.0,11.0,True,True,4
-actuate_component,10.0,11.0,True,True,generator,True,generator,2
+actuate_component,0,1,True,True,solar_generator,True,solar_generator,2
+actuate_component,5.5,6.5,True,True,battery,True,battery,2
+charge,10.5,11.75,True,True
+actuate_component,11.75,12.75,True,True,battery,True,battery,-8
+actuate_component,11.75,12.75,True,True,solar_generator,True,solar_generator,2

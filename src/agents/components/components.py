@@ -2,6 +2,7 @@ from logging import Logger
 
 import simpy
 from simpy import Environment
+
 from src.network.messages import Message
 
 
@@ -103,7 +104,7 @@ class Transmitter(Component):
         super().turn_off()
         self.transmitting = False
 
-    def allocate_buffer_memory(self, env: Environment, msg: Message, logger: Logger):
+    def allocate_buffer_memory(self, env: Environment, msg: Message, parent_agent):
         if msg.data_rate + self.data_rate > self.max_data_rate:
             # The message being sent requests a data-rate higher than the maximum available
             # for this transmitter. Dropping packet.
@@ -114,13 +115,17 @@ class Transmitter(Component):
 
         try:
             # request transmitter to allocate outgoing message into its buffer
-            logger.debug(f'T{env.now}:\tMoving message from internal memory to outgoing buffer...')
-            yield self.data_stored.put(msg.size)
-            logger.debug(f'T{env.now}:\tMessage successfully moved to outgoing buffer.')
-        except simpy.Interrupt:
-            logger.debug(f'T{env.now}:\tCould not move message to outgoing buffer.')
+            parent_agent.logger.debug(f'T{env.now}:\tMoving message from internal memory to outgoing buffer...')
 
-    def request_channel(self, env: Environment, msg: Message, logger: Logger):
+            parent_agent.update_system()
+            yield self.data_stored.put(msg.size)
+            parent_agent.update_system()
+
+            parent_agent.logger.debug(f'T{env.now}:\tMessage successfully moved to outgoing buffer.')
+        except simpy.Interrupt:
+            parent_agent.logger.debug(f'T{env.now}:\tCould not move message to outgoing buffer.')
+
+    def request_channel(self, env: Environment, msg: Message, parent_agent):
         # unpack message
         dst = msg.dst
         receiver = dst.platform.receiver
@@ -134,33 +139,37 @@ class Transmitter(Component):
         req_rcr = receiver.channels.request()
 
         try:
-            logger.debug(f'T{env.now}:\tRequesting transmission channel...')
+            parent_agent.logger.debug(f'T{env.now}:\tRequesting transmission channel...')
             yield req_trs
             transmission_channel_established = True
 
-            logger.debug(f'T{env.now}:\tTransmission channel obtained! Requesting reception channel...')
+            parent_agent.logger.debug(f'T{env.now}:\tTransmission channel obtained! Requesting reception channel...')
             yield req_rcr
             reception_channel_established = True
 
-            logger.debug(f'T{env.now}:\tReception channel obtained! Connection established.')
+            parent_agent.logger.debug(f'T{env.now}:\tReception channel obtained! Connection established.')
 
             # request receiver to allocate outgoing message into its buffer
-            logger.debug(f'T{env.now}:\tRequesting receiver to allocate message size in buffer...')
+            parent_agent.logger.debug(f'T{env.now}:\tRequesting receiver to allocate message size in buffer...')
             dst.update_system()
+
+            parent_agent.update_system()
             yield receiver.data_stored.put(msg.size)
-            logger.debug(f'T{env.now}:\tReceiver buffer memory allocated! Starting transmission...')
+            parent_agent.update_system()
+
+            parent_agent.logger.debug(f'T{env.now}:\tReceiver buffer memory allocated! Starting transmission...')
 
         except simpy.Interrupt as i:
             if transmission_channel_established:
-                logger.debug(f'T{env.now}:\t{i.cause} Releasing transmission channel...')
+                parent_agent.logger.debug(f'T{env.now}:\t{i.cause} Releasing transmission channel...')
                 self.channels.release(req_trs)
             if reception_channel_established:
-                logger.debug(f'T{env.now}:\t{i.cause} Releasing reception channel...')
+                parent_agent.logger.debug(f'T{env.now}:\t{i.cause} Releasing reception channel...')
                 receiver.channels.release(req_rcr)
 
         return req_trs, req_rcr
 
-    def transmit_message(self, req_trs, req_rcr, env: Environment, msg: Message, logger: Logger):
+    def transmit_message(self, req_trs, req_rcr, env: Environment, msg: Message, parent_agent):
         '''
         Attempts to send a message to the destination specified in the message.
         It waits for the transmitter to have enough room in its buffer to move message from
@@ -186,57 +195,60 @@ class Transmitter(Component):
             if msg.transmission_start == -1:
                 msg.transmission_start = env.now
 
+            parent_agent.update_system()
             yield env.timeout(msg.size / msg.data_rate - (env.now - msg.transmission_start))
+            parent_agent.update_system()
+
             msg.transmission_end_event.succeed()
             msg.transmission_end = env.now
-            logger.debug(f'T{env.now}:\tTransmission complete!')
+            parent_agent.logger.debug(f'T{env.now}:\tTransmission complete!')
 
             # end transmission
-            logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
+            parent_agent.logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
             self.channels.release(req_trs)
             receiver.channels.release(req_rcr)
 
-            logger.debug(f'T{env.now}:\tTransmission protocol complete!')
+            parent_agent.logger.debug(f'T{env.now}:\tTransmission protocol complete!')
 
         except simpy.Interrupt as i:
             # transmission interrupted while broadcasting
             # release channels used
-            logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
+            parent_agent.logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
             self.channels.release(req_trs)
             receiver.channels.release(req_rcr)
 
             # stopping transmission event
             msg.transmission_end_event.succeed()
 
-    def send_message(self, env: Environment, msg: Message, logger: Logger):
+    def send_message(self, env: Environment, msg: Message, parent_agent):
         allocate_memory = None
         request_channel = None
         transmit = None
 
         try:
-            allocate_memory = env.process(self.allocate_buffer_memory(env, msg, logger))
+            allocate_memory = env.process(self.allocate_buffer_memory(env, msg, parent_agent))
             yield allocate_memory
 
-            request_channel = env.process(self.request_channel(env, msg, logger))
+            request_channel = env.process(self.request_channel(env, msg, parent_agent))
             req_trs, req_rcr = yield request_channel
 
-            transmit = env.process(self.transmit_message(req_trs, req_rcr, env, msg, logger))
+            transmit = env.process(self.transmit_message(req_trs, req_rcr, env, msg, parent_agent))
             yield transmit
             return
 
         except simpy.Interrupt as i:
             if allocate_memory is not None and not allocate_memory.triggered:
-                logger.debug(f'T{env.now}:\tInterrupting memory allocation...')
+                parent_agent.logger.debug(f'T{env.now}:\tInterrupting memory allocation...')
                 allocate_memory.interrupt(i)
             if request_channel is not None and not request_channel.triggered:
-                logger.debug(f'T{env.now}:\tInterrupting channel requests...')
+                parent_agent.logger.debug(f'T{env.now}:\tInterrupting channel requests...')
                 request_channel.interrupt(i)
             if transmit is not None and not transmit.triggered:
-                logger.debug(f'T{env.now}:\tInterrupting transmission...')
+                parent_agent.logger.debug(f'T{env.now}:\tInterrupting transmission...')
                 transmit.interrupt(i)
 
             # drop packet
-            logger.debug(f'T{env.now}:\tDropping packet...')
+            parent_agent.logger.debug(f'T{env.now}:\tDropping packet...')
 
             if msg.transmission_start < 0:
                 yield self.data_stored.get(msg.size)
@@ -271,7 +283,7 @@ class Receiver(Component):
         self.inbox = simpy.Store(env)
         self.received_messages = []
 
-    def receive(self, env, msg, on_board_computer: OnBoardComputer, logger: Logger):
+    def receive(self, env, msg, parent_agent):
         '''
         Receives a message from another agent. Memory has already been allocated by the transmitter. Receiver waits for
         transmission to finish and then moves message from its buffer to the agent's internal memory. If interrupted it
@@ -287,7 +299,7 @@ class Receiver(Component):
             if self.data_rate + msg.data_rate > self.max_data_rate:
                 # The message being received requests a data-rate higher than the maximum
                 # available for this transmitter. Dropping packet.
-                logger.debug(f'T{env.now}:\tThe message being received requests a data-rate higher than the '
+                parent_agent.logger.debug(f'T{env.now}:\tThe message being received requests a data-rate higher than the '
                              f'maximum available for this transmitter. Dropping packet.')
                 return
 
@@ -300,14 +312,14 @@ class Receiver(Component):
             data_received = (msg.reception_end - msg.reception_start) * msg.data_rate
             if data_received < msg.size:
                 # insufficient data was received. wait for timeout
-                logger.debug(f'T{env.now}:\tStopped receiving transmission from A{msg.src.unique_id}.')
+                parent_agent.logger.debug(f'T{env.now}:\tStopped receiving transmission from A{msg.src.unique_id}.')
                 self.data_rate -= msg.data_rate
                 t_left = msg.reception_start + msg.timeout - env.now
                 yield env.timeout(t_left*2)
             else:
                 # successfully received the complete message
                 self.received_messages.append(msg)
-                logger.debug(f'T{env.now}:\tReception complete! ')
+                parent_agent.logger.debug(f'T{env.now}:\tReception complete! ')
                 self.received_messages.remove(msg)
 
         except simpy.Interrupt:
@@ -345,19 +357,30 @@ class PowerGenerator(Component):
 class SolarPanelArray(PowerGenerator):
     def __init__(self, env, power_generation):
         super().__init__(env, power_generation)
-        self.in_eclipse = False
+        self.eclipse = False
         self.name = 'solar_generator'
 
     def turn_on_generator(self, power_out):
         if power_out <= 0:
             raise ArithmeticError("Power generated must be greater than 0")
-        if self.health and not self.in_eclipse:
+        if self.health and not self.eclipse:
             if power_out <= self.max_power_generation:
                 self.power = power_out
             else:
                 self.power = self.max_power_generation
-            self.turn_on()
+        self.turn_on()
 
+    def in_eclipse(self):
+        return self.eclipse
+
+    def enter_eclipse(self):
+        self.eclipse = True
+        self.power = 0
+
+    def exit_eclipse(self):
+        self.eclipse = False
+        if self.is_on():
+            self.power = self.max_power_generation
 
 class Battery(Component):
     def __init__(self, env, max_power_generation, energy_capacity, dod=1, initial_charge=1):

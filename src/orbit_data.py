@@ -7,8 +7,8 @@ from src.agents.agent import AbstractAgent
 class OrbitData:
     def __init__(self, agent: AbstractAgent):
         self.parent_agent = agent
-        # self.eclipse_intervals = [(4.5, 6.5)]
-        self.eclipse_intervals = []
+        self.eclipse_intervals = [(5.5, 10.5)]
+        # self.eclipse_intervals = []
         return
 
     def get_next_eclipse(self, t: SimTime):
@@ -25,7 +25,7 @@ class OrbitData:
     def is_eclipse(self, t: SimTime):
         for interval in self.eclipse_intervals:
             t_start, t_end = interval
-            if t_start <= t <= t_end:
+            if t_start <= t < t_end:
                 return True
         return False
 

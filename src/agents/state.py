@@ -29,7 +29,10 @@ class StateHistory:
     def __str__(self):
         out = ''
         if len(self.states) > 0:
-            out = 't,id,p_in,p_out,p_tot,e_str,e_cap,' \
+            out = 't,id,' \
+                  'rx,ry,rz,' \
+                  'vx,vy,vz,eclipse,' \
+                  'p_in,p_out,p_tot,e_str,e_cap,' \
                   'r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap'
 
             component_list = self.states[0].is_on.keys()
@@ -118,23 +121,57 @@ class State:
         same_buffer_out_capacity = self.buffer_out_capacity == other.buffer_out_capacity
 
         same_data_rate_in = self.data_rate_in == other.data_rate_in
-        same_date_rate_out = self.data_rate_out == other.data_rate_out
+        same_data_rate_out = self.data_rate_out == other.data_rate_out
         same_data_rate_tot = self.data_rate_tot == other.data_rate_tot
 
         same_data_buffer_in = self.data_buffer_in == other.data_buffer_in
         same_data_memory = self.data_memory == other.data_memory
         same_data_buffer_out = self.data_buffer_out == other.data_buffer_out
+        same_data_capacity = self.data_capacity == other.data_capacity
+
+        same_power_in = self.power_in == other.power_in
+        same_power_out = self.power_out == other.power_out
+        same_power_tot = self.power_tot == other.power_tot
+        same_energy_capacity = self.energy_capacity == other.energy_capacity
+        same_energy_stored = self.energy_stored == other.energy_stored
+
+        same_t = self.t == other.t
+
+        same_pos = True
+        same_vel = True
+        for i in range(3):
+            if self.pos[i] != other.pos[i]:
+                same_pos = False
+                break
+            if self.vel[i] != other.vel[i]:
+                same_vel = False
+                break
+        same_eclipse = self.eclipse == other.eclipse
+
+        same_critical = self.critical == other.critical
+
+        return (same_agent and same_component_status and same_dod and same_charging_status and same_buffer_in_capacity
+                and same_buffer_out_capacity and same_data_rate_in and same_data_rate_out and same_data_rate_tot
+                and same_data_buffer_in and same_data_memory and same_data_buffer_out and same_data_capacity
+                and same_power_in and same_power_out and same_power_tot and same_energy_capacity and same_energy_stored
+                and same_t and same_pos and same_vel and same_eclipse and same_critical)
 
     def __str__(self):
         """
         Prints state in the following format:
-        t,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap
+        t,id,rx,ry,rz,vx,vy,vz,eclipse,
+        p_in,p_out,p_tot,e_str,e_cap,
+        r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap
         """
-        return f'{self.t},{self.parent_agent.unique_id},{self.power_in},{self.power_out},{self.power_tot},' \
+        return f'{self.t},{self.parent_agent.unique_id},' \
+               f'{self.pos[0]},{self.pos[1]},{self.pos[2]},' \
+               f'{self.vel[0]},{self.vel[1]},{self.vel[2]},' \
+               f'{int(self.eclipse == True)},' \
+               f'{self.power_in},{self.power_out},{self.power_tot},' \
                f'{self.energy_stored},{self.energy_capacity},' \
                f'{self.data_rate_in},{self.data_rate_out},{self.data_rate_tot},' \
-               f'{self.data_buffer_in},{self.buffer_in_capacity},{self.data_buffer_out},{self.buffer_out_capacity}' \
-               f',{self.data_memory},{self.data_capacity}'
+               f'{self.data_buffer_in},{self.buffer_in_capacity},{self.data_buffer_out},{self.buffer_out_capacity},' \
+               f'{self.data_memory},{self.data_capacity}'
 
     def is_critical(self):
         """

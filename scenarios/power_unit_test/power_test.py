@@ -1,30 +1,25 @@
 import os
 
-import numpy as np
-
 from src.agents.agent import AbstractAgent
 from src.agents.components.components import *
 from src.agents.components.instruments import *
 from src.environment import SimulationEnvironment
 from src.planners.planner import *
 from src.planners.testPlanners import PowerTracking
-import pandas as pd
-import matplotlib.pyplot as plt
-
 
 # SIMULATION SETUP
 from src.utils.state_plots import *
 
 T = 30
 
-scenario = 6
+scenario = 8
 
 env = SimulationEnvironment()
 agents = []
 component_list = None
 
 n = None
-if scenario <= 3:
+if scenario <= 3 or scenario > 7:
     n = 1
 elif scenario <= 4:
     n = 2
@@ -91,6 +86,15 @@ for i in range(n):
         receiver = Receiver(env, 1, 1, 10, 1)
         generator = PowerGenerator(env, 10)
         battery = Battery(env, 0, 100)
+        onboardcomp = OnBoardComputer(env, 1, 5)
+        ins = Instrument(env, 'instrument', 8, 1)
+    elif scenario == 8:
+        # agent uses solar panels to generate power, enters eclipse and switches to battery power, and charges
+        # batteries when exiting eclipse
+        transmitter = Transmitter(env, 1, 1, 10, 1)
+        receiver = Receiver(env, 1, 1, 10, 1)
+        generator = SolarPanelArray(env, 10)
+        battery = Battery(env, 10, 100)
         onboardcomp = OnBoardComputer(env, 1, 5)
         ins = Instrument(env, 'instrument', 8, 1)
     else:

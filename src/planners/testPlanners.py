@@ -20,7 +20,7 @@ class PowerTracking(Planner):
                 self.receiver = component
             elif type(component) == OnBoardComputer:
                 self.on_board_computer = component
-            elif type(component) == PowerGenerator:
+            elif type(component) == PowerGenerator or type(component) == SolarPanelArray:
                 self.power_generator = component
             elif type(component) == Battery:
                 self.battery = component
@@ -134,6 +134,11 @@ class PowerTracking(Planner):
 
                     self.plan[actuate_on] = actuate_on_prc
                     self.plan[transmit] = transmit_prc
+            elif self.scenario <= 8:
+            #     turn_on = ActuatePowerComponentAction(self.power_generator, 10.5, 10)
+            #     turn_on_prc = self.env.process(self.schedule_action(turn_on, state, t))
+            #     self.plan[turn_on] = turn_on_prc
+                return
             else:
                 raise ImportError(f'Testing scenario number {self.scenario} not yet supported.')
         return

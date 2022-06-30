@@ -1,4 +1,4 @@
-from src.agents.components.components import PowerGenerator
+from src.agents.components.components import PowerGenerator, SolarPanelArray
 from src.agents.state import State, simpy
 from src.planners.actions import *
 
@@ -24,7 +24,9 @@ class Planner:
             if p_tot < 0:
                 # power deficiency detected
                 power_on = None
-                if platform.power_generator.power < platform.power_generator.max_power_generation:
+                if (platform.power_generator.power < platform.power_generator.max_power_generation
+                    and (type(platform.power_generator) != SolarPanelArray
+                         or not platform.power_generator.in_eclipse())):
                     # if power generator is not up to its maximum power generation, turn on and provide power
                     # power_on = ActuatePowerComponentAction(self.power_generator, t,
                     #                                        -p_tot + self.power_generator.power)
@@ -59,13 +61,12 @@ class Planner:
                     if power_on is not None:
                         power_on_prc = self.env.process(self.schedule_action(power_on, state, t))
                         self.plan[power_on] = power_on_prc
-
-
-            elif state.power_tot > 0:
+            elif p_tot > 0:
                 # power surplus
                 power_off = None
-                if (platform.battery.energy_stored.level / platform.battery.energy_capacity < 0.70
-                        and platform.battery.power < state.power_tot and not platform.battery.is_charging()):
+                if (1 - platform.battery.energy_stored.level / platform.battery.energy_capacity < platform.battery.dod
+                        and platform.battery.energy_stored.level < platform.battery.energy_capacity
+                        and platform.battery.power < p_tot and not platform.battery.is_charging()):
                     # if battery not up to capacity, charge batteries
                     start = t
                     dt = (platform.battery.energy_capacity - platform.battery.energy_stored.level) / \

@@ -7,6 +7,6 @@ actuate_component,5,6,True,True,instrument,False
 actuate_component,5,6,True,True,generator,True,generator,2
 actuate_component,6,7,True,True,transmitter,True
 actuate_component,6,7,True,True,generator,True,generator,3
-transmit,6,10.0,True,True,<src.agents.agent.AbstractAgent object at 0x000002922600AA88>,<src.agents.agent.AbstractAgent object at 0x00000292236112C8>
+transmit,6,10.0,True,True,<src.agents.agent.AbstractAgent object at 0x000001B00756A488>,<src.agents.agent.AbstractAgent object at 0x000001B004AC5548>
 delete_message,14.0,15.0,True,True,4
 actuate_component,14.0,15.0,True,True,generator,True,generator,2

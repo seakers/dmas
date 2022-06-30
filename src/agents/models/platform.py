@@ -74,6 +74,8 @@ class Platform:
         self.agent_update = simpy.Event(env)
         self.updated_periodically = simpy.Event(env)
         self.updated_manually = simpy.Event(env)
+        self.critical_state = simpy.Event(env)
+
         self.t_prev = self.env.now
         self.t_crit = -1
         self.crit_counter = 0
@@ -83,13 +85,13 @@ class Platform:
         self.logger = setup_platform_logger(parent_agent.unique_id)
 
     def sim(self):
-        critical_state_event = self.env.process(self.wait_for_critical_state())
+        critical_state_check = self.env.process(self.wait_for_critical_state())
         eclipse_event = self.env.process(self.wait_for_eclipse_event())
         periodic_update = self.env.process(self.periodic_update())
 
         # self.updated_manually.succeed()
         while True:
-            yield critical_state_event | eclipse_event | self.agent_update | periodic_update
+            yield critical_state_check | self.critical_state | eclipse_event | self.agent_update | periodic_update
             if self.updated_manually.triggered:
                 self.updated_manually = simpy.Event(self.env)
 
@@ -98,17 +100,23 @@ class Platform:
             self.update(t_curr)
 
             # inform agent of critical event
-            if ((critical_state_event.triggered or eclipse_event.triggered or self.is_critical())
+            if ((critical_state_check.triggered or eclipse_event.triggered or self.is_critical())
                     and self.parent_agent.alive):
                 self.crit_counter += 1
 
                 if not self.parent_agent.critical_state.triggered:
-                    self.parent_agent.system_check()
+                    self.parent_agent.system_check('Platform flagged a new event.')
             else:
                 self.crit_counter = 0
 
-            # if critical state persists after 3 iterations, kill platform and agent
-            if self.crit_counter > 3:
+            if eclipse_event.triggered:
+                if self.eclipse:
+                    self.logger.debug(f'T{self.env.now}:\tEclipse event started!')
+                else:
+                    self.logger.debug(f'T{self.env.now}:\tEclipse event ended!')
+
+            # if critical state persists after 5 iterations, kill platform and agent
+            if self.crit_counter > 5:
                 self.logger.debug(f'T{self.env.now}:\tCritical state persisting. Platform going off-line...')
 
                 # turn off all components
@@ -118,27 +126,30 @@ class Platform:
                         component.turn_off()
 
                 # terminate all background processes
-                if not critical_state_event.triggered:
-                    critical_state_event.interrupt('Platform off-line.')
+                if not critical_state_check.triggered:
+                    critical_state_check.interrupt('Platform off-line.')
                 if not eclipse_event.triggered:
                     eclipse_event.interrupt('Platform off-line.')
                 if not periodic_update.triggered:
                     periodic_update.interrupt('Platform off-line.')
 
                 # flag agent for status
-                self.parent_agent.system_check()
+                self.parent_agent.system_check('Platform flagged a critical state.')
                 break
 
             # reset parallel processes as needed
-            if not critical_state_event.triggered:
-                critical_state_event.interrupt()
-                yield critical_state_event
-            critical_state_event = self.env.process(self.wait_for_critical_state())
+            if not critical_state_check.triggered:
+                critical_state_check.interrupt()
+                yield critical_state_check
+            critical_state_check = self.env.process(self.wait_for_critical_state())
 
             if not eclipse_event.triggered:
                 eclipse_event.interrupt()
                 yield eclipse_event
             eclipse_event = self.env.process(self.wait_for_eclipse_event())
+
+            if self.critical_state.triggered:
+                self.critical_state = simpy.Event(self.env)
 
             if self.agent_update.triggered:
                 self.agent_update = simpy.Event(self.env)
@@ -152,18 +163,7 @@ class Platform:
         dt = t - self.t_prev
 
         # count power and data usage
-        data_rate_in = 0
-        power_out = 0
-        power_in = 0
-        for component in self.component_list:
-            if component.is_on():
-                if component.power <= 0:
-                    power_out -= component.power
-                if type(component) != Receiver and type(component) != Transmitter:
-                    data_rate_in += component.data_rate
-                if type(component) == Battery or type(component) == PowerGenerator:
-                    power_in += component.power
-        power_tot = power_in - power_out
+        power_in, power_out, power_tot, data_rate_in = self.count_usage()
 
         # update values
         # -data
@@ -192,13 +192,12 @@ class Platform:
 
         # update component capabilities
         if type(self.power_generator) == SolarPanelArray:
-            if self.eclipse:
-                self.power_generator.in_eclipse = True
-
-                if self.power_generator.is_on():
-                    self.power_generator.turn_off_generator()
-            else:
-                self.power_generator.in_eclipse = False
+            if self.eclipse and not self.power_generator.in_eclipse():
+                self.parent_agent.system_check('Platform is about to enter eclipse.')
+                self.power_generator.enter_eclipse()
+            elif not self.eclipse and self.power_generator.in_eclipse():
+                self.parent_agent.system_check('Platform is about to exit eclipse.')
+                self.power_generator.exit_eclipse()
 
         if (1 - self.battery.energy_stored.level / self.battery.energy_capacity) >= self.battery.dod:
             self.battery.can_hold_charge = False
@@ -209,22 +208,15 @@ class Platform:
         self.t_prev = t
         self.updated_manually.succeed()
 
+        # check for critical state
+        if self.is_critical() and not self.critical_state.triggered:
+            self.critical_state.succeed()
+
         self.logger.debug(f'T{t}:\t{str(self)}')
 
     def is_critical(self):
         # count power and data usage
-        data_rate_in = 0
-        power_out = 0
-        power_in = 0
-        for component in self.component_list:
-            if component.is_on():
-                if component.power <= 0:
-                    power_out -= component.power
-                if type(component) != Receiver and type(component) != Transmitter:
-                    data_rate_in += component.data_rate
-                if type(component) == Battery or type(component) == PowerGenerator:
-                    power_in += component.power
-        power_tot = power_in - power_out
+        power_in, power_out, power_tot, data_rate_in = self.count_usage()
 
         critical = False
 
@@ -283,13 +275,13 @@ class Platform:
         power_tot = power_in - power_out
 
         # check when battery charge will reach its full capacity
-        if self.battery.is_charging():
-            dx = self.battery.energy_capacity - self.battery.energy_stored.level
-            dxdt = power_tot - self.battery.power
-            if dxdt > 0:
-                dt = dx / dxdt
-                if dt < dt_min:
-                    dt_min = dt
+        # if self.battery.is_charging():
+        #     dx = self.battery.energy_capacity - self.battery.energy_stored.level
+        #     dxdt = power_tot - self.battery.power
+        #     if dxdt > 0:
+        #         dt = dx / dxdt
+        #         if dt < dt_min:
+        #             dt_min = dt
 
         # check when battery charge will be below DOD
         if self.battery.is_on():
@@ -337,13 +329,7 @@ class Platform:
         except simpy.Interrupt as i:
             return
 
-    def __str__(self):
-        """
-        format:
-        't,id,p_in,p_out,p_tot,e_str,e_cap,r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap'
-        :return:
-        """
-
+    def count_usage(self):
         # count power and data usage
         data_rate_in = 0
         power_out = 0
@@ -354,11 +340,31 @@ class Platform:
                     power_out -= component.power
                 if type(component) != Receiver and type(component) != Transmitter:
                     data_rate_in += component.data_rate
-                if type(component) == Battery or type(component) == PowerGenerator:
+                if (type(component) == Battery
+                        or type(component) == PowerGenerator
+                        or type(component) == SolarPanelArray):
                     power_in += component.power
         power_tot = power_in - power_out
 
-        return f'{self.t_prev},{power_in},{power_out},{power_tot},{self.battery.energy_stored.level},' \
+        return power_in, power_out, power_tot, data_rate_in
+
+    def __str__(self):
+        """
+        Prints platform state in the following format:
+        t,id,rx,ry,rz,vx,vy,vz,eclipse,
+        p_in,p_out,p_tot,e_str,e_cap,
+        r_in,r_out,r_tot,d_in,d_in_cap,d_out,d_out_cap,d_mem,d_mem_cap
+        :return:
+        """
+
+        # count power and data usage
+        power_in, power_out, power_tot, data_rate_in = self.count_usage()
+
+        return f'{self.t_prev},{self.parent_agent.unique_id}' \
+               f'{self.pos[0]},{self.pos[1]},{self.pos[2]},' \
+               f'{self.vel[0]},{self.vel[1]},{self.vel[2]},' \
+               f'{int(self.eclipse == True)},' \
+               f'{power_in},{power_out},{power_tot},{self.battery.energy_stored.level},' \
                f'{self.battery.energy_capacity},{data_rate_in},{self.transmitter.data_rate},' \
                f'{data_rate_in - self.transmitter.data_rate},{self.receiver.data_stored.level},' \
                f'{self.receiver.data_capacity},{self.transmitter.data_stored.level},{self.transmitter.data_capacity},' \

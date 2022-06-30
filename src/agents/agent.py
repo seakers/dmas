@@ -366,7 +366,7 @@ class AbstractAgent:
             msg = action.msg
 
             msg_timeout = self.env.timeout(msg.timeout)
-            send_message = self.env.process(self.platform.transmitter.send_message(self.env, msg, self.logger))
+            send_message = self.env.process(self.platform.transmitter.send_message(self.env, msg, self))
 
             yield msg_timeout | send_message
 
@@ -378,8 +378,6 @@ class AbstractAgent:
                     msg_timeout.interrupt("Message transmitted successfully!")
 
                 # update system
-                self.update_system()
-
                 self.platform.transmitter.data_rate -= msg.data_rate
 
                 if self.platform.transmitter.channels.count == 0:
@@ -481,9 +479,7 @@ class AbstractAgent:
 
             self.update_system()
             msg_timeout = self.env.timeout(msg.timeout)
-            msg_reception = self.env.process(
-                self.platform.receiver.receive(self.env, msg, self.platform.on_board_computer, self.logger)
-            )
+            msg_reception = self.env.process(self.platform.receiver.receive(self.env, msg, self))
 
             self.logger.debug(f'T{self.env.now}:\tStarting message reception from A{msg.src.unique_id}!')
             yield msg_timeout | msg_reception
@@ -502,6 +498,7 @@ class AbstractAgent:
                 # move message from buffer to internal memory
                 self.logger.debug(f'T{self.env.now}:\tMoving data from buffer to internal memory...')
                 yield self.platform.on_board_computer.data_stored.put(msg.size) | msg_timeout
+                self.update_system()
                 yield self.platform.receiver.data_stored.get(msg.size)
 
                 if msg_timeout.triggered:
@@ -528,7 +525,7 @@ class AbstractAgent:
         except simpy.Interrupt as i:
             self.logger.debug(f'T{self.env.now}:\tMessage reception paused. {i.cause}')
 
-    def system_check(self):
+    def system_check(self, msg=''):
         # check if system state is critical
         # self.logger.debug(f'T{self.env.now}:\tPerforming system check...')
 
@@ -543,17 +540,18 @@ class AbstractAgent:
                     break
 
             if all_off:
-                self.logger.debug(f'T{self.env.now}:\tPerforming system check... All platform systems off line.')
+                self.logger.debug(f'T{self.env.now}:\t{msg} Performing system check... All platform systems off line.')
                 kill = ActuateAgentAction(self.env.now, status=False)
                 self.actuate_agent(kill)
+                self.planner.clear_plan()
 
             # if critical, trigger critical state event
             elif not self.critical_state.triggered:
-                self.logger.debug(f'T{self.env.now}:\tPerforming system check... Critical state reached! {cause}')
+                self.logger.debug(f'T{self.env.now}:\t{msg} Performing system check... Critical state reached! {cause}')
                 self.critical_state.succeed()
         else:
             # state is nominal
-            self.logger.debug(f'T{self.env.now}:\tPerforming system check... State nominal.')
+            self.logger.debug(f'T{self.env.now}:\t{msg} Performing system check... State nominal.')
             if self.critical_state.triggered:
                 # if critical state was previously detected, reset event to nominal
                 self.critical_state = self.env.event()

@@ -7,7 +7,7 @@ A2-T0:	Updated system status.
 A2-T0:	Turning on generator with power 2W...
 A2-T0:	Completed all maintenance actions.
 A2-T0:	Updated system status.
-A2-T0:	Performing system check... State nominal.
+A2-T0:	 Performing system check... State nominal.
 A2-T0:	DOING PHASE COMPLETE!
 A2-T0:	STARTING IDLE PHASE...
 A2-T6:	Updated system status.
@@ -18,22 +18,28 @@ A2-T10.0:	Updated system status.
 A2-T10.0:	Received message from A0!
 A2-T10.0:	Updated system status.
 A2-T10.0:	Moving data from buffer to internal memory...
+A2-T10.0:	Updated system status.
 A2-T10.0:	Message reception from A0 timed out. Dropping packet...
 A2-T10.0:	Updated system status.
 A2-T10.0:	IDLE PHASE COMPLETE!
-A2-T10.0:	Performing system check... State nominal.
+A2-T10.0:	 Performing system check... State nominal.
 A2-T10.0:	STARTING IDLE PHASE...
 A2-T10.0:	Waiting for any incoming transmission...
 A2-T10.0:	Updated system status.
 A2-T10.0:	Starting message reception from A1!
+A2-T11.0:	Platform flagged a new event. Performing system check... State nominal.
+A2-T12.0:	Platform flagged a new event. Performing system check... State nominal.
+A2-T13.0:	Platform flagged a new event. Performing system check... State nominal.
 A2-T14.0:	Reception complete! 
 A2-T14.0:	Received message from A1!
 A2-T14.0:	Updated system status.
 A2-T14.0:	Moving data from buffer to internal memory...
-A2-T14.0:	Message reception from A1 timed out. Dropping packet...
-A2-T14.0:	Updated system status.
-A2-T14.0:	IDLE PHASE COMPLETE!
-A2-T14.0:	Performing system check... State nominal.
-A2-T14.0:	STARTING IDLE PHASE...
-A2-T14.0:	Waiting for any incoming transmission...
+A2-T14.0:	Platform flagged a new event. Performing system check... State nominal.
+A2-T20.0:	Updated system status.
+A2-T20.0:	Message reception from A1 timed out. Dropping packet...
+A2-T20.0:	Updated system status.
+A2-T20.0:	IDLE PHASE COMPLETE!
+A2-T20.0:	 Performing system check... State nominal.
+A2-T20.0:	STARTING IDLE PHASE...
+A2-T20.0:	Waiting for any incoming transmission...
 A2-T30:	Updated system status.
