@@ -1,3 +1,0 @@
-#!/bin/sh
-conda activate "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv"
-exec "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/bin/wrappers/conda/run-in" "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/bin/python3.10" "$@"

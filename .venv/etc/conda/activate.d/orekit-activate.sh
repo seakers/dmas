@@ -1,2 +1,0 @@
-export _JCC_JDK_CONDA_BACKUP=${JCC_JDK:-}
-export JCC_JDK=$CONDA_PREFIX

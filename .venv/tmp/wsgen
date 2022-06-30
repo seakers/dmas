@@ -1,2 +1,0 @@
-#!/bin/sh
-"./.venv/tmp/run-in" "/Users/a.aguilar/Documents/GitHub/DMASpy/.venv/bin/wsgen" "$@"
