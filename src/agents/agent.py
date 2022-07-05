@@ -47,6 +47,14 @@ class AbstractAgent:
         self.state_history = StateHistory(self, self.platform, env.now)
         self.critical_state = env.event()
 
+        self.t_crit = -1
+
+        #orbit info
+        self.eclipse_intervals = []
+        self.position = []
+        self.velocity = []
+        self.time_step = 1
+
         # Message history
         self.message_history = MessageHistory()
 
