@@ -17,7 +17,7 @@ class AbstractAgent:
 
     '''
 
-    def __init__(self, env, unique_id, component_list=None, planner: Planner = None):
+    def __init__(self, env, unique_id, results_dir, component_list=None, planner: Planner = None):
         """
         Abstract agent class.
         :param env: Simulation environment
@@ -25,7 +25,7 @@ class AbstractAgent:
         :param component_list: list of components of the agent
         :param planner: planner used by the agent for assigning tasks
         """
-        self.results_dir = self.create_results_directory(unique_id)
+        self.results_dir = results_dir
         self.logger = self.setup_agent_logger(unique_id)
 
         self.alive = True
@@ -629,25 +629,6 @@ class AbstractAgent:
                 f.write('\n')
 
         f.close()
-
-    def create_results_directory(self, unique_id):
-        """
-        Creates a utils directory for this particular scenario if it has not been created yet. Initializes a new
-        logger report for this particular agent
-        :param unique_id: agent's unique ID
-        :return:
-        """
-        directory_path = os.getcwd()
-        results_dir = directory_path + '/results/'
-
-        if not os.path.isdir(results_dir):
-            os.mkdir(results_dir)
-
-        if os.path.exists(results_dir + f'A{unique_id}.log'):
-            os.remove(results_dir + f'A{unique_id}.log')
-            os.remove(results_dir + f'P{unique_id}.log')
-
-        return results_dir
 
     def setup_agent_logger(self, unique_id):
         """

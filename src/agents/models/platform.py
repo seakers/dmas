@@ -7,38 +7,13 @@ from src.agents.components.components import *
 from src.planners.actions import ActuateAgentAction
 
 
-def setup_platform_logger(unique_id):
-    """
-    Sets up logger for this platform simulator
-    :param agent: parent agent for this platform
-    :return:
-    """
-    directory_path = os.getcwd()
-    results_dir = directory_path + '/results/'
-
-    logger = logging.getLogger(f'P{unique_id}')
-    logger.setLevel(logging.DEBUG)
-
-    formatter = logging.Formatter('%(name)s-%(message)s')
-
-    file_handler = logging.FileHandler(results_dir + f'P{unique_id}.log')
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-
-    stream_handler = logging.StreamHandler()
-    stream_handler.setLevel(logging.DEBUG)
-    stream_handler.setFormatter(formatter)
-
-    logger.addHandler(file_handler)
-    logger.addHandler(stream_handler)
-
-    return logger
-
-
 class Platform:
     def __init__(self, parent_agent, env, component_list):
         self.parent_agent = parent_agent
         self.env = env
+
+        # logger
+        self.logger = self.setup_platform_logger()
 
         # component status
         self.component_list = component_list
@@ -80,9 +55,6 @@ class Platform:
         self.t_crit = -1
         self.crit_counter = 0
         self.event_tracker = None
-
-        # logger
-        self.logger = setup_platform_logger(parent_agent.unique_id)
 
     def sim(self):
         critical_state_check = self.env.process(self.wait_for_critical_state())
@@ -369,3 +341,30 @@ class Platform:
                f'{data_rate_in - self.transmitter.data_rate},{self.receiver.data_stored.level},' \
                f'{self.receiver.data_capacity},{self.transmitter.data_stored.level},{self.transmitter.data_capacity},' \
                f'{self.on_board_computer.data_stored.level},{self.on_board_computer.data_capacity}'
+    
+    def setup_platform_logger(self):
+        """
+        Sets up logger for this platform simulator
+        :param agent: parent agent for this platform
+        :return:
+        """
+        results_dir = self.parent_agent.results_dir
+        unique_id = self.parent_agent.unique_id
+
+        logger = logging.getLogger(f'P{unique_id}')
+        logger.setLevel(logging.DEBUG)
+
+        formatter = logging.Formatter('%(name)s-%(message)s')
+
+        file_handler = logging.FileHandler(results_dir + f'P{unique_id}.log')
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)
+
+        return logger

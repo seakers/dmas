@@ -13,8 +13,8 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}",
-            "env": {"PYTHONPATH": "${cwd}/src"}
+            "cwd": "${workspaceRoot}/scenarios/${file}",
+            "env": {"PYTHONPATH": "${workspaceRoot}/.env/"}
         }
 
     ]

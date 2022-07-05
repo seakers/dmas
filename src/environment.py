@@ -1,3 +1,4 @@
+import os
 from typing import Union
 
 from simpy import Environment, Event
@@ -8,10 +9,28 @@ from src.orbit_data import OrbitData
 
 
 class SimulationEnvironment(Environment):
-    def __init__(self, initial_time: SimTime = 0):
+    def __init__(self, dir_path, initial_time: SimTime = 0):
         super().__init__(initial_time=initial_time)
         self.agent_list = []
         self.orbit_data = []
+        self.results_dir = self.create_results_directory(dir_path)
+
+    def create_results_directory(self, dir_path):
+        """
+        Creates a utils directory for this particular scenario if it has not been created yet. 
+        :return:
+        """        
+        results_dir = dir_path + '/results/'
+
+        if os.path.isdir(results_dir):
+            print( os.listdir(results_dir) )
+
+            for f in os.listdir(results_dir):
+                os.remove(os.path.join(results_dir, f)) 
+            os.rmdir(results_dir)
+        os.mkdir(results_dir)
+
+        return results_dir
 
     def add_agents(self, agent_list):
         self.agent_list = agent_list
@@ -28,6 +47,8 @@ class SimulationEnvironment(Environment):
             self.process(agent.platform.sim())
 
         self.run(until)
+
+        print('SIMULATION DONE')
 
         for agent in self.agent_list:
             agent.update_system()

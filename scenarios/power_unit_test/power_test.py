@@ -2,6 +2,10 @@ import os
 
 directory_path = os.getcwd()
 print(f'\nCurrent directory: {directory_path}\n')
+print ("File __name__ = %s" %__name__)
+print ("File __file__ = %s" %__file__)
+print ("File Path = %s" % os.path.dirname(__file__))
+
 
 from src.agents.agent import AbstractAgent
 from src.agents.components.components import *
@@ -17,7 +21,8 @@ T = 30
 
 scenario = 3
 
-env = SimulationEnvironment()
+dir_path = os.path.dirname(__file__)
+env = SimulationEnvironment(dir_path)
 agents = []
 component_list = None
 
@@ -105,7 +110,7 @@ for i in range(n):
 
     component_list = [transmitter, receiver, generator, battery, onboardcomp, ins]
     planner = PowerTracking(env, i, component_list, scenario=scenario)
-    agent = AbstractAgent(env, i, component_list=component_list, planner=planner)
+    agent = AbstractAgent(env, i, results_dir=env.results_dir, component_list=component_list, planner=planner)
     agents.append(agent)
 
 for agent in agents:
@@ -122,7 +127,7 @@ for agent in agents:
     agent.print_planner_history()
 
 # PLOTS
-directory_path = os.getcwd()
+directory_path = os.path.dirname(__file__)
 results_dir = directory_path + '/results/'
 
 # -Power Plot
