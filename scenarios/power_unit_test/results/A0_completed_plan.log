@@ -1,6 +1,0 @@
-type,t_start,t_end
-actuate_component,0,1,True,True,solar_generator,True,solar_generator,2
-actuate_component,5.5,6.5,True,True,battery,True,battery,2
-charge,10.5,11.75,True,True
-actuate_component,11.75,12.75,True,True,battery,True,battery,-8
-actuate_component,11.75,12.75,True,True,solar_generator,True,solar_generator,2

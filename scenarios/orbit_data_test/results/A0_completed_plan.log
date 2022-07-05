@@ -1,7 +1,0 @@
-type,t_start,t_end
-actuate_component,0,1,True,True,generator,True,generator,2
-actuate_component,1,2,True,True,instrument,True
-actuate_component,1,2,True,True,generator,True,generator,10
-measurement,1,8.5,True,True,instrument,None
-actuate_component,8.5,9.5,True,True,instrument,False
-actuate_component,8.5,9.5,True,True,generator,True,generator,2

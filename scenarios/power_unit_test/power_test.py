@@ -1,5 +1,8 @@
 import os
 
+directory_path = os.getcwd()
+print(f'\nCurrent directory: {directory_path}\n')
+
 from src.agents.agent import AbstractAgent
 from src.agents.components.components import *
 from src.agents.components.instruments import *
@@ -12,7 +15,7 @@ from src.utils.state_plots import *
 
 T = 30
 
-scenario = 8
+scenario = 3
 
 env = SimulationEnvironment()
 agents = []
