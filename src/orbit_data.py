@@ -12,22 +12,27 @@ from src.agents.agent import AbstractAgent
 class OrbitData:
     def __init__(self, agent: AbstractAgent):
         self.parent_agent = agent
-        self.eclipse_intervals = [(5.5, 10.5)]
-        # self.eclipse_intervals = []
-        #get data from files
-        root = os.getcwd() + "/scenarios/orbit_data_test/input"
-        eclipse_data, cartesian_data, step = self.parse_data(root, agent.unique_id)
-        #assign eclipse data
+        # self.eclipse_intervals = [(5.5, 10.5)]
         self.eclipse_intervals = []
-        for i in eclipse_data:
-            self.eclipse_intervals.append(i)
-        #assign attitude data
-        agent.position = []
-        agent .velocity = []
-        for i in cartesian_data:
-            agent.position.append(i[1:4])
-            agent.velocity.append(i[4:])
-        self.time_step = step
+        self.time_step = 1
+
+        # self.eclipse_intervals = []
+        # #get data from files
+        # root = os.getcwd() + "/scenarios/orbit_data_test/input"
+        # eclipse_data, cartesian_data, step = self.parse_data(root, agent.unique_id)
+        #
+        # #assign eclipse data
+        # self.eclipse_intervals = []
+        # for i in eclipse_data:
+        #     self.eclipse_intervals.append(i)
+        #
+        # #assign attitude data
+        # self.position = []
+        # self.velocity = []
+        # for i in cartesian_data:
+        #     self.position.append(i[1:4])
+        #     self.velocity.append(i[4:])
+        # self.time_step = step
         return
 
     def parse_data(self, root, id):
@@ -65,8 +70,10 @@ class OrbitData:
 
     def get_position(self, t: SimTime):
         t = int(t * self.time_step)
-        return self.position[t]
+        # return self.position[t]
+        return [-1,-1,-1]
 
     def get_velocity(self, t: SimTime):
         t = int(t * self.time_step)
-        return self.velocity[t]
+        # return self.velocity[t]
+        return [-1,-1,-1]
