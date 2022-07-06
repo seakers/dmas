@@ -13,7 +13,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "${workspaceRoot}/scenarios/orbitpy_test/input/"
+                "${workspaceRoot}/scenarios/orbitpy_test/"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
@@ -28,9 +28,6 @@
             "program": "${workspaceRoot}/scenarios/power_unit_test/power_test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": [
-                "${workspaceRoot}/scenarios/orbitpy_test/input/"
-            ],
             "cwd": "${workspaceRoot}",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
