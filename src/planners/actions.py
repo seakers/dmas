@@ -56,7 +56,7 @@ class ActuatePowerComponentAction(ActuateComponentAction):
 
     def __str__(self):
         out = super().__str__()
-        return out + f',{self.component.name},{self.power}'
+        return out + f',{self.power}'
 
 
 class DeleteMessageAction(Action):

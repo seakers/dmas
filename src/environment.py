@@ -48,12 +48,17 @@ class SimulationEnvironment(Environment):
 
         self.run(until)
 
-        print('SIMULATION DONE')
-
         for agent in self.agent_list:
             agent.update_system()
+
+        print('SIMULATION DONE')
+
+        # PRINT AGENT STATE HISTORY
+        for agent in self.agent_list:
             agent.print_state()
             agent.print_planner_history()
+
+        print('Results printed to: \'' + self.results_dir + '\'')
 
     def is_eclipse(self, agent: AbstractAgent, t: SimTime):
         return self.orbit_data[agent].is_eclipse(t)

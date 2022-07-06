@@ -1,12 +1,5 @@
 import os
 
-directory_path = os.getcwd()
-print(f'\nCurrent directory: {directory_path}\n')
-print ("File __name__ = %s" %__name__)
-print ("File __file__ = %s" %__file__)
-print ("File Path = %s" % os.path.dirname(__file__))
-
-
 from src.agents.agent import AbstractAgent
 from src.agents.components.components import *
 from src.agents.components.instruments import *
@@ -19,7 +12,7 @@ from src.utils.state_plots import *
 
 T = 30
 
-scenario = 3
+scenario = 7
 
 dir_path = os.path.dirname(__file__)
 env = SimulationEnvironment(dir_path)
@@ -105,6 +98,9 @@ for i in range(n):
         battery = Battery(env, 10, 100)
         onboardcomp = OnBoardComputer(env, 1, 5)
         ins = Instrument(env, 'instrument', 8, 1)
+    # elif scenario == 9:
+    #     # agent 0 sends a message to agent 1, which responds with the same message as soon as it is received (Ping Pong)
+    #     pass
     else:
         raise Exception("Scenario not yet supported")
 
@@ -120,11 +116,6 @@ env.add_agents(agents)
 
 # RUN SIMULATION
 env.simulate(T)
-
-# PRINT AGENT STATE HISTORY
-for agent in agents:
-    agent.print_state()
-    agent.print_planner_history()
 
 # PLOTS
 directory_path = os.path.dirname(__file__)

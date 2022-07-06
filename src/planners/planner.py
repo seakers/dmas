@@ -111,6 +111,9 @@ class Planner:
             self.plan[delete] = delete_prc
 
         action.complete()
+
+        # print(f'\n Completed action of type: {action}\n')
+
         self.plan.pop(action)
         self.completed_plan.append((action, t))
 

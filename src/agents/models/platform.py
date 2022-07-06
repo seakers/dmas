@@ -15,7 +15,10 @@ class Platform:
         # logger
         self.logger = self.setup_platform_logger()
 
-        # component status
+        # platform status
+        self.alive = True
+
+        # component list
         self.component_list = component_list
         self.transmitter = None
         self.receiver = None
@@ -53,7 +56,6 @@ class Platform:
 
         self.t_prev = self.env.now
         self.t_crit = -1
-        self.crit_counter = 0
         self.event_tracker = None
 
     def sim(self):
@@ -68,27 +70,21 @@ class Platform:
                 self.updated_manually = simpy.Event(self.env)
 
             # update component status
-            t_curr = self.env.now
-            self.update(t_curr)
+            if not self.is_critical():
+                t_curr = self.env.now
+                self.update(t_curr)
 
             # inform agent of critical event
-            if ((critical_state_check.triggered or eclipse_event.triggered or self.is_critical())
+            if ((critical_state_check.triggered 
+                or eclipse_event.triggered 
+                or self.is_critical())
                     and self.parent_agent.alive):
-                self.crit_counter += 1
-
+                
                 if not self.parent_agent.critical_state.triggered:
                     self.parent_agent.system_check('Platform flagged a new event.')
-            else:
-                self.crit_counter = 0
 
-            if eclipse_event.triggered:
-                if self.eclipse:
-                    self.logger.debug(f'T{self.env.now}:\tEclipse event started!')
-                else:
-                    self.logger.debug(f'T{self.env.now}:\tEclipse event ended!')
-
-            # if critical state persists after 5 iterations, kill platform and agent
-            if self.crit_counter > 5:
+            # if critical state persists after 1 time-step, kill platform and agent
+            if self.is_critical() and 0 < (self.env.now -  self.t_crit) <= 1 and self.t_crit >= 0:
                 self.logger.debug(f'T{self.env.now}:\tCritical state persisting. Platform going off-line...')
 
                 # turn off all components
@@ -108,6 +104,17 @@ class Platform:
                 # flag agent for status
                 self.parent_agent.system_check('Platform flagged a critical state.')
                 break
+            elif self.is_critical():
+                self.t_crit = self.env.now
+            else:
+                self.t_crit = -1
+
+            if eclipse_event.triggered:
+                if self.eclipse:
+                    self.logger.debug(f'T{self.env.now}:\tEclipse event started!')
+                else:
+                    self.logger.debug(f'T{self.env.now}:\tEclipse event ended!')
+
 
             # reset parallel processes as needed
             if not critical_state_check.triggered:
@@ -183,6 +190,8 @@ class Platform:
         # check for critical state
         if self.is_critical() and not self.critical_state.triggered:
             self.critical_state.succeed()
+        elif self.is_critical():
+            self.t_crit = -1
 
         self.logger.debug(f'T{t}:\t{str(self)}')
 
@@ -332,7 +341,7 @@ class Platform:
         # count power and data usage
         power_in, power_out, power_tot, data_rate_in = self.count_usage()
 
-        return f'{self.t_prev},{self.parent_agent.unique_id}' \
+        return f'{self.t_prev},{self.parent_agent.unique_id},' \
                f'{self.pos[0]},{self.pos[1]},{self.pos[2]},' \
                f'{self.vel[0]},{self.vel[1]},{self.vel[2]},' \
                f'{int(self.eclipse == True)},' \

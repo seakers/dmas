@@ -14,7 +14,16 @@ from src.planners.planner import Planner
 
 class AbstractAgent:
     '''
-
+    Abstract class for a generic agent. 
+    Initializes its own platform simulator and is capable of manipulating its platform and 
+    the environment it lives in to perform actions according to its planner
+        _____________________
+        |                   |
+        v                   |
+    idle/listen -> think -> do
+                    | ^
+                    v |
+                  planner
     '''
 
     def __init__(self, env, unique_id, results_dir, component_list=None, planner: Planner = None):
@@ -91,7 +100,7 @@ class AbstractAgent:
                     # perform manual systems check prior to performing any actions
                     self.update_system()
 
-                    if self.critical_state.triggered and len(maintenance_actions) < 1:
+                    if self.critical_state.triggered and len(maintenance_actions) < 1 and self.alive:
                         critical, _ = self.state_history.get_latest_state().is_critical()
                         if not self.safe_mode and critical:
                             '''
@@ -136,11 +145,13 @@ class AbstractAgent:
 
                             # informs planner of safe-mode
                             self.planner.enter_safe_mode()
+                            self.safe_mode = True
 
+                            # clear plan
                             while len(self.plan.items) > 0:
                                 self.plan.get()
+                            self.actions = []
 
-                            self.safe_mode = True
                             continue
 
                     # perform maintenance actions
