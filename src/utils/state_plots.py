@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def plot_power_state(results_dir, n_agents, savefig=True):
+def plot_power_state(results_dir, n_agents):
     if n_agents < 1:
         return
     elif n_agents < 2:
@@ -35,9 +35,6 @@ def plot_power_state(results_dir, n_agents, savefig=True):
         plt.subplots_adjust(wspace=0.4,
                             hspace=0.9)
         plt.show()
-
-        if savefig:
-            plt.savefig(results_dir + 'power_state.png')
     else:
         figure, axis = plt.subplots(5, n_agents)
 
@@ -70,11 +67,8 @@ def plot_power_state(results_dir, n_agents, savefig=True):
                             hspace=0.9)
         plt.show()
 
-        if savefig:
-            plt.savefig(results_dir + 'power_state.png')
 
-
-def plot_data_rate_state(results_dir, n_agents, savefig=True):
+def plot_data_rate_state(results_dir, n_agents):
     if n_agents < 1:
         return
     elif n_agents < 2:
@@ -103,9 +97,6 @@ def plot_data_rate_state(results_dir, n_agents, savefig=True):
         plt.subplots_adjust(wspace=0.4,
                             hspace=0.9)
         plt.show()
-
-        if savefig:
-            plt.savefig(results_dir + 'data_rate_state.png')
     else:
         figure, axis = plt.subplots(4, n_agents)
 
@@ -134,11 +125,8 @@ def plot_data_rate_state(results_dir, n_agents, savefig=True):
                             hspace=0.9)
         plt.show()
 
-        if savefig:
-            plt.savefig(results_dir + 'data_rate_state.png')
 
-
-def plot_data_state(results_dir, n_agents, savefig=True):
+def plot_data_state(results_dir, n_agents):
     if n_agents < 1:
         return
     elif n_agents < 2:
@@ -161,9 +149,6 @@ def plot_data_state(results_dir, n_agents, savefig=True):
         plt.subplots_adjust(wspace=0.4,
                             hspace=0.9)
         plt.show()
-
-        if savefig:
-            plt.savefig(results_dir + 'data_state.png')
     else:
         figure, axis = plt.subplots(3, n_agents)
 
@@ -185,6 +170,3 @@ def plot_data_state(results_dir, n_agents, savefig=True):
         plt.subplots_adjust(wspace=0.4,
                             hspace=0.9)
         plt.show()
-
-        if savefig:
-            plt.savefig(results_dir + 'data_state.png')

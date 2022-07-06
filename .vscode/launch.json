@@ -4,18 +4,37 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+
         {
-            "name": "Python: Current File",
+            "name": "DMAS: Simulation Driver",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceRoot}/test/driver.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/scenarios/${file}",
-            "env": {"PYTHONPATH": "${workspaceRoot}"}
-            // "env": {"PYTHONPATH": "${workspaceRoot}/.env/"}
+            "args": [
+                "${workspaceRoot}/scenarios/orbitpy_test/input/"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+        
+        {
+            "name": "DMAS: Power Unit Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/scenarios/power_unit_test/power_test.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "${workspaceRoot}/scenarios/orbitpy_test/input/"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
         }
-
     ]
 }
