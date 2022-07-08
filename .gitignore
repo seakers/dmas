@@ -11,3 +11,4 @@
 *.iml
 *.xml
 scenarios/*/results
+scenarios/*/orbit_data
