@@ -1,5 +1,5 @@
 import simpy
-from agents.agent import AbstractAgent
+from src.agents.agent import AbstractAgent
 
 # class SpacecraftAgent(AbstractAgent):
 class SpacecraftAgent():
@@ -19,14 +19,14 @@ class SpacecraftAgent():
         if self.env is None:
             raise simpy.Interrupt(f'No environment set for Agent {self.name}')
 
-        print('hello world!')
-        print('dying in 3...')
+        print('\nhello world!')
+        print('Not much to do now\n3...')
         yield self.env.timeout(1)
         print('2...')
         yield self.env.timeout(1)
         print('1...')
         yield self.env.timeout(1)
-        print('goodnight!')
+        print('...goodnight!\n')
 
 class GroundStationAgent():
     def __init__(self, d) -> None:

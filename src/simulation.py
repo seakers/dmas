@@ -4,20 +4,8 @@ import os
 from orbitpy.util import Spacecraft, GroundStation, SpacecraftBus, OutputInfoUtility, OrbitState
 import orbitpy
 
-from agents.simulation_agents import SpacecraftAgent
-
-class ScenarioEnvironment(Environment):
-    def __init__(self, duration) -> None:
-        super().__init__()
-        self.duration = duration * 24 * 3600 #convert from days to seconds
-
-    def from_json(d):
-        duration = d.get("duration")
-        return ScenarioEnvironment(duration)
-
-    def run(self):
-        super().run(self.duration)
-        
+from src.environment import ScenarioEnvironment
+from src.agents.simulation_agents import SpacecraftAgent       
 
 class Simulation:
     def __init__(self, user_dir, space_segment = [], ground_segment=[], scenario_environment=None) -> None:
@@ -67,7 +55,7 @@ class Simulation:
         # ground_segment = orbitpy.util.dictionary_list_to_object_list(mission_dict.get("groundStation", None), GroundStationAgent)
         ground_segment = None
 
-        scenario_environment = ScenarioEnvironment.from_json(mission_dict.get("scenario", None))        
+        scenario_environment = ScenarioEnvironment.from_json(mission_dict)        
         
         return Simulation(user_dir, space_segment, ground_segment, scenario_environment)
 

@@ -4,8 +4,32 @@ from typing import Union
 from simpy import Environment, Event
 from simpy.core import SimTime
 
+from orbitpy.mission import Mission
+
 from src.agents.agent import AbstractAgent
 from src.orbit_data import OrbitData
+
+
+class ScenarioEnvironment(Environment):
+    def __init__(self, orbit_info, duration) -> None:
+        super().__init__()
+        self.duration = duration * 24 * 3600 #convert from days to seconds
+        self.orbit_info = orbit_info
+        
+    def from_json(d):
+        mission = Mission.from_json(d)   
+
+        print("Propagating orbits...")
+        orbit_info = mission.execute()
+        print("Propagation done!")
+        
+        print(orbit_info)
+
+        duration = d.get("duration")
+        return ScenarioEnvironment(orbit_info, duration)
+
+    def run(self):
+        super().run(self.duration)
 
 
 class SimulationEnvironment(Environment):
