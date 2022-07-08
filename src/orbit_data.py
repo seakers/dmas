@@ -9,6 +9,21 @@ from simpy.core import SimTime
 
 from src.agents.agent import AbstractAgent
 
+class TimeInterval:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        if self.end < self.start:
+            raise Exception('The end of time interval must be later than beginning of the interval.')
+
+    def is_before(self, t):
+        return t < self.start
+
+    def is_after(self, t):
+        return self.end < t
+
+    def is_during(self, t):
+        return self.start <= t <= self.end
 
 class OrbitData:
     def __init__(self, agent: AbstractAgent):
@@ -81,7 +96,11 @@ class OrbitData:
                     gndStation, _ = file.split('_')
                     id = re.sub("[^0-9]", "", gndStation)
                     gs_access['gs'+str(id)] = pd.read_csv(gs_access_file, skiprows=range(3))
-                    x = 1
+
+            # load coverage data
+            
+
+            # load data metrics data
             x = 1
         pass
 
