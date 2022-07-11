@@ -5,23 +5,30 @@ from simpy import Environment, Event
 from simpy.core import SimTime
 
 from orbitpy.mission import Mission, Settings
+from orbitpy.grid import Grid
+import orbitpy.util
 
 from src.agents.agent import AbstractAgent
 from src.orbit_data import OrbitData
 
 
 class ScenarioEnvironment(Environment):
-    def __init__(self, mission, duration) -> None:
+    def __init__(self, mission, duration, grid) -> None:
         super().__init__()
         self.duration = duration * 24 * 3600 #convert from days to seconds
         self.mission = mission
+        self.grid = grid
         self.orbit_data = dict()
         
     def from_json(d):
         # parse settings            
         mission = Mission.from_json(d)  
         duration = d.get("duration")
-        return ScenarioEnvironment(mission, duration)
+
+        # read grid information
+        grid = orbitpy.util.dictionary_list_to_object_list(d.get("grid", None), Grid)
+
+        return ScenarioEnvironment(mission, duration, grid)
 
     def run(self):
         super().run(self.duration)
@@ -33,8 +40,7 @@ class ScenarioEnvironment(Environment):
 
     def load_orbit_data(self, data_dir, agent_list):
         for agent in agent_list:
-            self.orbit_data[agent] = OrbitData.from_directory(data_dir, agent.unique_id)
-        
+            self.orbit_data[agent] = OrbitData.from_directory(data_dir, agent)
 
 class SimulationEnvironment(Environment):
     def __init__(self, dir_path, initial_time: SimTime = 0):

@@ -26,36 +26,24 @@ class TimeInterval:
         return self.start <= t <= self.end
 
 class OrbitData:
-    def __init__(self, agent: AbstractAgent):
+    def __init__(self, agent: AbstractAgent, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data):
         self.parent_agent = agent
-        # self.eclipse_intervals = [(5.5, 10.5)]
-        self.eclipse_intervals = []
-        self.time_step = 1
+        
+        self.time_step = time_data['time step']
+        self.epoc_type = time_data['epoc type']
+        self.epoc = time_data['epoc']
 
-        # self.eclipse_intervals = []
-        # #get data from files
-        # root = os.getcwd() + "/scenarios/orbit_data_test/input"
-        # eclipse_data, cartesian_data, step = self.parse_data(root, agent.unique_id)
-        #
-        # #assign eclipse data
-        # self.eclipse_intervals = []
-        # for i in eclipse_data:
-        #     self.eclipse_intervals.append(i)
-        #
-        # #assign attitude data
-        # self.position = []
-        # self.velocity = []
-        # for i in cartesian_data:
-        #     self.position.append(i[1:4])
-        #     self.velocity.append(i[4:])
-        # self.time_step = step
-        return
+        self.eclipse_data = eclipse_data
+        self.position_data = position_data
+        self.isl_data = isl_data
+        self.gs_access_data = gs_access_data
+        self.gp_access_data = gp_access_data
 
-    def from_directory(dir, unique_id):
-        if 'sp' in unique_id:
+    def from_directory(dir, agent):
+        if 'sp' in agent.unique_id:
             # data is from a satellite
-            id = re.sub("[^0-9]", "", unique_id)
-            agent_folder = "sat" + str(id) + '/'
+            id = int(re.sub("[^0-9]", "", agent.unique_id))
+            agent_folder = "sat" + str(id - 1) + '/'
 
             # load eclipse data
             eclipse_file = dir + agent_folder + "eclipses.csv"
@@ -65,13 +53,17 @@ class OrbitData:
             position_file = dir + agent_folder + "state_cartesian.csv"
             position_data = pd.read_csv(position_file, skiprows=range(4))
 
+            # load propagation time data
             time_data =  pd.read_csv(position_file, nrows=3)
             _, epoc_type, _, epoc = time_data.at[0,time_data.axes[1][0]].split(' ')
             epoc_type = epoc_type[1 : -1]
             epoc = float(epoc)
+            _, _, _, _, time_step = time_data.at[1,time_data.axes[1][0]].split(' ')
+            time_step = float(time_step)
 
-            _, _, _, _, step_size = time_data.at[1,time_data.axes[1][0]].split(' ')
-            step_size = float(step_size)
+            time_data = { "epoc": epoc, 
+                          "epoc type": epoc_type, 
+                          "time step": time_step }
 
             # load inter-satellite link data
             isl_data = dict()
@@ -97,29 +89,45 @@ class OrbitData:
                     id = re.sub("[^0-9]", "", gndStation)
                     gs_access['gs'+str(id)] = pd.read_csv(gs_access_file, skiprows=range(3))
 
-            # load coverage data
-            
+            # load and coverage data metrics data
+            gp_access = dict()
+            for instrument in agent.payload:
+                i_ins = agent.payload.index(instrument)
+                gp_acces_by_mode = []
 
-            # load data metrics data
-            x = 1
+                for mode in instrument.modes:
+                    i_mode = instrument.modes.index(mode)
+                    gp_acces_by_grid = dict()
+                    
+                    for grid in agent.env.grid:
+                        i_grid = agent.env.grid.index(grid)
+
+                        access_file = dir + agent_folder + f'access_instru{i_ins}_mode{i_mode}_grid{i_grid}.csv'
+                        access_data = pd.read_csv(access_file, skiprows=range(4))
+
+                        metrics_file = dir + agent_folder + f'datametrics_instru{i_ins}_mode{i_mode}_grid{i_grid}.csv'
+                        metrics_data = pd.read_csv(metrics_file, skiprows=range(4))
+
+                        gp_acces_by_grid[grid]=[access_data, metrics_data]
+                    
+                    gp_acces_by_mode.append(gp_acces_by_grid)
+
+                gp_access[instrument] = gp_acces_by_mode
+            
+        return OrbitData(agent, time_data, eclipse_data, position_data, isl_data, gs_access, gp_access)
+    
+    def get_next_isl_access(self, target, t):
         pass
 
-    def parse_data(self, root, id):
-        agent_folder = "/sat" + str(id)
-        eclipse_file = root + agent_folder + "/eclipses.csv"
-        cartesian_file = root + agent_folder + "/state_cartesian.csv"
-        eclipse_data = pd.read_csv(eclipse_file, skiprows=[0, 1, 2])
-        cartesian_data = pd.read_csv(cartesian_file, skiprows=[0, 1, 2, 3])
-        a = np.asarray(eclipse_data)
-        b = np.asarray(cartesian_data)
-        time_str = np.asarray(pd.read_csv(cartesian_file, nrows=3))[1][0]
-        x = time_str.split(' ')
-        t = x[-1] #step size in seconds --> used to index correct time
-        return a, b, t
+    def get_next_gs_access(self, t):
+        pass
+
+    def get_next_gp_access(self, grid_id, target_index, t):
+        pass
 
     def get_next_eclipse(self, t: SimTime):
-        #t = int(t * self.time_step)
-        for interval in self.eclipse_intervals:
+        t = int(t * self.time_step)
+        for interval in self.eclipse_data:
             t_start, t_end = interval
             if t_end <= t:
                 continue

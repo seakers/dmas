@@ -9,22 +9,23 @@ from src.environment import ScenarioEnvironment
 from src.agents.simulation_agents import SpacecraftAgent       
 
 class Simulation:
-    def __init__(self, user_dir, space_segment = [], ground_segment=[], grid=[], scenario_environment=None) -> None:
+    def __init__(self, user_dir, space_segment = [], ground_segment=None, scenario_environment=None) -> None:
         """
         Initializes a simulation.
         """
         # create agent list
+        # -add all satellites in the space segment
         self.agent_list = []
         for spacecraft in space_segment:
             self.agent_list.append(spacecraft)
 
-        # TODO Add support for ground stations
-        # for ground_station in ground_segment:
-        #     self.agent_list.append(ground_station)
+        # -add ground station
+        if ground_segment is not None:
+            self.agent_list.append(ground_segment) 
 
         # assign grid 
         self.grid = []
-        self.grid.extend(grid)
+        self.grid.extend(scenario_environment.grid)
 
         # create simulation directories
         self.user_dir = user_dir
@@ -60,36 +61,28 @@ class Simulation:
         if mission_dict is None:
             raise ImportError()
 
+        # read scenario information
+        scenario_environment = ScenarioEnvironment.from_json(mission_dict)    
+
         # read space and ground segment information
         custom_spc_dict = mission_dict.get("spacecraft", None)
         constel_dict = mission_dict.get("constellation", None)
         if custom_spc_dict is not None:
-            space_segment = orbitpy.util.dictionary_list_to_object_list(custom_spc_dict, SpacecraftAgent)
+            if custom_spc_dict is not None:
+                if isinstance(custom_spc_dict, list):
+                    space_segment = [SpacecraftAgent.from_dict(x, scenario_environment) for x in custom_spc_dict]
+                else:
+                    space_segment = [SpacecraftAgent.from_dict(custom_spc_dict, scenario_environment)] 
+
         elif constel_dict is not None:
             raise IOError('Constallation inputs not yet supported')
 
         # TODO Add support for ground stations
         # ground_segment = orbitpy.util.dictionary_list_to_object_list(mission_dict.get("groundStation", None), GroundStationAgent)
         ground_segment = None
-
-        # read grid information
-        grid_dict = mission_dict.get('grid', None) 
-        if grid_dict:
-            # make into list of dictionaries if not already list
-            if not isinstance(grid_dict, list):
-                grid_dict = [grid_dict]
-            # iterate through the list of grids
-            grid = []
-            for gd in grid_dict:
-                grid.append(Grid.from_dict(gd))
-        else:
-            grid = []
-
-        # read scenario information
-        scenario_environment = ScenarioEnvironment.from_json(mission_dict)        
         
         # return initialized simulation
-        return Simulation(user_dir, space_segment, ground_segment, grid, scenario_environment)
+        return Simulation(user_dir, space_segment, ground_segment, scenario_environment)
 
     def run(self):
         # checks for agent list
@@ -107,7 +100,7 @@ class Simulation:
 
         # initiate agent live process
         for agent in self.agent_list:
-            self.scenario_environment.process(agent.live(self.scenario_environment))
+            self.scenario_environment.process(agent.live())
             # self.scenario.process(agent.platform.sim())
 
         # run simulation
