@@ -98,7 +98,7 @@ class OrbitData:
                 for mode in instrument.modes:
                     i_mode = instrument.modes.index(mode)
                     gp_acces_by_grid = dict()
-                    
+
                     for grid in agent.env.grid:
                         i_grid = agent.env.grid.index(grid)
 
@@ -117,13 +117,13 @@ class OrbitData:
         return OrbitData(agent, time_data, eclipse_data, position_data, isl_data, gs_access, gp_access)
     
     def get_next_isl_access(self, target, t):
-        pass
+        return [-np.Infinity, np.Infinity]
 
     def get_next_gs_access(self, t):
-        pass
+        return [-np.Infinity, np.Infinity]
 
     def get_next_gp_access(self, grid_id, target_index, t):
-        pass
+        return [-np.Infinity, np.Infinity]
 
     def get_next_eclipse(self, t: SimTime):
         t = int(t * self.time_step)

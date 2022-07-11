@@ -35,7 +35,7 @@ class Simulation:
         # assign scenario environment
         self.scenario_environment = scenario_environment
 
-    def from_json(user_dir):
+    def from_dir(user_dir):
         """
         Initializes a simulation from a JSON file
         """
@@ -56,7 +56,6 @@ class Simulation:
             new_dir = user_dir + '/orbit_data/'
             if not os.path.isdir(new_dir):
                 os.mkdir(new_dir)   
-            
 
         if mission_dict is None:
             raise ImportError()

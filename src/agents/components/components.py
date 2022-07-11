@@ -77,6 +77,14 @@ class OnBoardComputer(Component):
                          energy_capacity=0, data_rate=0, data_stored=0,
                          data_capacity=memory_size, status=True)
 
+    def from_dict(d, env):
+        power = d.get('power', None)
+        memory_size = d.get('memorySize', None)
+
+        if power is None or memory_size is None:
+            raise Exception('Input Error: JSON input file must contain power and memory information for on-board computer.')
+
+        return OnBoardComputer(env, power, memory_size)
 
 class Transmitter(Component):
     def __init__(self, env, power, max_data_rate, buffer_size, num_channels=1):
@@ -96,6 +104,19 @@ class Transmitter(Component):
         self.num_channels = num_channels
         self.channels = simpy.Resource(env, num_channels)
         self.transmitting = False
+
+    def from_dict(d, env):
+        power = d.get('power', None)
+        max_data_rate = d.get('maxDataRate', None)
+        buffer_size = d.get('bufferSize', None)
+        num_channels = d.get('numChannels', None)
+
+        if num_channels is None:
+            num_channels = 1
+        if power is None or max_data_rate is None or buffer_size:
+            raise Exception('Input Error: JSON input file must contain power, max data rate, and buffer size for transmitter.')
+
+        return Transmitter(env, power, max_data_rate, buffer_size, num_channels)
 
     def is_transmitting(self):
         return self.transmitting
@@ -283,6 +304,19 @@ class Receiver(Component):
         self.inbox = simpy.Store(env)
         self.received_messages = []
 
+    def from_dict(d, env):
+        power = d.get('power', None)
+        max_data_rate = d.get('maxDataRate', None)
+        buffer_size = d.get('bufferSize', None)
+        num_channels = d.get('numChannels', None)
+
+        if num_channels is None:
+            num_channels = 1
+        if power is None or max_data_rate is None or buffer_size:
+            raise Exception('Input Error: JSON input file must contain power, max data rate, and buffer size for receiver.')
+
+        return Receiver(env, power, max_data_rate, buffer_size, num_channels)
+
     def receive(self, env, msg, parent_agent):
         '''
         Receives a message from another agent. Memory has already been allocated by the transmitter. Receiver waits for
@@ -360,6 +394,14 @@ class SolarPanelArray(PowerGenerator):
         self.eclipse = False
         self.name = 'solar_generator'
 
+    def from_dict(d, env):
+        power_generation = d.get('maxPowerGeneration', None)
+
+        if power_generation is None:
+            raise Exception('Input Error: JSON input file must contain maximum power generation for solar panels.')
+        
+        return SolarPanelArray(env, power_generation)
+
     def turn_on_generator(self, power_out):
         if power_out <= 0:
             raise ArithmeticError("Power generated must be greater than 0")
@@ -405,6 +447,22 @@ class Battery(Component):
             raise IOError("Depth-of-Discharge can only be a value between 0 and 1.")
         elif not (0 <= initial_charge <= 1):
             raise IOError("Initial charge can only be a value between 0 and 1.")
+
+    def from_dict(d, env):
+        max_power_generation = d.get('maxPowerGeneration', None)
+        energy_capacity = d.get('energyStorageCapacity', None)
+        dod = d.get('depthOfDischarge', None)
+        initial_charge = d.get('initialCharge', None)
+
+        if dod is None:
+            dod = 1
+        if initial_charge is None:
+            initial_charge = 1
+
+        if max_power_generation is None or energy_capacity is None:
+            raise Exception('Input Error: JSON input file must contain at least maximum power generation and energy storage capacity for battery.')
+
+        return Battery(env, max_power_generation, energy_capacity, dod, initial_charge)
 
     def update_charge(self, power_in, dt):
         power_charging = 0

@@ -9,12 +9,12 @@ def main(user_dir):
     user configuration file, and any auxillary files. The output files are written in the same directory 
     by default.
         
-    Example usage: :code:`python bin/run_mission.py examples/mission_1/`
+    Example usage: :code:`python test/driver.py scenarios/orbitpy_test/`
 
     """
     start_time = time.process_time()
     
-    simulation = Simulation.from_json(user_dir)
+    simulation = Simulation.from_dir(user_dir)
 
     print('Start simulation.')
     simulation.run()
