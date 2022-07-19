@@ -1,5 +1,5 @@
 print('Hello vscode')
 
-from src.environment import SimulationEnvironment
+from dmas.environment import SimulationEnvironment
 
 env = SimulationEnvironment()

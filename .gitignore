@@ -3,7 +3,7 @@
 .venv
 .venv/*
 .dmasenv
-./src/**.log
+dmas/**.log
 ./.idea/DMASpy.iml
 ./.idea/misc.xml
 .idea/DMASpy.iml

@@ -40,7 +40,7 @@ class Packet(object):
         self.flow_id = flow_id
 
     def __repr__(self):
-        return "id: {}, src: {}, time: {}, size: {}".\
+        return "id: {}, dmas: {}, time: {}, size: {}".\
             format(self.id, self.src, self.time, self.size)
 
 

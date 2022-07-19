@@ -1,14 +1,14 @@
 import os
 
-from src.agents.agent import AbstractAgent
-from src.agents.components.components import *
-from src.agents.components.instruments import *
-from src.environment import SimulationEnvironment
-from src.planners.planner import *
-from src.planners.testPlanners import PowerTracking
+from dmas.agents.agent import AbstractAgent
+from dmas.agents.components.components import *
+from dmas.agents.components.instruments import *
+from dmas.environment import SimulationEnvironment
+from dmas.planners.planner import *
+from dmas.planners.testPlanners import PowerTracking
 
 # SIMULATION SETUP
-from src.utils.state_plots import *
+from dmas.utils.state_plots import *
 
 T = 30
 

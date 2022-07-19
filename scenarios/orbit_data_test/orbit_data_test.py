@@ -1,11 +1,11 @@
 import os
 
-from src.agents.agent import AbstractAgent
-from src.agents.components.components import *
-from src.agents.components.instruments import Instrument
-from src.environment import SimulationEnvironment
-from src.planners.planner import Planner
-from src.planners.testPlanners import PowerTracking
+from dmas.agents.agent import AbstractAgent
+from dmas.agents.components.components import *
+from dmas.agents.components.instruments import Instrument
+from dmas.environment import SimulationEnvironment
+from dmas.planners.planner import Planner
+from dmas.planners.testPlanners import PowerTracking
 import subprocess
 
 
@@ -16,7 +16,7 @@ print('\nOrbitPy Complete\n\n\n\n')
 
 
 # SET-UP SIMULATION
-from src.utils.state_plots import *
+from dmas.utils.state_plots import *
 
 env = SimulationEnvironment()
 agents = []

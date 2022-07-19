@@ -1,7 +1,7 @@
 
 import os, json, argparse
 import time
-from src.simulation import Simulation
+from dmas.simulation import Simulation
 
 def main(user_dir):
     """ This script executes a mission according to an input JSON configuration file. 
@@ -14,6 +14,7 @@ def main(user_dir):
     """
     start_time = time.process_time()
     
+    print('Initializing simulation.')
     simulation = Simulation.from_dir(user_dir)
 
     print('Start simulation.')
