@@ -1,26 +1,26 @@
 import simpy
 import orbitpy
-from src.agents.components.components import OnBoardComputer, SolarPanelArray, Transmitter
+from src.planners.planner import Planner
+from src.agents.components.components import OnBoardComputer, Receiver, SolarPanelArray, Transmitter, Battery
 from src.agents.components.instruments import Instrument
 from src.agents.agent import AbstractAgent
 
 class SpacecraftAgent(AbstractAgent):
 # class SpacecraftAgent():
-    def __init__(self, env, name, unique_id, payload, bus_components):
-        # if bus_components is None:
-        #     component_list = self.design_bus(payload)
-        # else:
-        #     component_list = []
-        #     cdmh_dict = bus_components
-        #     component_list.extend(payload))
-
-        super().__init__(env, unique_id, results_dir, component_list, planner)
-        self.env = env
+    def __init__(self, env, name, unique_id, payload, bus_components, planner, results_dir):
         self.name = name
-        self.unique_id = unique_id
         self.payload = payload
 
-    def from_dict(d, env):
+        if len(bus_components) < 1:
+            bus_components = self.design_bus(payload)
+
+        component_list = []
+        component_list.extend(payload)
+        component_list.extend(bus_components)
+
+        super().__init__(env, unique_id, results_dir, component_list, planner)
+
+    def from_dict(d, env, results_dir):
         name = d.get('name')
         unique_id = d.get('@id')
 
@@ -35,47 +35,55 @@ class SpacecraftAgent(AbstractAgent):
             payload = []
 
         # load components
-        bus = d.get('spacecraftBus', None)
-        bus_comp_dict = bus.get('components',None)
+        bus_dict = d.get('spacecraftBus', None)
+        bus_comp_dict = bus_dict.get('components',None)
         if bus_comp_dict:
             # command and data-handling
-            cdmh_dict = bus_comp_dict.get('cdmh', None)
-            on_board_computer = OnBoardComputer.from_dict(cdmh_dict, env)
+            cmdh_dict = bus_comp_dict.get('cmdh', None)
+            on_board_computer = OnBoardComputer.from_dict(cmdh_dict, env)
             
             # transmitter and reciver
             comms_dict = bus_comp_dict.get('comms', None)
             transmitter = Transmitter.from_dict(comms_dict.get('transmitter', None), env)
-            receiver = Transmitter.from_dict(comms_dict.get('receiver', None), env)
+            receiver = Receiver.from_dict(comms_dict.get('receiver', None), env)
             
             # eps system
             eps_dict = bus_comp_dict.get('eps', None)
             solar_panel = SolarPanelArray.from_dict(eps_dict.get('powerGenerator', None), env)
-            battery = SolarPanelArray.from_dict(eps_dict.get('powerStorage', None), env)
+            battery = Battery.from_dict(eps_dict.get('powerStorage', None), env)
 
             bus_components = [on_board_computer, transmitter, receiver, solar_panel, battery]
         else:
             bus_components = []
 
-        return SpacecraftAgent(env, name, unique_id, payload, bus_components)
+        planner_dict = d.get('planner', None)
+        planner_type = planner_dict.get('@type', None)
+        if 'STATION_KEEPING' in planner_type:
+            planner = Planner(env)
+        else:
+            raise Exception(f'Planner of type {planner_type} not yet suppoerted')
+
+        return SpacecraftAgent(env, name, unique_id, payload, bus_components, planner, results_dir)
 
     def design_bus(self, payload):
+        raise Exception('Automated satellite bus design not yet supported')
         return []
 
     def set_environment(self, env):
         self.env = env
 
-    def live(self):
-        print('\nhello world!')
-        print('Not much to do now\n3...')
-        yield self.env.timeout(1)
-        print('2...')
-        yield self.env.timeout(1)
-        print('1...')
-        yield self.env.timeout(1)
-        print('...goodnight!\n')
+    # def live(self):
+    #     print('\nhello world!')
+    #     print('Not much to do now\n3...')
+    #     yield self.env.timeout(1)
+    #     print('2...')
+    #     yield self.env.timeout(1)
+    #     print('1...')
+    #     yield self.env.timeout(1)
+    #     print('...goodnight!\n')
 
-    def update_system(self):
-        pass
+    # def update_system(self):
+    #     pass
 
 class GroundStationAgent():
     def __init__(self, d) -> None:

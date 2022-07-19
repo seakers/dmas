@@ -113,7 +113,7 @@ class Transmitter(Component):
 
         if num_channels is None:
             num_channels = 1
-        if power is None or max_data_rate is None or buffer_size:
+        if power is None or max_data_rate is None or buffer_size is None:
             raise Exception('Input Error: JSON input file must contain power, max data rate, and buffer size for transmitter.')
 
         return Transmitter(env, power, max_data_rate, buffer_size, num_channels)
@@ -312,7 +312,7 @@ class Receiver(Component):
 
         if num_channels is None:
             num_channels = 1
-        if power is None or max_data_rate is None or buffer_size:
+        if power is None or max_data_rate is None or buffer_size is None:
             raise Exception('Input Error: JSON input file must contain power, max data rate, and buffer size for receiver.')
 
         return Receiver(env, power, max_data_rate, buffer_size, num_channels)

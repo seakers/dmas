@@ -127,8 +127,9 @@ class OrbitData:
 
     def get_next_eclipse(self, t: SimTime):
         t = int(t * self.time_step)
-        for interval in self.eclipse_data:
-            t_start, t_end = interval
+        for _, row in self.eclipse_data.iterrows():
+            t_start = row['start index'] * self.time_step
+            t_end = row['end index'] * self.time_step
             if t_end <= t:
                 continue
             elif t < t_start:
@@ -139,8 +140,9 @@ class OrbitData:
 
     def is_eclipse(self, t: SimTime):
         t = int(t*self.time_step)
-        for interval in self.eclipse_intervals:
-            t_start, t_end = interval
+        for _, row in self.eclipse_data.iterrows():
+            t_start = row['start index'] * self.time_step
+            t_end = row['end index'] * self.time_step
             if t_start <= t < t_end:
                 return True
         return False

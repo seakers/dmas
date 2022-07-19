@@ -52,10 +52,14 @@ class Simulation:
                 mission_dict["settings"] = {}
                 mission_dict["settings"]["outDir"] = user_dir + '/orbit_data/'
 
-            # creat orbit data directory
-            new_dir = user_dir + '/orbit_data/'
-            if not os.path.isdir(new_dir):
-                os.mkdir(new_dir)   
+            # creat orbit data and results directory
+            orbit_data_dir = user_dir + '/orbit_data/'
+            if not os.path.isdir(orbit_data_dir):
+                os.mkdir(orbit_data_dir)   
+            
+            results_dir = user_dir + '/results/'
+            if not os.path.isdir(results_dir):
+                os.mkdir(results_dir)   
 
         if mission_dict is None:
             raise ImportError()
@@ -69,9 +73,9 @@ class Simulation:
         if custom_spc_dict is not None:
             if custom_spc_dict is not None:
                 if isinstance(custom_spc_dict, list):
-                    space_segment = [SpacecraftAgent.from_dict(x, scenario_environment) for x in custom_spc_dict]
+                    space_segment = [SpacecraftAgent.from_dict(x, scenario_environment, results_dir) for x in custom_spc_dict]
                 else:
-                    space_segment = [SpacecraftAgent.from_dict(custom_spc_dict, scenario_environment)] 
+                    space_segment = [SpacecraftAgent.from_dict(custom_spc_dict, scenario_environment, results_dir)] 
 
         elif constel_dict is not None:
             raise IOError('Constallation inputs not yet supported')
