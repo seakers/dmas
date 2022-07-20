@@ -33,13 +33,23 @@ class OrbitData:
         self.epoc_type = time_data['epoc type']
         self.epoc = time_data['epoc']
 
-        self.eclipse_data = eclipse_data
-        self.position_data = position_data
-        self.isl_data = isl_data
-        self.gs_access_data = gs_access_data
-        self.gp_access_data = gp_access_data
+        self.eclipse_data = eclipse_data.sort_values(by=['start index'])
+        self.position_data = position_data.sort_values(by=['time index'])
 
-    def from_directory(dir, spacecraft_id_list, ground_station_id_list, spacecraft=None, ground_station=None):
+        self.isl_data = {}
+        for satellite_name in isl_data.keys():
+            self.isl_data[satellite_name] = isl_data[satellite_name].sort_values(by=['start index'])
+
+        self.gs_access_data = gs_access_data.sort_values(by=['start index'])
+        
+        self.gp_access_data = {}
+        for instrument in gp_access_data.keys():
+            self.gp_access_data[instrument] = []
+            for mode in range(len(gp_access_data[instrument])):
+                self.gp_access_data[instrument].append(gp_access_data[instrument][mode].sort_values(by=['time index']))
+        x = 1
+
+    def from_directory(dir, spacecraft_id_list, ground_segment_id_list, spacecraft=None, ground_segment=None):
         if spacecraft is not None:
             # data is from a satellite
             id = str(spacecraft_id_list.index(spacecraft.unique_id))
@@ -83,14 +93,24 @@ class OrbitData:
                         isl_data[sender_id] = pd.read_csv(isl_file, skiprows=range(3))
 
             # load ground station access data
-            gs_access = dict()
+            gs_access = pd.DataFrame(columns=['start index', 'end index', 'gndStn id'])
             for file in os.listdir(dir + agent_folder):
                 if 'gndStn' in file:
-                    gs_access_file = dir + agent_folder + file
-                    gndStation, _ = file.split('_')
-                    gndStation_index = int(re.sub("[^0-9]", "", gndStation))
-                    gndStation_id = ground_station_id_list[gndStation_index]
-                    gs_access[gndStation_id] = pd.read_csv(gs_access_file, skiprows=range(3))
+                    gndStn_access_file = dir + agent_folder + file
+                    gndStn_access_data = pd.read_csv(gndStn_access_file, skiprows=range(3))
+                    nrows, _ = gndStn_access_data.shape
+
+                    if nrows > 0:
+                        gndStn, _ = file.split('_')
+                        gndStn_index = int(re.sub("[^0-9]", "", gndStn))
+                        gndStn_id = ground_segment_id_list[gndStn_index]
+                        gndStn_id_column = [gndStn_id] * nrows
+                        gndStn_access_data['gndStn id'] = gndStn_id_column
+
+                        if len(gs_access) == 0:
+                            gs_access = gndStn_access_data
+                        else:
+                            gs_access = pd.concat([gs_access, gndStn_access_data])
 
             # load and coverage data metrics data
             gp_access = dict()
@@ -100,19 +120,23 @@ class OrbitData:
 
                 for mode in instrument.modes:
                     i_mode = instrument.modes.index(mode)
-                    gp_acces_by_grid = dict()
+                    gp_acces_by_grid = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]',
+                                                             'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
 
                     for grid in spacecraft.env.grid:
                         i_grid = spacecraft.env.grid.index(grid)
-
-                        access_file = dir + agent_folder + f'access_instru{i_ins}_mode{i_mode}_grid{i_grid}.csv'
-                        access_data = pd.read_csv(access_file, skiprows=range(4))
-
                         metrics_file = dir + agent_folder + f'datametrics_instru{i_ins}_mode{i_mode}_grid{i_grid}.csv'
                         metrics_data = pd.read_csv(metrics_file, skiprows=range(4))
+                        
+                        nrows, _ = metrics_data.shape
+                        grid_id_column = [i_grid] * nrows
+                        metrics_data['grid index'] = grid_id_column
 
-                        gp_acces_by_grid[grid]=[access_data, metrics_data]
-                    
+                        if len(gp_acces_by_grid) == 0:
+                            gp_acces_by_grid = metrics_data
+                        else:
+                            gp_acces_by_grid = pd.concat([gp_acces_by_grid, metrics_data])
+
                     gp_acces_by_mode.append(gp_acces_by_grid)
 
                 gp_access[instrument] = gp_acces_by_mode
@@ -120,16 +144,17 @@ class OrbitData:
         return OrbitData(spacecraft, time_data, eclipse_data, position_data, isl_data, gs_access, gp_access)
     
     def get_next_isl_access(self, target, t):
+        target_id = target.unique_id
         return [-np.Infinity, np.Infinity]
 
     def get_next_gs_access(self, t):
         return [-np.Infinity, np.Infinity]
 
-    def get_next_gp_access(self, grid_id, target_index, t):
+    def get_next_gp_access(self, lat, lon, t):
         return [-np.Infinity, np.Infinity]
 
     def get_next_eclipse(self, t: SimTime):
-        t = int(t * self.time_step)
+        # t = int(t * self.time_step)
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
             t_end = row['end index'] * self.time_step
@@ -142,7 +167,7 @@ class OrbitData:
         return np.Infinity
 
     def is_eclipse(self, t: SimTime):
-        t = int(t*self.time_step)
+        # t = int(t*self.time_step)
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
             t_end = row['end index'] * self.time_step

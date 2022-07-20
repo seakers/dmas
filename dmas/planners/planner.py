@@ -28,8 +28,6 @@ class Planner:
                     and (type(platform.power_generator) != SolarPanelArray
                          or not platform.power_generator.in_eclipse())):
                     # if power generator is not up to its maximum power generation, turn on and provide power
-                    # power_on = ActuatePowerComponentAction(self.power_generator, t,
-                    #                                        -p_tot + self.power_generator.power)
                     dif = platform.power_generator.power - platform.power_generator.max_power_generation
                     if p_tot >= dif:
                         power_on = ActuatePowerComponentAction(platform.power_generator, t,
@@ -44,10 +42,9 @@ class Planner:
                         power_on_prc = self.env.process(self.schedule_action(power_on, state, t))
                         self.plan[power_on] = power_on_prc
 
-                if platform.battery.power < platform.battery.max_power_generation and p_tot < 0:
+                if (platform.battery.power < platform.battery.max_power_generation 
+                    and p_tot < 0 and platform.battery.energy_stored.level > 0):
                     # else if battery is not up to its maximum power generation, turn on and provide power
-                    # power_on = ActuatePowerComponentAction(self.battery, t, -state.power_tot + self.battery.power)
-
                     dif = platform.battery.power - platform.battery.max_power_generation
                     if p_tot >= dif:
                         power_on = ActuatePowerComponentAction(platform.battery, t,
@@ -114,8 +111,9 @@ class Planner:
 
         # print(f'\n Completed action of type: {action}\n')
 
-        self.plan.pop(action)
-        self.completed_plan.append((action, t))
+        if action in self.plan:
+            self.plan.pop(action)
+            self.completed_plan.append((action, t))
 
     def interrupted_action(self, action: Action, state: State, t):
         self.plan.pop(action)

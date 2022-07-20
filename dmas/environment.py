@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Union
 
@@ -33,15 +34,52 @@ class ScenarioEnvironment(Environment):
     def run(self):
         super().run(self.duration)
 
-    def load_orbit_data(self, data_dir, space_segment, spacecraft_id_list, 
+    def load_orbit_data(self, user_dir, space_segment, spacecraft_id_list, 
                                 ground_segment, ground_segment_id_list, grid):
-        if len(os.listdir(data_dir)) > len(grid):
+        data_dir = user_dir + 'orbit_data/'
+
+        changes_to_scenario = False
+        with open(user_dir +'MissionSpecs.json', 'r') as scenario_specs:
+            if os.path.exists(data_dir + 'MissionSpecs.json'):
+                with open(data_dir +'MissionSpecs.json', 'r') as mission_specs:
+                    scenario_dict = json.load(scenario_specs)
+                    mission_dict = json.load(mission_specs)
+                    if scenario_dict != mission_dict:
+                        changes_to_scenario = True
+            else:
+                changes_to_scenario = True
+
+        if len(os.listdir(data_dir)) > len(grid) and not changes_to_scenario:
             print('Orbit data found!')
         else:
-            print('Orbit data not found.')
+            if changes_to_scenario:
+                print('Existing orbit data does not match scenario.')
+            else:
+                print('Orbit data not found.')
+
+            # clear files if they exist
+            if os.path.exists(data_dir):
+                for f in os.listdir(data_dir):
+                    if 'grid' in f:
+                        continue
+                    if os.path.isdir(os.path.join(data_dir, f)):
+                        for h in os.listdir(data_dir + f):
+                             os.remove(os.path.join(data_dir, f, h))
+                        os.rmdir(data_dir + f)
+                    else:
+                        os.remove(os.path.join(data_dir, f)) 
+                    # os.rmdir(new_dir)
+            
+            # propagate data and save to orbit data directory
             print("Propagating orbits...")
-            self.mission.execute()
+            self.mission.execute()                
             print("Propagation done!")
+
+            # save specifications of propagation in the orbit data directory
+            with open(user_dir +'MissionSpecs.json', 'r') as scenario_specs:
+                scenario_dict = json.load(scenario_specs)
+                with open(data_dir +'MissionSpecs.json', 'w') as mission_specs:
+                    mission_specs.write(json.dumps(scenario_dict, indent=4))
 
         print('Loading orbit data...')
         # load spacecraft data
@@ -52,10 +90,10 @@ class ScenarioEnvironment(Environment):
                                                                    spacecraft=spacecraft)
 
         # load ground station data
-        self.orbit_data[ground_segment] = OrbitData.from_directory(data_dir, 
-                                                                   spacecraft_id_list, 
-                                                                   ground_segment_id_list,
-                                                                   ground_segment=ground_segment)
+        # self.orbit_data[ground_segment] = OrbitData.from_directory(data_dir, 
+        #                                                            spacecraft_id_list, 
+        #                                                            ground_segment_id_list,
+        #                                                            ground_segment=ground_segment)
         print('Done loading orbit data!')
 
     def is_eclipse(self, agent: AbstractAgent, t: SimTime):

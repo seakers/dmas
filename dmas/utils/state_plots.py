@@ -1,74 +1,82 @@
+import json
 import pandas as pd
 import matplotlib.pyplot as plt
 
+plt.rcParams['figure.figsize'] = [5, 10]
 
-def plot_power_state(results_dir, n_agents):
-    if n_agents < 1:
-        return
-    elif n_agents < 2:
-        figure, axis = plt.subplots(5, 1)
+def plot_power_state(scenario_dir):
+    
+    with open(scenario_dir +'/MissionSpecs.json', 'r') as mission_specs:
+        mission_dict = json.load(mission_specs)
+        spacecraft_dict = mission_dict.get('spacecraft', None)
 
-        df = pd.read_csv(results_dir + f'A0_state.csv')
+        if not spacecraft_dict:
+            raise Exception('No agents to be plotted')
 
-        axis[0].step(df['t'], df['p_in'])
-        axis[0].set_title("Power Generated [W]")
-        axis[0].grid(True)
+        if isinstance(spacecraft_dict, list):
+            agent_ids = [x.get('@id') for x in spacecraft_dict]            
+        else:
+            agent_ids = [spacecraft_dict.get('@id')]
 
-        axis[1].step(df['t'], df['p_out'])
-        axis[1].set_title("Power Consumed [W]")
-        axis[1].grid(True)
+        n_agents = len(agent_ids)
+        _, axis = plt.subplots(5, n_agents)
 
-        axis[2].step(df['t'], df['p_tot'])
-        axis[2].set_title("Total Power ")
-        axis[2].grid(True)
+        results_dir = scenario_dir + '/results/'
 
-        axis[3].step(df['t'], df['p_in'])
-        axis[3].step(df['t'], -df['p_out'])
-        axis[3].step(df['t'], df['p_tot'])
-        axis[3].set_title("Total Power ")
-        axis[3].grid(True)
+        for id in agent_ids:
+            df = pd.read_csv(results_dir + f'A{id}_state.csv')
 
-        axis[4].plot(df['t'], df['e_str'] / df['e_cap'])
-        axis[4].set_title("Battery Charge")
-        axis[4].grid(True)
+            if n_agents < 2:
+                axis[0].step(df['t'], df['p_in'])
+                axis[0].set_title("Power Generated [W]")
+                axis[0].grid(True)
 
-        plt.subplots_adjust(wspace=0.4,
-                            hspace=0.9)
-        plt.show()
-    else:
-        figure, axis = plt.subplots(5, n_agents)
+                axis[1].step(df['t'], df['p_out'])
+                axis[1].set_title("Power Consumed [W]")
+                axis[1].grid(True)
 
-        for i in range(n_agents):
-            df = pd.read_csv(results_dir + f'A{i}_state.csv')
+                axis[2].step(df['t'], df['p_tot'])
+                axis[2].set_title("Total Power ")
+                axis[2].grid(True)
 
-            axis[0][i].step(df['t'], df['p_in'])
-            axis[0][i].set_title("Power Generated [W]")
-            axis[0][i].grid(True)
+                axis[3].step(df['t'], df['p_in'])
+                axis[3].step(df['t'], -df['p_out'])
+                axis[3].step(df['t'], df['p_tot'])
+                axis[3].set_title("Total Power ")
+                axis[3].grid(True)
 
-            axis[1][i].step(df['t'], df['p_out'])
-            axis[1][i].set_title("Power Consumed [W]")
-            axis[1][i].grid(True)
+                axis[4].plot(df['t'], df['e_str'] / df['e_cap'])
+                axis[4].set_title("Battery Charge")
+                axis[4].grid(True)
+            else:
+                axis[0][id].step(df['t'], df['p_in'])
+                axis[0][id].set_title("Power Generated [W]")
+                axis[0][id].grid(True)
 
-            axis[2][i].step(df['t'], df['p_tot'])
-            axis[2][i].set_title("Total Power ")
-            axis[2][i].grid(True)
+                axis[1][id].step(df['t'], df['p_out'])
+                axis[1][id].set_title("Power Consumed [W]")
+                axis[1][id].grid(True)
 
-            axis[3][i].step(df['t'], df['p_in'])
-            axis[3][i].step(df['t'], -df['p_out'])
-            axis[3][i].step(df['t'], df['p_tot'])
-            axis[3][i].set_title("Total Power ")
-            axis[3][i].grid(True)
+                axis[2][id].step(df['t'], df['p_tot'])
+                axis[2][id].set_title("Total Power ")
+                axis[2][id].grid(True)
 
-            axis[4][i].plot(df['t'], df['e_str'] / df['e_cap'])
-            axis[4][i].set_title("Battery Charge")
-            axis[4][i].grid(True)
+                axis[3][id].step(df['t'], df['p_in'])
+                axis[3][id].step(df['t'], -df['p_out'])
+                axis[3][id].step(df['t'], df['p_tot'])
+                axis[3][id].set_title("Total Power ")
+                axis[3][id].grid(True)
 
-        plt.subplots_adjust(wspace=0.4,
-                            hspace=0.9)
-        plt.show()
+                axis[4][id].plot(df['t'], df['e_str'] / df['e_cap'])
+                axis[4][id].set_title("Battery Charge")
+                axis[4][id].grid(True)
 
+            plt.subplots_adjust(wspace=0.4,
+                                hspace=0.9)
+            plt.autoscale
+            plt.show()
 
-def plot_data_rate_state(results_dir, n_agents):
+def plot_data_rate_state(results_dir, n_agents=1):
     if n_agents < 1:
         return
     elif n_agents < 2:
@@ -126,7 +134,7 @@ def plot_data_rate_state(results_dir, n_agents):
         plt.show()
 
 
-def plot_data_state(results_dir, n_agents):
+def plot_data_state(results_dir, n_agents=1):
     if n_agents < 1:
         return
     elif n_agents < 2:

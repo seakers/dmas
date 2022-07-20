@@ -21,19 +21,20 @@ class AbstractAgent:
         |                   |
         v                   |
     idle/listen -> think -> do
-                    | ^
-                    v |
-                  planner
+        :           | ^
+        v           v |
+    knowledge <..> planner
     '''
 
-    def __init__(self, env, unique_id, results_dir, component_list=None, planner: Planner = None):
+    def __init__(self, env, unique_id, results_dir, platform: Platform, planner: Planner):
         """
         Abstract agent class.
         :param env: Simulation environment
         :param unique_id: id for agent
-        :param component_list: list of components of the agent
+        :param platform: platform simulator used to simulate and track the agent's state independently 
         :param planner: planner used by the agent for assigning tasks
         """
+
         self.results_dir = results_dir
         self.logger = self.setup_agent_logger(unique_id)
 
@@ -45,7 +46,7 @@ class AbstractAgent:
         self.other_agents = []
 
         # Platform Simulator
-        self.platform = Platform(self, env, component_list)
+        self.platform = platform
 
         # Planner
         self.planner = planner

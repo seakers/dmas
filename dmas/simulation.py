@@ -8,6 +8,22 @@ import orbitpy
 from dmas.environment import ScenarioEnvironment
 from dmas.agents.simulation_agents import SpacecraftAgent
 
+def create_dir(dir_path: str, dir_name: str, clear=False):
+    """
+    Creates directory within a resired path if it does not already exist and clears its contents of if indicated
+    """
+    new_dir = dir_path + '/' + dir_name + '/'
+
+    if os.path.isdir(new_dir):
+        if clear:
+            for f in os.listdir(new_dir):
+                os.remove(os.path.join(new_dir, f)) 
+    else:
+        os.mkdir(new_dir)
+
+    print(f'new directory made at {new_dir}')
+    return new_dir
+
 class Simulation:
     def __init__(self, user_dir, 
                 space_segment = [], space_segment_id_list=[], 
@@ -60,13 +76,7 @@ class Simulation:
                 mission_dict["settings"]["outDir"] = user_dir + '/orbit_data/'
 
             # creat orbit data and results directory
-            orbit_data_dir = user_dir + '/orbit_data/'
-            if not os.path.isdir(orbit_data_dir):
-                os.mkdir(orbit_data_dir)   
-            
-            results_dir = user_dir + '/results/'
-            if not os.path.isdir(results_dir):
-                os.mkdir(results_dir)   
+            results_dir, _ = create_dir(user_dir, 'results', clear=True), create_dir(user_dir, 'orbit_data')
 
         if mission_dict is None:
             raise ImportError()
@@ -112,7 +122,7 @@ class Simulation:
             raise EnvironmentError('No agents loaded to simulation')
 
         # perform orbit propagation and coverage analysis
-        self.scenario_environment.load_orbit_data(self.orbit_data_dir, 
+        self.scenario_environment.load_orbit_data(self.user_dir, 
                                                   self.space_segment, self.space_segment_id_list, 
                                                   self.ground_segment, self.ground_segment_id_list, 
                                                   self.grid)
@@ -120,7 +130,7 @@ class Simulation:
         # initiate agent live process
         for agent in self.agent_list:
             self.scenario_environment.process(agent.live())
-            # self.scenario.process(agent.platform.sim())
+            self.scenario_environment.process(agent.platform.sim())
 
         # run simulation
         self.scenario_environment.run()
@@ -135,22 +145,6 @@ class Simulation:
         """
         # print agent state hitory
         for agent in self.agent_list:
-            # agent.print_state()
-            # agent.print_planner_history()
+            agent.print_state()
+            agent.print_planner_history()
             pass
-
-    def create_dir(self, dir_path: str, dir_name: str, clear=False):
-        """
-        Creates directory within a resired path and can clear the contents of said directory if it already exists
-        """
-        new_dir = dir_path + '/' + dir_name + '/'
-
-        if os.path.isdir(new_dir) and clear:
-            for f in os.listdir(new_dir):
-                os.remove(os.path.join(new_dir, f)) 
-            os.rmdir(new_dir)
-        os.mkdir(new_dir)
-
-        print(f'new directory made at {new_dir}')
-        return new_dir
-

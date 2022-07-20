@@ -57,6 +57,7 @@ class Platform:
         self.t_prev = self.env.now
         self.t_crit = -1
         self.event_tracker = None
+        self.critical_state_counter = 0
 
     def sim(self):
         critical_state_check = self.env.process(self.wait_for_critical_state())
@@ -78,13 +79,13 @@ class Platform:
             if ((critical_state_check.triggered 
                 or eclipse_event.triggered 
                 or self.is_critical())
-                    and self.parent_agent.alive):
+                and self.parent_agent.alive):
                 
                 if not self.parent_agent.critical_state.triggered:
                     self.parent_agent.system_check('Platform flagged a new event.')
 
             # if critical state persists after 1 time-step, kill platform and agent
-            if self.is_critical() and 0 < (self.env.now -  self.t_crit) <= 1 and self.t_crit >= 0:
+            if (self.is_critical() and 0 < (self.env.now -  self.t_crit) <= 1 and self.t_crit >= 0) or self.critical_state_counter > 10:
                 self.logger.debug(f'T{self.env.now}:\tCritical state persisting. Platform going off-line...')
 
                 # turn off all components
@@ -103,10 +104,15 @@ class Platform:
 
                 # flag agent for status
                 self.parent_agent.system_check('Platform flagged a critical state.')
+                self.alive = False
                 break
+
             elif self.is_critical():
+                if self.t_crit == -1:
+                    self.critical_state_counter += 1
                 self.t_crit = self.env.now
             else:
+                self.critical_state_counter = 0
                 self.t_crit = -1
 
             if eclipse_event.triggered:
@@ -170,28 +176,30 @@ class Platform:
         self.vel = self.env.get_velocity(self.parent_agent, t)
 
         # update component capabilities
-        if type(self.power_generator) == SolarPanelArray:
-            if self.eclipse and not self.power_generator.in_eclipse():
-                self.parent_agent.system_check('Platform is about to enter eclipse.')
-                self.power_generator.enter_eclipse()
-            elif not self.eclipse and self.power_generator.in_eclipse():
-                self.parent_agent.system_check('Platform is about to exit eclipse.')
-                self.power_generator.exit_eclipse()
+        if self.alive:
+            if type(self.power_generator) == SolarPanelArray:
+                if self.eclipse and not self.power_generator.in_eclipse():
+                    self.parent_agent.system_check('Platform is about to enter eclipse.')
+                    self.power_generator.enter_eclipse()
+                elif not self.eclipse and self.power_generator.in_eclipse():
+                    self.parent_agent.system_check('Platform is about to exit eclipse.')
+                    self.power_generator.exit_eclipse()
 
-        if (1 - self.battery.energy_stored.level / self.battery.energy_capacity) >= self.battery.dod:
-            self.battery.can_hold_charge = False
-            if self.battery.is_charging:
-                self.battery.turn_off_charge()
+            if abs((1 - self.battery.energy_stored.level / self.battery.energy_capacity) - self.battery.dod) <= 1e-9:
+                self.battery.can_hold_charge = False
+                if self.battery.is_charging:
+                    self.battery.turn_off_charge()
 
         # update times
         self.t_prev = t
         self.updated_manually.succeed()
 
         # check for critical state
-        if self.is_critical() and not self.critical_state.triggered:
-            self.critical_state.succeed()
-        elif self.is_critical():
-            self.t_crit = -1
+        if self.alive:
+            if self.is_critical() and not self.critical_state.triggered:
+                self.critical_state.succeed()
+            elif self.is_critical():
+                self.t_crit = -1
 
         self.logger.debug(f'T{t}:\t{str(self)}')
 
@@ -255,19 +263,14 @@ class Platform:
                     power_in += component.power
         power_tot = power_in - power_out
 
-        # check when battery charge will reach its full capacity
-        # if self.battery.is_charging():
-        #     dx = self.battery.energy_capacity - self.battery.energy_stored.level
-        #     dxdt = power_tot - self.battery.power
-        #     if dxdt > 0:
-        #         dt = dx / dxdt
-        #         if dt < dt_min:
-        #             dt_min = dt
-
-        # check when battery charge will be below DOD
+        # check when battery charge will be below maximum allowed depth of discharge or be depleated
         if self.battery.is_on():
-            dx = self.battery.energy_capacity * (
-                    1 - self.battery.dod) - self.battery.energy_stored.level
+            # if abs((1 - self.battery.energy_stored.level / self.battery.energy_capacity) - self.battery.dod) <= 1e-9:
+            if self.battery.can_hold_charge:
+                dx = self.battery.energy_capacity * (1 - self.battery.dod) - self.battery.energy_stored.level
+            else:
+                dx = 0 - self.battery.energy_stored.level
+
             dxdt = power_tot - self.battery.power
             dt = dx / dxdt
             if dt > 0:

@@ -183,7 +183,10 @@ class State:
         critical = False
         cause = ''
 
-        if (1 - self.energy_stored / self.energy_capacity) >= self.dod:
+        if self.energy_stored < 1e-9: 
+            cause = 'Battery charge depleted'
+            critical = True
+        elif abs((1 - self.energy_stored / self.energy_capacity) - self.dod) <= 1e-9:
             cause = 'Battery has reached its maximum depth-of-discharge level'
             critical = True
         elif self.energy_stored == self.energy_capacity and self.charging:

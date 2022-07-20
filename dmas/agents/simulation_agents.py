@@ -1,5 +1,6 @@
 import simpy
 import orbitpy
+from dmas.agents.models.platform import Platform
 from dmas.planners.planner import Planner
 from dmas.agents.components.components import OnBoardComputer, Receiver, SolarPanelArray, Transmitter, Battery
 from dmas.agents.components.instruments import Instrument
@@ -7,18 +8,20 @@ from dmas.agents.agent import AbstractAgent
 
 class SpacecraftAgent(AbstractAgent):
 # class SpacecraftAgent():
-    def __init__(self, env, name, unique_id, payload, bus_components, planner, results_dir):
+    def __init__(self, env, name, unique_id, results_dir, payload, bus_components, planner):
+        self.results_dir = results_dir
+        self.unique_id = unique_id
         self.name = name
         self.payload = payload
 
-        if len(bus_components) < 1:
+        if not bus_components:
             bus_components = self.design_bus(payload)
-
+        
         component_list = []
         component_list.extend(payload)
         component_list.extend(bus_components)
 
-        super().__init__(env, unique_id, results_dir, component_list, planner)
+        super().__init__(env, unique_id, results_dir, Platform(self, env, component_list), planner)
 
     def from_dict(d, env, results_dir):
         name = d.get('name')
@@ -63,7 +66,7 @@ class SpacecraftAgent(AbstractAgent):
         else:
             raise Exception(f'Planner of type {planner_type} not yet suppoerted')
 
-        return SpacecraftAgent(env, name, unique_id, payload, bus_components, planner, results_dir)
+        return SpacecraftAgent(env, name, unique_id, results_dir, payload, bus_components, planner)
 
     def design_bus(self, payload):
         raise Exception('Automated satellite bus design not yet supported')
