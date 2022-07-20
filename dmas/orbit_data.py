@@ -154,7 +154,6 @@ class OrbitData:
         return [-np.Infinity, np.Infinity]
 
     def get_next_eclipse(self, t: SimTime):
-        # t = int(t * self.time_step)
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
             t_end = row['end index'] * self.time_step
@@ -167,7 +166,6 @@ class OrbitData:
         return np.Infinity
 
     def is_eclipse(self, t: SimTime):
-        # t = int(t*self.time_step)
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
             t_end = row['end index'] * self.time_step
@@ -176,11 +174,24 @@ class OrbitData:
         return False
 
     def get_position(self, t: SimTime):
-        t = int(t * self.time_step)
         # return self.position[t]
+        for _, row in self.position_data.iterrows():
+            t_row = row['time index'] * self.time_step
+            if t_row <= t:
+                x = row['x [km]']
+                y = row['y [km]']
+                z = row['z [km]']
+                return [x, y, z]
+
         return [-1,-1,-1]
 
     def get_velocity(self, t: SimTime):
-        t = int(t * self.time_step)
         # return self.velocity[t]
+        for _, row in self.position_data.iterrows():
+            t_row = row['time index'] * self.time_step
+            if t_row <= t:
+                x = row['vx [km/s]']
+                y = row['vy [km/s]']
+                z = row['vz [km/s]']
+                return [x, y, z]
         return [-1,-1,-1]

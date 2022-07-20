@@ -201,7 +201,7 @@ class Platform:
             elif self.is_critical():
                 self.t_crit = -1
 
-        self.logger.debug(f'T{t}:\t{str(self)}')
+        # self.logger.debug(f'T{t}:\t{str(self)}')
 
     def is_critical(self):
         # count power and data usage
@@ -229,6 +229,7 @@ class Platform:
             self.updated_periodically.succeed()
             while True:
                 yield self.env.timeout(1)
+        
                 if self.updated_periodically.triggered:
                     self.updated_periodically = simpy.Event(self.env)
 

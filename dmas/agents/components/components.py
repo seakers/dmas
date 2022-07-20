@@ -430,11 +430,13 @@ class Battery(Component):
         Battery component in charge of storing energy and providing power when actuated
         :param env: Simulation environment
         :param max_power_generation: Maximum power provided by battery when turned on
-        :param energy_capacity: Maximum power storage capacity of the battery
+        :param energy_capacity: Maximum power storage capacity of the battery [kWh]
         :param dod: Maximum depth-of-discharge allowed.
         :param initial_charge: Initial charge
             TODO: if charge is below DOD then set battery health to False. Should prevent it from charging in the future.
         """
+        energy_capacity *= 1000*3600
+
         super().__init__(env=env, name='battery', power=0,
                          energy_stored=initial_charge*energy_capacity, energy_capacity=energy_capacity,
                          data_rate=0, data_stored=0, data_capacity=0, status=False)

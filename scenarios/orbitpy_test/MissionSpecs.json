@@ -33,7 +33,7 @@
                                     "powerStorage": {
                                         "@type": "Battery",
                                         "maxPowerGeneration": 10,
-                                        "energyStorageCapacity": 100,
+                                        "energyStorageCapacity": 0.0012,
                                         "depthOfDischarge": 0.99,
                                         "initialCharge": 1
                                     }
