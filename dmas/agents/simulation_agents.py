@@ -7,7 +7,6 @@ from dmas.agents.components.instruments import Instrument
 from dmas.agents.agent import AbstractAgent
 
 class SpacecraftAgent(AbstractAgent):
-# class SpacecraftAgent():
     def __init__(self, env, name, unique_id, results_dir, payload, bus_components, planner):
         self.results_dir = results_dir
         self.unique_id = unique_id
@@ -75,19 +74,9 @@ class SpacecraftAgent(AbstractAgent):
     def set_environment(self, env):
         self.env = env
 
-    # def live(self):
-    #     print('\nhello world!')
-    #     print('Not much to do now\n3...')
-    #     yield self.env.timeout(1)
-    #     print('2...')
-    #     yield self.env.timeout(1)
-    #     print('1...')
-    #     yield self.env.timeout(1)
-    #     print('...goodnight!\n')
-
-    # def update_system(self):
-    #     pass
-
 class GroundStationAgent():
-    def __init__(self, d) -> None:
+    def __init__(self) -> None:
+        pass
+
+    def from_dict(d, env, results_dir):
         pass
