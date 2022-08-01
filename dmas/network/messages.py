@@ -1,4 +1,5 @@
 import math
+from matplotlib.font_manager import json_load
 
 import numpy as np
 
@@ -14,6 +15,7 @@ class Message:
         self.timeout = timeout
 
         self.size = size
+        self.data_sent = 0.0
         self.data_rate = data_rate
         self.message_id = message_id
 
@@ -21,11 +23,19 @@ class Message:
         self.dst = dst
         self.content = content
 
+        self.transmission_start_event = src.env.event()
+        self.transmission_stop_event = src.env.event()
         self.transmission_end_event = src.env.event()
 
     def __repr__(self):
         return "id: {}, dmas: {}, time: {}, size: {}".\
             format(self.message_id, str(self.src), self.reception_end, self.size)
+
+    def from_dict(content):
+        if isinstance(content, dict):
+            pass
+        else:
+            pass
 
 
 class MessageHistory:

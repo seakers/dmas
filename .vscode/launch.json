@@ -6,7 +6,7 @@
     "configurations": [
 
         {
-            "name": "DMAS: Simulation Driver",
+            "name": "DMAS: OrbitPy Test",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/test/driver.py",
@@ -14,6 +14,22 @@
             "justMyCode": true,
             "args": [
                 "${workspaceRoot}/scenarios/orbitpy_test/"
+            ],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+
+        {
+            "name": "DMAS: Inter-Satellite Communications Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/test/driver.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "${workspaceRoot}/scenarios/comms_test/"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
