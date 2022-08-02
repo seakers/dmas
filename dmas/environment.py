@@ -90,6 +90,7 @@ class ScenarioEnvironment(Environment):
                                                                    spacecraft=spacecraft)
 
         # load ground station data
+        # TODO: ADD SUPPORT FOR GROUND STATIONS' ORBIT DATA
         # self.orbit_data[ground_segment] = OrbitData.from_directory(data_dir, 
         #                                                            spacecraft_id_list, 
         #                                                            ground_segment_id_list,
@@ -105,8 +106,8 @@ class ScenarioEnvironment(Environment):
     def get_velocity(self, agent: AbstractAgent, t: SimTime):
         return self.orbit_data[agent].get_velocity(t)
 
-
-        
+    def get_next_agent_access(self, src: AbstractAgent, dst: AbstractAgent, t: SimTime):
+        return self.orbit_data[src].get_next_agent_access(dst, t)
 
 class SimulationEnvironment(Environment):
     def __init__(self, dir_path, initial_time: SimTime = 0):

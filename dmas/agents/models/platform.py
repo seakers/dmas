@@ -62,30 +62,32 @@ class Platform:
     def sim(self):
         critical_state_check = self.env.process(self.wait_for_critical_state())
         eclipse_event = self.env.process(self.wait_for_eclipse_event())
-        periodic_update = self.env.process(self.periodic_update())
+        # periodic_update = self.env.process(self.periodic_update())
 
         # self.updated_manually.succeed()
         while True:
-            yield critical_state_check | self.critical_state | eclipse_event | self.agent_update | periodic_update
+            yield critical_state_check | self.critical_state | eclipse_event | self.agent_update # | periodic_update
             if self.updated_manually.triggered:
                 self.updated_manually = simpy.Event(self.env)
 
+            critical_state = self.is_critical()
+
             # update component status
-            if not self.is_critical():
+            if not critical_state:
                 t_curr = self.env.now
                 self.update(t_curr)
 
             # inform agent of critical event
             if ((critical_state_check.triggered 
                 or eclipse_event.triggered 
-                or self.is_critical())
+                or critical_state)
                 and self.parent_agent.alive):
                 
                 if not self.parent_agent.critical_state.triggered:
-                    self.parent_agent.system_check('Platform flagged a new event.')
+                    self.parent_agent.system_check('Platform flagged a new event. ')
 
             # if critical state persists after 1 time-step, kill platform and agent
-            if (self.is_critical() and 0 < (self.env.now -  self.t_crit) <= 1 and self.t_crit >= 0) or self.critical_state_counter > 10:
+            if (critical_state and 0 < (self.env.now -  self.t_crit) <= 1 and self.t_crit >= 0) or self.critical_state_counter > 10:
                 self.logger.debug(f'T{self.env.now}:\tCritical state persisting. Platform going off-line...')
 
                 # turn off all components
@@ -99,15 +101,15 @@ class Platform:
                     critical_state_check.interrupt('Platform off-line.')
                 if not eclipse_event.triggered:
                     eclipse_event.interrupt('Platform off-line.')
-                if not periodic_update.triggered:
-                    periodic_update.interrupt('Platform off-line.')
+                # if not periodic_update.triggered:
+                #     periodic_update.interrupt('Platform off-line.')
 
                 # flag agent for status
                 self.parent_agent.system_check('Platform flagged a critical state.')
                 self.alive = False
                 break
 
-            elif self.is_critical():
+            elif critical_state:
                 if self.t_crit == -1:
                     self.critical_state_counter += 1
                 self.t_crit = self.env.now
@@ -152,20 +154,20 @@ class Platform:
 
         # update values
         # -data
-        if data_rate_in * dt > 0:
-            dD = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
-            if dD > data_rate_in * dt:
-                self.on_board_computer.data_stored.put(data_rate_in * dt)
-            else:
-                self.on_board_computer.data_stored.put(dD)
+        # if data_rate_in * dt > 0:
+        #     dD = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
+        #     if dD > data_rate_in * dt:
+        #         self.on_board_computer.data_stored.put(data_rate_in * dt)
+        #     else:
+        #         self.on_board_computer.data_stored.put(dD)
 
-        if (self.transmitter.data_rate * dt > 0
-                and self.transmitter.data_stored.level > 0
-                and self.transmitter.is_transmitting()):
-            if self.transmitter.data_stored.level >= self.transmitter.data_rate * dt:
-                self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
-            else:
-                self.transmitter.data_stored.get(self.transmitter.data_stored.level)
+        # if (self.transmitter.data_rate * dt > 0
+        #         and self.transmitter.data_stored.level > 0
+        #         and self.transmitter.is_transmitting()):
+        #     if self.transmitter.data_stored.level >= self.transmitter.data_rate * dt:
+        #         self.transmitter.data_stored.get(self.transmitter.data_rate * dt)
+        #     else:
+        #         self.transmitter.data_stored.get(self.transmitter.data_stored.level)
 
         # -power
         self.battery.update_charge(power_tot, dt)
@@ -179,10 +181,10 @@ class Platform:
         if self.alive:
             if type(self.power_generator) == SolarPanelArray:
                 if self.eclipse and not self.power_generator.in_eclipse():
-                    self.parent_agent.system_check('Platform is about to enter eclipse.')
+                    self.parent_agent.system_check('Platform is about to enter eclipse. ')
                     self.power_generator.enter_eclipse()
                 elif not self.eclipse and self.power_generator.in_eclipse():
-                    self.parent_agent.system_check('Platform is about to exit eclipse.')
+                    self.parent_agent.system_check('Platform is about to exit eclipse. ')
                     self.power_generator.exit_eclipse()
 
             if abs((1 - self.battery.energy_stored.level / self.battery.energy_capacity) - self.battery.dod) <= 1e-9:
@@ -226,6 +228,9 @@ class Platform:
 
     def periodic_update(self):
         try:
+            t_curr = self.env.now
+            self.update(t_curr)
+
             self.updated_periodically.succeed()
             while True:
                 yield self.env.timeout(1)
@@ -278,21 +283,21 @@ class Platform:
                 if dt < dt_min:
                     dt_min = dt
 
-        # check when memory will fill up
-        dx = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
-        dxdt = data_rate_in + self.receiver.data_rate - self.transmitter.data_rate
-        if dxdt > 0:
-            dt = dx / dxdt
-            if dt < dt_min:
-                dt_min = dt
+        # # check when memory will fill up
+        # dx = self.on_board_computer.data_capacity - self.on_board_computer.data_stored.level
+        # dxdt = data_rate_in + self.receiver.data_rate - self.transmitter.data_rate
+        # if dxdt > 0:
+        #     dt = dx / dxdt
+        #     if dt < dt_min:
+        #         dt_min = dt
 
-        # check when memory will empty
-        dx = -self.on_board_computer.data_stored.level
-        dxdt = data_rate_in + self.receiver.data_rate - self.transmitter.data_rate
-        if dxdt < 0:
-            dt = dx / dxdt
-            if dt < dt_min:
-                dt_min = dt
+        # # check when memory will empty
+        # dx = -self.on_board_computer.data_stored.level
+        # dxdt = data_rate_in + self.receiver.data_rate - self.transmitter.data_rate
+        # if dxdt < 0:
+        #     dt = dx / dxdt
+        #     if dt < dt_min:
+        #         dt_min = dt
 
         try:
             self.logger.debug(f'T{self.t_prev}:\tNext projected critical state will be at T{self.env.now + dt_min}.')
@@ -374,7 +379,7 @@ class Platform:
         file_handler.setFormatter(formatter)
 
         stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setLevel(logging.WARNING)
         stream_handler.setFormatter(formatter)
 
         logger.addHandler(file_handler)

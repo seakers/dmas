@@ -125,6 +125,27 @@ class Transmitter(Component):
         super().turn_off()
         self.transmitting = False
 
+    def wait_for_access(self, env, msg, parent_agent):
+        try:
+            src = parent_agent
+            dst = msg.dst
+            t = env.now
+
+            parent_agent.logger.debug(f'T{env.now}:\tCalculating next access opportunity with {dst.name}...')
+
+            access_start, _ = env.get_next_agent_access(src, dst, t)
+            delay = access_start - t
+            
+            if delay > 1e-9:
+                parent_agent.logger.debug(f'T{env.now}:\tNext access opportunity begins at T{access_start}s. Waiting for access...')
+                yield env.timeout(delay)
+                parent_agent.logger.debug(f'T{env.now}:\tAccess with {dst.name} started!')
+            else:
+                parent_agent.logger.debug(f'T{env.now}:\tCurrently accesing {dst.name}!')
+                yield env.timeout(1e-9)
+        except simpy.Interrupt:
+            pass
+
     def allocate_buffer_memory(self, env: Environment, msg: Message, parent_agent):
         if msg.data_rate + self.data_rate > self.max_data_rate:
             # The message being sent requests a data-rate higher than the maximum available
@@ -136,13 +157,16 @@ class Transmitter(Component):
 
         try:
             # request transmitter to allocate outgoing message into its buffer
-            parent_agent.logger.debug(f'T{env.now}:\tMoving message from internal memory to outgoing buffer...')
-
+            parent_agent.logger.debug(f'T{env.now}:\tMoving message into outgoing buffer (current level at {self.data_stored.level}/{self.data_capacity}, message of size {msg.size})...')
             parent_agent.update_system()
+
             yield self.data_stored.put(msg.size)
-            parent_agent.update_system()
+            self.data_stored.put(msg.size)
 
-            parent_agent.logger.debug(f'T{env.now}:\tMessage successfully moved to outgoing buffer.')
+            parent_agent.logger.debug(f'T{env.now}:\tMessage successfully moved to outgoing buffer (new level at {self.data_stored.level}/{self.data_capacity})!')
+            parent_agent.update_system()
+            
+            return
         except simpy.Interrupt:
             parent_agent.logger.debug(f'T{env.now}:\tCould not move message to outgoing buffer.')
 
@@ -168,17 +192,16 @@ class Transmitter(Component):
             yield req_rcr
             reception_channel_established = True
 
-            parent_agent.logger.debug(f'T{env.now}:\tReception channel obtained! Connection established.')
+            parent_agent.logger.debug(f'T{env.now}:\tReception channel obtained! Connection with {dst.name} established.')
 
             # request receiver to allocate outgoing message into its buffer
             parent_agent.logger.debug(f'T{env.now}:\tRequesting receiver to allocate message size in buffer...')
+
+            dst.update_system()
+            yield receiver.data_stored.put(msg.size)
             dst.update_system()
 
-            parent_agent.update_system()
-            yield receiver.data_stored.put(msg.size)
-            parent_agent.update_system()
-
-            parent_agent.logger.debug(f'T{env.now}:\tReceiver buffer memory allocated! Starting transmission...')
+            parent_agent.logger.debug(f'T{env.now}:\tReceiver buffer memory allocated!')
 
         except simpy.Interrupt as i:
             if transmission_channel_established:
@@ -215,19 +238,21 @@ class Transmitter(Component):
 
             if msg.transmission_start == -1:
                 msg.transmission_start = env.now
-
+            
             parent_agent.update_system()
+            parent_agent.logger.debug(f'T{env.now}:\tStarting Transmission')
             yield env.timeout(msg.size / msg.data_rate - (env.now - msg.transmission_start))
+            parent_agent.logger.debug(f'T{env.now}:\tTransmission complete!')
             parent_agent.update_system()
 
             msg.transmission_end_event.succeed()
             msg.transmission_end = env.now
-            parent_agent.logger.debug(f'T{env.now}:\tTransmission complete!')
-
+            
             # end transmission
             parent_agent.logger.debug(f'T{env.now}:\tReleasing transmission and reception channels...')
             self.channels.release(req_trs)
             receiver.channels.release(req_rcr)
+            self.data_stored.get(msg.size)
 
             parent_agent.logger.debug(f'T{env.now}:\tTransmission protocol complete!')
 
@@ -241,20 +266,50 @@ class Transmitter(Component):
             # stopping transmission event
             msg.transmission_end_event.succeed()
 
+    def access_timer(self, env, msg, parent_agent):
+        # try:
+        src = msg.src
+        dst = msg.dst
+        t = env.now 
+        _, access_end = env.get_next_agent_access(src, dst, t)
+        
+        delay = access_end - t
+        if delay > 0.0:
+            yield env.timeout(access_end - t)
+
     def send_message(self, env: Environment, msg: Message, parent_agent):
         allocate_memory = None
         request_channel = None
         transmit = None
 
         try:
+            dst = msg.dst
+            access_timer = env.process(self.access_timer(env, msg, parent_agent))
+            
+            wait_for_access = env.process(self.wait_for_access(env, msg, parent_agent))
+            yield wait_for_access | access_timer
+
+            if access_timer.triggered:
+                parent_agent.logger.debug(f'T{env.now}:\tLost access to {dst.name}.')
+                raise simpy.Interrupt(f'Lost access to {msg.dst.name}')
+
             allocate_memory = env.process(self.allocate_buffer_memory(env, msg, parent_agent))
-            yield allocate_memory
+            yield allocate_memory | access_timer
+
+            if access_timer.triggered:
+                parent_agent.logger.debug(f'T{env.now}:\tLost access to {dst.name}.')
+                raise simpy.Interrupt(f'Lost access to {msg.dst.name}')
 
             request_channel = env.process(self.request_channel(env, msg, parent_agent))
             req_trs, req_rcr = yield request_channel
 
             transmit = env.process(self.transmit_message(req_trs, req_rcr, env, msg, parent_agent))
-            yield transmit
+            yield transmit | access_timer
+
+            if access_timer.triggered:
+                parent_agent.logger.debug(f'T{env.now}:\tLost access to {dst.name}.')
+                raise simpy.Interrupt(f'Lost access to {msg.dst.name}')
+
             return
 
         except simpy.Interrupt as i:
@@ -270,13 +325,7 @@ class Transmitter(Component):
 
             # drop packet
             parent_agent.logger.debug(f'T{env.now}:\tDropping packet...')
-
-            if msg.transmission_start < 0:
-                yield self.data_stored.get(msg.size)
-            else:
-                rem_size = msg.size - (env.now - msg.transmission_start) * msg.data_rate
-                if rem_size > 0:
-                    yield self.data_stored.get(rem_size)
+            yield self.data_stored.get(msg.size)
 
             if self.transmitting:
                 # reducing data-rate

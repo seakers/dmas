@@ -27,6 +27,9 @@ class Action:
     def __str__(self):
         return f'{self.action_type},{self.start},{self.end},{self.started},{self.completed}'
 
+    def __repr__(self) -> str:
+        return f'{self.action_type}'
+
 
 class ActuateAgentAction(Action):
     def __init__(self, start, status=True):
@@ -36,6 +39,12 @@ class ActuateAgentAction(Action):
     def __str__(self):
         out = super().__str__()
         return out + f',{self.status}'
+
+    def __repr__(self) -> str:
+        if self.status:
+            return f'Actuate Agent ON'
+        else:
+            return f'Actuate Agent OFF'
 
 
 class ActuateComponentAction(Action):
@@ -48,6 +57,12 @@ class ActuateComponentAction(Action):
         out = super().__str__()
         return out + f',{self.component.name},{self.status}'
 
+    def __repr__(self) -> str:
+        if self.status:
+            return f'Actuate {self.component.name} ON'
+        else:
+            return f'Actuate {self.component.name} OFF'
+
 
 class ActuatePowerComponentAction(ActuateComponentAction):
     def __init__(self, component, start, power):
@@ -58,6 +73,9 @@ class ActuatePowerComponentAction(ActuateComponentAction):
         out = super().__str__()
         return out + f',{self.power}'
 
+    def __repr__(self) -> str:
+        return f'Regulate {self.component.name} to {self.power}W'
+
 
 class DeleteMessageAction(Action):
     def __init__(self, msg, start):
@@ -66,8 +84,10 @@ class DeleteMessageAction(Action):
 
     def __str__(self):
         out = super().__str__()
-        return out + f',{self.msg.size}' \
-                     f''
+        return out + f',{self.msg.size}'
+
+    def __repr__(self) -> str:
+        return f'Delete Message'
 
 class MeasurementAction(Action):
     def __init__(self, instrument_list, target, start, end):
@@ -84,6 +104,9 @@ class MeasurementAction(Action):
 
         return out + f',{self.target}'
 
+    def __repr__(self) -> str:
+        return f'Measure Target {self.target} with Instrument {self.instrument_list}'
+
 
 class TransmitAction(Action):
     def __init__(self, src, dst, start, size, rate, timeout, content=None):
@@ -97,7 +120,13 @@ class TransmitAction(Action):
         out = super().__str__()
         return out + f',{self.src},{self.dst}'
 
+    def __repr__(self) -> str:
+        return f'Transmit Message to {self.dst.name}'
+
 
 class ChargeAction(Action):
     def __init__(self, start, end):
         super().__init__('charge', start, end)
+
+    def __repr__(self) -> str:
+        return f'Charge Batteries'

@@ -102,11 +102,6 @@ class Planner:
             return
 
     def completed_action(self, action: Action, state: State, t):
-        if type(action) == TransmitAction:
-            delete = DeleteMessageAction(action.msg, t)
-            delete_prc = self.env.process(self.schedule_action(delete, state, t))
-            self.plan[delete] = delete_prc
-
         action.complete()
 
         # print(f'\n Completed action of type: {action}\n')
@@ -127,7 +122,8 @@ class Planner:
 
     def message_received(self, msg, state: State, t):
         delete = DeleteMessageAction(msg, t)
-        self.schedule_action(delete, state, t)
+        delete_prc = self.env.process(self.schedule_action(delete, state, t))
+        self.plan[delete] = delete_prc        
 
     def message_deleted(self, msg, t):
         pass

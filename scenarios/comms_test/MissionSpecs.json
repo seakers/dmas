@@ -33,7 +33,7 @@
                                     "powerStorage": {
                                         "@type": "Battery",
                                         "maxPowerGeneration": 10,
-                                        "energyStorageCapacity": 0.0012,
+                                        "energyStorageCapacity": 0.010,
                                         "depthOfDischarge": 0.99,
                                         "initialCharge": 1
                                     }
@@ -48,7 +48,7 @@
             "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 6878.137, "ecc": 0.001, "inc": 45, "raan": 0, "aop": 145, "ta": 0}
                             }, 
-            "planner" : {"@type": "STATION_KEEPING"}
+            "planner" : {"@type": "COMMS_TEST"}
         },
 
         {
@@ -82,7 +82,7 @@
                                     "powerStorage": {
                                         "@type": "Battery",
                                         "maxPowerGeneration": 10,
-                                        "energyStorageCapacity": 0.0012,
+                                        "energyStorageCapacity": 0.010,
                                         "depthOfDischarge": 0.99,
                                         "initialCharge": 1
                                     }
@@ -97,7 +97,7 @@
             "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 6878.137, "ecc": 0.001, "inc": -45, "raan": 0, "aop": 145, "ta": -25}
                             }, 
-            "planner" : {"@type": "STATION_KEEPING"}
+            "planner" : {"@type": "COMMS_TEST"}
         }
     ],
     "groundStation" : [

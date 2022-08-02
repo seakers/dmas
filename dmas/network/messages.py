@@ -21,7 +21,11 @@ class Message:
 
         self.src = src
         self.dst = dst
-        self.content = content
+
+        if content is None:
+            self.conten = dict()
+        else:
+            self.content = content
 
         self.transmission_start_event = src.env.event()
         self.transmission_stop_event = src.env.event()

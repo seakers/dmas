@@ -5,7 +5,7 @@ import os.path
 import shutil
 import pandas as pd
 from simpy.core import SimTime
-#import orekit
+from dmas.agents.simulation_agents import SpacecraftAgent
 
 from dmas.agents.agent import AbstractAgent
 
@@ -143,6 +143,22 @@ class OrbitData:
             
         return OrbitData(spacecraft, time_data, eclipse_data, position_data, isl_data, gs_access, gp_access)
     
+    def get_next_agent_access(self, dst, t: SimTime):
+        src = self.parent_agent
+
+        if isinstance(src, SpacecraftAgent) and isinstance(dst, SpacecraftAgent):
+            isl_data = self.isl_data[dst.unique_id]
+            for _, row in isl_data.iterrows():
+                t_start = row['start index'] * self.time_step
+                t_end = row['end index'] * self.time_step
+
+                if t_start <= t <= t_end:
+                    return t_start, t_end
+                elif t < t_start:
+                    return t_start, t_end
+        else:
+            raise Exception(f'Access between {type(src)} and {type(dst)} not yet supported.')
+
     def get_next_isl_access(self, target, t):
         target_id = target.unique_id
         return [-np.Infinity, np.Infinity]

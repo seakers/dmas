@@ -20,8 +20,7 @@ def create_dir(dir_path: str, dir_name: str, clear=False):
                 os.remove(os.path.join(new_dir, f)) 
     else:
         os.mkdir(new_dir)
-
-    print(f'new directory made at {new_dir}')
+        
     return new_dir
 
 class Simulation:
@@ -34,17 +33,22 @@ class Simulation:
         """
         # create agent list
         # -add all satellites in the space segment
-        self.agent_list = []
+        self.agent_list = dict()
         for spacecraft in space_segment:
-            self.agent_list.append(spacecraft)
+            self.agent_list[spacecraft.unique_id] = spacecraft
         self.space_segment_id_list = space_segment_id_list
         self.space_segment = space_segment
 
         # -add ground station
         if ground_segment is not None:
-            self.agent_list.append(ground_segment) 
+            self.agent_list[ground_segment.unique_id] = ground_segment
         self.ground_segment_id_list = ground_segment_id_list
         self.ground_segment = ground_segment
+
+        # -assign agent list to every agent
+        for agent_id in self.agent_list:
+            agent = self.agent_list[agent_id]
+            agent.set_other_agents(self.agent_list)
 
         # assign grid 
         self.grid = []
@@ -128,15 +132,19 @@ class Simulation:
                                                   self.grid)
 
         # initiate agent live process
-        for agent in self.agent_list:
+        for agent_id in self.agent_list:
+            agent = self.agent_list[agent_id]
             self.scenario_environment.process(agent.live())
             self.scenario_environment.process(agent.platform.sim())
 
         # run simulation
+        print('Performing simulation...')
         self.scenario_environment.run()
+        print('Simulation done!')
 
         # perform final system update for all agents        
-        for agent in self.agent_list:
+        for agent_id in self.agent_list:
+            agent = self.agent_list[agent_id]
             agent.update_system()
 
     def print_results(self):
@@ -144,7 +152,8 @@ class Simulation:
         Prints agent states and planner history to results directory
         """
         # print agent state hitory
-        for agent in self.agent_list:
+        for agent_id in self.agent_list:
+            agent = self.agent_list[agent_id]
             agent.print_state()
             agent.print_planner_history()
             pass

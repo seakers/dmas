@@ -43,7 +43,7 @@ class AbstractAgent:
 
         self.env = env
         self.unique_id = unique_id
-        self.other_agents = []
+        self.other_agents = dict()
 
         # Platform Simulator
         self.platform = platform
@@ -476,7 +476,7 @@ class AbstractAgent:
             for action in self.actions:
                 if action != self.actions[0]:
                     types += ', '
-                types += action.action_type
+                types += repr(action)
 
             self.logger.debug(f'T{self.env.now}:\tReceived instructions from planner! Instructions include: {types}')
         except simpy.Interrupt:
@@ -560,18 +560,18 @@ class AbstractAgent:
                     break
 
             if all_off:
-                self.logger.debug(f'T{self.env.now}:\t{msg} Performing system check... All platform systems off line.')
+                self.logger.debug(f'T{self.env.now}:\t{msg}Performing system check... All platform systems off line.')
                 kill = ActuateAgentAction(self.env.now, status=False)
                 self.actuate_agent(kill)
                 self.planner.clear_plan()
 
             # if critical, trigger critical state event
             elif not self.critical_state.triggered:
-                self.logger.debug(f'T{self.env.now}:\t{msg} Performing system check... Critical state reached! {cause}')
+                self.logger.debug(f'T{self.env.now}:\t{msg}Performing system check... Critical state reached! {cause}')
                 self.critical_state.succeed()
         else:
             # state is nominal
-            self.logger.debug(f'T{self.env.now}:\t{msg} Performing system check... State nominal.')
+            self.logger.debug(f'T{self.env.now}:\t{msg}Performing system check... State nominal.')
             if self.critical_state.triggered:
                 # if critical state was previously detected, reset event to nominal
                 self.critical_state = self.env.event()
@@ -608,9 +608,9 @@ class AbstractAgent:
         :param others: list of other agents
         :return:
         """
-        for other in others:
-            if other is not self:
-                self.other_agents.append(other)
+        for other_id in others:
+            if other_id is not self.unique_id:
+                self.other_agents[other_id] = others[other_id]
 
     '''
     MISCELLANEOUS HELPING METHODS
@@ -658,7 +658,7 @@ class AbstractAgent:
         file_handler.setFormatter(formatter)
 
         stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(logging.DEBUG)
+        stream_handler.setLevel(logging.WARNING)
         stream_handler.setFormatter(formatter)
 
         logger.addHandler(file_handler)

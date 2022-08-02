@@ -17,14 +17,11 @@ def main(user_dir):
     print('Initializing simulation.')
     simulation = Simulation.from_dir(user_dir)
 
-    print('Start simulation.')
     simulation.run()
+    print(f'Simulation execution time: {time.process_time() - start_time}[s]')
 
-    print('Printing Results')
     simulation.print_results()
-
-    print("Time taken to execute in seconds is ", time.process_time() - start_time)
-
+    print(f'Results printed to:\n\t{simulation.results_dir}')
 
 class readable_dir(argparse.Action):
     """Defines a custom argparse Action to identify a readable directory."""
