@@ -1,27 +1,11 @@
+import argparse
 
-import os, json, argparse
-import time
-from dmas.simulation import Simulation
+class AbstractAgent:
+    def __init__(self, scenario_dir) -> None:
+        pass
 
-def main(user_dir):
-    """ This script executes a mission according to an input JSON configuration file. 
-    It takes as argument the path to the user directory where it expects a :code:`MissionSpecs.json`
-    user configuration file, and any auxillary files. The output files are written in the same directory 
-    by default.
-        
-    Example usage: :code:`python test/driver.py scenarios/orbitpy_test/`
-
-    """
-    start_time = time.process_time()
-    
-    print('Initializing simulation.')
-    simulation = Simulation.from_dir(user_dir)
-
-    simulation.run()
-    print(f'Simulation execution time: {time.process_time() - start_time}[s]')
-
-    simulation.print_results()
-    print(f'Results printed to:\n\t{simulation.results_dir}')
+    async def live() -> None:
+        pass
 
 class readable_dir(argparse.Action):
     """Defines a custom argparse Action to identify a readable directory."""
@@ -38,15 +22,16 @@ class readable_dir(argparse.Action):
                 '{0} is not a readable dir'.format(prospective_dir)
             )
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Run Simulation'
     )
     parser.add_argument(
-        'user_dir',
+        'scenario_dir',
         action=readable_dir,
         help="Directory with user config JSON file, and also to write the results."
     )
     args = parser.parse_args()
-    main(args.user_dir)
+    
+    agent = AbstractAgent(args.scenario_dir)
+    await agent.live()
