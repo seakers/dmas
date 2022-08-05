@@ -56,3 +56,27 @@ class Container:
             return self.level == 0
         
         await self.when_cond(accept)
+
+    async def when_less_than(self, val):
+        def accept():
+            return self.level < val
+        
+        await self.when_cond(accept)
+    
+    async def when_leq_than(self, val):
+        def accept():
+            return self.level <= val
+        
+        await self.when_cond(accept)
+
+    async def when_greater_than(self, val):
+        def accept():
+            return self.level > val
+        
+        await self.when_cond(accept)
+    
+    async def when_geq_than(self, val):
+        def accept():
+            return self.level >= val
+        
+        await self.when_cond(accept)

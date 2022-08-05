@@ -4,46 +4,16 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "DMAS: OrbitPy Test",
+            "name": "internal process test",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/test/driver.py",
+            "program": "${workspaceRoot}/dmas/agents/agent.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "${workspaceRoot}/scenarios/orbitpy_test/"
+                "${workspaceRoot}/scenarios/"
             ],
-            "cwd": "${workspaceRoot}",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            }
-        },
-
-        {
-            "name": "DMAS: Inter-Satellite Communications Test",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceRoot}/test/driver.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "args": [
-                "${workspaceRoot}/scenarios/comms_test/"
-            ],
-            "cwd": "${workspaceRoot}",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            }
-        },
-        
-        {
-            "name": "DMAS: Power Unit Test",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceRoot}/scenarios/power_unit_test/power_test.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
             "cwd": "${workspaceRoot}",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
