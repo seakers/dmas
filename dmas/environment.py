@@ -1,53 +1,87 @@
 import logging
+from multiprocessing import Process
 import os
 import threading
+import time
 import zmq
 
+def is_port_in_use(port: int) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
 class Environment:
-    def __init__(self, name, scenario_dir, agent_name_list, simulation_frequency, duration, environment_port_number='5555', request_port_number='5556') -> None:
+    def __init__(self, name, scenario_dir, agent_name_list: list, simulation_frequency, duration) -> None:
         # Constants
-        self.name = name                                            # Environment Name
-        self.SIMULATION_FREQUENCY = simulation_frequency            # Ratio of simulation-time to real-time
-        self.DURATION = duration                                    # Duration of simulation in simulation-time
-        self.NUMBER_AGENTS = len(agent_name_list)                   # Number of agents present in the simulation
-        self.AGENT_NAME_LIST = []                                   # List of names of agent present in the simulation
+        self.name = name                                                # Environment Name
+        self.SIMULATION_FREQUENCY = simulation_frequency                # Ratio of simulation-time to real-time
+        self.DURATION = duration                                        # Duration of simulation in simulation-time
+        self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
+        self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         for agent_name in agent_name_list:
             self.AGENT_NAME_LIST.append(agent_name)
         
-        # Set up network ports
-        self.context = zmq.Context()                                
-        
-        publisher_socket = self.context.socket(zmq.PUB)             # Socket to send information to agents
-        publisher_socket.sndhwm = 1100000                           ## set SNDHWM, so we don't drop messages for slow subscribers
-        publisher_socket.bind(f"tcp://*:{environment_port_number}")
-
-        request_socket = self.context.socket(zmq.REP)               # Socket to receive requests from agents
-        request_socket.bind(f"tcp://*:{request_port_number}")
-
         # set up results dir
         self.SCENARIO_RESULTS_DIR, self.ENVIRONMENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
 
         # set up loggers
-        self.message_logger, self.request_logger, self.state_logger = self.set_up_loggers()
+        [self.message_logger, self.request_logger, self.state_logger] = self.set_up_loggers()
+        
+        self.state_logger.info('Environment Initialized!')
 
-
-    def live(self):
+    def main(self):
         """
         MAIN FUNCTION 
         """
-        self.state_logger.debug('Environment Initialized!')
+        # Activate 
+        self.activate()
 
-        # Wait for all agents to initialize
-        self.state_logger(f"Waiting for {self.NUMBER_AGENTS} to initiate...")
-        sync_subscriber = threading.Thread(target=self.sync_agents)
-        sync_subscriber.start()
-        sync_subscriber.join()
+        # Run simulation
+        self.live()
 
-        self.state_logger(f"All subscribers initalized! Starting simulation...")
+        # Turn off
+        self.shut_down()
+
+    def activate(self):
+        """
+        Initiates and executes commands that are thread-sensitive but that must be performed before the simulation starts.
+        """
+        self.state_logger.info('Starting activation routine...')
+        
+        # activate network ports
+        self.state_logger.info('Configuring network ports...')
+        self.network_config()
+        self.state_logger.info('Network configuration completed!')
+
+        # Wait for agents to initialize their own network ports
+        self.state_logger.info(f"Waiting for {self.NUMBER_AGENTS} to initiate...")
+        self.sync_agents()
+        self.state_logger.info(f"All subscribers initalized! Starting simulation...")
+
+        self.state_logger.info('Environment Activated!')
+
+    def live(self):
+        """
+        Performs simulation actions 
+        """
+        self.state_logger.info(f"Starting simulation...")
         timer = threading.Thread(target=self.run_timer)
         timer.start()
         timer.join
-        self.state_logger(f"Simulation time completed! Termianting sim...")
+        self.state_logger.info(f"Simulation time completed!")
+        
+    def shut_down(self):
+        """
+        Terminate processes 
+        """
+        self.state_logger.info(f"Shutting down...")
+
+        # close network ports        
+        self.publisher.close()
+        self.reqservice.close()
+        self.state_logger.info(f"Network ports closed.")
+        
+        self.state_logger.info(f"Good night!")
 
     """
     --------------------
@@ -56,7 +90,38 @@ class Environment:
     """
     def run_timer(self): 
         delay = self.DURATION/self.SIMULATION_FREQUENCY
-        self.sleep(delay)
+        time.sleep(delay)
+
+    """
+    --------------------
+    HELPING FUNCTIONS
+    --------------------    
+    """
+    def network_config(self):
+        """
+        Creates communication ports and binds to them
+
+        publisher: port in charge of broadcasting messages to all agents in the simulation
+        reqservice: port in charge of receiving and answering requests from agents. These request can be sync requests or 
+        """
+        # Activate network ports
+        self.context = zmq.Context()                                
+    
+        ## assign ports to sockets
+        self.environment_port_number = '5561'
+        if is_port_in_use(int(self.environment_port_number)):
+            raise Exception(f"{self.environment_port_number} port already in use")
+        
+        self.publisher = self.context.socket(zmq.PUB)                   # Socket to send information to agents
+        self.publisher.sndhwm = 1100000                                 ## set SNDHWM, so we don't drop messages for slow subscribers
+        self.publisher.bind(f"tcp://*:{self.environment_port_number}")
+
+        self.request_port_number = '5562'
+        if is_port_in_use(int(self.request_port_number)):
+            raise Exception(f"{self.request_port_number} port already in use")
+
+        self.reqservice = self.context.socket(zmq.REP)                 # Socket to receive synchronization and measurement requests from agents
+        self.reqservice.bind(f"tcp://*:{self.request_port_number}")
 
     def sync_agents(self):
         """
@@ -65,63 +130,68 @@ class Environment:
         """
         subscribers = []
         n_subscribers = 0
-        while subscribers < self.NUMBER_AGENTS:
+        while n_subscribers < self.NUMBER_AGENTS:
             # wait for synchronization request
-            msg = self.request_socket.recv()
-            
-            # send synchronization reply
-            self.request_socket.send('')
+            msg = self.reqservice.recv_string() # TODO: Change to recv_json() and check if message received is a sync request, else reject or raise an exception
+            self.request_logger.info(f'Received sync request from {msg}! Checking if already synchronized...')
 
+            # send synchronization reply
+            self.reqservice.send_string('')
+            
             # log subscriber confirmation
             for agent_name in self.AGENT_NAME_LIST:
                 if agent_name in msg and not agent_name in subscribers:
                     subscribers.append(agent_name)
                     n_subscribers += 1
-                    self.state_logger(f"{agent_name} subscribed to environment! ({n_subscribers}/{self.NUMBER_AGENTS})")
-                    continue
+                    self.state_logger.info(f"{agent_name} is now synchronized to environment ({n_subscribers}/{self.NUMBER_AGENTS}).")
+                    break
 
-
-    """
-    --------------------
-    HELPING FUNCTIONS
-    --------------------    
-    """
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
         if not os.path.exists(scenario_results_path):
             # if directory does not exists, create it
             os.mkdir(scenario_results_path)
 
-        enviroment_results_path = scenario_results_path + '/environment'
-        if not os.path.exists(enviroment_results_path):
-            # if directory does not exists, create it
+        enviroment_results_path = scenario_results_path + f'/{self.name}'
+        if os.path.exists(enviroment_results_path):
+            # if directory already exists, cleare contents
+            for f in os.listdir(enviroment_results_path):
+                os.remove(os.path.join(enviroment_results_path, f)) 
+        else:
+            # if directory does not exist, create a new onw
             os.mkdir(enviroment_results_path)
 
         return scenario_results_path, enviroment_results_path
 
+
     def set_up_loggers(self):
+        # set root logger to default settings
+        logging.root.setLevel(logging.NOTSET)
+        logging.basicConfig(level=logging.NOTSET)
+
         logger_names = ['messages', 'requests', 'state']
 
         loggers = []
-        for name in logger_names:
-            path = self.ENVIRONMENT_RESULTS_DIR + f'/{name}.log'
+        for logger_name in logger_names:
+            path = self.ENVIRONMENT_RESULTS_DIR + f'/{logger_name}.log'
 
             if os.path.isdir(path):
                 # if file already exists, delete
                 os.remove(path)
 
             # create logger
-            logger = logging.getLogger(self.name)
+            logger = logging.getLogger(f'{self.name}_{logger_name}')
+            logger.propagate = False
 
             # create handlers
             c_handler = logging.StreamHandler()
-            c_handler.setLevel(logging.WARNING)
+            c_handler.setLevel(logging.INFO)
 
             f_handler = logging.FileHandler(path)
             f_handler.setLevel(logging.DEBUG)
 
             # create formatters
-            c_format = logging.Formatter('%(name)s:\t%(message)s')
+            c_format = logging.Formatter(f'{self.name}:\t%(message)s')
             c_handler.setFormatter(c_format)
             f_format = logging.Formatter('%(message)s')
             f_handler.setFormatter(f_format)
@@ -132,3 +202,20 @@ class Environment:
 
             loggers.append(logger)
         return loggers
+
+"""
+--------------------
+MAIN
+--------------------    
+"""
+if __name__ == '__main__':
+    print('Initializing environment...')
+    scenario_dir = './scenarios/sim_test'
+    agent_to_port_map = dict()
+    agent_to_port_map['AGENT0'] = '5557'
+    
+    environment = Environment("ENV", scenario_dir, ['AGENT0'], 1, 1)
+    
+    env_prcs = Process(target=environment.main)
+    env_prcs.start()
+    env_prcs.join()
