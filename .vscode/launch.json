@@ -8,11 +8,11 @@
             "name": "internal process test",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/dmas/agents/agent.py",
+            "program": "${workspaceRoot}/scenarios/sim_test/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "${workspaceRoot}/scenarios/"
+                "${workspaceRoot}/scenarios/sim_test/"
             ],
             "cwd": "${workspaceRoot}",
             "env": {
