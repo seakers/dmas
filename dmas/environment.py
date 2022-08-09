@@ -1,6 +1,9 @@
+import os
+# os.environ['PYTHONASYNCIODEBUG'] = '0'
+import asyncio
+import json
 import logging
 from multiprocessing import Process
-import os
 import threading
 import time
 import zmq
@@ -65,16 +68,17 @@ class Environment:
         Performs simulation actions 
         """
         self.state_logger.info(f"Starting simulation...")
-        timer = threading.Thread(target=self.run_timer)
-        timer.start()
-        timer.join
-        self.state_logger.info(f"Simulation time completed!")
+        
+        asyncio.run(self.excute_coroutines())
         
     def shut_down(self):
         """
         Terminate processes 
         """
         self.state_logger.info(f"Shutting down...")
+
+        # broadcast simulation end
+        self.broadcast_end()
 
         # close network ports        
         self.publisher.close()
@@ -85,12 +89,80 @@ class Environment:
 
     """
     --------------------
-    PARALLEL PROCESSES
+    CO-ROUTINES AND TASKS
     --------------------
     """
-    def run_timer(self): 
-        delay = self.DURATION/self.SIMULATION_FREQUENCY
-        time.sleep(delay)
+    async def excute_coroutines(self):
+        # await asyncio.gather( 
+        #     self.sim_wait(self.DURATION)
+        # )
+        t1 = asyncio.create_task(self.sim_wait(self.DURATION))
+        t2 = asyncio.create_task(self.tic_broadcast())
+
+        await t1
+        t2.cancel()
+        await t2
+        self.state_logger.info(f"Simulation time completed!")
+
+    async def sim_wait(self, delay):
+        """
+        Sleeps for a given amout of time
+        delay: simulation time to be waited
+        """
+        await asyncio.sleep(delay/self.SIMULATION_FREQUENCY)
+
+    async def tic_broadcast(self):
+        try:
+            while True:
+                msg_dict = dict()
+                msg_dict['src'] = self.name
+                msg_dict['dst'] = 'all'
+                msg_dict['@type'] = 'tic'
+                msg_dict['server_clock'] = time.perf_counter()
+                msg_json = json.dumps(msg_dict)
+
+                t = msg_dict['server_clock']
+                self.message_logger.debug(f'Broadcasting server tic at t={t}')
+                self.state_logger.debug(f'Broadcasting server tic at t={t}')
+
+                self.publisher.send_json(msg_json)
+
+                await self.sim_wait(1)
+        except asyncio.CancelledError:
+            return
+
+    def broadcast_end(self):
+        # broadcast simulation end to all subscribers
+        msg_dict = dict()
+        msg_dict['src'] = self.name
+        msg_dict['dst'] = 'all'
+        msg_dict['@type'] = 'END'
+        msg_dict['server_clock'] = time.perf_counter()
+        kill_msg = json.dumps(msg_dict)
+
+        t = msg_dict['server_clock']
+        self.message_logger.debug(f'Broadcasting simulation end at t={t}')
+        self.state_logger.debug(f'Broadcasting simulation end at t={t}')
+        self.publisher.send_json(kill_msg)
+
+        # wait for their confirmation
+        subscribers = []
+        n_subscribers = 0
+        while n_subscribers < self.NUMBER_AGENTS:
+            # wait for synchronization request
+            msg = self.reqservice.recv_string() # TODO: Change to recv_json() and check if message received is a sync request, else reject or raise an exception
+            self.request_logger.info(f'Received simulation end confirmation from {msg}!')
+
+            # send synchronization reply
+            self.reqservice.send_string('')
+            
+            # log subscriber confirmation
+            for agent_name in self.AGENT_NAME_LIST:
+                if agent_name in msg and not agent_name in subscribers:
+                    subscribers.append(agent_name)
+                    n_subscribers += 1
+                    self.state_logger.info(f"{agent_name} has ended its processes ({n_subscribers}/{self.NUMBER_AGENTS}).")
+                    break
 
     """
     --------------------
@@ -214,7 +286,7 @@ if __name__ == '__main__':
     agent_to_port_map = dict()
     agent_to_port_map['AGENT0'] = '5557'
     
-    environment = Environment("ENV", scenario_dir, ['AGENT0'], 1, 1)
+    environment = Environment("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=10)
     
     env_prcs = Process(target=environment.main)
     env_prcs.start()

@@ -1,3 +1,5 @@
+import asyncio
+import json
 from multiprocessing import Process
 import os
 import threading
@@ -69,7 +71,7 @@ class AbstractAgent:
         Performs simulation actions 
         """
         self.state_logger.info(f"Starting simulation...")
-        time.sleep(1)        
+        asyncio.run(self.excute_coroutines())
 
     def shut_down(self):
         """
@@ -85,12 +87,45 @@ class AbstractAgent:
 
     """
     --------------------
-    PARALLEL PROCESSES
+    CO-ROUTINES AND TASKS
     --------------------
     """
-    def message_handler(self):
+    async def excute_coroutines(self):
+        self.state_logger.debug('Awaiting simulation termination...')
+        await self.message_handler()
+
+    async def message_handler(self):
         while True:
-            pass
+            socks = dict(self.poller.poll())                
+
+            if self.environment_broadcast_socket in socks:
+                msg_string = self.environment_broadcast_socket.recv_json()
+                msg_dict = json.loads(msg_string)
+
+                src = msg_dict['src']
+                dst = msg_dict['dst']
+                msg_type = msg_dict['@type']
+                t_server = msg_dict['server_clock']
+
+                self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+                self.state_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+
+                if msg_type == 'END':
+                    self.state_logger.info(f'Sim has ended.')
+                    
+                    # send a reception confirmation
+                    self.request_logger.info('Connection to environment established!')
+                    self.environment_request_socket.send_string(self.name)
+                    self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+
+                    # wait for server reply
+                    self.environment_request_socket.recv() 
+                    self.request_logger.info('Response received! terminating agent.')
+                    return
+
+                elif msg_type == 'tic':
+                    self.message_logger.info(f'Updating internal clock.')
+                    
 
     """
     --------------------
@@ -116,7 +151,7 @@ class AbstractAgent:
         self.poller.register(self.environment_broadcast_socket, zmq.POLLIN)
 
     def sync_environment(self):
-        ## send a synchronization request
+        # send a synchronization request
         self.request_logger.debug('Connection to environment established!')
         self.environment_request_socket.send_string(self.name)
         self.request_logger.debug('Synchronization request sent. Awaiting environment response...')
@@ -126,6 +161,7 @@ class AbstractAgent:
 
         # log simulation start time
         self.START_TIME = time.perf_counter()
+        self.sim_time = 0
 
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
