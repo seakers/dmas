@@ -24,11 +24,9 @@ class Module:
             subroutine.cancel()
 
     async def message_handler(self):
-        # print('MODULE: awaiting messages')
         while True:
             # wait for any incoming requests
             msg = await self.inbox.get()
-            # print('MODULE: received message!')
 
             # hangle request
             dst_name = msg['dst']
@@ -67,8 +65,6 @@ class SubModule:
             await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
 
         except asyncio.CancelledError:
-            # for process in processes:
-            #     process.cancel()
             return
 
     async def message_handler(self):
@@ -85,7 +81,6 @@ class SubModule:
     async def routine(self):
         try:
             while True:
-                # print('SUBMODULE: Preparing to send message to parent module')
                 msg = dict()
                 msg['src'] = self.name
                 msg['dst'] = self.parent_module.name
@@ -94,13 +89,26 @@ class SubModule:
 
                 await self.parent_module.put_message(msg)
 
-                # print('SUBMODULE: Message sent!')
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
             return
 
     async def put_message(self, msg):
         await self.inbox.put(msg)
+
+"""
+--------------------
+ENGINEERING MODULES
+--------------------
+"""
+# class EngineeringModule(Module):
+#     def __init__(self, parent_agent, components) -> None:
+#         network_simulator = NetworkSimulator()
+#         platform_simulator = PlatformSimulator()
+#         operations_planner = OperationsPlanner()
+
+#         submodules = []
+#         super().__init__('engineering_mod', parent_agent, submodules)
 """
 --------------------
 TESTING MODULES

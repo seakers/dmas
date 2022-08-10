@@ -41,19 +41,19 @@ class AbstractAgent:
     def main(self):
         """
         MAIN FUNCTION 
+        executes event loop for ayncronous processes within the agent
         """           
-        asyncio.run(self.run())
+        async def agent_run(self):
+            # Activate 
+            await self.activate()
 
-    async def run(self):
-        # Activate 
-        await self.activate()
+            # Run simulation
+            await self.live()
 
-        # Run simulation
-        await self.live()
+            # Turn off
+            await self.shut_down()
 
-        # Turn off
-        await self.shut_down()
-
+        asyncio.run(agent_run())   
 
     async def activate(self):
         """
@@ -119,36 +119,42 @@ class AbstractAgent:
     async def message_handler(self):
         self.state_logger.debug('Awaiting simulation termination...')
         while True:
-            socks = dict(await self.poller.poll())                
+            # socks = dict(await self.poller.poll())                
 
-            if self.environment_broadcast_socket in socks:
-                msg_string = await self.environment_broadcast_socket.recv_json()
-                msg_dict = json.loads(msg_string)
+            # if self.environment_broadcast_socket in socks:
+            #     pass
+            # else:
+            #     # TODO: ADD SUPPORT FOR MESSAGES FROM OTHER AGENTS
+            #     # must pass them down to communications module
+            #     continue
 
-                src = msg_dict['src']
-                dst = msg_dict['dst']
-                msg_type = msg_dict['@type']
-                t_server = msg_dict['server_clock']
+            msg_string = await self.environment_broadcast_socket.recv_json()
+            msg_dict = json.loads(msg_string)
 
-                self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-                # self.state_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+            src = msg_dict['src']
+            dst = msg_dict['dst']
+            msg_type = msg_dict['@type']
+            t_server = msg_dict['server_clock']
 
-                if msg_type == 'END':
-                    self.state_logger.info(f'Sim has ended.')
-                    
-                    # send a reception confirmation
-                    self.request_logger.info('Connection to environment established!')
-                    self.environment_request_socket.send_string(self.name)
-                    self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+            self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+            # self.state_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
-                    # wait for server reply
-                    await self.environment_request_socket.recv() 
-                    self.request_logger.info('Response received! terminating agent.')
-                    return
+            if msg_type == 'END':
+                self.state_logger.info(f'Sim has ended.')
+                
+                # send a reception confirmation
+                self.request_logger.info('Connection to environment established!')
+                self.environment_request_socket.send_string(self.name)
+                self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
 
-                elif msg_type == 'tic':
-                    self.message_logger.info(f'Updating internal clock.')
-                    self.sim_time = t_server
+                # wait for server reply
+                await self.environment_request_socket.recv() 
+                self.request_logger.info('Response received! terminating agent.')
+                return
+
+            elif msg_type == 'tic':
+                self.message_logger.info(f'Updating internal clock.')
+                self.sim_time = t_server
 
     """
     --------------------
@@ -170,16 +176,19 @@ class AbstractAgent:
         # connect to environment request port
         self.environment_request_socket = self.context.socket(zmq.REQ)
         self.environment_request_socket.connect(f"tcp://localhost:{self.REQUEST_PORT_NUMBER}")
+        self.environment_request_lock = asyncio.Lock()
 
         # create poller to be used for parsing through incoming message
-        self.poller = zmq.asyncio.Poller()
-        self.poller.register(self.environment_request_socket, zmq.POLLIN)
-        self.poller.register(self.environment_broadcast_socket, zmq.POLLIN)
+        # self.poller = zmq.asyncio.Poller()
+        # self.poller.register(self.environment_request_socket, zmq.POLLIN)
+        # self.poller.register(self.environment_broadcast_socket, zmq.POLLIN)
 
     async def sync_environment(self):
         # send a synchronization request
         self.request_logger.debug('Connection to environment established!')
+        await self.environment_request_lock.acquire()
         self.environment_request_socket.send_string(self.name)
+        await self.environment_request_lock.release()
         self.request_logger.debug('Synchronization request sent. Awaiting environment response...')
 
         # wait for synchronization reply

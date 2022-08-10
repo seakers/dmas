@@ -9,9 +9,15 @@ class Container:
 
         self.level = level
         self.capacity = capacity
+        self.updated = None
+
+    def activate(self):
         self.updated = asyncio.Event()
 
     async def put(self, value):
+        if self.updated is None:
+            raise Exception('Container not activated in event loop')
+
         def accept():
             return self.level + value <= self.capacity
 
@@ -25,6 +31,9 @@ class Container:
             await self.put(value)
 
     async def get(self, value):
+        if self.updated is None:
+            raise Exception('Container not activated in event loop')
+
         def accept():
             return self.level - value >= 0
         
@@ -38,6 +47,9 @@ class Container:
             await self.get(value)
 
     async def when_cond(self, cond):
+        if self.updated is None:
+            raise Exception('Container not activated in event loop')
+             
         if cond():
             return True
         else:
