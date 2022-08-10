@@ -7,6 +7,7 @@ from multiprocessing import Process
 import threading
 import time
 import zmq
+import zmq.asyncio
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -80,9 +81,10 @@ class Environment:
         # broadcast simulation end
         self.broadcast_end()
 
-        # close network ports        
+        # close network ports     
         self.publisher.close()
         self.reqservice.close()
+        self.context.term()
         self.state_logger.info(f"Network ports closed.")
         
         self.state_logger.info(f"Good night!")
@@ -142,7 +144,7 @@ class Environment:
 
         t = msg_dict['server_clock']
         self.message_logger.debug(f'Broadcasting simulation end at t={t}')
-        self.state_logger.debug(f'Broadcasting simulation end at t={t}')
+        # self.state_logger.debug(f'Broadcasting simulation end at t={t}')
         self.publisher.send_json(kill_msg)
 
         # wait for their confirmation
@@ -177,7 +179,8 @@ class Environment:
         reqservice: port in charge of receiving and answering requests from agents. These request can be sync requests or 
         """
         # Activate network ports
-        self.context = zmq.Context()                                
+        self.context = zmq.Context()
+        # self.context = zmq.asyncio.Context()              
     
         ## assign ports to sockets
         self.environment_port_number = '5561'
@@ -286,7 +289,7 @@ if __name__ == '__main__':
     agent_to_port_map = dict()
     agent_to_port_map['AGENT0'] = '5557'
     
-    environment = Environment("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=10)
+    environment = Environment("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=5)
     
     env_prcs = Process(target=environment.main)
     env_prcs.start()

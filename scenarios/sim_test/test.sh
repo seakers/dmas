@@ -1,8 +1,7 @@
-#! /dmas
+#!/bin/bash
 
-echo "Starting subscribers..."
-for ((a=0; a<10; a++)); do
-    syncsub &
+for ((a=0; a<1; a++)); do
+    gnome-terminal -- python ./dmas/agent.py
 done
-echo "Starting publisher..."
-syncpub
+
+gnome-terminal -- python ./dmas/environment.py
