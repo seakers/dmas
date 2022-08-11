@@ -1,112 +1,31 @@
+from dmas.modules.modules import Module, SubModule
 import asyncio
-import json
-
-class Module:
-    def __init__(self, name, parent_agent, submodules = []) -> None:
-        self.name = name
-        self.parent_agent = parent_agent
-
-        self.inbox = None       
-        self.submodules = submodules
-
-    async def activate(self):
-        self.inbox = asyncio.Queue()   
-        for submodule in self.submodules:
-            await submodule.activate()
-
-    async def run(self):
-        subroutines = [submodule.run() for submodule in self.submodules]
-        subroutines.append(self.message_handler())
-
-        _, pending = await asyncio.wait(subroutines, return_when=asyncio.FIRST_COMPLETED)
-
-        for subroutine in pending:
-            subroutine.cancel()
-
-    async def message_handler(self):
-        while True:
-            # wait for any incoming requests
-            msg = await self.inbox.get()
-
-            # hangle request
-            dst_name = msg['dst']
-
-            if dst_name == self.name:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    print(content)
-            else:
-                dst = None
-                for submodule in self.submodules:
-                    if submodule.name == dst_name:
-                        dst = submodule
-                        break
-                
-                if dst is None:
-                    dst = self.parent_agent
-
-                await dst.put_message(msg)
-                
-    async def put_message(self, msg):
-        await self.inbox.put(msg)
-
-class SubModule:
-    def __init__(self, name, parent_module: Module) -> None:
-        self.name = name
-        self.parent_module = parent_module
-        self.inbox = None
-
-    async def activate(self):
-        self.inbox = asyncio.Queue()  
-
-    async def run(self):
-        try:
-            processes = [self.message_handler(), self.routine()]
-            await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
-
-        except asyncio.CancelledError:
-            return
-
-    async def message_handler(self):
-        try:
-            while True:
-                # wait for any incoming messages
-                _ = await self.inbox.get()
-
-                # hangle request
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            return
-
-    async def routine(self):
-        try:
-            while True:
-                msg = dict()
-                msg['src'] = self.name
-                msg['dst'] = self.parent_module.name
-                msg['@type'] = 'PRINT'
-                msg['content'] = 'TEST_PRINT'
-
-                await self.parent_module.put_message(msg)
-
-                await asyncio.sleep(1)
-        except asyncio.CancelledError:
-            return
-
-    async def put_message(self, msg):
-        await self.inbox.put(msg)
 
 """
---------------------
---------------------
-ENGINEERING MODULES
---------------------
---------------------
+--------------------------------------------------------
+ _____            _                      _              
+|  ___|          (_)                    (_)             
+| |__ _ __   __ _ _ _ __   ___  ___ _ __ _ _ __   __ _  
+|  __| '_ \ / _` | | '_ \ / _ \/ _ \ '__| | '_ \ / _` | 
+| |__| | | | (_| | | | | |  __/  __/ |  | | | | | (_| | 
+\____/_| |_|\__, |_|_| |_|\___|\___|_|  |_|_| |_|\__, | 
+             __/ |                                __/ | 
+            |___/                                |___/  
+___  ___          _       _                             
+|  \/  |         | |     | |                            
+| .  . | ___   __| |_   _| | ___                        
+| |\/| |/ _ \ / _` | | | | |/ _ \                       
+| |  | | (_) | (_| | |_| | |  __/                       
+\_|  |_/\___/ \__,_|\__,_|_|\___|                                                                                                                                                   
+--------------------------------------------------------
 """
+
 class EngineeringModule(Module):
-    def __init__(self, parent_agent, component_list: list, agent_comms_socket, environment_request_socket) -> None:
-        network_simulator = NetworkSimulator(agent)
-        platform_simulator = PlatformSimulator()
+    def __init__(self, parent_agent, component_list: list, 
+                    agent_comms_socket_in, agent_comms_socket_out, 
+                    environment_broadcast_socket, environment_request_socket, environment_request_lock) -> None:
+        network_simulator = NetworkSimulator(self, parent_agent)
+        platform_simulator = PlatformSimulator(self, component_list)
         operations_planner = OperationsPlanner()
 
         submodules = []
@@ -114,11 +33,70 @@ class EngineeringModule(Module):
 
 """
 --------------------
+Platform Simulator
+--------------------
+"""
+class PlatformSimulator(SubModule):
+    def __init__(self, parent_module: Module, component_list) -> None:
+        super().__init__('plaform_simulator', parent_module)
+        
+    async def activate(self):
+        await super().activate()
+        self.updated = asyncio.Event()
+        self.update_state()
+        return 
+
+    async def message_handler(self):
+        """
+        Reads messages from other modules. Only accepts the following message types:
+            -STATE_UPDATE_REQUEST: integrates state up to current simulation time. Returns state to sender
+            -CRITICAL_STATE:
+        """
+        try:
+            while True:
+                # wait for any incoming transmission requests
+                msg = await self.inbox.get()
+
+                # hangle request
+                if msg['dst'] == self.name:
+                    msg_type = msg['@type']
+                    if msg_type == 'STATE_UPDATE_REQUEST':
+                        pass
+
+                else:
+                    # if request is not intended for this submodule, forward to parent module
+                    await self.parent_module.put_message(msg)    
+                    pass
+                    
+
+        except asyncio.CancelledError:
+            return
+    
+    async def periodic_state_update(self):
+
+        while True:
+            self.update_state()
+            await asyncio.sleep(self.parent_module.parent_agent.SIMULATION_FREQUENCY)
+
+    async def wait_for_critical_state(self):
+        """
+        Sends current state to Predictive model submodule and waits for estimate for the next projected critical state. 
+
+        """
+        pass
+
+    async def wait_for_environment_event(self):
+        pass
+
+    def is_critical(self):
+        return False
+"""
+--------------------
 Network Simulator
 --------------------
 """
 class NetworkSimulator(SubModule):
-    def __init__(self, parent_module: Module, component_list, agent_comms_socket_in, agent_comms_socket_out, environment_request_socket) -> None:
+    def __init__(self, parent_module: Module, agent_comms_socket_in, agent_comms_socket_out, environment_request_socket) -> None:
         super().__init__('network_sim', parent_module)
         self.agent_comms_socket_in = agent_comms_socket_in
         self.agent_comms_socket_out = agent_comms_socket_out
@@ -237,52 +215,3 @@ class NetworkSimulator(SubModule):
 
     async def create_routing_plan(self, src_name, dst_name, t_curr):
         pass
-
-
-"""
---------------------
---------------------
-  TESTING MODULES
---------------------
---------------------
-"""
-class TestModule(Module):
-    def __init__(self, parent_agent) -> None:
-        submodules = [SubModule('sub_test', self)]
-        super().__init__('test', parent_agent, submodules)
-
-# class CommunicationsModule(Module):
-#     def __init__(self, parent_agent: AbstractAgent, results_dir, environment_broadcast_socket) -> None:
-#         super().__init__('comms_module', parent_agent, results_dir, submodules=[])
-    
-#     async def message_handler(self):
-#         while True:
-#             socks = dict(self.poller.poll())                
-
-#             if self.environment_broadcast_socket in socks:
-                # msg_string = self.environment_broadcast_socket.recv_json()
-                # msg_dict = json.loads(msg_string)
-
-                # src = msg_dict['src']
-                # dst = msg_dict['dst']
-                # msg_type = msg_dict['@type']
-                # t_server = msg_dict['server_clock']
-
-                # # self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-
-                # if msg_type == 'END':
-                #     self.state_logger.info(f'Sim has ended.')
-                    
-                #     # send a reception confirmation
-                #     # self.request_logger.info('Connection to environment established!')
-                #     self.environment_request_socket.send_string(self.name)
-                #     # self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
-
-                #     # wait for server reply
-                #     self.environment_request_socket.recv() 
-                #     # self.request_logger.info('Response received! terminating agent.')
-                #     return
-
-                # elif msg_type == 'tic':
-                #     # self.message_logger.info(f'Updating internal clock.')
-                #     _ = 1

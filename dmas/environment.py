@@ -69,7 +69,7 @@ class Environment:
         Performs simulation actions 
         """
         self.state_logger.info(f"Starting simulation...")
-        
+        print('Starting simulation!')
         asyncio.run(self.excute_coroutines())
         
     def shut_down(self):
@@ -88,6 +88,7 @@ class Environment:
         self.state_logger.info(f"Network ports closed.")
         
         self.state_logger.info(f"Good night!")
+        print('Simulation done, good night!')
 
     """
     --------------------
@@ -201,25 +202,54 @@ class Environment:
     def sync_agents(self):
         """
         Awaits for all other agents to undergo their initialization routines and become online. Once they become online, 
-        they will reach the environment through the 'request_socket' channel and subscribe to future broadcasts from the environment
+        they will reach out to the environment through the 'reqservice' channel and subscribe to future broadcasts from the environment.
+
+        The environment will then broadcast a list of agent-to-port assignments to all agents so they are able to communicate directly 
+        with one and other as needed 
         """
+
+        # wait for agents to synchronize
         subscribers = []
+        subscriber_to_port_map = dict()
         n_subscribers = 0
         while n_subscribers < self.NUMBER_AGENTS:
             # wait for synchronization request
-            msg = self.reqservice.recv_string() # TODO: Change to recv_json() and check if message received is a sync request, else reject or raise an exception
-            self.request_logger.info(f'Received sync request from {msg}! Checking if already synchronized...')
-
-            # send synchronization reply
-            self.reqservice.send_string('')
+            msg_str = self.reqservice.recv_json() 
+            msg = json.loads(msg_str)
+            if msg['@type'] != 'SYNC_REQUEST' or msg.get('content') is None:
+                continue
             
+            msg_src = msg.get('src', None)
+            src_port = msg.get('content').get('port')
+
+            self.request_logger.info(f'Received sync request from {msg_src}! Checking if already synchronized...')            
+
             # log subscriber confirmation
             for agent_name in self.AGENT_NAME_LIST:
-                if agent_name in msg and not agent_name in subscribers:
+                print(agent_name in msg_src)
+                print(agent_name not in subscribers)
+                if (agent_name in msg_src) and (agent_name not in subscribers):
                     subscribers.append(agent_name)
                     n_subscribers += 1
                     self.state_logger.info(f"{agent_name} is now synchronized to environment ({n_subscribers}/{self.NUMBER_AGENTS}).")
+                    print(f"{agent_name} is now synchronized to environment ({n_subscribers}/{self.NUMBER_AGENTS}).")
+                    
+                    # send synchronization reply
+                    self.reqservice.send_string('')
+
+                    subscriber_to_port_map[msg_src] = src_port
                     break
+            
+        
+        # boradcast agent-to-port map
+        msg_dict = dict()
+        msg_dict['src'] = self.name
+        msg_dict['dst'] = 'ALL'
+        msg_dict['@type'] = 'AGENT_TO_PORT_MAP'
+        msg_dict['content'] = subscriber_to_port_map
+
+        msg_json = json.dumps(msg_dict)
+        self.publisher.send_json(msg_json)
 
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
@@ -286,8 +316,6 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test'
-    agent_to_port_map = dict()
-    agent_to_port_map['AGENT0'] = '5557'
     
     environment = Environment("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=5)
     

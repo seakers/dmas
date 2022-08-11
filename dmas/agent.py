@@ -3,13 +3,14 @@ import json
 from multiprocessing import Process
 import os
 import random
+import sys
 import threading
 import time
 import zmq
 import zmq.asyncio
 import logging
 
-from dmas.modules import TestModule
+from modules.modules import TestModule
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -18,12 +19,12 @@ def is_port_in_use(port: int) -> bool:
 
 def get_next_available_port():
     port = 5555
-    while is_port_in_use(int):
+    while is_port_in_use(port):
         port += 1
     return port
 
 class AbstractAgent:
-    def __init__(self, name, scenario_dir, agent_to_port_map, simulation_frequency, modules=[]) -> None:
+    def __init__(self, name, scenario_dir, simulation_frequency, modules=[]) -> None:
         # constants
         self.name = name
         self.SIMULATION_FREQUENCY = simulation_frequency
@@ -38,9 +39,10 @@ class AbstractAgent:
         # Network information
         self.ENVIRONMENT_PORT_NUMBER =  '5561'
         self.REQUEST_PORT_NUMBER = '5562'
-        self.AGENT_TO_PORT_MAP = dict()
-        for port in agent_to_port_map:
-            self.AGENT_TO_PORT_MAP[port] = agent_to_port_map
+        self.AGENT_TO_PORT_MAP = None
+        # self.AGENT_TO_PORT_MAP = dict()
+        # for port in agent_to_port_map:
+        #     self.AGENT_TO_PORT_MAP[port] = agent_to_port_map
 
         # saves list of modules. They must already be initiated beforehand
         self.queue = None
@@ -65,7 +67,7 @@ class AbstractAgent:
             # Turn off
             await self.shut_down()
 
-        asyncio.run(agent_run())   
+        asyncio.run(agent_run(self))   
 
     async def activate(self):
         """
@@ -97,13 +99,16 @@ class AbstractAgent:
         Terminate processes 
         """
         self.state_logger.info(f"Shutting down...")
+        print('Shutting down...')
 
         # close network ports  
-        self.environment_broadcast_socket.close()
-        self.environment_request_socket.close()
-        self.context.term()
+        # self.environment_broadcast_socket.close()
+        # self.environment_request_socket.close()
+        self.context.destroy()
 
-        self.state_logger.info('Good Night!')
+        self.state_logger.info('...Good Night!')
+        print('...Good night!')
+        return
 
     """
     --------------------
@@ -121,85 +126,99 @@ class AbstractAgent:
 
         subroutines = []
         subroutines = [module.run() for module in self.modules]
-        subroutines.append(self.message_handler())
-        subroutines.append(self.transmission_handler())
+        subroutines.append(self.internal_message_handler())
+        subroutines.append(self.external_message_handler())
 
         _, pending = await asyncio.wait(subroutines, return_when=asyncio.FIRST_COMPLETED)
 
+        print('cancelling all other routines...')
         for routine in pending:
             routine.cancel()
+            await routine
+        print('all routines cancelled.')
+        return
 
-    async def message_handler(self):
+    async def internal_message_handler(self):
         """
         Listens for internal messages being sent between modules and routes them to their respective destinations.
         """
-        while True:
-            # wait for any incoming requests
-            msg = await self.inbox.get()
+        try:
+            while True:
+                # wait for any incoming requests
+                msg = await self.inbox.get()
 
-            # hangle request
-            dst_name = msg['dst']
+                # hangle request
+                dst_name = msg['dst']
 
-            if dst_name == self.name:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    print(content)
-            else:
-                dst = None
+                if dst_name == self.name:
+                    if msg['@type'] == 'PRINT':
+                        content = msg['content']
+                        print(content)
+                else:
+                    dst = None
+                    
+                    # search for destination to forward message to
+                    for module in self.modules:
+                        # check for module that matches first
+                        if module.name == dst_name:
+                            dst = module
+                            break
 
-                for module in self.modules:
-                    if module.name == dst_name:
-                        dst = module
-                        break
+                        else:
+                            # if the module does not match, check its submodules if it has any
+                            for submodule in module.submodules:
+                                if submodule.name == dst_name:
+                                    dst = module
+                                    break
+                        
+                        # if destination was found, exit search
+                        if module is not None:
+                            break                
+                    
+                    # if destiantion module or submodule is found, send message. if not, then ignore message
+                    if dst is not None:
+                        await dst.put_message(msg)
+                        
+        except asyncio.CancelledError:
+            return
 
-                    else:
-                        for submodule in module.submodules:
-                            if submodule.name == dst_name:
-                                dst = module
-                                break
-
-                    if module is not None:
-                        break                
-                
-                if dst is None:
-                    continue
-
-                await dst.put_message(msg)
-
-    async def transmission_handler(self):
+    async def external_message_handler(self):
         """
-        Listens for broadcasts from the environment. Stops processes when simulation end command is reached.
+        Listens for broadcasts from the environment. Stops processes when simulation end-command is reached.
         """
-        
-        self.state_logger.debug('Awaiting simulation termination...')
-        while True:
-            msg_string = await self.environment_broadcast_socket.recv_json()
-            msg_dict = json.loads(msg_string)
+        try:
+            self.state_logger.debug('Awaiting simulation termination...')
+            while True:
+                msg_string = await self.environment_broadcast_socket.recv_json()
+                msg_dict = json.loads(msg_string)
 
-            src = msg_dict['src']
-            dst = msg_dict['dst']
-            msg_type = msg_dict['@type']
-            t_server = msg_dict['server_clock']
+                src = msg_dict['src']
+                dst = msg_dict['dst']
+                msg_type = msg_dict['@type']
+                t_server = msg_dict['server_clock']
 
-            self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-            # self.state_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+                self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+                # self.state_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
-            if msg_type == 'END':
-                self.state_logger.info(f'Sim has ended.')
-                
-                # send a reception confirmation
-                self.request_logger.info('Connection to environment established!')
-                self.environment_request_socket.send_string(self.name)
-                self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+                if msg_type == 'END':
+                    self.state_logger.info(f'Sim has ended.')
+                    
+                    # send a reception confirmation
+                    self.request_logger.info('Connection to environment established!')
+                    self.environment_request_socket.send_string(self.name)
+                    self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
 
-                # wait for server reply
-                await self.environment_request_socket.recv() 
-                self.request_logger.info('Response received! terminating agent.')
-                return
+                    # wait for server reply
+                    await self.environment_request_socket.recv() 
+                    self.request_logger.info('Response received! terminating agent.')
+                    print('Response received! terminating agent.')
+                    return
 
-            elif msg_type == 'tic':
-                self.message_logger.info(f'Updating internal clock.')
-                self.sim_time = t_server
+                elif msg_type == 'tic':
+                    self.message_logger.info(f'Updating internal clock.')
+                    self.sim_time = t_server
+        except asyncio.CancelledError:
+            return
 
     """
     --------------------
@@ -240,9 +259,20 @@ class AbstractAgent:
         # send a synchronization request
         self.request_logger.debug('Connection to environment established!')
         await self.environment_request_lock.acquire()
-        self.environment_request_socket.send_string(self.name)
-        await self.environment_request_lock.release()
+
+        sync_msg = dict()
+        sync_msg['src'] = self.name
+        sync_msg['dst'] = 'ENV'
+        sync_msg['@type'] = 'SYNC_REQUEST'
+        content = dict()
+        content['port'] = self.agent_port_in
+        sync_msg['content'] = content
+        sync_json = json.dumps(sync_msg)
+
+        self.environment_request_socket.send_json(sync_json)
+        self.environment_request_lock.release()
         self.request_logger.debug('Synchronization request sent. Awaiting environment response...')
+        print('Synchronization request sent. Awaiting environment response...')
 
         # wait for synchronization reply
         await self.environment_request_socket.recv()  
@@ -250,6 +280,17 @@ class AbstractAgent:
         # log simulation start time
         self.START_TIME = time.perf_counter()
         self.sim_time = 0
+
+        # await list of other agent's port numbers
+        port_map_msg = await self.environment_broadcast_socket.recv_json()
+        port_map_dict = json.loads(port_map_msg)
+        agent_to_port_map = port_map_dict['content']
+
+        self.AGENT_TO_PORT_MAP = dict()
+        for agent in agent_to_port_map:
+            self.AGENT_TO_PORT_MAP[agent] = agent_to_port_map[agent]
+        print(self.AGENT_TO_PORT_MAP)
+
 
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
@@ -288,8 +329,8 @@ class AbstractAgent:
             logger.propagate = False
 
             # create handlers
-            c_handler = logging.StreamHandler()
-            c_handler.setLevel(logging.INFO)
+            c_handler = logging.StreamHandler(sys.stderr)
+            c_handler.setLevel(logging.DEBUG)
 
             f_handler = logging.FileHandler(path)
             f_handler.setLevel(logging.DEBUG)
@@ -321,10 +362,8 @@ MAIN
 if __name__ == '__main__':
     print('Initializing agent...')
     scenario_dir = './scenarios/sim_test'
-    agent_to_port_map = dict()
-    agent_to_port_map['AGENT0'] = '5557'
     
-    agent = AbstractAgent("AGENT0", scenario_dir, agent_to_port_map, 1)
+    agent = AbstractAgent("AGENT0", scenario_dir, 1)
     
     agent_prcs = Process(target=agent.main)    
     agent_prcs.start()
