@@ -65,6 +65,63 @@ class Component:
         """
         self.status = False
 
+class OnBoardComputer(Component):
+    def __init__(self, power, data_capacity):
+        super().__init__('onboard_computer', power, 0, 0, 0, 0, data_capacity, True)
+
+    async def allocate_to_memory(self, data_size):
+        await self.data_storage.put(data_size)
+
+    async def remove_from_memory(self, data_size):
+        await self.data_storage.get(data_size)
+
+class Transceiver(Component):
+    def __init__(self, power, data_rate, buffer_capacity):
+        super().__init__('transceiver', power, 0, 0, data_rate, buffer_capacity, True)
+
+    async def allocate_to_buffer(self, data_size):
+        await self.data_storage.put(data_size)
+
+    async def remove_from_buffer(self, data_size):
+        await self.data_storage.get(data_size)
+
+class PowerGenerator(Component):
+    def __init__(self, max_power_output):
+        self.max_power_output = max_power_output
+        super().__init__('power_generator', 0, 0, 0, 0, 0, 0, False)
+
+    def regulate_power(self, power):
+        if power <= 1e-9:
+            self.power = 0
+            self.turn_off()
+        elif power < self.max_power_output:
+            self.power = power
+            self.turn_on()
+        else:
+            self.power = self.max_power_output
+            self.turn_on()       
+
+class SolarPanel(PowerGenerator):
+    def __init__(self, max_power_output):
+        super().__init__(max_power_output)
+        self.name = 'solar_panel_array'
+
+class Battery(Component):
+    def __init__(self, max_power_output, energy_capacity):
+        self.max_power_output = max_power_output
+        super().__init__('battery', 0, energy_capacity, energy_capacity, 0, 0, 0, False)
+
+    def regulate_power(self, power):
+        if power <= 1e-9:
+            self.power = 0
+            self.turn_off()
+        elif power < self.max_power_output:
+            self.power = power
+            self.turn_on()
+        else:
+            self.power = self.max_power_output
+            self.turn_on()   
+
 
 # class Component:
 #     def __init__(self, env, name, power, energy_stored, energy_capacity,

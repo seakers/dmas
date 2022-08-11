@@ -2,6 +2,7 @@ import asyncio
 import json
 from multiprocessing import Process
 import os
+import random
 import threading
 import time
 import zmq
@@ -9,6 +10,17 @@ import zmq.asyncio
 import logging
 
 from dmas.modules import TestModule
+
+def is_port_in_use(port: int) -> bool:
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
+def get_next_available_port():
+    port = 5555
+    while is_port_in_use(int):
+        port += 1
+    return port
 
 class AbstractAgent:
     def __init__(self, name, scenario_dir, agent_to_port_map, simulation_frequency, modules=[]) -> None:
@@ -110,6 +122,7 @@ class AbstractAgent:
         subroutines = []
         subroutines = [module.run() for module in self.modules]
         subroutines.append(self.message_handler())
+        subroutines.append(self.transmission_handler())
 
         _, pending = await asyncio.wait(subroutines, return_when=asyncio.FIRST_COMPLETED)
 
@@ -117,17 +130,49 @@ class AbstractAgent:
             routine.cancel()
 
     async def message_handler(self):
+        """
+        Listens for internal messages being sent between modules and routes them to their respective destinations.
+        """
+        while True:
+            # wait for any incoming requests
+            msg = await self.inbox.get()
+
+            # hangle request
+            dst_name = msg['dst']
+
+            if dst_name == self.name:
+                if msg['@type'] == 'PRINT':
+                    content = msg['content']
+                    print(content)
+            else:
+                dst = None
+
+                for module in self.modules:
+                    if module.name == dst_name:
+                        dst = module
+                        break
+
+                    else:
+                        for submodule in module.submodules:
+                            if submodule.name == dst_name:
+                                dst = module
+                                break
+
+                    if module is not None:
+                        break                
+                
+                if dst is None:
+                    continue
+
+                await dst.put_message(msg)
+
+    async def transmission_handler(self):
+        """
+        Listens for broadcasts from the environment. Stops processes when simulation end command is reached.
+        """
+        
         self.state_logger.debug('Awaiting simulation termination...')
         while True:
-            # socks = dict(await self.poller.poll())                
-
-            # if self.environment_broadcast_socket in socks:
-            #     pass
-            # else:
-            #     # TODO: ADD SUPPORT FOR MESSAGES FROM OTHER AGENTS
-            #     # must pass them down to communications module
-            #     continue
-
             msg_string = await self.environment_broadcast_socket.recv_json()
             msg_dict = json.loads(msg_string)
 
@@ -171,13 +216,21 @@ class AbstractAgent:
         self.environment_broadcast_socket.setsockopt(zmq.SUBSCRIBE, b'')
         
         # give environment time to set up
-        time.sleep(1)
+        time.sleep(random.random())
 
         # connect to environment request port
         self.environment_request_socket = self.context.socket(zmq.REQ)
         self.environment_request_socket.connect(f"tcp://localhost:{self.REQUEST_PORT_NUMBER}")
         self.environment_request_lock = asyncio.Lock()
 
+        # give environment time to set up
+        time.sleep(random.random())
+
+        self.agent_socket_in = self.context.socket(zmq.REP)
+        self.agent_port_in = get_next_available_port()
+        self.agent_socket_in.bind(f"tcp://*:{self.agent_port_in}")
+
+        self.agent_socket_out = self.context.socket(zmq.REQ)
         # create poller to be used for parsing through incoming message
         # self.poller = zmq.asyncio.Poller()
         # self.poller.register(self.environment_request_socket, zmq.POLLIN)
@@ -253,6 +306,12 @@ class AbstractAgent:
 
             loggers.append(logger)
         return loggers
+
+    def get_current_simulation_time(self): 
+        return (time.perf_counter() - self.START_TIME)/self.SIMULATION_FREQUENCY
+
+    def get_current_real_time(self):
+        return (time.perf_counter() - self.START_TIME)
 
 """
 --------------------
