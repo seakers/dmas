@@ -8,9 +8,9 @@ class Module:
     """
     Generic module class. Can house multiple submodules 
     """
-    def __init__(self, name, parent_agent, submodules = []) -> None:
+    def __init__(self, name, parent_module, submodules = []) -> None:
         self.name = name
-        self.parent_agent = parent_agent
+        self.parent_module = parent_module
 
         self.inbox = None       
         self.submodules = submodules
@@ -25,12 +25,14 @@ class Module:
 
     async def run(self):
         """
-        Executes any internal routines along with any submodules' routines
+        Executes any internal routines along with any submodules' routines. 
+        If class is modified to perform implementation-specific routines, this function must be overwritten to execute
+        said routines. Must include catch for CancelledError exception.
         """
         try:
             subroutines = [asyncio.Task(submodule.run()) for submodule in self.submodules]
             subroutines.append(asyncio.Task(self.routine()))
-            subroutines.append(asyncio.Task(self.message_handler()))
+            subroutines.append(asyncio.Task(self.internal_message_router()))
 
             await asyncio.wait(subroutines, return_when=asyncio.ALL_COMPLETED)
         except asyncio.CancelledError: 
@@ -39,21 +41,20 @@ class Module:
                 subroutine.cancel()
             return
 
-    async def message_handler(self):
+    async def internal_message_router(self):
         """
         Listens for internal messages being sent between modules and routes them to their respective destinations.
+        If this module is the intended destination for this message, then handle the message.
         """
         try:
             while True:
-                # wait for any incoming requests
+                # wait for any incoming messages
                 msg = await self.inbox.get()
-                dst_name = msg['dst']               
+                dst_name = msg['dst']
 
-                # if this module is the intended receiver, handle request
+                # if this module is the intended receiver, handle message
                 if dst_name == self.name:
-                    if msg['@type'] == 'PRINT':
-                        content = msg['content']
-                        print(content)
+                    await self.handle_message(msg)
                 else:
                     # else, search if any of this module's submodule is the intended destination
                     dst = None
@@ -64,15 +65,26 @@ class Module:
                     
                     # if no module is found, forward to parent agent
                     if dst is None:
-                        dst = self.parent_agent
+                        dst = self.parent_module
 
                     await dst.put_message(msg)
         except asyncio.CancelledError:
             return
 
+    async def handle_message(self, msg):
+        """
+        Handles message intended for this module.
+        """
+        try:
+            if msg['@type'] == 'PRINT':
+                content = msg['content']
+                print(content)                
+        except asyncio.CancelledError:
+            return
+
     async def routine(self):
         """
-        Generic routine to be performed by module. By default, it just waits indefinitively.
+        Generic routine to be performed by module.
         """
         try:
             while True:
@@ -81,52 +93,56 @@ class Module:
             return
     
     async def put_message(self, msg):
+        """
+        Places a message in this modules inbox.
+        Intended to be executed by other modules for sending messages to this module.
+        """
         await self.inbox.put(msg)
 
 """
-SUBMODULE
+--------------------
+  TESTING MODULES
+--------------------
 """
-class SubModule:
-    def __init__(self, name, parent_module: Module) -> None:
-        self.name = name
-        self.parent_module = parent_module
-        self.inbox = None
-
-    async def activate(self):
-        """
-        Initiates any thread-sensitive or envent-loop-sensitive variables
-        """
-        self.inbox = asyncio.Queue()  
+class SubModule(Module):
+    def __init__(self, name, parent_module) -> None:
+        super().__init__(name, parent_module, submodules=[])
 
     async def run(self):
+        """
+        Executes any internal routines along with any submodules' routines. 
+        If class is modified to perform implementation-specific routines, this function must be overwritten to execute
+        said routines. Must include catch for CancelledError exception.
+        """
         try:
-            msg_handler_task = asyncio.Task(self.message_handler())
+            internal_message_router_task = asyncio.Task(self.internal_message_router())
             routine_task = asyncio.Task(self.routine())
 
-            await asyncio.gather(msg_handler_task, routine_task)
+            await asyncio.gather(internal_message_router_task, routine_task)
 
         except asyncio.CancelledError:
-            msg_handler_task.cancel()
-            await msg_handler_task
+            internal_message_router_task.cancel()
+            await internal_message_router_task
 
             routine_task.cancel()
             await routine_task
 
             return
 
-    async def message_handler(self):
+    async def handle_message(self, msg):
+        """
+        Handles message intended for this module.
+        """
         try:
-            while True:
-                # wait for any incoming messages
-                await asyncio.sleep(1)                
-                _ = await self.inbox.get()
-
-                # hangle request
+            if msg['@type'] == 'PRINT':
+                content = msg['content']
+                print(content)                
         except asyncio.CancelledError:
             return
 
     async def routine(self):
         try:
+            print('Starting periodic print routine...')
             while True:
                 msg = dict()
                 msg['src'] = self.name
@@ -141,16 +157,6 @@ class SubModule:
             print('Periodic print routine cancelled')
             return
 
-    async def put_message(self, msg):
-        await self.inbox.put(msg)
-
-"""
---------------------
---------------------
-  TESTING MODULES
---------------------
---------------------
-"""
 class TestModule(Module):
     def __init__(self, parent_agent) -> None:
         submodules = [SubModule('sub_test', self)]
