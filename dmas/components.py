@@ -64,10 +64,16 @@ class Component:
         :return:
         """
         self.status = False
+    
+    def enter_eclipse(self):
+        pass
+
+    def eclipse_eclipse(self):
+        pass
 
 class OnBoardComputer(Component):
     def __init__(self, power, data_capacity):
-        super().__init__('onboard_computer', power, 0, 0, 0, 0, data_capacity, True)
+        super().__init__('onboard_computer', -power, 0, 0, 0, 0, data_capacity, True)
 
     async def allocate_to_memory(self, data_size):
         await self.data_storage.put(data_size)
@@ -77,7 +83,7 @@ class OnBoardComputer(Component):
 
 class Transceiver(Component):
     def __init__(self, power, data_rate, buffer_capacity):
-        super().__init__('transceiver', power, 0, 0, data_rate, buffer_capacity, True)
+        super().__init__('transceiver', -power, 0, 0, data_rate, buffer_capacity, True)
 
     async def allocate_to_buffer(self, data_size):
         await self.data_storage.put(data_size)

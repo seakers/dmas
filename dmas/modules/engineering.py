@@ -24,9 +24,9 @@ class EngineeringModule(Module):
     def __init__(self, parent_agent, component_list: list, 
                     agent_comms_socket_in, agent_comms_socket_out, 
                     environment_broadcast_socket, environment_request_socket, environment_request_lock) -> None:
-        network_simulator = NetworkSimulator(self, parent_agent)
-        platform_simulator = PlatformSimulator(self, component_list)
-        operations_planner = OperationsPlanner()
+        # network_simulator = NetworkSimulator(self, parent_agent)
+        platform_simulator = PlatformSimulator(self, component_list, environment_broadcast_socket)
+        # operations_planner = OperationsPlanner()
 
         submodules = []
         super().__init__('engineering_mod', parent_agent, submodules)
@@ -36,9 +36,13 @@ class EngineeringModule(Module):
 Platform Simulator
 --------------------
 """
-class PlatformSimulator(SubModule):
+class PlatformSimulator(Module):
+    """
+    Simulates and keeps track of the state of the agent.
+
+    """
     def __init__(self, parent_module: Module, component_list) -> None:
-        super().__init__('plaform_simulator', parent_module)
+        super().__init__('plaform_simulator', parent_module, submodules=[])
         
     async def activate(self):
         await super().activate()
@@ -215,3 +219,39 @@ class NetworkSimulator(SubModule):
 
     async def create_routing_plan(self, src_name, dst_name, t_curr):
         pass
+
+    # class CommunicationsModule(Module):
+#     def __init__(self, parent_agent: AbstractAgent, results_dir, environment_broadcast_socket) -> None:
+#         super().__init__('comms_module', parent_agent, results_dir, submodules=[])
+    
+#     async def message_handler(self):
+#         while True:
+#             socks = dict(self.poller.poll())                
+
+#             if self.environment_broadcast_socket in socks:
+                # msg_string = self.environment_broadcast_socket.recv_json()
+                # msg_dict = json.loads(msg_string)
+
+                # src = msg_dict['src']
+                # dst = msg_dict['dst']
+                # msg_type = msg_dict['@type']
+                # t_server = msg_dict['server_clock']
+
+                # # self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+
+                # if msg_type == 'END':
+                #     self.state_logger.info(f'Sim has ended.')
+                    
+                #     # send a reception confirmation
+                #     # self.request_logger.info('Connection to environment established!')
+                #     self.environment_request_socket.send_string(self.name)
+                #     # self.request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+
+                #     # wait for server reply
+                #     self.environment_request_socket.recv() 
+                #     # self.request_logger.info('Response received! terminating agent.')
+                #     return
+
+                # elif msg_type == 'tic':
+                #     # self.message_logger.info(f'Updating internal clock.')
+                #     _ = 1

@@ -245,8 +245,9 @@ class Environment:
         msg_dict = dict()
         msg_dict['src'] = self.name
         msg_dict['dst'] = 'ALL'
-        msg_dict['@type'] = 'AGENT_TO_PORT_MAP'
+        msg_dict['@type'] = 'START'
         msg_dict['content'] = subscriber_to_port_map
+        msg_dict['server_clock'] = time.perf_counter()
 
         msg_json = json.dumps(msg_dict)
         self.publisher.send_json(msg_json)

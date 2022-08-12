@@ -10,7 +10,7 @@ import zmq
 import zmq.asyncio
 import logging
 
-from modules.modules import TestModule
+from modules.modules import Module, TestModule
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -23,8 +23,13 @@ def get_next_available_port():
         port += 1
     return port
 
-class AbstractAgent:
+class AbstractAgent(Module):
+    # def __init__(self, name, scenario_dir, simla) -> None:
+    #     super().__init__(name, parent_module, submodules)
+
     def __init__(self, name, scenario_dir, simulation_frequency, modules=[]) -> None:
+        super().__init__(name, None, modules)
+
         # constants
         self.name = name
         self.SIMULATION_FREQUENCY = simulation_frequency
@@ -52,7 +57,7 @@ class AbstractAgent:
 
         self.state_logger.info('Agent Initialized!')
 
-    def main(self):
+    def run(self):
         """
         MAIN FUNCTION 
         executes event loop for ayncronous processes within the agent
@@ -85,14 +90,38 @@ class AbstractAgent:
         await self.sync_environment()
         self.request_logger.debug(f'Synchronization response received! Environment synchronized at time {self.START_TIME}!')
 
+        # await for start-simulation message from environment
+        await self.wait_sim_start()
+        await super().activate()
         self.state_logger.info('Agent activated!')
 
     async def live(self):        
         """
-        Performs simulation actions 
-        """
+        Performs simulation actions.
+
+        Runs every module owned by the agent. Stops when one of the modules goes off-line, completes its run() routines, 
+        or the environment sends a simulation end broadcast.
+        """  
+        # begin simulation
         self.state_logger.info(f"Starting simulation...")
-        await self.execute_modules()
+
+        # activate all modules
+        for module in self.modules:
+            await module.activate()
+
+        subroutines = []
+        subroutines = [module.run() for module in self.modules]
+        subroutines.append(self.internal_message_handler())
+        subroutines.append(self.listen_for_simulation_end())
+
+        # await for a module to go off-line, finish its routine, or receive a simulatio end message
+        _, pending = await asyncio.wait(subroutines, return_when=asyncio.FIRST_COMPLETED)
+
+        print('Off-line, terminating all modules...')
+        for routine in pending:
+            routine.cancel()
+            await routine
+        print('modules cancelled.')
 
     async def shut_down(self):
         """
@@ -101,9 +130,6 @@ class AbstractAgent:
         self.state_logger.info(f"Shutting down...")
         print('Shutting down...')
 
-        # close network ports  
-        # self.environment_broadcast_socket.close()
-        # self.environment_request_socket.close()
         self.context.destroy()
 
         self.state_logger.info('...Good Night!')
@@ -115,76 +141,9 @@ class AbstractAgent:
     CO-ROUTINES AND TASKS
     --------------------
     """
-    async def put_message(self, msg):
-        await self.inbox.put(msg)
-
-    async def execute_modules(self):       
-        self.inbox = asyncio.Queue()
-
-        for module in self.modules:
-            await module.activate()
-
-        subroutines = []
-        subroutines = [module.run() for module in self.modules]
-        subroutines.append(self.internal_message_handler())
-        subroutines.append(self.external_message_handler())
-
-        _, pending = await asyncio.wait(subroutines, return_when=asyncio.FIRST_COMPLETED)
-
-        print('cancelling all other routines...')
-        for routine in pending:
-            routine.cancel()
-            await routine
-        print('all routines cancelled.')
-        return
-
-    async def internal_message_handler(self):
+    async def listen_for_simulation_end(self):
         """
-        Listens for internal messages being sent between modules and routes them to their respective destinations.
-        """
-        try:
-            while True:
-                # wait for any incoming requests
-                msg = await self.inbox.get()
-
-                # hangle request
-                dst_name = msg['dst']
-
-                if dst_name == self.name:
-                    if msg['@type'] == 'PRINT':
-                        content = msg['content']
-                        print(content)
-                else:
-                    dst = None
-                    
-                    # search for destination to forward message to
-                    for module in self.modules:
-                        # check for module that matches first
-                        if module.name == dst_name:
-                            dst = module
-                            break
-
-                        else:
-                            # if the module does not match, check its submodules if it has any
-                            for submodule in module.submodules:
-                                if submodule.name == dst_name:
-                                    dst = module
-                                    break
-                        
-                        # if destination was found, exit search
-                        if module is not None:
-                            break                
-                    
-                    # if destiantion module or submodule is found, send message. if not, then ignore message
-                    if dst is not None:
-                        await dst.put_message(msg)
-                        
-        except asyncio.CancelledError:
-            return
-
-    async def external_message_handler(self):
-        """
-        Listens for broadcasts from the environment. Stops processes when simulation end-command is reached.
+        Listens for broadcasts from the environment. Stops processes when simulation end-command is received.
         """
         try:
             self.state_logger.debug('Awaiting simulation termination...')
@@ -198,7 +157,6 @@ class AbstractAgent:
                 t_server = msg_dict['server_clock']
 
                 self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-                # self.state_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
                 if msg_type == 'END':
                     self.state_logger.info(f'Sim has ended.')
@@ -245,11 +203,13 @@ class AbstractAgent:
         # give environment time to set up
         time.sleep(random.random())
 
+        # create agent communication sockets
         self.agent_socket_in = self.context.socket(zmq.REP)
         self.agent_port_in = get_next_available_port()
         self.agent_socket_in.bind(f"tcp://*:{self.agent_port_in}")
 
         self.agent_socket_out = self.context.socket(zmq.REQ)
+
         # create poller to be used for parsing through incoming message
         # self.poller = zmq.asyncio.Poller()
         # self.poller.register(self.environment_request_socket, zmq.POLLIN)
@@ -281,6 +241,7 @@ class AbstractAgent:
         self.START_TIME = time.perf_counter()
         self.sim_time = 0
 
+    async def wait_sim_start(self):
         # await list of other agent's port numbers
         port_map_msg = await self.environment_broadcast_socket.recv_json()
         port_map_dict = json.loads(port_map_msg)
@@ -365,6 +326,6 @@ if __name__ == '__main__':
     
     agent = AbstractAgent("AGENT0", scenario_dir, 1)
     
-    agent_prcs = Process(target=agent.main)    
+    agent_prcs = Process(target=agent.run)    
     agent_prcs.start()
     agent_prcs.join
