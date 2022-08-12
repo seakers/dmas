@@ -315,6 +315,10 @@ class AbstractAgent(Module):
     def get_current_real_time(self):
         return (time.perf_counter() - self.START_TIME)
 
+class AgentState:
+    def __init__(self, agent: AbstractAgent, component_list) -> None:
+        pass
+
 """
 --------------------
 MAIN

@@ -1,3 +1,4 @@
+from dmas.agent import AbstractAgent
 from dmas.modules.modules import Module, SubModule
 import asyncio
 
@@ -41,8 +42,14 @@ class PlatformSimulator(Module):
     Simulates and keeps track of the state of the agent.
 
     """
-    def __init__(self, parent_module: Module, component_list) -> None:
+    def __init__(self, parent_module: Module, component_list, environment_request_socket, environment_request_lock) -> None:
         super().__init__('plaform_simulator', parent_module, submodules=[])
+        self.parent_agent = self.parent_module.parent_module
+        self.environment_request_socket = environment_request_socket
+        self.environment_request_lock = environment_request_lock
+        self.component_list = []
+        for component in component_list:
+            self.component_list.append(component)
         
     async def activate(self):
         await super().activate()
@@ -50,7 +57,7 @@ class PlatformSimulator(Module):
         self.update_state()
         return 
 
-    async def message_handler(self):
+    async def internal_message_handler(self):
         """
         Reads messages from other modules. Only accepts the following message types:
             -STATE_UPDATE_REQUEST: integrates state up to current simulation time. Returns state to sender
@@ -58,30 +65,20 @@ class PlatformSimulator(Module):
         """
         try:
             while True:
-                # wait for any incoming transmission requests
+                # wait for any incoming messages
                 msg = await self.inbox.get()
+                dst_name = msg['dst']
 
-                # hangle request
-                if msg['dst'] == self.name:
-                    msg_type = msg['@type']
-                    if msg_type == 'STATE_UPDATE_REQUEST':
-                        pass
-
+                if dst_name != self.name:
+                    await self.internal_message_router(msg)
                 else:
-                    # if request is not intended for this submodule, forward to parent module
-                    await self.parent_module.put_message(msg)    
-                    pass
-                    
+                    if msg['@type'] == 'PRINT':
+                        content = msg['content']
+                        print(content)    
 
         except asyncio.CancelledError:
             return
     
-    async def periodic_state_update(self):
-
-        while True:
-            self.update_state()
-            await asyncio.sleep(self.parent_module.parent_agent.SIMULATION_FREQUENCY)
-
     async def wait_for_critical_state(self):
         """
         Sends current state to Predictive model submodule and waits for estimate for the next projected critical state. 
@@ -89,11 +86,20 @@ class PlatformSimulator(Module):
         """
         pass
 
+    async def periodic_state_update(self):
+
+        while True:
+            self.update_state()
+            await asyncio.sleep(self.parent_agent.SIMULATION_FREQUENCY)
+
     async def wait_for_environment_event(self):
         pass
 
     def is_critical(self):
         return False
+
+    def update_state():
+        pass
 """
 --------------------
 Network Simulator
@@ -106,7 +112,7 @@ class NetworkSimulator(SubModule):
         self.agent_comms_socket_out = agent_comms_socket_out
         self.environment_request_socket = environment_request_socket
 
-    async def message_handler(self):
+    async def internal_message_handler(self):
         """
         Reads messages from other modules. Only accepts transmission request messages with contents meant to be sent to other agents. 
         All other messages are ignored.
