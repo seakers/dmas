@@ -53,7 +53,12 @@ class PlatformSimulator(Module):
         
     async def activate(self):
         await super().activate()
+        
+        # initiate events in async event loop
         self.updated = asyncio.Event()
+        self.nominal = asyncio.Event()
+
+        # update agent state
         self.update_state()
         return 
 
@@ -99,7 +104,11 @@ class PlatformSimulator(Module):
         return False
 
     def update_state():
+        
         pass
+
+# class OperationsPlanner:
+#     def
 """
 --------------------
 Network Simulator
