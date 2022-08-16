@@ -1,9 +1,22 @@
 import asyncio
+from enum import Enum, IntEnum
+import random
 import numpy
 
+class SimClocks(Enum):
+    # asynchronized clocks
+    # -Each node in the network carries their own clocks to base their waits with
+    REAL_TIME = 'REAL_TIME'             # runs simulations in real-time. 
+    REAL_TIME_FAST = 'REAL_TIME_FAST'   # runs simulations in spead up real-time. Each real time second represents a user-given amount of simulation seconds
+
+    # synchronized clocks
+    # -Each node requests to be notified by the server when a particular time is reached, which they use to base their waits
+    SERVER_TIME = 'SERVER_TIC'          # server sends tics in real-time
+    SERVER_TIME_FAST = 'SERVER_TIC'     # server sends tics in spead up real-time
+    SERVER_STEP = 'SERVER_STEP'         # server waits until all agents have submitted a tic request and fast-forwards to that time
 
 class Container:
-    def __init__(self, level=0, capacity=numpy.Infinity):
+    def __init__(self, level: float =0, capacity: float =numpy.Infinity):
         if level > capacity:
             raise Exception('Initial level must be lower than maximum capacity.')
 
@@ -11,8 +24,15 @@ class Container:
         self.capacity = capacity
         self.updated = None
 
-    def activate(self):
         self.updated = asyncio.Event()
+        self.lock = asyncio.Lock()
+
+    async def set_level(self, value):
+        self.level = 0
+        await self.put(value)
+
+    async def empty(self):
+        self.set_level(0)
 
     async def put(self, value):
         if self.updated is None:
@@ -21,11 +41,15 @@ class Container:
         def accept():
             return self.level + value <= self.capacity
 
+        await self.lock.acquire()
+
         if accept():
             self.level += value
             self.updated.set()
+            self.lock.release()
             print(f'Container state: {self.level}/{self.capacity}')
         else:
+            self.lock.release()
             self.updated.clear()
             await self.updated.wait()
             await self.put(value)
@@ -92,3 +116,33 @@ class Container:
             return self.level >= val
         
         await self.when_cond(accept)
+
+async def f1(container: Container):
+    print('tast1 starting...')
+    await container.put(1)
+    await asyncio.sleep(1)
+    await container.get(1)
+
+async def f2(container: Container):
+    print('tast2 starting...')
+    # await asyncio.sleep(0.5)
+    await container.put(1)
+
+async def f3(container: Container):
+    for _ in range(100):
+        await container.put(1)
+        await asyncio.sleep(random.random()/10)
+        await container.get(1)
+
+async def col():
+    container = Container(0, 100)
+
+    # t1 = asyncio.create_task(f1(container))
+    # t2 = asyncio.create_task(f2(container))
+    t1 = asyncio.create_task(f3(container))
+    t2 = asyncio.create_task(f3(container))
+    
+    await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
+
+if __name__ == '__main__':
+    asyncio.run(col())

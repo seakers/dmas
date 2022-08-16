@@ -2,7 +2,10 @@ import asyncio
 import json
 import logging
 from multiprocessing import parent_process
+import re
 import time
+
+from utils import Container, SimClocks
 """
 MODULE
 """
@@ -17,24 +20,14 @@ class Module:
         self.inbox = None       
         self.submodules = submodules
 
-        self.START_TIME = -1                # simulation start time in real-time seconds
-        self.sim_time = -1                  # current simulation time in simulation time-steps
+        self.START_TIME = -1                # Simulation start time in real-time seconds
+        self.sim_time = None                # Current simulation time
+        self.CLOCK_TYPE = None              # Clock type being used in this simulation
         self.SIMULATION_FREQUENCY = 0       # [times-steps/real second]
+
+        self.NUMBER_OF_TIMED_COROUTINES = 0 # number of coroutines to be executed by this module
         
         self.actions_logger = None
-
-    async def activate(self):
-        """
-        Initiates any thread sensitive or envent-loop sensitive variables
-        """
-        if self.parent_module is not None:
-            self.START_TIME = self.parent_module.START_TIME
-            self.SIMULATION_FREQUENCY = self.parent_module.SIMULATION_FREQUENCY
-
-        self.inbox = asyncio.Queue()   
-        for submodule in self.submodules:
-            await submodule.activate()
-        self.log('Activated!', level=logging.INFO)
 
     async def run(self):
         """
@@ -51,7 +44,7 @@ class Module:
                 task.set_name (f'{self.name}_run')
                 coroutines.append(task)
 
-            routine_task = asyncio.create_task(self.routine())
+            routine_task = asyncio.create_task(self.coroutines())
             routine_task.set_name (f'{self.name}_routine')
             coroutines.append(routine_task)
             
@@ -130,7 +123,29 @@ class Module:
     """
     FUNCTIONS TO IMPLEMENT:
     """
+    async def activate(self):
+        """
+        Initiates any thread-sensitive or envent-loop sensitive variables
+        """
+        if self.parent_module is not None:
+            self.START_TIME = self.parent_module.START_TIME
+            self.SIMULATION_FREQUENCY = self.parent_module.SIMULATION_FREQUENCY
+            self.CLOCK_TYPE = self.parent_module.CLOCK_TYPE
+
+        if self.NUMBER_OF_TIMED_COROUTINES < 0:
+            raise Exception('module needs to specify how many routines are being performed.')
+
+        self.inbox = asyncio.Queue()   
+        for submodule in self.submodules:
+            await submodule.activate()
+            self.NUMBER_OF_TIMED_COROUTINES += submodule.NUMBER_OF_TIMED_COROUTINES
+        
+        self.log('Activated!', level=logging.INFO)
+
     async def shut_down(self):
+        """
+        Cleanup subroutine that should be used to terminate any thread-sensitive or envent-loop sensitive variables
+        """
         self.log(f'Terminated.', level=logging.INFO)
 
     async def internal_message_handler(self, msg):
@@ -148,13 +163,13 @@ class Module:
         except asyncio.CancelledError:
             return
 
-    async def routine(self):
+    async def coroutines(self):
         """
         Generic routine to be performed by module. May be modified to perform other coroutines.
         """
         try:
             while True:
-                await asyncio.sleep(1000)     
+                await self.sim_wait(1000)     
         except asyncio.CancelledError:
             return
     
@@ -185,12 +200,18 @@ class Module:
 
     def get_current_time(self):
         if self.parent_module is None:
-            if self.START_TIME < 0:
-                self.sim_time = 0
+            if self.sim_time is None:
+                return 0
+
+            if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+                if self.START_TIME >= 0:
+                    self.sim_time = (time.perf_counter() - self.START_TIME) * self.SIMULATION_FREQUENCY
+                
+                return self.sim_time
+            elif self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+                return self.sim_time.level
             else:
-                self.sim_time = (time.perf_counter() - self.START_TIME) * self.SIMULATION_FREQUENCY
-            
-            return self.sim_time
+                raise Exception(f'Clock of type {self.CLOCK_TYPE.value} not yet supported')
         else:
             self.parent_module.get_current_time()
 
@@ -198,7 +219,16 @@ class Module:
         return (time.perf_counter() - self.START_TIME)
 
     async def sim_wait(self, delay):
-        await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
+        if self.parent_module is None:
+            if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+                await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
+            else:
+                t_end = self.sim_time.level + delay
+                await self.sim_time.when_geq_than(t_end)
+        else:
+            await self.parent_module.sim_wait(delay)
+
+        
 
     def log(self, content, level=logging.DEBUG, module_name=None):
         if module_name is None:
@@ -230,8 +260,9 @@ class Module:
 class SubModule(Module):
     def __init__(self, name, parent_module) -> None:
         super().__init__(name, parent_module, submodules=[])
+        self.NUMBER_OF_TIMED_COROUTINES = 1
 
-    async def routine(self):
+    async def coroutines(self):
         try:
             self.log('Starting periodic print routine...')
             while True:
@@ -250,5 +281,5 @@ class SubModule(Module):
 
 class TestModule(Module):
     def __init__(self, parent_agent) -> None:
-        submodules = [SubModule('sub_test', self)]
-        super().__init__('test', parent_agent, submodules)
+        super().__init__('test', parent_agent, [SubModule('sub_test', self)])
+        self.NUMBER_OF_TIMED_COROUTINES = 1

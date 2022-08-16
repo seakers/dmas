@@ -1,4 +1,4 @@
-from dmas.agent import AbstractAgent
+from dmas.agent import AgentNode
 from dmas.modules.modules import Module, SubModule
 import asyncio
 
@@ -104,7 +104,7 @@ class PlatformSimulator(Module):
         return False
 
     def update_state():
-        
+
         pass
 
 # class OperationsPlanner:
@@ -172,7 +172,7 @@ class NetworkSimulator(SubModule):
         except asyncio.CancelledError:
             return
 
-    async def routine(self):
+    async def coroutines(self):
         """
         In charge of listening to transmission port for any requests 
         1-await reception request

@@ -3,157 +3,207 @@ import os
 import asyncio
 import json
 import logging
-from multiprocessing import Process
-import threading
 import time
-import zmq
 import zmq.asyncio
+from utils import Container, SimClocks
+
+from modules.modules import Module
 
 def is_port_in_use(port: int) -> bool:
     import socket
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
-class Environment:
-    def __init__(self, name, scenario_dir, agent_name_list: list, simulation_frequency, duration) -> None:
+class EnvironmentServer(Module):
+    def __init__(self, name,scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
+        super().__init__(name, None, [])
         # Constants
         self.name = name                                                # Environment Name
-        self.SIMULATION_FREQUENCY = simulation_frequency                # Ratio of simulation-time to real-time
-        self.DURATION = duration                                        # Duration of simulation in simulation-time
-        self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
+        self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
+        self.NUMBER_OF_TIMED_COROUTINES = 0                             # Number of timed co-routines to be performed by the server
+        self.NUMBER_OF_TIMED_COROUTINES_AGENTS = 0                      # Number of timed co-routines to be performed by other agents
+
         for agent_name in agent_name_list:
             self.AGENT_NAME_LIST.append(agent_name)
+
+        # simulation clock constants
+        self.CLOCK_TYPE = clock_type                                    # Clock type being used in this simulation
+        self.DURATION = duration                                        # Duration of simulation in simulation-time
+        if self.SIMULATION_FREQUENCY < 0 and self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+            raise Exception('Simulation frequency needed to initiate simulation with a REAL_TIME_FAST clock.')
+        if self.CLOCK_TYPE == SimClocks.REAL_TIME:
+            self.SIMULATION_FREQUENCY = 1
+        elif self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+            self.SIMULATION_FREQUENCY = simulation_frequency            # Ratio of simulation-time seconds to real-time seconds
+        elif self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+            pass
+        else:
+            raise Exception(f'Simulation clock of type {clock_type.value} not yet supported')
         
         # set up results dir
         self.SCENARIO_RESULTS_DIR, self.ENVIRONMENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
 
         # set up loggers
-        [self.message_logger, self.request_logger, self.state_logger] = self.set_up_loggers()
+        [self.message_logger, self.request_logger, self.state_logger, self.actions_logger] = self.set_up_loggers()
         
-        self.state_logger.info('Environment Initialized!')
+        print('Environment Initialized!')
 
-    def main(self):
+    async def live(self):
         """
         MAIN FUNCTION 
+        executes event loop for ayncronous processes within the environment
         """
         # Activate 
-        self.activate()
+        await self.activate()
 
         # Run simulation
-        self.live()
+        await self.run()
 
-        # Turn off
-        self.shut_down()
-
-    def activate(self):
+    async def activate(self):
         """
         Initiates and executes commands that are thread-sensitive but that must be performed before the simulation starts.
         """
-        self.state_logger.info('Starting activation routine...')
+        self.log('Starting activation routine...', level=logging.INFO)
         
         # activate network ports
-        self.state_logger.info('Configuring network ports...')
-        self.network_config()
-        self.state_logger.info('Network configuration completed!')
+        self.log('Configuring network ports...', level=logging.INFO)
+        await self.network_config()
+        self.log('Network configuration completed!', level=logging.INFO)
 
         # Wait for agents to initialize their own network ports
-        self.state_logger.info(f"Waiting for {self.NUMBER_AGENTS} to initiate...")
-        self.sync_agents()
-        self.state_logger.info(f"All subscribers initalized! Starting simulation...")
+        self.log(f"Waiting for {self.NUMBER_AGENTS} to initiate...", level=logging.INFO)
+        subscriber_to_port_map =await self.sync_agents()
 
-        self.state_logger.info('Environment Activated!')
+        self.log(f"All subscribers initalized! Starting simulation...", level=logging.INFO)
+        await self.broadcast_sim_start(subscriber_to_port_map)
 
-    def live(self):
-        """
-        Performs simulation actions 
-        """
-        self.state_logger.info(f"Starting simulation...")
-        print('Starting simulation!')
-        asyncio.run(self.excute_coroutines())
-        
-    def shut_down(self):
+        self.log(f'Activating environment submodules...')
+        await super().activate()
+        self.log('Environment Activated!', level=logging.INFO)
+    
+    async def coroutines(self):
+        sim_end_timer = asyncio.create_task(self.sim_wait(self.DURATION))
+        agent_req_handler = asyncio.create_task(self.agent_request_handler())
+        tic_request_handler = asyncio.create_task(self.tic_request_handler())
+        ticker = asyncio.create_task(self.tic_broadcast())
+
+        await sim_end_timer
+        ticker.cancel()
+        agent_req_handler.cancel()
+        tic_request_handler.cancel()
+        await ticker
+        await agent_req_handler
+        await tic_request_handler
+        self.log(f"Simulation time completed!", level=logging.INFO)
+
+    async def shut_down(self):
         """
         Terminate processes 
         """
-        self.state_logger.info(f"Shutting down...")
+        self.log(f"Shutting down...", level=logging.INFO)
 
         # broadcast simulation end
-        self.broadcast_end()
+        await self.broadcast_end()
 
         # close network ports     
         self.publisher.close()
         self.reqservice.close()
         self.context.term()
-        self.state_logger.info(f"Network ports closed.")
+        self.log(f"Network sockets closed.", level=logging.INFO)
         
-        self.state_logger.info(f"Good night!")
-        print('Simulation done, good night!')
+        self.log(f"Simulation done, good night!", level=logging.INFO)
 
     """
     --------------------
     CO-ROUTINES AND TASKS
     --------------------
     """
-    async def excute_coroutines(self):
-        # await asyncio.gather( 
-        #     self.sim_wait(self.DURATION)
-        # )
-        t1 = asyncio.create_task(self.sim_wait(self.DURATION))
-        t2 = asyncio.create_task(self.tic_broadcast())
 
-        await t1
-        t2.cancel()
-        await t2
-        self.state_logger.info(f"Simulation time completed!")
+    async def agent_request_handler(self):
+        try:
+            while True:
+                msg_str = await self.reqservice.recv_json() 
+                msg_dict = json.loads(msg_str)
 
-    async def sim_wait(self, delay):
-        """
-        Sleeps for a given amout of time
-        delay: simulation time to be waited
-        """
-        await asyncio.sleep(delay/self.SIMULATION_FREQUENCY)
+                msg_type = msg_dict.get('@type', None)
+                await self.reqservice.send_string('')
+
+                if msg_type == 'TIC_REQUEST':
+                    t_req = msg_dict.get('t')
+                    self.log(f'Received tic request for t_req={t_req}')
+                    await self.tic_request_queue.put(t_req)
+                else:
+                    # dump message
+                    continue
+        except asyncio.CancelledError:
+            return
+
+    async def tic_request_handler(self):
+        try:
+            while True:
+                tic_req = float(await self.tic_request_queue.get())
+                self.tic_request_queue_sorted.append(tic_req)
+
+                self.log(f'Tic request queue: {len(self.tic_request_queue_sorted)} / {self.NUMBER_OF_TIMED_COROUTINES_AGENTS}')
+                if len(self.tic_request_queue_sorted) == self.NUMBER_OF_TIMED_COROUTINES_AGENTS:
+                    self.log('Sorting tic requests...')
+                    print(self.tic_request_queue_sorted)
+                    self.tic_request_queue_sorted.sort()
+                    self.log(f'Tic requests sorted: {self.tic_request_queue_sorted}')
+
+                    t_next = self.tic_request_queue_sorted.pop(0)
+
+                    await self.sim_time.set_level(t_next)
+
+                    if self.CLOCK_TYPE == SimClocks.SERVER_STEP:                    
+                        msg_dict = dict()
+                        msg_dict['src'] = self.name
+                        msg_dict['dst'] = 'all'
+                        msg_dict['@type'] = 'tic'
+                        msg_dict['server_clock'] = t_next
+                        msg_json = json.dumps(msg_dict) 
+
+                        t = msg_dict['server_clock']
+                        self.message_logger.debug(f'Broadcasting server tic at t={t}')
+                        self.state_logger.debug(f'Broadcasting server tic at t={t}')
+
+                        await self.publisher.send_json(msg_json)
+
+        except asyncio.CancelledError:
+            return
 
     async def tic_broadcast(self):
         try:
             while True:
-                msg_dict = dict()
-                msg_dict['src'] = self.name
-                msg_dict['dst'] = 'all'
-                msg_dict['@type'] = 'tic'
-                msg_dict['server_clock'] = time.perf_counter()
-                msg_json = json.dumps(msg_dict)
-
-                t = msg_dict['server_clock']
-                self.message_logger.debug(f'Broadcasting server tic at t={t}')
-                self.state_logger.debug(f'Broadcasting server tic at t={t}')
-
-                self.publisher.send_json(msg_json)
-
-                await self.sim_wait(1)
+                # TODO: Create different cases for each different synchronous clock types
+                if self.CLOCK_TYPE == SimClocks.SERVER_TIME or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST:
+                    pass
+                else:
+                    await self.sim_wait(10000000)
         except asyncio.CancelledError:
             return
 
-    def broadcast_end(self):
+    async def broadcast_end(self):
         # broadcast simulation end to all subscribers
         msg_dict = dict()
         msg_dict['src'] = self.name
         msg_dict['dst'] = 'all'
         msg_dict['@type'] = 'END'
-        msg_dict['server_clock'] = time.perf_counter()
+        msg_dict['server_clock'] = time.perf_counter() - self.START_TIME
         kill_msg = json.dumps(msg_dict)
 
         t = msg_dict['server_clock']
-        self.message_logger.debug(f'Broadcasting simulation end at t={t}')
-        # self.state_logger.debug(f'Broadcasting simulation end at t={t}')
-        self.publisher.send_json(kill_msg)
+        self.message_logger.debug(f'Broadcasting simulation end at t={t}[s]')
+        self.log(f'Broadcasting simulation end at t={t}[s]')
+        await self.publisher.send_json(kill_msg)
 
         # wait for their confirmation
         subscribers = []
         n_subscribers = 0
         while n_subscribers < self.NUMBER_AGENTS:
             # wait for synchronization request
-            msg = self.reqservice.recv_string() # TODO: Change to recv_json() and check if message received is a sync request, else reject or raise an exception
+            msg = await self.reqservice.recv_string() 
             self.request_logger.info(f'Received simulation end confirmation from {msg}!')
 
             # send synchronization reply
@@ -172,7 +222,7 @@ class Environment:
     HELPING FUNCTIONS
     --------------------    
     """
-    def network_config(self):
+    async def network_config(self):
         """
         Creates communication ports and binds to them
 
@@ -180,15 +230,14 @@ class Environment:
         reqservice: port in charge of receiving and answering requests from agents. These request can be sync requests or 
         """
         # Activate network ports
-        self.context = zmq.Context()
-        # self.context = zmq.asyncio.Context()              
+        self.context = zmq.asyncio.Context()
     
         ## assign ports to sockets
         self.environment_port_number = '5561'
         if is_port_in_use(int(self.environment_port_number)):
             raise Exception(f"{self.environment_port_number} port already in use")
         
-        self.publisher = self.context.socket(zmq.PUB)                   # Socket to send information to agents
+        self.publisher = self.context.socket(zmq.PUB)                   # Socket to broadcast information to agents
         self.publisher.sndhwm = 1100000                                 ## set SNDHWM, so we don't drop messages for slow subscribers
         self.publisher.bind(f"tcp://*:{self.environment_port_number}")
 
@@ -199,7 +248,7 @@ class Environment:
         self.reqservice = self.context.socket(zmq.REP)                 # Socket to receive synchronization and measurement requests from agents
         self.reqservice.bind(f"tcp://*:{self.request_port_number}")
 
-    def sync_agents(self):
+    async def sync_agents(self):
         """
         Awaits for all other agents to undergo their initialization routines and become online. Once they become online, 
         they will reach out to the environment through the 'reqservice' channel and subscribe to future broadcasts from the environment.
@@ -214,43 +263,56 @@ class Environment:
         n_subscribers = 0
         while n_subscribers < self.NUMBER_AGENTS:
             # wait for synchronization request
-            msg_str = self.reqservice.recv_json() 
+            msg_str = await self.reqservice.recv_json() 
             msg = json.loads(msg_str)
-            if msg['@type'] != 'SYNC_REQUEST' or msg.get('content') is None:
+            if msg['@type'] != 'SYNC_REQUEST' or msg.get('port') is None:
                 continue
             
             msg_src = msg.get('src', None)
-            src_port = msg.get('content').get('port')
+            src_port = msg.get('port')
+            self.NUMBER_OF_TIMED_COROUTINES_AGENTS += msg.get('n_coroutines')
 
-            self.request_logger.info(f'Received sync request from {msg_src}! Checking if already synchronized...')            
+            self.log(f'Received sync request from {msg_src}! Checking if already synchronized...', level=logging.INFO) 
 
             # log subscriber confirmation
             for agent_name in self.AGENT_NAME_LIST:
-                print(agent_name in msg_src)
-                print(agent_name not in subscribers)
                 if (agent_name in msg_src) and (agent_name not in subscribers):
                     subscribers.append(agent_name)
                     n_subscribers += 1
-                    self.state_logger.info(f"{agent_name} is now synchronized to environment ({n_subscribers}/{self.NUMBER_AGENTS}).")
-                    print(f"{agent_name} is now synchronized to environment ({n_subscribers}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} is now synchronized to environment ({n_subscribers}/{self.NUMBER_AGENTS}).")
                     
-                    # send synchronization reply
-                    self.reqservice.send_string('')
-
                     subscriber_to_port_map[msg_src] = src_port
                     break
-            
-        
-        # boradcast agent-to-port map
+            # send synchronization reply
+            await self.reqservice.send_string('')
+        return subscriber_to_port_map
+                    
+    async def broadcast_sim_start(self, subscriber_to_port_map):
+        # boradcast simulation start with agent-to-port map
         msg_dict = dict()
         msg_dict['src'] = self.name
         msg_dict['dst'] = 'ALL'
         msg_dict['@type'] = 'START'
-        msg_dict['content'] = subscriber_to_port_map
-        msg_dict['server_clock'] = time.perf_counter()
+        msg_dict['port_map'] = subscriber_to_port_map
+        
+        clock_info = dict()
+        clock_info['@type'] = self.CLOCK_TYPE.value
+        if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+            clock_info['frequency'] = self.SIMULATION_FREQUENCY
+            self.sim_time = 0
+        else:
+            self.sim_time = Container()
+        msg_dict['clock_info'] = clock_info
 
         msg_json = json.dumps(msg_dict)
-        self.publisher.send_json(msg_json)
+        await self.publisher.send_json(msg_json)
+
+        # log simulation start time
+        self.START_TIME = time.perf_counter()
+
+        # initiate tic request queue
+        self.tic_request_queue = asyncio.Queue()
+        self.tic_request_queue_sorted = []
 
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
@@ -275,7 +337,7 @@ class Environment:
         logging.root.setLevel(logging.NOTSET)
         logging.basicConfig(level=logging.NOTSET)
 
-        logger_names = ['messages', 'requests', 'state']
+        logger_names = ['messages', 'requests', 'state', 'actions']
 
         loggers = []
         for logger_name in logger_names:
@@ -291,16 +353,13 @@ class Environment:
 
             # create handlers
             c_handler = logging.StreamHandler()
-            c_handler.setLevel(logging.INFO)
+            if logger_name == 'actions':
+                c_handler.setLevel(logging.DEBUG)
+            else:
+                c_handler.setLevel(logging.WARNING)
 
             f_handler = logging.FileHandler(path)
             f_handler.setLevel(logging.DEBUG)
-
-            # create formatters
-            c_format = logging.Formatter(f'{self.name}:\t%(message)s')
-            c_handler.setFormatter(c_format)
-            f_format = logging.Formatter('%(message)s')
-            f_handler.setFormatter(f_format)
 
             # add handlers to logger
             logger.addHandler(c_handler)
@@ -318,8 +377,7 @@ if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test'
     
-    environment = Environment("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=5)
+    # environment = EnvironmentServer("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=5)
+    environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.SERVER_STEP)
     
-    env_prcs = Process(target=environment.main)
-    env_prcs.start()
-    env_prcs.join()
+    asyncio.run(environment.live())

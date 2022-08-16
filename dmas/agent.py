@@ -1,14 +1,13 @@
 import asyncio
 import json
-from multiprocessing import Process
 import os
 import random
 import sys
-import threading
 import time
 import zmq
 import zmq.asyncio
 import logging
+from utils import SimClocks, Container
 
 from modules.modules import Module, TestModule
 
@@ -23,12 +22,13 @@ def get_next_available_port():
         port += 1
     return port
 
-class AbstractAgent(Module):
+class AgentNode(Module):
     def __init__(self, name, scenario_dir, simulation_frequency, modules=[], env_port_number = '5561', env_request_port_number = '5562') -> None:
         super().__init__(name, None, modules)
 
         # constants
         self.SIMULATION_FREQUENCY = simulation_frequency
+        self.NUMBER_OF_TIMED_COROUTINES = 0
 
         # set up results dir
         self.SCENARIO_RESULTS_DIR, self.AGENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
@@ -40,8 +40,8 @@ class AbstractAgent(Module):
         self.ENVIRONMENT_PORT_NUMBER =  env_port_number
         self.REQUEST_PORT_NUMBER = env_request_port_number
         self.AGENT_TO_PORT_MAP = None
-
-        # self.state_logger.info('Agent Initialized!')
+        
+        self.log('Agent Initialized!', level=logging.INFO)
 
     async def live(self):
         """
@@ -106,7 +106,7 @@ class AbstractAgent(Module):
     CO-ROUTINES AND TASKS
     --------------------
     """
-    async def routine(self):
+    async def coroutines(self):
         """
         Listens for broadcasts from the environment. Stops processes when simulation end-command is received.
         """
@@ -138,8 +138,14 @@ class AbstractAgent(Module):
                     return
 
                 elif msg_type == 'tic':
-                    self.message_logger.info(f'Updating internal clock.')
-                    self.sim_time = t_server
+                    if (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
+                        or self.CLOCK_TYPE == SimClocks.SERVER_TIME
+                        or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
+                        
+                        # use server clock broadcasts to update internal clock
+                        self.message_logger.info(f'Updating internal clock.')
+                        await self.sim_time.set_level(t_server)
+                        self.log('Updated internal clock.')
         except asyncio.CancelledError:
             return
 
@@ -148,6 +154,28 @@ class AbstractAgent(Module):
     HELPING FUNCTIONS
     --------------------    
     """
+    async def sim_wait(self, delay):
+        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+            t_end = self.sim_time.level + delay
+            self.log(f'Sending tic request for t_end={t_end}...')
+            await self.environment_request_lock.acquire()
+
+            sync_msg = dict()
+            sync_msg['src'] = self.name
+            sync_msg['dst'] = 'ENV'
+            sync_msg['@type'] = 'TIC_REQUEST'
+            sync_msg['t'] = t_end
+            sync_json = json.dumps(sync_msg)
+
+            self.environment_request_socket.send_json(sync_json)
+
+            # wait for synchronization reply
+            await self.environment_request_socket.recv()  
+            self.environment_request_lock.release()
+            self.log('Tic request sent successfully.')
+
+        return await super().sim_wait(delay)
+
     async def network_config(self):
         # self.context = zmq.Context() 
         self.context = zmq.asyncio.Context() 
@@ -181,9 +209,8 @@ class AbstractAgent(Module):
         sync_msg['src'] = self.name
         sync_msg['dst'] = 'ENV'
         sync_msg['@type'] = 'SYNC_REQUEST'
-        content = dict()
-        content['port'] = self.agent_port_in
-        sync_msg['content'] = content
+        sync_msg['port'] = self.agent_port_in
+        sync_msg['n_coroutines'] = self.count_number_of_subroutines(self)
         sync_json = json.dumps(sync_msg)
 
         self.environment_request_socket.send_json(sync_json)
@@ -193,22 +220,34 @@ class AbstractAgent(Module):
         await self.environment_request_socket.recv()  
         self.environment_request_lock.release()
 
+    def count_number_of_subroutines(self, module):
+        count = module.NUMBER_OF_TIMED_COROUTINES
+        for submodule in module.submodules:
+            count += self.count_number_of_subroutines(submodule)
+        return count
+
     async def wait_sim_start(self):
         # await list of other agent's port numbers
-        port_map_msg = await self.environment_broadcast_socket.recv_json()
+        start_msg = await self.environment_broadcast_socket.recv_json()
 
         # log simulation start time
         self.START_TIME = time.perf_counter()
-        self.sim_time = 0
 
         # register agent-to-port map
-        port_map_dict = json.loads(port_map_msg)
-        agent_to_port_map = port_map_dict['content']
+        start_dict = json.loads(start_msg)
+        agent_to_port_map = start_dict['port_map']
+        clock_info = start_dict['clock_info']
+        self.CLOCK_TYPE = SimClocks[clock_info['@type']]
+
+        if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+            self.sim_time = 0
+        else:
+            self.sim_time = Container()
 
         self.AGENT_TO_PORT_MAP = dict()
         for agent in agent_to_port_map:
             self.AGENT_TO_PORT_MAP[agent] = agent_to_port_map[agent]
-        self.log(f'Agent to port map received:\n{self.AGENT_TO_PORT_MAP}')
+        self.log(f'Agent to port map received: {self.AGENT_TO_PORT_MAP}')
 
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
@@ -269,7 +308,7 @@ class AbstractAgent(Module):
         return loggers
 
 class AgentState:
-    def __init__(self, agent: AbstractAgent, component_list) -> None:
+    def __init__(self, agent: AgentNode, component_list) -> None:
         pass
 
 
@@ -278,7 +317,7 @@ class AgentState:
   TESTING AGENTS
 --------------------
 """
-class TestAgent(AbstractAgent):
+class TestAgent(AgentNode):
     def __init__(self, name, scenario_dir, simulation_frequency, env_port_number='5561', env_request_port_number='5562') -> None:
         super().__init__(name, scenario_dir, simulation_frequency, [], env_port_number, env_request_port_number)
         self.submodules = [TestModule(self)]
