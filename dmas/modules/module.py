@@ -2,6 +2,7 @@ from abc import abstractmethod
 import asyncio
 from enum import Enum
 import logging
+import random
 import time
 from messages import BroadcastTypes, RequestTypes
 
@@ -364,7 +365,8 @@ class SubModule(Module):
 
                 await self.parent_module.put_message(msg)
 
-                await self.sim_wait(1)
+                await self.sim_wait(random.random())
+                
         except asyncio.CancelledError:
             self.log('Periodic print routine cancelled')
             return

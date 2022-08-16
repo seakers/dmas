@@ -114,7 +114,6 @@ class AgentNode(Module):
         # wait for server reply
         await self.environment_request_socket.recv() 
         self.env_request_logger.info('Response received! terminating agent.')
-        self.log('Simulation end broadcast received! terminating agent...', level=logging.INFO)
 
         self.log(f"Closing all network sockets...")
         self.agent_socket_in.close()
@@ -171,7 +170,7 @@ class AgentNode(Module):
                 msg_type = BroadcastTypes[msg_type]
 
                 if msg_type is BroadcastTypes.SIM_END:
-                    self.state_logger.info(f'Sim has ended.')
+                    self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
                     return
 
                 elif msg_type is BroadcastTypes.TIC:

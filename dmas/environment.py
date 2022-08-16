@@ -425,19 +425,17 @@ class EnvironmentServer(Module):
         while n_subscribers < self.NUMBER_AGENTS:
             # wait for synchronization request
             msg_str = await self.reqservice.recv_json() 
+            self.reqservice.send_string('')
             msg_dict = json.loads(msg_str)
-            
             msg_src = msg_dict['src']
             msg_type = msg_dict['@type']
+
             if RequestTypes[msg_type] is not RequestTypes.END_CONFIRMATION:
-                self.reqservice.send_string('')
+                # if request is not of the type end-of-simulation, then discard and wait for the next
                 continue
             
             self.request_logger.info(f'Received simulation end confirmation from {msg_src}!')
             self.log(f'Received simulation end confirmation from {msg_src}!', level=logging.INFO)
-
-            # send synchronization reply
-            self.reqservice.send_string('')
             
             # log subscriber confirmation
             for agent_name in self.AGENT_NAME_LIST:
