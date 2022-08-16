@@ -1,18 +1,21 @@
+from abc import abstractclassmethod
 import asyncio
 from enum import Enum, IntEnum
 import random
 import numpy
 
 class SimClocks(Enum):
-    # asynchronized clocks
+    """
+    asynchronized clocks
+    """
     # -Each node in the network carries their own clocks to base their waits with
     REAL_TIME = 'REAL_TIME'             # runs simulations in real-time. 
     REAL_TIME_FAST = 'REAL_TIME_FAST'   # runs simulations in spead up real-time. Each real time second represents a user-given amount of simulation seconds
 
     # synchronized clocks
     # -Each node requests to be notified by the server when a particular time is reached, which they use to base their waits
-    SERVER_TIME = 'SERVER_TIC'          # server sends tics in real-time
-    SERVER_TIME_FAST = 'SERVER_TIC'     # server sends tics in spead up real-time
+    SERVER_TIME = 'SERVER_TIC'          # server sends tics at a fixed rate in real-time
+    SERVER_TIME_FAST = 'SERVER_TIC'     # server sends tics at a fixed rate in spead up real-time
     SERVER_STEP = 'SERVER_STEP'         # server waits until all agents have submitted a tic request and fast-forwards to that time
 
 class Container:
@@ -47,7 +50,6 @@ class Container:
             self.level += value
             self.updated.set()
             self.lock.release()
-            print(f'Container state: {self.level}/{self.capacity}')
         else:
             self.lock.release()
             self.updated.clear()
@@ -64,7 +66,6 @@ class Container:
         if accept():
             self.level -= value
             self.updated.set()
-            print(f'Container state: {self.level}/{self.capacity}')
         else:
             self.updated.clear()
             await self.updated.wait()         

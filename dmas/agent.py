@@ -7,9 +7,11 @@ import time
 import zmq
 import zmq.asyncio
 import logging
+from messages import BroadcastTypes
 from utils import SimClocks, Container
+from messages import RequestTypes
 
-from modules.modules import Module, TestModule
+from modules.module import Module, TestModule
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -22,14 +24,16 @@ def get_next_available_port():
         port += 1
     return port
 
+def count_number_of_subroutines(module: Module):
+        count = module.NUMBER_OF_TIMED_COROUTINES
+        for submodule in module.submodules:
+            count += count_number_of_subroutines(submodule)
+        return count
+
 class AgentNode(Module):
-    def __init__(self, name, scenario_dir, simulation_frequency, modules=[], env_port_number = '5561', env_request_port_number = '5562') -> None:
-        super().__init__(name, None, modules)
-
-        # constants
-        self.SIMULATION_FREQUENCY = simulation_frequency
-        self.NUMBER_OF_TIMED_COROUTINES = 0
-
+    def __init__(self, name, scenario_dir, modules=[], env_port_number = '5561', env_request_port_number = '5562') -> None:
+        super().__init__(name, submodules=modules, n_timed_coroutines=0)
+        
         # set up results dir
         self.SCENARIO_RESULTS_DIR, self.AGENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
 
@@ -95,9 +99,27 @@ class AgentNode(Module):
         Terminate processes 
         """
         self.log(f"Shutting down agent...", level=logging.INFO)
+        
+        # send a reception confirmation
+        self.env_request_logger.info('Connection to environment established!')
+        end_msg = dict()
+        end_msg['src'] = self.name
+        end_msg['dst'] = 'ENV'
+        end_msg['@type'] = RequestTypes.END_CONFIRMATION.name
+        end_json = json.dumps(end_msg)
 
-        self.log(f"Closing all communications channels...")
+        await self.environment_request_socket.send_json(end_json)
+        self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+
+        # wait for server reply
+        await self.environment_request_socket.recv() 
+        self.env_request_logger.info('Response received! terminating agent.')
+        self.log('Simulation end broadcast received! terminating agent...', level=logging.INFO)
+
+        self.log(f"Closing all network sockets...")
+        self.agent_socket_in.close()
         self.context.destroy()
+        self.log(f"Network sockets closed.", level=logging.INFO)
 
         self.log(f'...Good Night!', level=logging.INFO)
 
@@ -106,12 +128,35 @@ class AgentNode(Module):
     CO-ROUTINES AND TASKS
     --------------------
     """
+    async def internal_message_handler(self, msg):
+        """
+        Handles message intended for this module and performs actions accordingly.
+        """
+        try:
+            dst_name = msg['dst']
+            if dst_name != self.name:
+                await self.put_message(msg)
+            else:
+                if msg['@type'] == 'PRINT':
+                    content = msg['content']
+                    self.log(content)                
+        except asyncio.CancelledError:
+            return
+
     async def coroutines(self):
+        try:
+            broadcast_reception_handler = asyncio.create_task(self.broadcast_reception_handler())
+            await broadcast_reception_handler   
+        except asyncio.CancelledError:
+            broadcast_reception_handler.cancel()
+            await broadcast_reception_handler
+            return
+    
+    async def broadcast_reception_handler(self):
         """
         Listens for broadcasts from the environment. Stops processes when simulation end-command is received.
         """
         try:
-            self.state_logger.debug('Listening to environment broadcasts...')
             while True:
                 msg_string = await self.environment_broadcast_socket.recv_json()
                 msg_dict = json.loads(msg_string)
@@ -123,21 +168,13 @@ class AgentNode(Module):
 
                 self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
-                if msg_type == 'END':
-                    self.state_logger.info(f'Sim has ended.')
-                    
-                    # send a reception confirmation
-                    self.env_request_logger.info('Connection to environment established!')
-                    self.environment_request_socket.send_string(self.name)
-                    self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+                msg_type = BroadcastTypes[msg_type]
 
-                    # wait for server reply
-                    await self.environment_request_socket.recv() 
-                    self.env_request_logger.info('Response received! terminating agent.')
-                    self.log('Simulation end broadcast received! terminating agent...', level=logging.INFO)
+                if msg_type is BroadcastTypes.SIM_END:
+                    self.state_logger.info(f'Sim has ended.')
                     return
 
-                elif msg_type == 'tic':
+                elif msg_type is BroadcastTypes.TIC:
                     if (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
@@ -146,6 +183,8 @@ class AgentNode(Module):
                         self.message_logger.info(f'Updating internal clock.')
                         await self.sim_time.set_level(t_server)
                         self.log('Updated internal clock.')
+                else:
+                    self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
         except asyncio.CancelledError:
             return
 
@@ -154,30 +193,15 @@ class AgentNode(Module):
     HELPING FUNCTIONS
     --------------------    
     """
-    async def sim_wait(self, delay):
-        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
-            t_end = self.sim_time.level + delay
-            self.log(f'Sending tic request for t_end={t_end}...')
-            await self.environment_request_lock.acquire()
-
-            sync_msg = dict()
-            sync_msg['src'] = self.name
-            sync_msg['dst'] = 'ENV'
-            sync_msg['@type'] = 'TIC_REQUEST'
-            sync_msg['t'] = t_end
-            sync_json = json.dumps(sync_msg)
-
-            self.environment_request_socket.send_json(sync_json)
-
-            # wait for synchronization reply
-            await self.environment_request_socket.recv()  
-            self.environment_request_lock.release()
-            self.log('Tic request sent successfully.')
-
-        return await super().sim_wait(delay)
-
     async def network_config(self):
-        # self.context = zmq.Context() 
+        """
+        Creates communication sockets and connects this agent to them.
+
+        'environment_broadcast_socket': listens for broadcasts coming from the environment
+        'environment_request_socket': used to request and receive information directly from the environment
+        'agent_socket_in': conects to other agents. Receives requests for information from others
+        'agent_socket_out': connects to other agents. Sends information to others
+        """ 
         self.context = zmq.asyncio.Context() 
 
         # subscribe to environment broadcasting port
@@ -201,33 +225,34 @@ class AgentNode(Module):
         self.agent_socket_out = self.context.socket(zmq.REQ)
 
     async def sync_environment(self):
-        # send a synchronization request to environment server
+        """
+        Cend a synchronization request to environment server
+        """
         self.log('Connection to environment established!')
         await self.environment_request_lock.acquire()
 
         sync_msg = dict()
         sync_msg['src'] = self.name
         sync_msg['dst'] = 'ENV'
-        sync_msg['@type'] = 'SYNC_REQUEST'
+        sync_msg['@type'] = RequestTypes.SYNC_REQUEST.name
         sync_msg['port'] = self.agent_port_in
-        sync_msg['n_coroutines'] = self.count_number_of_subroutines(self)
+        sync_msg['n_coroutines'] = count_number_of_subroutines(self)
         sync_json = json.dumps(sync_msg)
 
-        self.environment_request_socket.send_json(sync_json)
+        await self.environment_request_socket.send_json(sync_json)
         self.log('Synchronization request sent. Awaiting environment response...')
 
         # wait for synchronization reply
         await self.environment_request_socket.recv()  
         self.environment_request_lock.release()
 
-    def count_number_of_subroutines(self, module):
-        count = module.NUMBER_OF_TIMED_COROUTINES
-        for submodule in module.submodules:
-            count += self.count_number_of_subroutines(submodule)
-        return count
-
     async def wait_sim_start(self):
-        # await list of other agent's port numbers
+        """
+        Awaits for simulation start message from the environment. 
+        This message contains a ledger that maps agent names to ports to be connected to for inter-agent communications. 
+        The message also contains information about the clock-type being used in this simulation.
+        """
+        # await for start message 
         start_msg = await self.environment_broadcast_socket.recv_json()
 
         # log simulation start time
@@ -236,20 +261,27 @@ class AgentNode(Module):
         # register agent-to-port map
         start_dict = json.loads(start_msg)
         agent_to_port_map = start_dict['port_map']
-        clock_info = start_dict['clock_info']
-        self.CLOCK_TYPE = SimClocks[clock_info['@type']]
-
-        if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
-            self.sim_time = 0
-        else:
-            self.sim_time = Container()
-
         self.AGENT_TO_PORT_MAP = dict()
         for agent in agent_to_port_map:
             self.AGENT_TO_PORT_MAP[agent] = agent_to_port_map[agent]
         self.log(f'Agent to port map received: {self.AGENT_TO_PORT_MAP}')
 
+        # setup clock information
+        clock_info = start_dict['clock_info']
+        self.CLOCK_TYPE = SimClocks[clock_info['@type']]
+
+        if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+            self.SIMULATION_FREQUENCY = clock_info['freq']
+            self.sim_time = 0
+        else:
+            self.SIMULATION_FREQUENCY = None
+            self.sim_time = Container()
+
     def set_up_results_directory(self, scenario_dir):
+        """
+        Creates directories for agent results and clears them if they already exist
+        """
+
         scenario_results_path = scenario_dir + '/results'
         if not os.path.exists(scenario_results_path):
             # if directory does not exists, create it
@@ -267,7 +299,10 @@ class AgentNode(Module):
         return scenario_results_path, agent_results_path
 
     def set_up_loggers(self):
-        # set root logger to default settings
+        """
+        set root logger to default settings
+        """
+
         logging.root.setLevel(logging.NOTSET)
         logging.basicConfig(level=logging.NOTSET)
         
@@ -307,21 +342,48 @@ class AgentNode(Module):
             loggers.append(logger)
         return loggers
 
+    async def sim_wait(self, delay):
+        """
+        Waits time according to clock set to simulation
+        """
+        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+            # if the clock is server-step, then submit a tic request to environment
+            t_end = self.sim_time.level + delay
+            
+            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
+            await self.environment_request_lock.acquire()
+
+            sync_msg = dict()
+            sync_msg['src'] = self.name
+            sync_msg['dst'] = 'ENV'
+            sync_msg['@type'] = RequestTypes.TIC_REQUEST.name
+            sync_msg['t'] = t_end
+            sync_json = json.dumps(sync_msg)
+
+            await self.environment_request_socket.send_json(sync_json)
+            self.log('Tic request sent successfully. Awaiting confirmation...')
+
+            # wait for synchronization reply
+            await self.environment_request_socket.recv()  
+            self.environment_request_lock.release()
+            self.log('Tic request reception confirmation received.')
+
+        # perform wait
+        return await super().sim_wait(delay)
+
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
         pass
-
 
 """
 --------------------
   TESTING AGENTS
 --------------------
 """
-class TestAgent(AgentNode):
-    def __init__(self, name, scenario_dir, simulation_frequency, env_port_number='5561', env_request_port_number='5562') -> None:
-        super().__init__(name, scenario_dir, simulation_frequency, [], env_port_number, env_request_port_number)
-        self.submodules = [TestModule(self)]
-    
+class TestAgent(AgentNode):    
+    def __init__(self, name, scenario_dir) -> None:
+        super().__init__(name, scenario_dir)
+        self.submodules = [TestModule(self)]  
 
 """
 --------------------
@@ -332,6 +394,6 @@ if __name__ == '__main__':
     print('Initializing agent...')
     scenario_dir = './scenarios/sim_test'
     
-    agent = TestAgent("AGENT0", scenario_dir, 1)
+    agent = TestAgent("AGENT0", scenario_dir)
     
     asyncio.run(agent.live())

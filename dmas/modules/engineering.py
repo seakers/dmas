@@ -1,5 +1,5 @@
 from dmas.agent import AgentNode
-from dmas.modules.modules import Module, SubModule
+from dmas.modules.module import Module, SubModule
 import asyncio
 
 """
@@ -22,6 +22,9 @@ ___  ___          _       _
 """
 
 class EngineeringModule(Module):
+    PLATFORM_SIM = 'PLATFORM_SIMULATOR'
+    NETWORK_SIM = 'NETWORK_SIMULATOR'
+
     def __init__(self, parent_agent, component_list: list, 
                     agent_comms_socket_in, agent_comms_socket_out, 
                     environment_broadcast_socket, environment_request_socket, environment_request_lock) -> None:
@@ -43,7 +46,7 @@ class PlatformSimulator(Module):
 
     """
     def __init__(self, parent_module: Module, component_list, environment_request_socket, environment_request_lock) -> None:
-        super().__init__('plaform_simulator', parent_module, submodules=[])
+        super().__init__(EngineeringModule.PLATFORM_SIM.value, parent_module, submodules=[])
         self.parent_agent = self.parent_module.parent_module
         self.environment_request_socket = environment_request_socket
         self.environment_request_lock = environment_request_lock
@@ -116,7 +119,7 @@ Network Simulator
 """
 class NetworkSimulator(SubModule):
     def __init__(self, parent_module: Module, agent_comms_socket_in, agent_comms_socket_out, environment_request_socket) -> None:
-        super().__init__('network_sim', parent_module)
+        super().__init__(EngineeringModule.NETWORK_SIM.value, parent_module)
         self.agent_comms_socket_in = agent_comms_socket_in
         self.agent_comms_socket_out = agent_comms_socket_out
         self.environment_request_socket = environment_request_socket
