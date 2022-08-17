@@ -77,8 +77,27 @@ class OrbitData:
     def get_next_gs_access_interval(self, t):
         return [-np.Infinity, np.Infinity]
 
-    def get_next_gp_access_interval(self, lat, lon, t):
-        return [-np.Infinity, np.Infinity]
+    def get_next_gp_access_interval(self, lat: float, lon: float, t: float):
+        """
+        Returns the next access to a ground point
+        """
+        # find closest gridpoint 
+        grid_index, gp_index = self.find_gp(lat,lon)
+
+        # find next access
+
+        interval = TimeInterval(-np.Infinity, np.Infinity)
+        instruments = []
+        modes = dict()
+        return interval, instruments, modes
+
+    def find_gp(self, lat: float, lon: float):
+        """
+        Returns the ground point and grid index to the point closest to the latitude and longitude given.
+
+        lat, lon must be given in degrees
+        """
+        return -1, -1
 
     def get_next_eclipse_interval(self, t: float):
         for _, row in self.eclipse_data.iterrows():
@@ -96,7 +115,9 @@ class OrbitData:
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
             t_end = row['end index'] * self.time_step
-            if t_start <= t < t_end:
+
+            interval = TimeInterval(t_start, t_end)
+            if interval.is_during(t):
                 return True
         return False
 

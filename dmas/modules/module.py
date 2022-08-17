@@ -241,9 +241,14 @@ class Module:
             else:
                 raise Exception(f'clock type {self.CLOCK_TYPE} not yet supported by module.')
         else:
-            await self.parent_module.sim_wait(delay)
+            await self.parent_module.sim_wait(delay)       
 
-        
+    async def sim_wait_to(self, t):
+        if self.parent_module is None:
+            delay = t - self.get_current_time()
+            await self.sim_wait(delay)
+        else:
+            await self.parent_module.sim_wait(delay)       
 
     def log(self, content, level=logging.DEBUG, module_name=None):
         if module_name is None:

@@ -6,6 +6,7 @@ import logging
 import random
 import time
 import zmq.asyncio
+from modules.environment import EclipseEventModule
 from orbitdata import OrbitData
 
 from messages import BroadcastTypes, RequestTypes
@@ -32,6 +33,11 @@ from utils import Container, SimClocks
 --------------------------------------------------------
 """
 
+def count_number_of_subroutines(module: Module):
+    count = module.NUMBER_OF_TIMED_COROUTINES
+    for submodule in module.submodules:
+        count += count_number_of_subroutines(submodule)
+    return count
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -40,11 +46,10 @@ def is_port_in_use(port: int) -> bool:
 
 class EnvironmentServer(Module):
     def __init__(self, name, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
-        super().__init__(name)
+        super().__init__(name ,n_timed_coroutines=0)
         # Constants
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
-        self.NUMBER_OF_TIMED_COROUTINES = 0                             # Number of timed co-routines to be performed by the server
         self.NUMBER_OF_TIMED_COROUTINES_AGENTS = 0                      # Number of timed co-routines to be performed by other agents
 
         for agent_name in agent_name_list:
@@ -66,7 +71,7 @@ class EnvironmentServer(Module):
             raise Exception('Simulation frequency needed to initiate simulation with a REAL_TIME_FAST clock.')
 
         # set up submodules
-        self.submodules = [TicRequestModule(self)]
+        self.submodules = [TicRequestModule(self), EclipseEventModule(self)]
         
         # set up results dir
         self.SCENARIO_RESULTS_DIR, self.ENVIRONMENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
@@ -75,7 +80,7 @@ class EnvironmentServer(Module):
         [self.message_logger, self.request_logger, self.state_logger, self.actions_logger] = self.set_up_loggers()
 
         # propagate orbit and coverage information
-        self.orbit_data = OrbitData.from_json(scenario_dir)
+        self.orbit_data = OrbitData.from_directory(scenario_dir)
 
         print('Environment Initialized!')
 
@@ -180,17 +185,13 @@ class EnvironmentServer(Module):
                 if (BroadcastTypes[msg_type] is BroadcastTypes.TIC
                     or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
                     or BroadcastTypes[msg_type] is BroadcastTypes.ACCESS_EVENT):
-                    
-                    if not BroadcastTypes.format_check(msg):
-                        # if broadcast task does not meet the desired format, reject and dump
-                        self.log('Broadcast task did not meet format specifications. Task dumped.')
-                        return
-                    if BroadcastTypes[msg_type] is BroadcastTypes.TIC:
-                        t_next = msg['server_clock']
-                        self.log(f'Updating internal clock to t={t_next}')
-                        await self.sim_time.set_level(t_next)
 
                     await self.publisher_queue.put(msg)
+
+                elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
+                    # if an submodule sends a tic request, forward to tic request submodule
+                    msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE
+                    await self.put_message(msg)
 
                 # else, dump
                 return
@@ -275,16 +276,36 @@ class EnvironmentServer(Module):
             while True:
                 msg = await self.publisher_queue.get()
 
+                if not BroadcastTypes.format_check(msg):
+                    # if broadcast task does not meet the desired format, reject and dump
+                    self.log('Broadcast task did not meet format specifications. Task dumped.')
+                    return
+
+                # change from internal message to external message
                 msg['src'] = self.name
                 msg['dst'] = 'all'
-                msg_json = json.dumps(msg)
-
                 msg_type = msg['@type']
+
                 self.log(f'Broadcast task of type {msg_type} received! Publishing to all agents...')
 
+                if BroadcastTypes[msg_type] is BroadcastTypes.TIC:
+                    t_next = msg['server_clock']
+                    self.log(f'Updating internal clock to t={t_next}')
+                    await self.sim_time.set_level(t_next)
+
+                elif BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT:
+                    msg['dst'] = msg['agent']
+                    msg.pop['agent']
+                
+                else:
+                    self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
+                    continue
+                
+                # broadcast message
                 self.log('Awaiting access to publisher socket...')
                 await self.publisher_lock.acquire()
                 self.log('Access to publisher socket acquired.')
+                msg_json = json.dumps(msg)
                 await self.publisher.send_json(msg_json)
                 self.log('Broadcast sent')
                 self.publisher_lock.release()
@@ -294,73 +315,11 @@ class EnvironmentServer(Module):
             if self.publisher_lock.locked():
                 self.publisher_lock.release()
 
-    async def tic_broadcast(self):
-        try:
-            while True:
-                # TODO: Create different cases for each different synchronous clock types
-                if self.CLOCK_TYPE == SimClocks.SERVER_TIME or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST:
-                    await self.sim_wait()
-                else:
-                    await self.sim_wait(10000000)
-        except asyncio.CancelledError:
-            return
-
     """
     --------------------
     HELPING FUNCTIONS
     --------------------    
     """
-    def load_orbit_data(self, scenario_dir):
-        self.log('Loading orbit and coverage data...', level=logging.INFO)
-        data_dir = scenario_dir + 'orbit_data/'
-
-        changes_to_scenario = False
-        with open(scenario_dir +'MissionSpecs.json', 'r') as scenario_specs:
-            if os.path.exists(data_dir + 'MissionSpecs.json'):
-                with open(data_dir +'MissionSpecs.json', 'r') as mission_specs:
-                    scenario_dict = json.load(scenario_specs)
-                    mission_dict = json.load(mission_specs)
-                    if scenario_dict != mission_dict:
-                        changes_to_scenario = True
-            else:
-                changes_to_scenario = True
-            
-        if not changes_to_scenario:
-            self.log('Orbit data found!')
-        else:
-            if changes_to_scenario:
-                self.log('Existing orbit data does not match scenario.')
-            else:
-                self.log('Orbit data not found.')
-
-            # clear files if they exist
-            if os.path.exists(data_dir):
-                for f in os.listdir(data_dir):
-                    if 'grid' in f:
-                        continue
-                    if os.path.isdir(os.path.join(data_dir, f)):
-                        for h in os.listdir(data_dir + f):
-                             os.remove(os.path.join(data_dir, f, h))
-                        os.rmdir(data_dir + f)
-                    else:
-                        os.remove(os.path.join(data_dir, f)) 
-                    # os.rmdir(new_dir)
-            
-            
-            
-            with open(scenario_dir +'MissionSpecs.json', 'r') as scenario_specs:
-                # propagate data and save to orbit data directory
-                self.log("Propagating orbits...")
-                mission = Mission.from_json(scenario_specs)  
-                mission.execute()                
-                self.log("Propagation done!")
-
-                # save specifications of propagation in the orbit data directory
-                scenario_dict = json.load(scenario_specs)
-                with open(data_dir +'MissionSpecs.json', 'w') as mission_specs:
-                    mission_specs.write(json.dumps(scenario_dict, indent=4))
-
-        self.log('Loading orbit data...', level=logging.INFO)
 
     async def network_config(self):
         """
@@ -433,6 +392,9 @@ class EnvironmentServer(Module):
                     break
             # send synchronization reply
             await self.reqservice.send_string('')
+
+        self.NUMBER_OF_TIMED_COROUTINES = count_number_of_subroutines(self)
+
         return subscriber_to_port_map
                     
     async def broadcast_sim_start(self, subscriber_to_port_map):
@@ -573,6 +535,27 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
+    async def sim_wait(self, delay):
+        """
+        Waits time according to clock set to simulation
+        """
+        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+            # if the clock is server-step, then submit a tic request to environment
+            t_end = self.sim_time.level + delay
+            
+            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
+            await self.environment_request_lock.acquire()
+
+            sync_msg = dict()
+            sync_msg['src'] = self.name
+            sync_msg['dst'] = self.name
+            sync_msg['@type'] = RequestTypes.TIC_REQUEST.name
+            sync_msg['t'] = t_end
+
+            await self.put_message(sync_msg)
+
+        # perform wait
+        return await super().sim_wait(delay)
 """
 --------------------
 MAIN

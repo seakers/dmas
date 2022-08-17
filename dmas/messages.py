@@ -12,6 +12,13 @@ class MessageTypes(Enum):
         pass
 
 class BroadcastTypes(Enum):
+    """
+    Types of broadcasts sent from the environemnt to all agents.
+        1- tic: informs all agents of environment server's current time
+        2- eclipse_event: informs agents that an agent has entered eclipse. agents must ignore transmission if they are not the agent affected by the event
+        3- sim_start: notifies all agents that the simulation has started
+        4- sim_end: notifies all agents that the simulation has ended 
+    """
     TIC = 'TIC'
     ECLIPSE_EVENT = 'ECLIPSE_EVENT'
     ACCESS_EVENT = 'ACCESS_EVENT'
@@ -38,6 +45,8 @@ class BroadcastTypes(Enum):
             if t is None:
                 # tic broadcasts must contain current server time
                 return False
+        elif BroadcastTypes[msg_type] is BroadcastTypes.SIM_START or BroadcastTypes[msg_type] is BroadcastTypes.SIM_END:
+            return True
         else:
             return False
         
