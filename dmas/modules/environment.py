@@ -47,9 +47,10 @@ class TicRequestModule(Module):
             if dst_name != self.name:
                 await self.put_message(msg)
             else:
-                if RequestTypes[msg['@type']] is RequestTypes.TIC_REQUEST:
+                if 'REQUEST' in msg['@type'] and RequestTypes[msg['@type']] is RequestTypes.TIC_REQUEST:
                     # if a tic request is received, add to tic_request_queue
                     t = msg['t']
+                    self.log(f'Received tic request for time {t}!')
                     await self.tic_request_queue.put(t)
                 else:
                     # if not a tic request, dump message 
@@ -171,9 +172,12 @@ class EclipseEventModule(Module):
                 msg_dict['agent'] = row['agent name']
                 msg_dict['rise'] = row['rise']
 
-                self.log(f'Submitting broadcast request for eclipse event with server clock at t={t_next}')
+                if row['rise']:
+                    self.log(f'Submitting broadcast request for eclipse event start with server clock at t={t_next}')
+                else:
+                    self.log(f'Submitting broadcast request for eclipse event end with server clock at t={t_next}')
 
-                await self.parent_module.put_message(msg_dict)
+                await self.put_message(msg_dict)
 
             # once all eclipse events have occurred, go to sleep
             while True:

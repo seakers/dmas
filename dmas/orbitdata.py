@@ -4,7 +4,6 @@ import re
 from orbitpy.mission import Mission
 import pandas as pd
 import numpy as np
-from dmas.agent import AgentNode
 
 class TimeInterval:
     def __init__(self, start, end):

@@ -245,10 +245,11 @@ class Module:
 
     async def sim_wait_to(self, t):
         if self.parent_module is None:
-            delay = t - self.get_current_time()
+            t_curr = self.get_current_time()
+            delay = t - t_curr
             await self.sim_wait(delay)
         else:
-            await self.parent_module.sim_wait(delay)       
+            await self.parent_module.sim_wait_to(t)       
 
     def log(self, content, level=logging.DEBUG, module_name=None):
         if module_name is None:
@@ -294,7 +295,7 @@ class SubModule(Module):
 
                 await self.parent_module.put_message(msg)
 
-                await self.sim_wait(random.random())
+                await self.sim_wait(random.random()*10)
                 
         except asyncio.CancelledError:
             self.log('Periodic print routine cancelled')

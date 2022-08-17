@@ -27,6 +27,19 @@ class ScienceModule(Module):
     async def coroutines(self):
         try:
             while True:
+                t1 = asyncio.create_task(self.f1())
+                t2 = asyncio.create_task(self.f2())
+                t3 = asyncio.create_task(self.f3())
+
+                await asyncio.wait([t1, t2, t3], return_when=asyncio.FIRST_COMPLETED)
+
                 await self.sim_wait(1000)     
         except asyncio.CancelledError:
             return
+
+    async def f1(self):
+        pass
+    async def f2(self):
+        pass
+    async def f3(self):
+        pass

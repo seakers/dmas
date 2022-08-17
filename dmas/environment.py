@@ -46,7 +46,7 @@ def is_port_in_use(port: int) -> bool:
 
 class EnvironmentServer(Module):
     def __init__(self, name, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
-        super().__init__(name ,n_timed_coroutines=0)
+        super().__init__(name, n_timed_coroutines=0)
         # Constants
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
@@ -182,12 +182,12 @@ class EnvironmentServer(Module):
             else:
                 # if the message is of type broadcast, send to broadcast handler
                 msg_type = msg['@type']
-                if (BroadcastTypes[msg_type] is BroadcastTypes.TIC
+                if 'REQUEST' not in msg_type:
+                    if (BroadcastTypes[msg_type] is BroadcastTypes.TIC
                     or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
                     or BroadcastTypes[msg_type] is BroadcastTypes.ACCESS_EVENT):
 
-                    await self.publisher_queue.put(msg)
-
+                        await self.publisher_queue.put(msg)
                 elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
                     # if an submodule sends a tic request, forward to tic request submodule
                     msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE
@@ -393,7 +393,7 @@ class EnvironmentServer(Module):
             # send synchronization reply
             await self.reqservice.send_string('')
 
-        self.NUMBER_OF_TIMED_COROUTINES = count_number_of_subroutines(self)
+        # self.NUMBER_OF_TIMED_COROUTINES = count_number_of_subroutines(self)
 
         return subscriber_to_port_map
                     
@@ -539,16 +539,18 @@ class EnvironmentServer(Module):
         """
         Waits time according to clock set to simulation
         """
+        if delay <= 0.0:
+            return
+
         if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
             # if the clock is server-step, then submit a tic request to environment
             t_end = self.sim_time.level + delay
-            
-            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
-            await self.environment_request_lock.acquire()
+
+            self.log(f'Submitting tic-request for t_end={t_end}.')
 
             sync_msg = dict()
             sync_msg['src'] = self.name
-            sync_msg['dst'] = self.name
+            sync_msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
             sync_msg['@type'] = RequestTypes.TIC_REQUEST.name
             sync_msg['t'] = t_end
 
@@ -564,8 +566,9 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    
+    duration = 5 * 78
+
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
-    environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.SERVER_STEP)
+    environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], duration, clock_type=SimClocks.SERVER_STEP)
     
     asyncio.run(environment.live())
