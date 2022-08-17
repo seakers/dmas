@@ -6,11 +6,32 @@ import logging
 import random
 import time
 import zmq.asyncio
+from orbitdata import OrbitData
 
-from messages import BroadcastTypes
-from modules.module import  Module, EnvironmentModuleTypes, TicRequestModule
+from messages import BroadcastTypes, RequestTypes
+from modules.module import  Module
+from modules.environment import EnvironmentModuleTypes, TicRequestModule
 from utils import Container, SimClocks
-from messages import RequestTypes
+
+"""
+--------------------------------------------------------
+ ____                                                                         __      
+/\  _`\                    __                                                /\ \__   
+\ \ \L\_\    ___   __  __ /\_\  _ __   ___     ___     ___ ___      __    ___\ \ ,_\  
+ \ \  _\L  /' _ `\/\ \/\ \\/\ \/\`'__\/ __`\ /' _ `\ /' __` __`\  /'__`\/' _ `\ \ \/  
+  \ \ \L\ \/\ \/\ \ \ \_/ |\ \ \ \ \//\ \L\ \/\ \/\ \/\ \/\ \/\ \/\  __//\ \/\ \ \ \_ 
+   \ \____/\ \_\ \_\ \___/  \ \_\ \_\\ \____/\ \_\ \_\ \_\ \_\ \_\ \____\ \_\ \_\ \__\
+    \/___/  \/_/\/_/\/__/    \/_/\/_/ \/___/  \/_/\/_/\/_/\/_/\/_/\/____/\/_/\/_/\/__/                                                         
+ ____                                           
+/\  _`\                                         
+\ \,\L\_\     __   _ __   __  __     __   _ __  
+ \/_\__ \   /'__`\/\`'__\/\ \/\ \  /'__`\/\`'__\
+   /\ \L\ \/\  __/\ \ \/ \ \ \_/ |/\  __/\ \ \/ 
+   \ `\____\ \____\\ \_\  \ \___/ \ \____\\ \_\ 
+    \/_____/\/____/ \/_/   \/__/   \/____/ \/_/                                                                                                                                                   
+--------------------------------------------------------
+"""
+
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -18,7 +39,7 @@ def is_port_in_use(port: int) -> bool:
         return s.connect_ex(('localhost', port)) == 0
 
 class EnvironmentServer(Module):
-    def __init__(self, name,scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
+    def __init__(self, name, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
         super().__init__(name)
         # Constants
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
@@ -54,8 +75,8 @@ class EnvironmentServer(Module):
         [self.message_logger, self.request_logger, self.state_logger, self.actions_logger] = self.set_up_loggers()
 
         # propagate orbit and coverage information
-        # self.orbit_data = None
-        
+        self.orbit_data = OrbitData.from_json(scenario_dir)
+
         print('Environment Initialized!')
 
     async def live(self):
@@ -83,8 +104,9 @@ class EnvironmentServer(Module):
         # Wait for agents to initialize their own network ports
         self.log(f"Waiting for {self.NUMBER_AGENTS} to initiate...", level=logging.INFO)
         subscriber_to_port_map =await self.sync_agents()
-
         self.log(f"All subscribers initalized! Starting simulation...", level=logging.INFO)
+        
+        # broadcasting simulation start
         await self.broadcast_sim_start(subscriber_to_port_map)
 
         self.log(f'Activating environment submodules...')
@@ -288,6 +310,58 @@ class EnvironmentServer(Module):
     HELPING FUNCTIONS
     --------------------    
     """
+    def load_orbit_data(self, scenario_dir):
+        self.log('Loading orbit and coverage data...', level=logging.INFO)
+        data_dir = scenario_dir + 'orbit_data/'
+
+        changes_to_scenario = False
+        with open(scenario_dir +'MissionSpecs.json', 'r') as scenario_specs:
+            if os.path.exists(data_dir + 'MissionSpecs.json'):
+                with open(data_dir +'MissionSpecs.json', 'r') as mission_specs:
+                    scenario_dict = json.load(scenario_specs)
+                    mission_dict = json.load(mission_specs)
+                    if scenario_dict != mission_dict:
+                        changes_to_scenario = True
+            else:
+                changes_to_scenario = True
+            
+        if not changes_to_scenario:
+            self.log('Orbit data found!')
+        else:
+            if changes_to_scenario:
+                self.log('Existing orbit data does not match scenario.')
+            else:
+                self.log('Orbit data not found.')
+
+            # clear files if they exist
+            if os.path.exists(data_dir):
+                for f in os.listdir(data_dir):
+                    if 'grid' in f:
+                        continue
+                    if os.path.isdir(os.path.join(data_dir, f)):
+                        for h in os.listdir(data_dir + f):
+                             os.remove(os.path.join(data_dir, f, h))
+                        os.rmdir(data_dir + f)
+                    else:
+                        os.remove(os.path.join(data_dir, f)) 
+                    # os.rmdir(new_dir)
+            
+            
+            
+            with open(scenario_dir +'MissionSpecs.json', 'r') as scenario_specs:
+                # propagate data and save to orbit data directory
+                self.log("Propagating orbits...")
+                mission = Mission.from_json(scenario_specs)  
+                mission.execute()                
+                self.log("Propagation done!")
+
+                # save specifications of propagation in the orbit data directory
+                scenario_dict = json.load(scenario_specs)
+                with open(data_dir +'MissionSpecs.json', 'w') as mission_specs:
+                    mission_specs.write(json.dumps(scenario_dict, indent=4))
+
+        self.log('Loading orbit data...', level=logging.INFO)
+
     async def network_config(self):
         """
         Creates communication sockets and binds this environment to them.
@@ -506,7 +580,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/sim_test'
+    scenario_dir = './scenarios/sim_test/'
     
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.SERVER_STEP)
