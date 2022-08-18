@@ -19,11 +19,13 @@ class BroadcastTypes(Enum):
         3- sim_start: notifies all agents that the simulation has started
         4- sim_end: notifies all agents that the simulation has ended 
     """
-    TIC = 'TIC'
+    TIC_EVENT = 'TIC_EVENT'
     ECLIPSE_EVENT = 'ECLIPSE_EVENT'
-    ACCESS_EVENT = 'ACCESS_EVENT'
-    SIM_START = 'SIM_START'
-    SIM_END = 'SIM_END'
+    GP_ACCESS_EVENT = 'GP_ACCESS_EVENT'
+    GS_ACCESS_EVENT = 'GS_ACCESS_EVENT'
+    AGENT_ACCESS_EVENT = 'AGENT_ACCESS_EVENT'
+    SIM_START_EVENT = 'SIM_START_EVENT'
+    SIM_END_EVENT = 'SIM_END_EVENT'
 
     def format_check(msg: dict):
         """
@@ -39,20 +41,47 @@ class BroadcastTypes(Enum):
             # any message must contain a source, destination, and type.
             return False
         
-        if BroadcastTypes[msg_type] is BroadcastTypes.TIC:
+        if BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT:
             t = msg.get('server_clock', None)
             
             if t is None:
                 # tic broadcasts must contain current server time
                 return False
-        elif BroadcastTypes[msg_type] is BroadcastTypes.SIM_START or BroadcastTypes[msg_type] is BroadcastTypes.SIM_END:
+        elif BroadcastTypes[msg_type] is BroadcastTypes.SIM_START_EVENT or BroadcastTypes[msg_type] is BroadcastTypes.SIM_END_EVENT:
             return True
-        elif BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT:
+        elif BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT:
             return True
         else:
             return False
         
         return True
+
+    def create_eclipse_event_broadcast(src: str, dst: str, agent_name: str, rise: bool, t: float) -> dict:
+        msg_dict = dict()
+        msg_dict['src'] = src
+        msg_dict['dst'] = dst
+        msg_dict['@type'] = BroadcastTypes.ECLIPSE_EVENT.name
+        msg_dict['server_clock'] = t
+        msg_dict['agent'] = agent_name
+        msg_dict['rise'] = rise
+
+        return msg_dict
+
+    def create_gs_access_event_broadcast(src: str, dst: str, agent_name: str, rise: bool, t: float, 
+                                        gndStat_name: str, gndStat_id: str, lat: float, lon: float) -> dict:
+        msg_dict = dict()
+        msg_dict['src'] = src
+        msg_dict['dst'] = dst
+        msg_dict['@type'] = BroadcastTypes.GS_ACCESS_EVENT.name
+        msg_dict['server_clock'] = t
+        msg_dict['agent'] = agent_name
+        msg_dict['rise'] = rise
+        msg_dict['gndStat_name'] = gndStat_name
+        msg_dict['gndStat_id'] = gndStat_id
+        msg_dict['lat'] = lat
+        msg_dict['lon'] = lon
+
+        return msg_dict
 
 class RequestTypes(Enum):
     """
@@ -105,3 +134,12 @@ class RequestTypes(Enum):
             return False
         
         return True
+    
+    def create_tic_event_message(src: str, dst: str, t: float):
+        tic_msg = dict()
+        tic_msg['src'] = src
+        tic_msg['dst'] = dst
+        tic_msg['@type'] = RequestTypes.TIC_REQUEST.name
+        tic_msg['t'] = t
+
+        return tic_msg

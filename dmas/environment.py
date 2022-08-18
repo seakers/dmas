@@ -6,7 +6,7 @@ import logging
 import random
 import time
 import zmq.asyncio
-from modules.environment import EclipseEventModule
+from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule
 from orbitdata import OrbitData
 
 from messages import BroadcastTypes, RequestTypes
@@ -71,7 +71,11 @@ class EnvironmentServer(Module):
             raise Exception('Simulation frequency needed to initiate simulation with a REAL_TIME_FAST clock.')
 
         # set up submodules
-        self.submodules = [TicRequestModule(self), EclipseEventModule(self)]
+        self.submodules = [ TicRequestModule(self), 
+                            EclipseEventModule(self), 
+                            # GPAccessEventModule(self),
+                            GndStatAccessEventModule(self)
+                          ]
         
         # set up results dir
         self.SCENARIO_RESULTS_DIR, self.ENVIRONMENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
@@ -183,9 +187,11 @@ class EnvironmentServer(Module):
                 # if the message is of type broadcast, send to broadcast handler
                 msg_type = msg['@type']
                 if 'REQUEST' not in msg_type:
-                    if (BroadcastTypes[msg_type] is BroadcastTypes.TIC
+                    if (BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT
                     or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.ACCESS_EVENT):
+                    or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+                    or BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
+                    or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
 
                         await self.publisher_queue.put(msg)
                 elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
@@ -288,19 +294,19 @@ class EnvironmentServer(Module):
 
                 self.log(f'Broadcast task of type {msg_type} received! Publishing to all agents...')
 
-                if BroadcastTypes[msg_type] is BroadcastTypes.TIC:
+                if BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT:
                     t_next = msg['server_clock']
                     self.log(f'Updating internal clock to t={t_next}')
                     await self.sim_time.set_level(t_next)
 
-                elif BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT:
+                elif (BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
+                     or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT):
                     msg['dst'] = msg['agent']
                     msg.pop('agent')
                 
                 else:
-                    self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
-                    continue
-                
+                    raise Exception(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
+
                 # broadcast message
                 self.log('Awaiting access to publisher socket...')
                 await self.publisher_lock.acquire()
@@ -407,7 +413,7 @@ class EnvironmentServer(Module):
         msg_dict = dict()
         msg_dict['src'] = self.name
         msg_dict['dst'] = 'ALL'
-        msg_dict['@type'] = BroadcastTypes.SIM_START.name
+        msg_dict['@type'] = BroadcastTypes.SIM_START_EVENT.name
         
         # include subscriber-to-port map to message
         msg_dict['port_map'] = subscriber_to_port_map
@@ -443,7 +449,7 @@ class EnvironmentServer(Module):
         msg_dict = dict()
         msg_dict['src'] = self.name
         msg_dict['dst'] = 'all'
-        msg_dict['@type'] =  BroadcastTypes.SIM_END.name
+        msg_dict['@type'] =  BroadcastTypes.SIM_END_EVENT.name
         msg_dict['server_clock'] = time.perf_counter() - self.START_TIME
         kill_msg = json.dumps(msg_dict)
 
@@ -535,26 +541,16 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
-    async def sim_wait(self, delay, module_name=None):
-        """
-        Waits time according to clock set to simulation
-        """
-        if self.CLOCK_TYPE == SimClocks.SERVER_STEP and delay > 0:
-            # if the clock is server-step, then submit a tic request to environment
-            t_end = self.sim_time.level + delay
+    async def submit_tic_request(self, delay, module_name):
+        # if the clock is server-step, then submit a tic request to environment
+        t_end = self.sim_time.level + delay
 
-            self.log(f'Submitting tic-request for t_end={t_end}.', module_name=module_name)
+        self.log(f'Submitting tic-request for t_end={t_end}.', module_name=module_name)
 
-            req_msg = dict()
-            req_msg['src'] = self.name
-            req_msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name   
-            req_msg['@type'] = RequestTypes.TIC_REQUEST.name
-            req_msg['t'] = t_end
+        req_msg = RequestTypes.create_tic_event_message(self.name, EnvironmentModuleTypes.TIC_REQUEST_MODULE.name, t_end)
 
-            await self.put_message(req_msg)
-
-        # perform wait
-        return await super().sim_wait(delay, module_name)
+        await self.put_message(req_msg)
+        
 """
 --------------------
 MAIN
@@ -563,7 +559,7 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    duration = 5 * 78
+    duration = 6048
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], duration, clock_type=SimClocks.SERVER_STEP)

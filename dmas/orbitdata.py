@@ -29,34 +29,34 @@ class OrbitData:
     TODO: add support to load ground station agents' data
     """
     def __init__(self, agent_name: str, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data):
+        # name of agent being represented by this object
         self.agent_name = agent_name
-        
+
+        # propagation time specifications
         self.time_step = time_data['time step']
         self.epoc_type = time_data['epoc type']
         self.epoc = time_data['epoc']
 
+        # agent position and eclipse information
         self.eclipse_data = eclipse_data.sort_values(by=['start index'])
         self.position_data = position_data.sort_values(by=['time index'])
 
+        # inter-satellite communication access times
         self.isl_data = {}
         for satellite_name in isl_data.keys():
             self.isl_data[satellite_name] = isl_data[satellite_name].sort_values(by=['start index'])
 
+        # ground station access times
         self.gs_access_data = gs_access_data.sort_values(by=['start index'])
         
-        self.gp_access_data = {}
-        for instrument in gp_access_data.keys():
-            self.gp_access_data[instrument] = []
-            for mode in range(len(gp_access_data[instrument])):
-                self.gp_access_data[instrument].append(gp_access_data[instrument][mode].sort_values(by=['time index']))
+        # ground point access times
+        self.gp_access_data = gp_access_data.sort_values(by=['time index'])
     
     def get_next_agent_access(self, target, t: float):
         src = self.agent_name
 
         if target in self.isl_data.keys():
             return self.get_next_isl_access_interval(target, t)
-        # elif:
-        #     pass
         else:
             raise Exception(f'Access between {src} and {target} not supported.')
 
@@ -81,7 +81,7 @@ class OrbitData:
         Returns the next access to a ground point
         """
         # find closest gridpoint 
-        grid_index, gp_index = self.find_gp(lat,lon)
+        grid_index, gp_index = self.find_gp_index(lat,lon)
 
         # find next access
 
@@ -90,7 +90,7 @@ class OrbitData:
         modes = dict()
         return interval, instruments, modes
 
-    def find_gp(self, lat: float, lon: float):
+    def find_gp_index(self, lat: float, lon: float):
         """
         Returns the ground point and grid index to the point closest to the latitude and longitude given.
 
@@ -278,7 +278,7 @@ class OrbitData:
                             isl_data[sender_name] = pd.read_csv(isl_file, skiprows=range(3))
 
                 # load ground station access data
-                gs_access_data = pd.DataFrame(columns=['start index', 'end index', 'gndStn id'])
+                gs_access_data = pd.DataFrame(columns=['start index', 'end index', 'gndStn id', 'gndStn name','lat [deg]','lon [deg]'])
                 for file in os.listdir(data_dir + agent_folder):
                     if 'gndStn' in file:
                         gndStn_access_file = data_dir + agent_folder + file
@@ -288,24 +288,36 @@ class OrbitData:
                         if nrows > 0:
                             gndStn, _ = file.split('_')
                             gndStn_index = int(re.sub("[^0-9]", "", gndStn))
+                            
                             gndStn_name = gound_station_list[gndStn_index].get('name')
+                            gndStn_id = gound_station_list[gndStn_index].get('@id')
+                            gndStn_lat = gound_station_list[gndStn_index].get('latitude')
+                            gndStn_lon = gound_station_list[gndStn_index].get('longitude')
+
                             gndStn_name_column = [gndStn_name] * nrows
-                            gndStn_access_data['gndStn id'] = gndStn_name_column
+                            gndStn_id_column = [gndStn_id] * nrows
+                            gndStn_lat_column = [gndStn_lat] * nrows
+                            gndStn_lon_column = [gndStn_lon] * nrows
+
+                            gndStn_access_data['gndStn name'] = gndStn_name_column
+                            gndStn_access_data['gndStn id'] = gndStn_id_column
+                            gndStn_access_data['lat [deg]'] = gndStn_lat_column
+                            gndStn_access_data['lon [deg]'] = gndStn_lon_column
 
                             if len(gs_access_data) == 0:
                                 gs_access_data = gndStn_access_data
                             else:
                                 gs_access_data = pd.concat([gs_access_data, gndStn_access_data])
 
-                # load and coverage data metrics data
-                gp_access_data = dict()
-
+                # land coverage data metrics data
                 payload = spacecraft.get('instrument', None)
                 if not isinstance(payload, list):
                     payload = [payload]
 
+                gp_access_data = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]', 'agent','instrument',
+                                                                'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
+
                 for instrument in payload:
-                    ins_name = instrument.get('name')
                     i_ins = payload.index(instrument)
                     gp_acces_by_mode = []
 
@@ -313,6 +325,8 @@ class OrbitData:
                     if not isinstance(modes, list):
                         modes = [0]
 
+                    gp_acces_by_mode = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]','instrument',
+                                                                'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
                     for mode in modes:
                         i_mode = modes.index(mode)
                         gp_access_by_grid = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]',
@@ -332,11 +346,27 @@ class OrbitData:
                             else:
                                 gp_access_by_grid = pd.concat([gp_access_by_grid, metrics_data])
 
-                        
-                        gp_acces_by_mode.append(gp_access_by_grid)
+                        nrows, _ = gp_access_by_grid.shape
+                        gp_access_by_grid['pnt-opt index'] = [mode] * nrows
 
-                    gp_access_data[ins_name] = gp_acces_by_mode
+                        if len(gp_acces_by_mode) == 0:
+                            gp_acces_by_mode = gp_access_by_grid
+                        else:
+                            gp_acces_by_mode = pd.concat([gp_acces_by_mode, gp_access_by_grid])
+                        # gp_acces_by_mode.append(gp_access_by_grid)
+
+                    nrows, _ = gp_acces_by_mode.shape
+                    gp_access_by_grid['instrument'] = [instrument] * nrows
+                    # gp_access_data[ins_name] = gp_acces_by_mode
+
+                    if len(gp_access_data) == 0:
+                        gp_access_data = gp_acces_by_mode
+                    else:
+                        gp_access_data = pd.concat([gp_access_data, gp_acces_by_mode])
                 
+                nrows, _ = gp_access_data.shape
+                gp_access_data['agent'] = [spacecraft] * nrows
+
                 data[name] = OrbitData(name, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data)
 
             return data

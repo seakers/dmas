@@ -178,6 +178,8 @@ class Module:
     async def coroutines(self):
         """
         Generic routine to be performed by module. May be modified to perform other coroutines.
+        Must not return unless an exception is raised. If method returns or raises an unhandled 
+        exception, this module and its parent module will terminate.
         """
         try:
             while True:
@@ -211,6 +213,9 @@ class Module:
             return None
 
     def get_current_time(self):
+        """
+        Returns the current simulation time
+        """
         if self.parent_module is None:
             if self.sim_time is None:
                 return 0
@@ -228,15 +233,32 @@ class Module:
             self.parent_module.get_current_time()
 
     def get_current_real_time(self):
+        """
+        Returns current time from the start of the simulation
+        """
         return (time.perf_counter() - self.START_TIME)
 
+    @abstractmethod
+    async def submit_tic_request(self, delay, module_name):
+        """
+        creates a tic-request to be submitted to the environment
+        """
+        pass
+
     async def sim_wait(self, delay, module_name=None):
+        """
+        awaits until simulation time runs for a given delay
+        """
         if self.parent_module is None:
             if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                 await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
             elif (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
+
+                # if the clock is server-step, then submit a tic request to environment
+                await self.submit_tic_request(delay, module_name)
+
                 t_end = self.sim_time.level + delay
                 await self.sim_time.when_geq_than(t_end)
             else:
@@ -245,6 +267,9 @@ class Module:
             await self.parent_module.sim_wait(delay, module_name)       
 
     async def sim_wait_to(self, t, module_name=None):
+        """
+        awaits until simulation time reaches a time t
+        """
         if self.parent_module is None:
             t_curr = self.get_current_time()
             delay = t - t_curr

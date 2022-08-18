@@ -1,4 +1,5 @@
 import asyncio
+from curses import def_prog_mode
 import json
 import os
 import random
@@ -190,11 +191,11 @@ class AgentNode(Module):
 
                 msg_type = BroadcastTypes[msg_type]
 
-                if msg_type is BroadcastTypes.SIM_END:
+                if msg_type is BroadcastTypes.SIM_END_EVENT:
                     self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
                     return
 
-                elif msg_type is BroadcastTypes.TIC:
+                elif msg_type is BroadcastTypes.TIC_EVENT:
                     if (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
@@ -361,35 +362,23 @@ class AgentNode(Module):
 
             loggers.append(logger)
         return loggers
+        
+    async def submit_tic_request(self, delay, module_name):
+        t_end = self.sim_time.level + delay
+        
+        self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...', module_name=module_name)
+        await self.environment_request_lock.acquire()
 
-    async def sim_wait(self, delay, module_name=None):
-        """
-        Waits time according to clock set to simulation
-        """
-        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
-            # if the clock is server-step, then submit a tic request to environment
-            t_end = self.sim_time.level + delay
-            
-            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...', module_name=module_name)
-            await self.environment_request_lock.acquire()
+        tic_msg = RequestTypes.create_tic_event_message(self.name, 'ENV', t_end)
+        tic_json = json.dumps(tic_msg)
 
-            sync_msg = dict()
-            sync_msg['src'] = self.name
-            sync_msg['dst'] = 'ENV'
-            sync_msg['@type'] = RequestTypes.TIC_REQUEST.name
-            sync_msg['t'] = t_end
-            sync_json = json.dumps(sync_msg)
+        await self.environment_request_socket.send_json(tic_json)
+        self.log('Tic request sent successfully. Awaiting confirmation...', module_name=module_name)
 
-            await self.environment_request_socket.send_json(sync_json)
-            self.log('Tic request sent successfully. Awaiting confirmation...', module_name=module_name)
-
-            # wait for synchronization reply
-            await self.environment_request_socket.recv()  
-            self.environment_request_lock.release()
-            self.log('Tic request reception confirmation received.', module_name=module_name)
-
-        # perform wait
-        return await super().sim_wait(delay, module_name)
+        # wait for synchronization reply
+        await self.environment_request_socket.recv()  
+        self.environment_request_lock.release()
+        self.log('Tic request reception confirmation received.', module_name=module_name)
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
