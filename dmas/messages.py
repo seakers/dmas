@@ -47,6 +47,8 @@ class BroadcastTypes(Enum):
                 return False
         elif BroadcastTypes[msg_type] is BroadcastTypes.SIM_START or BroadcastTypes[msg_type] is BroadcastTypes.SIM_END:
             return True
+        elif BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT:
+            return True
         else:
             return False
         

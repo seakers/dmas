@@ -92,9 +92,9 @@ class TicRequestModule(Module):
                         t = msg_dict['server_clock']
                         self.log(f'Submitting broadcast request for tic with server clock at t={t}')
 
-                        await self.parent_module.put_message(msg_dict)
+                        await self.put_message(msg_dict)
                 else:
-                    await self.sim_wait(1e6)
+                    await self.sim_wait(1e6, module_name=self.name)
         except asyncio.CancelledError:
             return
 
@@ -159,9 +159,10 @@ class EclipseEventModule(Module):
             for _, row in self.eclipse_data.iterrows():
                 # get next scheduled eclipse event
                 t_next = row['time index'] * self.time_step
+                agent_name = row['agent name']
                 
                 # wait for said event to start
-                await self.sim_wait_to(t_next)
+                await self.sim_wait_to(t_next, module_name=self.name)
 
                 # send a broadcast request to parent environment               
                 msg_dict = dict()
@@ -169,18 +170,18 @@ class EclipseEventModule(Module):
                 msg_dict['dst'] = self.parent_module.name
                 msg_dict['@type'] = BroadcastTypes.ECLIPSE_EVENT.name
                 msg_dict['server_clock'] = t_next
-                msg_dict['agent'] = row['agent name']
+                msg_dict['agent'] = agent_name
                 msg_dict['rise'] = row['rise']
 
                 if row['rise']:
-                    self.log(f'Submitting broadcast request for eclipse event start with server clock at t={t_next}')
+                    self.log(f'Submitting broadcast request for eclipse event start with server clock at t={t_next} for agent {agent_name}')
                 else:
-                    self.log(f'Submitting broadcast request for eclipse event end with server clock at t={t_next}')
+                    self.log(f'Submitting broadcast request for eclipse event end with server clock at t={t_next} for agent {agent_name}')
 
                 await self.put_message(msg_dict)
 
             # once all eclipse events have occurred, go to sleep
             while True:
-                await self.sim_wait(1e6)
+                await self.sim_wait(1e6, module_name=self.name)
         except asyncio.CancelledError:
             return

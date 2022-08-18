@@ -46,7 +46,7 @@ def is_port_in_use(port: int) -> bool:
 
 class EnvironmentServer(Module):
     def __init__(self, name, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
-        super().__init__(name, n_timed_coroutines=0)
+        super().__init__(name, n_timed_coroutines=1)
         # Constants
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
@@ -234,7 +234,7 @@ class EnvironmentServer(Module):
 
                     # change source and destination to internal modules
                     req_dict['src'] = self.name
-                    req_dict['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.value
+                    req_dict['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
 
                     # send to internal message router for forwarding
                     await self.put_message(req_dict)
@@ -295,7 +295,7 @@ class EnvironmentServer(Module):
 
                 elif BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT:
                     msg['dst'] = msg['agent']
-                    msg.pop['agent']
+                    msg.pop('agent')
                 
                 else:
                     self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
@@ -535,29 +535,26 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
-    async def sim_wait(self, delay):
+    async def sim_wait(self, delay, module_name=None):
         """
         Waits time according to clock set to simulation
         """
-        if delay <= 0.0:
-            return
-
-        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+        if self.CLOCK_TYPE == SimClocks.SERVER_STEP and delay > 0:
             # if the clock is server-step, then submit a tic request to environment
             t_end = self.sim_time.level + delay
 
-            self.log(f'Submitting tic-request for t_end={t_end}.')
+            self.log(f'Submitting tic-request for t_end={t_end}.', module_name=module_name)
 
-            sync_msg = dict()
-            sync_msg['src'] = self.name
-            sync_msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
-            sync_msg['@type'] = RequestTypes.TIC_REQUEST.name
-            sync_msg['t'] = t_end
+            req_msg = dict()
+            req_msg['src'] = self.name
+            req_msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name   
+            req_msg['@type'] = RequestTypes.TIC_REQUEST.name
+            req_msg['t'] = t_end
 
-            await self.put_message(sync_msg)
+            await self.put_message(req_msg)
 
         # perform wait
-        return await super().sim_wait(delay)
+        return await super().sim_wait(delay, module_name)
 """
 --------------------
 MAIN

@@ -11,7 +11,7 @@ from messages import BroadcastTypes
 from utils import SimClocks, Container
 from messages import RequestTypes
 
-from modules.module import Module, TestModule
+from modules.module import Module
 
 """    
 --------------------------------------------------------
@@ -362,7 +362,7 @@ class AgentNode(Module):
             loggers.append(logger)
         return loggers
 
-    async def sim_wait(self, delay):
+    async def sim_wait(self, delay, module_name=None):
         """
         Waits time according to clock set to simulation
         """
@@ -370,7 +370,7 @@ class AgentNode(Module):
             # if the clock is server-step, then submit a tic request to environment
             t_end = self.sim_time.level + delay
             
-            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
+            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...', module_name=module_name)
             await self.environment_request_lock.acquire()
 
             sync_msg = dict()
@@ -381,15 +381,15 @@ class AgentNode(Module):
             sync_json = json.dumps(sync_msg)
 
             await self.environment_request_socket.send_json(sync_json)
-            self.log('Tic request sent successfully. Awaiting confirmation...')
+            self.log('Tic request sent successfully. Awaiting confirmation...', module_name=module_name)
 
             # wait for synchronization reply
             await self.environment_request_socket.recv()  
             self.environment_request_lock.release()
-            self.log('Tic request reception confirmation received.')
+            self.log('Tic request reception confirmation received.', module_name=module_name)
 
         # perform wait
-        return await super().sim_wait(delay)
+        return await super().sim_wait(delay, module_name)
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
@@ -404,6 +404,37 @@ class TestAgent(AgentNode):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
         self.submodules = [TestModule(self)]  
+
+"""
+--------------------
+  TESTING MODULES
+--------------------
+"""
+class SubModule(Module):
+    def __init__(self, name, parent_module) -> None:
+        super().__init__(name, parent_module, submodules=[])
+
+    async def coroutines(self):
+        try:
+            self.log('Starting periodic print routine...')
+            while True:
+                msg = dict()
+                msg['src'] = self.name
+                msg['dst'] = self.parent_module.name
+                msg['@type'] = 'PRINT'
+                msg['content'] = 'TEST_PRINT'
+
+                await self.parent_module.put_message(msg)
+
+                await self.sim_wait(20)
+                
+        except asyncio.CancelledError:
+            self.log('Periodic print routine cancelled')
+            return
+
+class TestModule(Module):
+    def __init__(self, parent_agent) -> None:
+        super().__init__('test', parent_agent, [SubModule('sub_test', self)])
 
 """
 --------------------

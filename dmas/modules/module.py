@@ -114,9 +114,10 @@ class Module:
                 dst_name = msg.get('dst',None)
 
                 if dst_name is None or src_name is None:
+                    self.log(f'Received invalid internal message. Discarting message.')
                     continue
 
-                self.log(f'Received message from \'{src_name}\' intended for \'{dst_name}\'')
+                self.log(f'Received internal message from \'{src_name}\' intended for \'{dst_name}\'')
 
                 # check destination
                 if dst_name == self.name:
@@ -229,7 +230,7 @@ class Module:
     def get_current_real_time(self):
         return (time.perf_counter() - self.START_TIME)
 
-    async def sim_wait(self, delay):
+    async def sim_wait(self, delay, module_name=None):
         if self.parent_module is None:
             if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                 await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
@@ -241,15 +242,15 @@ class Module:
             else:
                 raise Exception(f'clock type {self.CLOCK_TYPE} not yet supported by module.')
         else:
-            await self.parent_module.sim_wait(delay)       
+            await self.parent_module.sim_wait(delay, module_name)       
 
-    async def sim_wait_to(self, t):
+    async def sim_wait_to(self, t, module_name=None):
         if self.parent_module is None:
             t_curr = self.get_current_time()
             delay = t - t_curr
-            await self.sim_wait(delay)
+            await self.sim_wait(delay, module_name=module_name)
         else:
-            await self.parent_module.sim_wait_to(t)       
+            await self.parent_module.sim_wait_to(t, module_name)       
 
     def log(self, content, level=logging.DEBUG, module_name=None):
         if module_name is None:
@@ -273,34 +274,3 @@ class Module:
                 self.actions_logger.critical(out)
         else:
             self.parent_module.log(content, level, module_name)
-    
-"""
---------------------
-  TESTING MODULES
---------------------
-"""
-class SubModule(Module):
-    def __init__(self, name, parent_module) -> None:
-        super().__init__(name, parent_module, submodules=[])
-
-    async def coroutines(self):
-        try:
-            self.log('Starting periodic print routine...')
-            while True:
-                msg = dict()
-                msg['src'] = self.name
-                msg['dst'] = self.parent_module.name
-                msg['@type'] = 'PRINT'
-                msg['content'] = 'TEST_PRINT'
-
-                await self.parent_module.put_message(msg)
-
-                await self.sim_wait(random.random()*10)
-                
-        except asyncio.CancelledError:
-            self.log('Periodic print routine cancelled')
-            return
-
-class TestModule(Module):
-    def __init__(self, parent_agent) -> None:
-        super().__init__('test', parent_agent, [SubModule('sub_test', self)])
