@@ -31,6 +31,7 @@ class EnvironmentModuleTypes(Enum):
     ECLIPSE_EVENT_MODULE = 'ECLIPSE_EVENT_MODULE'
     GP_ACCESS_EVENT_MODULE = 'GP_ACCESS_EVENT_MODULE'
     GS_ACCESS_EVENT_MODULE = 'GS_ACCESS_EVENT_MODULE'
+    AGENT_ACCESS_EVENT_MODULE = 'AGENT_ACCESS_EVENT_MODULE'
 
 class TicRequestModule(Module):
     def __init__(self, parent_environment) -> None:
@@ -310,25 +311,50 @@ class GPAccessEventModule(ScheduledEventModule):
             for _, row in self.event_data.iterrows():
                 coverage_events = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'instrument', 'mode', 'grid', 'GP index', 'pnt-opt index', 'lat [deg]', 'lon [deg]',])
 
-        # for agent in orbit_data:
-        #     agent_eclipse_data = orbit_data[agent].eclipse_data
-        #     nrows, _ = agent_eclipse_data.shape
-        #     agent_name_column = [agent] * nrows
-
-        #     eclipse_rise = agent_eclipse_data.get(['start index'])
-        #     eclipse_rise = eclipse_rise.rename(columns={'start index': 'time index'})
-        #     eclipse_rise['agent name'] = agent_name_column
-        #     eclipse_rise['rise'] = [True] * nrows
-
-        #     eclipse_set = agent_eclipse_data.get(['end index'])
-        #     eclipse_set = eclipse_set.rename(columns={'end index': 'time index'})
-        #     eclipse_set['agent name'] = agent_name_column
-        #     eclipse_set['rise'] = [False] * nrows
-
-        #     eclipse_merged = pd.concat([eclipse_rise, eclipse_set])
-        #     if len(eclipse_data) == 0:
-        #         eclipse_data = eclipse_merged
-        #     else:
-        #         eclipse_data = pd.concat([eclipse_data, eclipse_merged])
 
         return coverage_data
+
+class AgentAccessEventModule(ScheduledEventModule):
+    def __init__(self, parent_environment) -> None:
+        super().__init__(EnvironmentModuleTypes.AGENT_ACCESS_EVENT_MODULE.name, parent_environment)
+
+    def row_to_msg_dict(self, row) -> dict:
+        t_next = row['time index'] * self.time_step
+        agent_name = row['agent name']
+        rise = row['rise']
+        target = row['target']
+
+        return BroadcastTypes.create_agent_access_event_broadcast(self.name, self.parent_module.name, rise, t_next, agent_name, target)
+
+    def compile_event_data(self) -> pd.DataFrame:
+        orbit_data = self.parent_module.orbit_data  
+        agent_access_data = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'target'])
+        
+        for src in orbit_data:
+            isl_data = orbit_data[src].isl_data
+            for dst in isl_data:
+                nrows, _ = isl_data[dst].shape
+                
+                # rise data
+                access_rise = isl_data[dst].copy()
+                access_rise = access_rise.rename(columns={'start index': 'time index'})
+                access_rise.pop('end index')
+                access_rise['agent name'] = [src] * nrows
+                access_rise['rise'] = [True] * nrows
+                access_rise['target'] = [dst] * nrows
+
+                # set data
+                access_set = isl_data[dst].copy()
+                access_set = access_set.rename(columns={'end index': 'time index'})
+                access_set.pop('start index')
+                access_set['agent name'] = [src] * nrows
+                access_set['rise'] = [False] * nrows
+                access_set['target'] = [dst] * nrows
+
+                access_merged = pd.concat([access_rise, access_set])
+                if len(agent_access_data) == 0:
+                    agent_access_data = access_merged
+                else:
+                    agent_access_data = pd.concat([agent_access_data, access_merged])
+        
+        return agent_access_data

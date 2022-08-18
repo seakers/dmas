@@ -6,7 +6,7 @@ import logging
 import random
 import time
 import zmq.asyncio
-from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule
+from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule
 from orbitdata import OrbitData
 
 from messages import BroadcastTypes, RequestTypes
@@ -74,7 +74,8 @@ class EnvironmentServer(Module):
         self.submodules = [ TicRequestModule(self), 
                             EclipseEventModule(self), 
                             # GPAccessEventModule(self),
-                            GndStatAccessEventModule(self)
+                            GndStatAccessEventModule(self),
+                            AgentAccessEventModule(self)
                           ]
         
         # set up results dir
@@ -300,7 +301,8 @@ class EnvironmentServer(Module):
                     await self.sim_time.set_level(t_next)
 
                 elif (BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
-                     or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT):
+                     or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+                     or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
                     msg['dst'] = msg['agent']
                     msg.pop('agent')
                 
