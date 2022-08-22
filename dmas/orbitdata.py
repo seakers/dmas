@@ -52,6 +52,9 @@ class OrbitData:
         # ground point access times
         self.gp_access_data = gp_access_data.sort_values(by=['time index'])
     
+    """
+    GET NEXT methods
+    """
     def get_next_agent_access(self, target, t: float):
         src = self.agent_name
 
@@ -90,14 +93,6 @@ class OrbitData:
         modes = dict()
         return interval, instruments, modes
 
-    def find_gp_index(self, lat: float, lon: float):
-        """
-        Returns the ground point and grid index to the point closest to the latitude and longitude given.
-
-        lat, lon must be given in degrees
-        """
-        return -1, -1
-
     def get_next_eclipse_interval(self, t: float):
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
@@ -109,6 +104,18 @@ class OrbitData:
             elif t < t_end:
                 return t_end
         return np.Infinity
+
+    """
+    STATE QUERY methods
+    """
+    def is_accessing_agent(self, target: str, t: float):
+        if target not in self.isl_data.keys():
+            return False 
+
+        t = t/self.time_step
+        nrows, _ = self.isl_data[target].query('`start index` <= @t & @t <= `end index`').shape
+               
+        return nrows > 0
 
     def is_eclipse(self, t: float):
         for _, row in self.eclipse_data.iterrows():
@@ -153,6 +160,15 @@ class OrbitData:
                 vz = row['vz [km/s]']
                 return [x, y, z, vx, vy, vz]
         return [-1,-1,-1]
+
+    
+    def find_gp_index(self, lat: float, lon: float):
+        """
+        Returns the ground point and grid index to the point closest to the latitude and longitude given.
+
+        lat, lon must be given in degrees
+        """
+        return -1, -1
 
     def from_directory(scenario_dir: str):
         """

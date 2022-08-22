@@ -257,14 +257,16 @@ class EnvironmentServer(Module):
                 # unpackage message
                 src = request['src']
                 target = request['target']
-                                
-                self.log(f'Received agent access request from {src} to {target}!')
+                
+                t_curr = self.get_current_time()
+                self.log(f'Received agent access request from {src} to {target} at simulation time t={t_curr}!')
 
                 # query agent access database
-                # self.orbit_data[src].isl_data
+                request['result'] = self.orbit_data[src].is_accessing_agent(target, t_curr) 
+                req_json = json.dumps(request)
                 
                 # send reception confirmation to agent
-                await self.reqservice.send_string('')
+                await self.reqservice.send_json(req_json)
                 
             #     await self.reqservice.send_string('')
             #     pass
@@ -612,8 +614,8 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    # duration = 6048
-    duration = 40
+    duration = 6048
+    # duration = 40
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)

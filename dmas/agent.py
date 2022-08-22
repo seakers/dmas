@@ -131,11 +131,13 @@ class AgentNode(Module):
         end_msg['@type'] = RequestTypes.AGENT_END_CONFIRMATION.name
         end_json = json.dumps(end_msg)
 
+        await self.environment_request_lock.acquire()
         await self.environment_request_socket.send_json(end_json)
         self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
 
         # wait for server reply
         await self.environment_request_socket.recv() 
+        self.environment_request_lock.release()
         self.env_request_logger.info('Response received! terminating agent.')
 
         self.log(f"Closing all network sockets...")
@@ -459,7 +461,6 @@ class AgentNode(Module):
                 
     async def request_submitter(self, req):
         req_type = req['@type']
-        req_json = json.dumps(req)
         src_module = req['src'] 
 
         req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
@@ -468,6 +469,7 @@ class AgentNode(Module):
 
         if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
             t_end = req['t']
+            req_json = json.dumps(req)
 
             # submit request
             self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
@@ -486,6 +488,7 @@ class AgentNode(Module):
             target = req['target']
             req['src'] = self.name
             req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+            req_json = json.dumps(req)
 
             # submit request
             self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
