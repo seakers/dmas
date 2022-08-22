@@ -103,17 +103,23 @@ class BroadcastTypes(Enum):
 class RequestTypes(Enum):
     """
     Types of requests between agents and environment.
-        1- tic_requests: agents ask to be notified when a certain time has passed in the environment's clock    
-        2- access_request: agent asks to be notified when a ground point or an agent is going to be accessible by said agent
-        3- agent_information_request: agent asks for information regarding its current position, velocity, and eclipse
-        4- observation_request: agent requests environment information regarding a the state of a ground point
+        0- sync_request: agent notifies environment server that it is online and ready to start the simulation. Only used before the start of the simulation
+        1- tic_request: agents ask to be notified when a certain time has passed in the environment's clock    
+        2- agent_access_request: agent asks the enviroment if the agent is capable of accessing another agent at the current simulation time
+        3- gp_access_request: agent asks the enviroment if the agent is capable of accessing a ground point at the current simulation time
+        4- gs_access_request: agent asks the enviroment if the agent is capable of accessing a ground station at the current simulation time
+        5- agent_information_request: agent asks for information regarding its current position, velocity, and eclipse at the current simulation time
+        6- observation_request: agent requests environment information regarding a the state of a ground point at the current simulation time
+        7- agent_end_confirmation: agent notifies the environment that it has successfully terminated its operations
     """
     SYNC_REQUEST = 'SYNC_REQUEST'
     TIC_REQUEST = 'TIC_REQUEST'
-    ACCESS_REQUEST = 'ACCESS_REQUEST'
+    AGENT_ACCESS_REQUEST = 'AGENT_ACCESS_REQUEST'
+    GP_ACCESS_REQUEST = 'GROUND_POINT_ACCESS_REQUEST'
+    GS_ACCESS_REQUEST = 'GROUND_STATION_ACCESS_REQUEST'
     AGENT_INFO_REQUEST = 'AGENT_INFO_REQUEST'
     OBSERVATION_REQUEST = 'OBSERVATION_REQUEST'
-    END_CONFIRMATION = 'END_CONFIRMATION'
+    AGENT_END_CONFIRMATION = 'AGENT_END_CONFIRMATION'
 
     def format_check(msg: dict):
         """
@@ -141,12 +147,14 @@ class RequestTypes(Enum):
             
             if t_end is None:
                 return False
-        elif RequestTypes[msg_type] is RequestTypes.ACCESS_REQUEST:
+        elif RequestTypes[msg_type] is RequestTypes.AGENT_ACCESS_REQUEST:
             pass
         elif RequestTypes[msg_type] is RequestTypes.AGENT_INFO_REQUEST:
             pass
         elif RequestTypes[msg_type] is RequestTypes.OBSERVATION_REQUEST:
             pass
+        elif RequestTypes[msg_type] is RequestTypes.AGENT_END_CONFIRMATION:
+            return True
         else:
             return False
         

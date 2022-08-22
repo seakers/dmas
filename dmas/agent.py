@@ -8,6 +8,7 @@ import time
 import zmq
 import zmq.asyncio
 import logging
+from environment import EnvironmentServer
 from messages import BroadcastTypes
 from utils import SimClocks, Container
 from messages import RequestTypes
@@ -126,8 +127,8 @@ class AgentNode(Module):
         self.env_request_logger.info('Connection to environment established!')
         end_msg = dict()
         end_msg['src'] = self.name
-        end_msg['dst'] = 'ENV'
-        end_msg['@type'] = RequestTypes.END_CONFIRMATION.name
+        end_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+        end_msg['@type'] = RequestTypes.AGENT_END_CONFIRMATION.name
         end_json = json.dumps(end_msg)
 
         await self.environment_request_socket.send_json(end_json)
@@ -158,9 +159,21 @@ class AgentNode(Module):
             if dst_name != self.name:
                 await self.put_message(msg)
             else:
-                if msg['@type'] == 'PRINT':
+                msg_type = msg['@type']
+                if msg_type == 'PRINT':
                     content = msg['content']
                     self.log(content)                
+                elif msg_type is RequestTypes.AGENT_ACCESS_REQUEST:
+                    src_module = msg['src'] 
+                    msg['src'] = self.name
+                    msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+
+                    msg_json = json.loads(msg)
+                    await self.environment_request_lock.acquire()
+                    resp = await self.environment_request_socket.send_json(msg)
+                    self.environment_request_lock.release()
+                    x = 1
+
         except asyncio.CancelledError:
             return
 
@@ -254,7 +267,7 @@ class AgentNode(Module):
 
         sync_msg = dict()
         sync_msg['src'] = self.name
-        sync_msg['dst'] = 'ENV'
+        sync_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
         sync_msg['@type'] = RequestTypes.SYNC_REQUEST.name
         sync_msg['port'] = self.agent_port_in
         sync_msg['n_coroutines'] = count_number_of_subroutines(self)
@@ -390,8 +403,8 @@ class AgentState:
 --------------------
 """
 class TestAgent(AgentNode):    
-    def __init__(self, name, scenario_dir) -> None:
-        super().__init__(name, scenario_dir)
+    def __init__(self, scenario_dir) -> None:
+        super().__init__('Mars1', scenario_dir)
         self.submodules = [TestModule(self)]  
 
 """
@@ -415,6 +428,16 @@ class SubModule(Module):
 
                 await self.parent_module.put_message(msg)
 
+                # await self.sim_wait(1)
+
+                # msg = dict()
+                # msg['src'] = self.name
+                # msg['dst'] = self.parent_module.parent_module.name
+                # msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST
+                # msg['target'] = 'Mars2'
+
+                # await self.parent_module.put_message(msg)
+
                 await self.sim_wait(20)
                 
         except asyncio.CancelledError:
@@ -434,6 +457,6 @@ if __name__ == '__main__':
     print('Initializing agent...')
     scenario_dir = './scenarios/sim_test'
     
-    agent = TestAgent("AGENT0", scenario_dir)
+    agent = TestAgent(scenario_dir)
     
     asyncio.run(agent.live())
