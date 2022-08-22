@@ -267,17 +267,28 @@ class EnvironmentServer(Module):
                 
                 # send reception confirmation to agent
                 await self.reqservice.send_json(req_json)
-                
-            #     await self.reqservice.send_string('')
-            #     pass
             
             # elif req_type is RequestTypes.GP_ACCESS_REQUEST:
-            #     await self.reqservice.send_string('')
+            #     # unpackage message
+            #     src = request['src']
+            #     lat, lon= request['target']
+
             #     pass
 
-            # elif req_type is RequestTypes.GS_ACCESS_REQUEST:
-            #     await self.reqservice.send_string('')
-            #     pass
+            elif req_type is RequestTypes.GS_ACCESS_REQUEST:
+                # unpackage message
+                src = request['src']
+                target = request['target']
+
+                t_curr = self.get_current_time()
+                self.log(f'Received ground station access request from {src} to {target} at simulation time t={t_curr}!')
+
+                # query agent access database
+                request['result'] = self.orbit_data[src].is_accessing_ground_station(target, t_curr) 
+                req_json = json.dumps(request)
+                
+                # send reception confirmation to agent
+                await self.reqservice.send_json(req_json)
 
             # elif req_type is RequestTypes.AGENT_INFO_REQUEST:
             #     await self.reqservice.send_string('')
@@ -614,8 +625,8 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    duration = 6048
-    # duration = 40
+    # duration = 6048
+    duration = 40
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)

@@ -178,11 +178,6 @@ class AgentNode(Module):
         try:
             # create coroutine tasks
             coroutines = []
-
-            ## Internal coroutines
-            # request_submittion_handler = asyncio.create_task(self.request_submittion_handler())
-            # request_submittion_handler.set_name (f'{self.name}_routine')
-            # coroutines.append(request_submittion_handler)
             
             broadcast_reception_handler = asyncio.create_task(self.broadcast_reception_handler())
             broadcast_reception_handler.set_name (f'{self.name}_internal_message_router')
@@ -207,61 +202,6 @@ class AgentNode(Module):
             for subroutine in coroutines:
                 subroutine.cancel()
                 await subroutine
-            return
-    
-    async def request_submittion_handler(self):
-        """
-        Listens any requests that need to be submitted to the environment from any submodule. 
-        Stops processes when simulation end-command is received.
-        """
-        try:
-            while True:
-                msg = await self.request_submittion_queue.get()
-
-                msg_type = msg['@type']
-                msg_json = json.dumps(msg)
-                src_module = msg['src'] 
-
-                msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-
-                self.log(f'Received internal message of type {msg_type}.')
-
-                if msg_type == 'PRINT':
-                    content = msg['content']
-                    self.log(content)                       
-                
-                elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
-                    t_end = msg['t']
-
-                    # submit request
-                    self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
-                    await self.environment_request_lock.acquire()
-                    await self.environment_request_socket.send_json(msg_json)
-                    self.log('Tic request sent successfully. Awaiting confirmation...')
-
-                    # wait for sever reply
-                    await self.environment_request_socket.recv()  
-                    self.environment_request_lock.release()
-                    self.log('Tic request reception confirmation received.')
-                    
-
-                elif RequestTypes[msg_type] is RequestTypes.AGENT_ACCESS_REQUEST:
-                    target = msg['target']
-                    msg['src'] = self.name
-                    msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-
-                    # submit request
-                    self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
-                    await self.environment_request_lock.acquire()
-                    await self.environment_request_socket.send_json(msg_json)
-                    self.log('Agent Access request sent successfully. Awaiting response...')
-                    
-                    # wait for server reply
-                    resp = await self.environment_request_socket.recv()
-                    self.environment_request_lock.release()
-                    self.log(f'Received Request Response: \'{resp}\'')
-                
-        except asyncio.CancelledError:
             return
 
     async def broadcast_reception_handler(self):
@@ -462,6 +402,7 @@ class AgentNode(Module):
     async def request_submitter(self, req):
         req_type = req['@type']
         src_module = req['src'] 
+        req['src'] = self.name
 
         req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
 
@@ -486,8 +427,6 @@ class AgentNode(Module):
 
         elif RequestTypes[req_type] is RequestTypes.AGENT_ACCESS_REQUEST:
             target = req['target']
-            req['src'] = self.name
-            req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
             req_json = json.dumps(req)
 
             # submit request
@@ -497,11 +436,30 @@ class AgentNode(Module):
             self.log('Agent Access request sent successfully. Awaiting response...')
             
             # wait for server reply
-            resp = await self.environment_request_socket.recv()
+            resp = await self.environment_request_socket.recv_json()
+            resp = json.loads(resp)
             self.environment_request_lock.release()
-            self.log(f'Received Request Response: \'{resp}\'')        
+            resp_val = resp.get('result')
+            self.log(f'Received Request Response: \'{resp_val}\'')        
             
             return resp
+
+        elif RequestTypes[req_type] is RequestTypes.GS_ACCESS_REQUEST:
+            target = req['target']            
+            req_json = json.dumps(req)
+
+            # submit request
+            self.log(f'Sending Ground Station Access Request (from {self.name} to {target})...')
+            await self.environment_request_lock.acquire()
+            await self.environment_request_socket.send_json(req_json)
+            self.log('Ground Station Access request sent successfully. Awaiting response...')
+            
+            # wait for server reply
+            resp = await self.environment_request_socket.recv_json()
+            resp = json.loads(resp)
+            self.environment_request_lock.release()
+            resp_val = resp.get('result')
+            self.log(f'Received Request Response: \'{resp_val}\'')       
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
@@ -540,11 +498,17 @@ class SubModule(Module):
 
                 await self.sim_wait(1)
 
+                # msg = dict()
+                # msg['src'] = self.name
+                # msg['dst'] = self.parent_module.parent_module.name
+                # msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
+                # msg['target'] = 'Mars2'
+
                 msg = dict()
                 msg['src'] = self.name
                 msg['dst'] = self.parent_module.parent_module.name
-                msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
-                msg['target'] = 'Mars2'
+                msg['@type'] = RequestTypes.GS_ACCESS_REQUEST.name
+                msg['target'] = 'NEN2'
 
                 resp = await self.submit_request(msg)
 

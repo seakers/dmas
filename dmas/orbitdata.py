@@ -117,6 +117,13 @@ class OrbitData:
                
         return nrows > 0
 
+    def is_accessing_ground_station(self, target: str, t: float):
+        t = t/self.time_step
+        nrows, _ = self.gs_access_data.query('`start index` <= @t & @t <= `end index` & `gndStn name` == @target').shape
+               
+        return nrows > 0
+
+
     def is_eclipse(self, t: float):
         for _, row in self.eclipse_data.iterrows():
             t_start = row['start index'] * self.time_step
