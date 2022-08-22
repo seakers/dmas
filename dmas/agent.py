@@ -160,32 +160,108 @@ class AgentNode(Module):
                 await self.put_message(msg)
             else:
                 msg_type = msg['@type']
+
+                self.log(f'Received internal message of type {msg_type}.')
+
                 if msg_type == 'PRINT':
                     content = msg['content']
-                    self.log(content)                
-                elif msg_type is RequestTypes.AGENT_ACCESS_REQUEST:
-                    src_module = msg['src'] 
-                    msg['src'] = self.name
-                    msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-
-                    msg_json = json.loads(msg)
-                    await self.environment_request_lock.acquire()
-                    resp = await self.environment_request_socket.send_json(msg)
-                    self.environment_request_lock.release()
-                    x = 1
+                    self.log(content)                       
+                elif 'REQUEST' in msg_type:
+                    await self.request_submittion_queue.put(msg)
 
         except asyncio.CancelledError:
             return
 
     async def coroutines(self):
         try:
+            # create coroutine tasks
+            coroutines = []
+
+            ## Internal coroutines
+            # request_submittion_handler = asyncio.create_task(self.request_submittion_handler())
+            # request_submittion_handler.set_name (f'{self.name}_routine')
+            # coroutines.append(request_submittion_handler)
+            
             broadcast_reception_handler = asyncio.create_task(self.broadcast_reception_handler())
-            await broadcast_reception_handler   
-        except asyncio.CancelledError:
-            broadcast_reception_handler.cancel()
-            await broadcast_reception_handler
+            broadcast_reception_handler.set_name (f'{self.name}_internal_message_router')
+            coroutines.append(broadcast_reception_handler)
+
+            _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+
+            done_name = None
+            for coroutine in coroutines:
+                if coroutine not in pending:
+                    done_name = coroutine.get_name()
+
+            # cancell all other coroutine tasks
+            self.log(f'{done_name} ended. Terminating all other coroutines...', level=logging.INFO)
+            for subroutine in pending:
+                subroutine.cancel()
+                await subroutine
+            return
+
+        except asyncio.CancelledError: 
+            self.log('Cancelling all coroutines...')
+            for subroutine in coroutines:
+                subroutine.cancel()
+                await subroutine
             return
     
+    async def request_submittion_handler(self):
+        """
+        Listens any requests that need to be submitted to the environment from any submodule. 
+        Stops processes when simulation end-command is received.
+        """
+        try:
+            while True:
+                msg = await self.request_submittion_queue.get()
+
+                msg_type = msg['@type']
+                msg_json = json.dumps(msg)
+                src_module = msg['src'] 
+
+                msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+
+                self.log(f'Received internal message of type {msg_type}.')
+
+                if msg_type == 'PRINT':
+                    content = msg['content']
+                    self.log(content)                       
+                
+                elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
+                    t_end = msg['t']
+
+                    # submit request
+                    self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
+                    await self.environment_request_lock.acquire()
+                    await self.environment_request_socket.send_json(msg_json)
+                    self.log('Tic request sent successfully. Awaiting confirmation...')
+
+                    # wait for sever reply
+                    await self.environment_request_socket.recv()  
+                    self.environment_request_lock.release()
+                    self.log('Tic request reception confirmation received.')
+                    
+
+                elif RequestTypes[msg_type] is RequestTypes.AGENT_ACCESS_REQUEST:
+                    target = msg['target']
+                    msg['src'] = self.name
+                    msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+
+                    # submit request
+                    self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
+                    await self.environment_request_lock.acquire()
+                    await self.environment_request_socket.send_json(msg_json)
+                    self.log('Agent Access request sent successfully. Awaiting response...')
+                    
+                    # wait for server reply
+                    resp = await self.environment_request_socket.recv()
+                    self.environment_request_lock.release()
+                    self.log(f'Received Request Response: \'{resp}\'')
+                
+        except asyncio.CancelledError:
+            return
+
     async def broadcast_reception_handler(self):
         """
         Listens for broadcasts from the environment. Stops processes when simulation end-command is received.
@@ -201,24 +277,27 @@ class AgentNode(Module):
                 t_server = msg_dict['server_clock']
 
                 self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+                self.log(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
-                msg_type = BroadcastTypes[msg_type]
+                if self.name == dst or 'all' == dst:
+                    msg_type = BroadcastTypes[msg_type]
+                    if msg_type is BroadcastTypes.SIM_END_EVENT:
+                        self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
+                        return
 
-                if msg_type is BroadcastTypes.SIM_END_EVENT:
-                    self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
-                    return
-
-                elif msg_type is BroadcastTypes.TIC_EVENT:
-                    if (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
-                        or self.CLOCK_TYPE == SimClocks.SERVER_TIME
-                        or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
-                        
-                        # use server clock broadcasts to update internal clock
-                        self.message_logger.info(f'Updating internal clock.')
-                        await self.sim_time.set_level(t_server)
-                        self.log('Updated internal clock.')
+                    elif msg_type is BroadcastTypes.TIC_EVENT:
+                        if (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
+                            or self.CLOCK_TYPE == SimClocks.SERVER_TIME
+                            or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
+                            
+                            # use server clock broadcasts to update internal clock
+                            self.message_logger.info(f'Updating internal clock.')
+                            await self.sim_time.set_level(t_server)
+                            self.log('Updated internal clock.')
+                    else:
+                        self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
                 else:
-                    self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
+                    self.log('Boradcast not intended for this agent. Discarding message...')
         except asyncio.CancelledError:
             return
 
@@ -279,6 +358,8 @@ class AgentNode(Module):
         # wait for synchronization reply
         await self.environment_request_socket.recv()  
         self.environment_request_lock.release()
+
+        self.request_submittion_queue = asyncio.Queue()
 
     async def wait_sim_start(self):
         """
@@ -375,23 +456,49 @@ class AgentNode(Module):
 
             loggers.append(logger)
         return loggers
-        
-    async def submit_tic_request(self, delay, module_name):
-        t_end = self.sim_time.level + delay
-        
-        self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...', module_name=module_name)
-        await self.environment_request_lock.acquire()
+                
+    async def request_submitter(self, req):
+        req_type = req['@type']
+        req_json = json.dumps(req)
+        src_module = req['src'] 
 
-        tic_msg = RequestTypes.create_tic_event_message(self.name, 'ENV', t_end)
-        tic_json = json.dumps(tic_msg)
+        req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
 
-        await self.environment_request_socket.send_json(tic_json)
-        self.log('Tic request sent successfully. Awaiting confirmation...', module_name=module_name)
+        self.log(f'Submitting a request of type {req_type}.')
 
-        # wait for synchronization reply
-        await self.environment_request_socket.recv()  
-        self.environment_request_lock.release()
-        self.log('Tic request reception confirmation received.', module_name=module_name)
+        if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
+            t_end = req['t']
+
+            # submit request
+            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
+            await self.environment_request_lock.acquire()
+            await self.environment_request_socket.send_json(req_json)
+            self.log('Tic request sent successfully. Awaiting confirmation...')
+
+            # wait for sever reply
+            await self.environment_request_socket.recv()  
+            self.environment_request_lock.release()
+            self.log('Tic request reception confirmation received.')         
+
+            return   
+
+        elif RequestTypes[req_type] is RequestTypes.AGENT_ACCESS_REQUEST:
+            target = req['target']
+            req['src'] = self.name
+            req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+
+            # submit request
+            self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
+            await self.environment_request_lock.acquire()
+            await self.environment_request_socket.send_json(req_json)
+            self.log('Agent Access request sent successfully. Awaiting response...')
+            
+            # wait for server reply
+            resp = await self.environment_request_socket.recv()
+            self.environment_request_lock.release()
+            self.log(f'Received Request Response: \'{resp}\'')        
+            
+            return resp
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
@@ -428,15 +535,15 @@ class SubModule(Module):
 
                 await self.parent_module.put_message(msg)
 
-                # await self.sim_wait(1)
+                await self.sim_wait(1)
 
-                # msg = dict()
-                # msg['src'] = self.name
-                # msg['dst'] = self.parent_module.parent_module.name
-                # msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST
-                # msg['target'] = 'Mars2'
+                msg = dict()
+                msg['src'] = self.name
+                msg['dst'] = self.parent_module.parent_module.name
+                msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
+                msg['target'] = 'Mars2'
 
-                # await self.parent_module.put_message(msg)
+                resp = await self.submit_request(msg)
 
                 await self.sim_wait(20)
                 

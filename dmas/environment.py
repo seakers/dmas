@@ -244,7 +244,7 @@ class EnvironmentServer(Module):
 
                 # schedule tic request
                 t_req = request.get('t')
-                self.log(f'Received tic request for t_req={t_req}')
+                self.log(f'Received tic request for t_req={t_req}!')
 
                 # change source and destination to internal modules
                 request['src'] = self.name
@@ -253,15 +253,18 @@ class EnvironmentServer(Module):
                 # send to internal message router for forwarding
                 await self.put_message(request)
 
-            # elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
-            #     # unpackage message
-            #     src = request['src']
-            #     target = request['target']
+            elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
+                # unpackage message
+                src = request['src']
+                target = request['target']
                                 
-            #     # query agent access database
-            #     self.orbit_data[src].isl_data
+                self.log(f'Received agent access request from {src} to {target}!')
 
+                # query agent access database
+                # self.orbit_data[src].isl_data
                 
+                # send reception confirmation to agent
+                await self.reqservice.send_string('')
                 
             #     await self.reqservice.send_string('')
             #     pass
@@ -588,15 +591,18 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
-    async def submit_tic_request(self, delay, module_name):
-        # if the clock is server-step, then submit a tic request to environment
-        t_end = self.sim_time.level + delay
+    async def request_submitter(self, req):
+        """
+        Submits requests to itself whenever a submodule requires information that can only be obtained from request messages
+        """
+        req['src'] = self.name
+        req_type = req['@type']
 
-        self.log(f'Submitting tic-request for t_end={t_end}.', module_name=module_name)
-
-        req_msg = RequestTypes.create_tic_event_message(self.name, EnvironmentModuleTypes.TIC_REQUEST_MODULE.name, t_end)
-
-        await self.put_message(req_msg)
+        if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
+            req['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
+        else:
+            raise Exception(f'Internal Handling of request type {req_type} not yet supported')
+        await self.put_message(req)
         
 """
 --------------------
@@ -606,7 +612,8 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    duration = 6048
+    # duration = 6048
+    duration = 40
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)

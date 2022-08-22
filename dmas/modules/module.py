@@ -114,7 +114,7 @@ class Module:
                 dst_name = msg.get('dst',None)
 
                 if dst_name is None or src_name is None:
-                    self.log(f'Received invalid internal message. Discarting message.')
+                    self.log(f'Received invalid internal message. Discarting message: {msg}')
                     continue
 
                 self.log(f'Received internal message from \'{src_name}\' intended for \'{dst_name}\'')
@@ -238,17 +238,14 @@ class Module:
         """
         return (time.perf_counter() - self.START_TIME)
 
-    @abstractmethod
-    async def submit_tic_request(self, delay, module_name):
-        """
-        creates a tic-request to be submitted to the environment
-        """
-        pass
 
     async def sim_wait(self, delay, module_name=None):
         """
         awaits until simulation time runs for a given delay
         """
+        if module_name is None:
+            module_name = self.name
+
         if self.parent_module is None:
             if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                 await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
@@ -257,14 +254,31 @@ class Module:
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
 
                 # if the clock is server-step, then submit a tic request to environment
-                await self.submit_tic_request(delay, module_name)
+                t_end = self.sim_time.level + delay       
+                tic_msg = RequestTypes.create_tic_event_message(self.name, 'ENV', t_end)
+                await self.submit_request(tic_msg)
 
-                t_end = self.sim_time.level + delay
                 await self.sim_time.when_geq_than(t_end)
             else:
                 raise Exception(f'clock type {self.CLOCK_TYPE} not yet supported by module.')
         else:
             await self.parent_module.sim_wait(delay, module_name)       
+
+    @abstractmethod
+    async def request_submitter(self, req):
+        """
+        submitts a request of any type to the environment
+        """
+        pass
+
+    async def submit_request(self, req):
+        """
+        submits environment request and returns response from environment server
+        """
+        if self.parent_module is None:
+            return await self.request_submitter(req)
+        else:
+            return await self.parent_module.submit_request(req)
 
     async def sim_wait_to(self, t, module_name=None):
         """
