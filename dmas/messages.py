@@ -49,9 +49,11 @@ class BroadcastTypes(Enum):
                 return False
         elif BroadcastTypes[msg_type] is BroadcastTypes.SIM_START_EVENT or BroadcastTypes[msg_type] is BroadcastTypes.SIM_END_EVENT:
             return True
-        elif (BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT 
-                or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
-                or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
+        elif (BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT):
+            return True
+        elif (BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
+              or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+              or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
             return True
         else:
             return False
@@ -82,6 +84,23 @@ class BroadcastTypes(Enum):
         msg_dict['rise'] = rise
         msg_dict['gndStat_name'] = gndStat_name
         msg_dict['gndStat_id'] = gndStat_id
+        msg_dict['lat'] = lat
+        msg_dict['lon'] = lon
+
+        return msg_dict
+
+    def create_gp_access_event_broadcast(src: str, dst: str, agent_name: str, rise: bool, t: float, 
+                                        grid_index: int, gp_index: int, lat: float, lon: float) -> dict:
+        msg_dict = dict()
+
+        msg_dict['src'] = src
+        msg_dict['dst'] = dst
+        msg_dict['@type'] = BroadcastTypes.GP_ACCESS_EVENT.name
+        msg_dict['server_clock'] = t
+        msg_dict['agent'] = agent_name
+        msg_dict['rise'] = rise
+        msg_dict['grid_index'] = grid_index
+        msg_dict['gp_index'] = gp_index
         msg_dict['lat'] = lat
         msg_dict['lon'] = lon
 

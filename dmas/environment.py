@@ -78,10 +78,13 @@ class EnvironmentServer(Module):
         if simulation_frequency < 0 and self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
             raise Exception('Simulation frequency needed to initiate simulation with a REAL_TIME_FAST clock.')
 
+        # propagate orbit and coverage information
+        self.orbit_data = OrbitData.from_directory(scenario_dir)
+
         # set up submodules
         self.submodules = [ TicRequestModule(self), 
                             EclipseEventModule(self), 
-                            # GPAccessEventModule(self),
+                            GPAccessEventModule(self),
                             GndStatAccessEventModule(self),
                             AgentAccessEventModule(self)
                           ]
@@ -91,9 +94,6 @@ class EnvironmentServer(Module):
 
         # set up loggers
         [self.message_logger, self.request_logger, self.state_logger, self.actions_logger] = self.set_up_loggers()
-
-        # propagate orbit and coverage information
-        self.orbit_data = OrbitData.from_directory(scenario_dir)
 
         print('Environment Initialized!')
 
@@ -191,24 +191,32 @@ class EnvironmentServer(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
+                self.log(f'Message not intended for this module. Rerouting.')
                 await self.put_message(msg)
             else:
                 # if the message is of type broadcast, send to broadcast handler
                 msg_type = msg['@type']
-                if 'REQUEST' not in msg_type:
-                    if (BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
+                self.log(f'Handling message of type {msg_type}...')
 
+                if ('REQUEST' not in msg_type and 
+                    (BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT
+                    or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
+                    or BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
+                    or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+                    or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT)):
+                        self.log(f'Submitting message of type {msg_type} for publishing...')
                         await self.publisher_queue.put(msg)
+                        
                 elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
                     # if an submodule sends a tic request, forward to tic request submodule
                     msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE
+                    
+                    self.log(f'Forwarding Tic request to relevant submodule...')
                     await self.put_message(msg)
+                else:
+                    self.log(f'Dumping internal message of type {msg_type}.')
 
-                # else, dump
+                self.log(f'Done handling message.')
                 return
         except asyncio.CancelledError:
             return
@@ -345,6 +353,7 @@ class EnvironmentServer(Module):
                 await request_worker(req)
 
         except asyncio.CancelledError:
+            # await self.reqservice.send_string('')
             return
 
     async def broadcast_handler(self):
@@ -380,6 +389,7 @@ class EnvironmentServer(Module):
 
                 elif (BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
                      or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+                     or BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
                      or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
                     msg['dst'] = msg['agent']
                     msg.pop('agent')
@@ -642,7 +652,8 @@ if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
     # duration = 6048
-    duration = 40
+    # duration = 40
+    duration = 70
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)

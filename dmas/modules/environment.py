@@ -110,6 +110,20 @@ class ScheduledEventModule(Module):
     def __init__(self, name: EnvironmentModuleTypes,parent_environment) -> None:   
         super().__init__(name, parent_environment, submodules=[], n_timed_coroutines=1)
 
+        # initialize scheduled events data and sort
+        self.event_data = self.compile_event_data()
+        self.event_data = self.event_data.sort_values(by=['time index'])
+
+        # if data does not have proper format, reject
+        if not self.check_data_format():
+            raise Exception('Event data loaded in an incorrect format.')
+
+        # get scheduled event time-step
+        self.time_step = -1
+        for agent_name in self.parent_module.orbit_data:
+            orbit_data = self.parent_module.orbit_data[agent_name]
+            self.time_step = orbit_data.time_step
+            break
 
     @abstractmethod
     def compile_event_data(self) -> pd.DataFrame:
@@ -129,20 +143,20 @@ class ScheduledEventModule(Module):
         """
         await super().activate()
         
-        # initialize scheduled events data and sort
-        self.event_data = self.compile_event_data()
-        self.event_data = self.event_data.sort_values(by=['time index'])
+        # # initialize scheduled events data and sort
+        # self.event_data = self.compile_event_data()
+        # self.event_data = self.event_data.sort_values(by=['time index'])
 
-        # if data does not have proper format, reject
-        if not self.check_data_format():
-            raise Exception('Event data loaded in an incorrect format.')
+        # # if data does not have proper format, reject
+        # if not self.check_data_format():
+        #     raise Exception('Event data loaded in an incorrect format.')
 
-        # get scheduled event time-step
-        self.time_step = -1
-        for agent_name in self.parent_module.orbit_data:
-            orbit_data = self.parent_module.orbit_data[agent_name]
-            self.time_step = orbit_data.time_step
-            break
+        # # get scheduled event time-step
+        # self.time_step = -1
+        # for agent_name in self.parent_module.orbit_data:
+        #     orbit_data = self.parent_module.orbit_data[agent_name]
+        #     self.time_step = orbit_data.time_step
+        #     break
     
     def check_data_format(self) -> bool:
         """
@@ -299,19 +313,74 @@ class GPAccessEventModule(ScheduledEventModule):
         super().__init__(EnvironmentModuleTypes.GP_ACCESS_EVENT_MODULE.name, parent_environment)
 
     def row_to_msg_dict(self, row) -> dict:
-        pass
+        t_next = row['time index'] * self.time_step
+        agent_name = row['agent name']
+        rise = row['rise']
+        grid_index = row['grid index']
+        gp_index = row['GP index']
+        lat = row['lat [deg]']
+        lon = row['lon [deg]']
+
+        return BroadcastTypes.create_gp_access_event_broadcast(self.name, self.parent_module.name, agent_name, rise, t_next,
+                                                                grid_index, gp_index, lat, lon)
 
     def compile_event_data(self) -> pd.DataFrame:
         orbit_data = self.parent_module.orbit_data
-        coverage_data = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'instrument', 'mode', 'grid', 'GP index', 'pnt-opt index', 'lat [deg]', 'lon [deg]',])
+        coverage_data = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'instrument', 'mode', 'grid index', 'GP index', 'pnt-opt index', 'lat [deg]', 'lon [deg]',])
 
         for agent in orbit_data:
-            agent_gp_coverate_date =orbit_data[agent].gp_access_data
+            agent_gp_coverate_data =orbit_data[agent].gp_access_data
+            grid_data = orbit_data[agent].grid_data
 
-            for _, row in self.event_data.iterrows():
-                coverage_events = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'instrument', 'mode', 'grid', 'GP index', 'pnt-opt index', 'lat [deg]', 'lon [deg]',])
+            for grid_index in range(len(grid_data)):
+                grid = grid_data[grid_index]
 
+                for _, grid_point in grid.iterrows():
+                    gp_index = grid_point['GP index']
 
+                    gp_data = agent_gp_coverate_data.query('`GP index` == @gp_index & `grid index` == @grid_index')
+                    gp_data = gp_data.sort_values(by=['time index'])
+
+                    intervals = []
+                    for _, row in gp_data.iterrows():
+                        t_index = row['time index']
+
+                        interval_found = False
+                        for interval in intervals:
+                            i_interval = intervals.index(interval)
+                            t_start, t_end = interval
+
+                            if t_index == t_start - 1:
+                                t_start = t_index
+                                interval_found = True
+                            elif t_index == t_end + 1:
+                                t_end = t_index
+                                interval_found = True
+
+                            if interval_found:
+                                intervals[i_interval] = [t_start, t_end]
+                                break                                                        
+
+                        if not interval_found:
+                            interval = [t_index, t_index]
+                            intervals.append(interval)
+
+                    for interval in intervals:
+                        t_rise, t_set = interval
+                        
+                        access_rise = gp_data.query('`time index` == @t_rise').copy()
+                        access_rise['rise'] = [True]
+
+                        access_set = gp_data.query('`time index` == @t_set').copy()
+                        access_set['rise'] = [False]
+
+                        access_merged = pd.concat([access_rise, access_set])
+
+                        if len(coverage_data) == 0:
+                            coverage_data = access_merged
+                        else:
+                            coverage_data = pd.concat([coverage_data, access_merged])
+            
         return coverage_data
 
 class AgentAccessEventModule(ScheduledEventModule):

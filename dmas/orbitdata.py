@@ -28,7 +28,7 @@ class OrbitData:
 
     TODO: add support to load ground station agents' data
     """
-    def __init__(self, agent_name: str, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data):
+    def __init__(self, agent_name: str, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data, grid_data):
         # name of agent being represented by this object
         self.agent_name = agent_name
 
@@ -51,6 +51,9 @@ class OrbitData:
         
         # ground point access times
         self.gp_access_data = gp_access_data.sort_values(by=['time index'])
+
+        # grid indofmation
+        self.grid_data = grid_data
     
     """
     GET NEXT methods
@@ -395,8 +398,19 @@ class OrbitData:
                         gp_access_data = pd.concat([gp_access_data, gp_acces_by_mode])
                 
                 nrows, _ = gp_access_data.shape
-                gp_access_data['agent'] = [spacecraft] * nrows
+                gp_access_data['agent name'] = [spacecraft['name']] * nrows
 
-                data[name] = OrbitData(name, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data)
+                grid_data_compiled = []
+                for grid in mission_dict.get('grid'):
+                    i_grid = mission_dict.get('grid').index(grid)
+                    grid_file = data_dir + f'grid{i_grid}.csv'
+
+                    grid_data = pd.read_csv(grid_file)
+                    nrows, _ = grid_data.shape
+                    grid_data['GP index'] = [i for i in range(nrows)]
+                    grid_data['grid index'] = [i_grid] * nrows
+                    grid_data_compiled.append(grid_data)
+
+                data[name] = OrbitData(name, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data, grid_data_compiled)
 
             return data

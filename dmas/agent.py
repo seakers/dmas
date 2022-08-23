@@ -124,21 +124,24 @@ class AgentNode(Module):
         self.log(f"Shutting down agent...", level=logging.INFO)
         
         # send a reception confirmation
-        self.env_request_logger.info('Connection to environment established!')
         end_msg = dict()
         end_msg['src'] = self.name
         end_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
         end_msg['@type'] = RequestTypes.AGENT_END_CONFIRMATION.name
         end_json = json.dumps(end_msg)
 
+        self.log('Awaiting access to environment request socket...')
         await self.environment_request_lock.acquire()
+        self.log('Access to environment request socket obtained! Sending agent termination confirmation...')
         await self.environment_request_socket.send_json(end_json)
         self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+        self.log('Agent termination aknowledgement sent. Awaiting environment response...')
 
         # wait for server reply
         await self.environment_request_socket.recv() 
         self.environment_request_lock.release()
         self.env_request_logger.info('Response received! terminating agent.')
+        self.log('Response received! terminating agent.')
 
         self.log(f"Closing all network sockets...")
         self.agent_socket_in.close()
@@ -239,7 +242,7 @@ class AgentNode(Module):
                     else:
                         self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
                 else:
-                    self.log('Boradcast not intended for this agent. Discarding message...')
+                    self.log('Broadcast not intended for this agent. Discarding message...')
         except asyncio.CancelledError:
             return
 
@@ -480,6 +483,9 @@ class AgentNode(Module):
             self.log(f'Received Request Response: \'{resp_val}\'')       
 
             return resp
+        
+        else:
+            raise Exception(f'Request of type {req_type} not supported by request submitter.')
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
