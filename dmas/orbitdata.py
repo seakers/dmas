@@ -130,29 +130,15 @@ class OrbitData:
 
         return nrows > 0
 
-    # def get_position(self, t: float):
-        # for _, row in self.position_data.iterrows():
-        #     t_row = row['time index'] * self.time_step
-        #     if t_row <= t:
-                # x = row['x [km]']
-                # y = row['y [km]']
-                # z = row['z [km]']
-        #         return [x, y, z]
+    def get_position(self, t: float):
+        pos, _, _ = self.get_orbit_state(t)
+        return pos
 
-        # return [-1,-1,-1]
-
-    # def get_velocity(self, t: float):
-    #     for _, row in self.position_data.iterrows():
-    #         t_row = row['time index'] * self.time_step
-    #         if t_row <= t:
-                # x = row['vx [km/s]']
-                # y = row['vy [km/s]']
-                # z = row['vz [km/s]']
-                # return [x, y, z]
-    #     return [-1,-1,-1]
-
+    def get_velocity(self, t: float):
+        _, vel, _ = self.get_orbit_state(t)
+        return vel
+        
     def get_orbit_state(self, t: float):
-        print(t)
         is_eclipse = self.is_eclipse(t)
 
         t_u = t + self.time_step
@@ -163,11 +149,12 @@ class OrbitData:
         t_l = t_l/self.time_step
 
         data = self.position_data.query('@t_l < `time index` < @t_u')
-        print(f'{t_l} < {t} < {t_u}')
-        print(data)
 
+        dt_min = None
+        touple_min = None
         for _, row in data.iterrows():
-            print(row)
+            t_row = row['time index']
+            dt = np.abs(t_row - t)
 
             x = row['x [km]']
             y = row['y [km]']
@@ -179,10 +166,14 @@ class OrbitData:
             vz = row['vz [km/s]']
             vel = [vx, vy, vz]
             
-            print((pos, vel, is_eclipse))
-            return (pos, vel, is_eclipse)
-               
-        return ([-1,-1,-1], [-1,-1,-1], None)
+            if dt_min is None or dt < dt_min:
+                touple_min = (pos, vel, is_eclipse)
+                dt_min = dt            
+        
+        if touple_min is None:
+            return (None, None, None)
+        else:
+            return touple_min
 
     
     def find_gp_index(self, lat: float, lon: float):
