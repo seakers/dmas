@@ -153,11 +153,11 @@ class RequestTypes(Enum):
             if target is None:
                 return False
         
-        elif RequestTypes[msg_type] is RequestTypes.GP_ACCESS_REQUEST:
-            target = msg.get('target', None)
+        # elif RequestTypes[msg_type] is RequestTypes.GP_ACCESS_REQUEST:
+        #     target = msg.get('target', None)
             
-            if target is None or not isinstance(target, list) or len(target) != 2:
-                return False
+        #     if target is None or not isinstance(target, list) or len(target) != 2:
+        #         return False
 
         elif RequestTypes[msg_type] is RequestTypes.GS_ACCESS_REQUEST:
             target = msg.get('target', None)
@@ -165,8 +165,9 @@ class RequestTypes(Enum):
             if target is None:
                 return False
 
-        # elif RequestTypes[msg_type] is RequestTypes.AGENT_INFO_REQUEST:
-        #     pass
+        elif RequestTypes[msg_type] is RequestTypes.AGENT_INFO_REQUEST:
+            return True
+            
         # elif RequestTypes[msg_type] is RequestTypes.OBSERVATION_REQUEST:
         #     pass
         elif RequestTypes[msg_type] is RequestTypes.AGENT_END_CONFIRMATION:

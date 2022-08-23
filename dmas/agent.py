@@ -461,6 +461,26 @@ class AgentNode(Module):
             resp_val = resp.get('result')
             self.log(f'Received Request Response: \'{resp_val}\'')       
 
+            return resp
+        
+        elif RequestTypes[req_type] is RequestTypes.AGENT_INFO_REQUEST:
+            req_json = json.dumps(req)
+
+            # submit request
+            self.log(f'Sending Agent Info Request...')
+            await self.environment_request_lock.acquire()
+            await self.environment_request_socket.send_json(req_json)
+            self.log('Agent Info request sent successfully. Awaiting response...')
+            
+            # wait for server reply
+            resp = await self.environment_request_socket.recv_json()
+            resp = json.loads(resp)
+            self.environment_request_lock.release()
+            resp_val = resp.get('result')
+            self.log(f'Received Request Response: \'{resp_val}\'')       
+
+            return resp
+
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
         pass
@@ -498,17 +518,25 @@ class SubModule(Module):
 
                 await self.sim_wait(1)
 
+                # agent access req
                 # msg = dict()
                 # msg['src'] = self.name
                 # msg['dst'] = self.parent_module.parent_module.name
                 # msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
                 # msg['target'] = 'Mars2'
 
+                # gs access req
+                # msg = dict()
+                # msg['src'] = self.name
+                # msg['dst'] = self.parent_module.parent_module.name
+                # msg['@type'] = RequestTypes.GS_ACCESS_REQUEST.name
+                # msg['target'] = 'NEN2'
+
+                # agent info req 
                 msg = dict()
                 msg['src'] = self.name
                 msg['dst'] = self.parent_module.parent_module.name
-                msg['@type'] = RequestTypes.GS_ACCESS_REQUEST.name
-                msg['target'] = 'NEN2'
+                msg['@type'] = RequestTypes.AGENT_INFO_REQUEST.name
 
                 resp = await self.submit_request(msg)
 

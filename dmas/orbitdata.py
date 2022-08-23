@@ -125,48 +125,64 @@ class OrbitData:
 
 
     def is_eclipse(self, t: float):
-        for _, row in self.eclipse_data.iterrows():
-            t_start = row['start index'] * self.time_step
-            t_end = row['end index'] * self.time_step
+        t = t/self.time_step
+        nrows, _ = self.eclipse_data.query('`start index` <= @t & @t <= `end index`').shape
 
-            interval = TimeInterval(t_start, t_end)
-            if interval.is_during(t):
-                return True
-        return False
+        return nrows > 0
 
-    def get_position(self, t: float):
-        for _, row in self.position_data.iterrows():
-            t_row = row['time index'] * self.time_step
-            if t_row <= t:
-                x = row['x [km]']
-                y = row['y [km]']
-                z = row['z [km]']
-                return [x, y, z]
+    # def get_position(self, t: float):
+        # for _, row in self.position_data.iterrows():
+        #     t_row = row['time index'] * self.time_step
+        #     if t_row <= t:
+                # x = row['x [km]']
+                # y = row['y [km]']
+                # z = row['z [km]']
+        #         return [x, y, z]
 
-        return [-1,-1,-1]
+        # return [-1,-1,-1]
 
-    def get_velocity(self, t: float):
-        for _, row in self.position_data.iterrows():
-            t_row = row['time index'] * self.time_step
-            if t_row <= t:
-                x = row['vx [km/s]']
-                y = row['vy [km/s]']
-                z = row['vz [km/s]']
-                return [x, y, z]
-        return [-1,-1,-1]
+    # def get_velocity(self, t: float):
+    #     for _, row in self.position_data.iterrows():
+    #         t_row = row['time index'] * self.time_step
+    #         if t_row <= t:
+                # x = row['vx [km/s]']
+                # y = row['vy [km/s]']
+                # z = row['vz [km/s]']
+                # return [x, y, z]
+    #     return [-1,-1,-1]
 
     def get_orbit_state(self, t: float):
-        for _, row in self.position_data.iterrows():
-            t_row = row['time index'] * self.time_step
-            if t_row <= t:
-                x = row['x [km]']
-                y = row['y [km]']
-                z = row['z [km]']
-                vx = row['vx [km/s]']
-                vy = row['vy [km/s]']
-                vz = row['vz [km/s]']
-                return [x, y, z, vx, vy, vz]
-        return [-1,-1,-1]
+        print(t)
+        is_eclipse = self.is_eclipse(t)
+
+        t_u = t + self.time_step
+        t_l = t - self.time_step
+
+        t = t/self.time_step
+        t_u = t_u/self.time_step
+        t_l = t_l/self.time_step
+
+        data = self.position_data.query('@t_l < `time index` < @t_u')
+        print(f'{t_l} < {t} < {t_u}')
+        print(data)
+
+        for _, row in data.iterrows():
+            print(row)
+
+            x = row['x [km]']
+            y = row['y [km]']
+            z = row['z [km]']
+            pos = [x, y, z]
+
+            vx = row['vx [km/s]']
+            vy = row['vy [km/s]']
+            vz = row['vz [km/s]']
+            vel = [vx, vy, vz]
+            
+            print((pos, vel, is_eclipse))
+            return (pos, vel, is_eclipse)
+               
+        return ([-1,-1,-1], [-1,-1,-1], None)
 
     
     def find_gp_index(self, lat: float, lon: float):

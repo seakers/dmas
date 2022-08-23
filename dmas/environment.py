@@ -290,9 +290,25 @@ class EnvironmentServer(Module):
                 # send reception confirmation to agent
                 await self.reqservice.send_json(req_json)
 
-            # elif req_type is RequestTypes.AGENT_INFO_REQUEST:
-            #     await self.reqservice.send_string('')
-            #     pass
+            elif req_type is RequestTypes.AGENT_INFO_REQUEST:
+                # unpackage message
+                src = request['src']
+
+                t_curr = self.get_current_time()
+                self.log(f'Received agent information request from {src} at simulation time t={t_curr}!')
+
+                # query agent access database
+                pos, vel, is_eclipse = self.orbit_data[src].get_orbit_state( t_curr) 
+                results = dict()
+                results['pos'] = pos
+                results['vel'] = vel
+                results['eclipse'] = is_eclipse
+
+                request['result'] = results
+                req_json = json.dumps(request)
+                
+                # send reception confirmation to agent
+                await self.reqservice.send_json(req_json)
 
             # elif req_type is RequestTypes.OBSERVATION_REQUEST:
             #     await self.reqservice.send_string('')
