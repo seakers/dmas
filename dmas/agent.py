@@ -403,89 +403,93 @@ class AgentNode(Module):
         return loggers
                 
     async def request_submitter(self, req):
-        req_type = req['@type']
-        src_module = req['src'] 
-        req['src'] = self.name
+        try:
+            req_type = req['@type']
+            src_module = req['src'] 
+            req['src'] = self.name
 
-        req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+            req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
 
-        self.log(f'Submitting a request of type {req_type}.')
+            self.log(f'Submitting a request of type {req_type}.')
 
-        if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
-            t_end = req['t']
-            req_json = json.dumps(req)
+            if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
+                t_end = req['t']
+                req_json = json.dumps(req)
 
-            # submit request
-            self.log(f'Sending tic request for t_end={t_end}. Awaiting access to environment request port...')
-            await self.environment_request_lock.acquire()
-            await self.environment_request_socket.send_json(req_json)
-            self.log('Tic request sent successfully. Awaiting confirmation...')
+                # submit request
+                self.log(f'Sending {req_type} for t_end={t_end}. Awaiting access to environment request socket...')
+                await self.environment_request_lock.acquire()
+                self.log('Access to environment request socket confirmed. Sending request...')
+                await self.environment_request_socket.send_json(req_json)
+                self.log('Request sent successfully. Awaiting confirmation...')
 
-            # wait for sever reply
-            await self.environment_request_socket.recv()  
-            self.environment_request_lock.release()
-            self.log('Tic request reception confirmation received.')         
+                # wait for sever reply
+                await self.environment_request_socket.recv()  
+                self.environment_request_lock.release()
+                self.log('Tic request reception confirmation received.')         
 
-            return   
+                return   
 
-        elif RequestTypes[req_type] is RequestTypes.AGENT_ACCESS_REQUEST:
-            target = req['target']
-            req_json = json.dumps(req)
+            elif RequestTypes[req_type] is RequestTypes.AGENT_ACCESS_REQUEST:
+                target = req['target']
+                req_json = json.dumps(req)
 
-            # submit request
-            self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
-            await self.environment_request_lock.acquire()
-            await self.environment_request_socket.send_json(req_json)
-            self.log('Agent Access request sent successfully. Awaiting response...')
+                # submit request
+                self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
+                await self.environment_request_lock.acquire()
+                await self.environment_request_socket.send_json(req_json)
+                self.log('Agent Access request sent successfully. Awaiting response...')
+                
+                # wait for server reply
+                resp = await self.environment_request_socket.recv_json()
+                resp = json.loads(resp)
+                self.environment_request_lock.release()
+                resp_val = resp.get('result')
+                self.log(f'Received Request Response: \'{resp_val}\'')        
+                
+                return resp
+
+            elif RequestTypes[req_type] is RequestTypes.GS_ACCESS_REQUEST:
+                target = req['target']            
+                req_json = json.dumps(req)
+
+                # submit request
+                self.log(f'Sending Ground Station Access Request (from {self.name} to {target})...')
+                await self.environment_request_lock.acquire()
+                await self.environment_request_socket.send_json(req_json)
+                self.log('Ground Station Access request sent successfully. Awaiting response...')
+                
+                # wait for server reply
+                resp = await self.environment_request_socket.recv_json()
+                resp = json.loads(resp)
+                self.environment_request_lock.release()
+                resp_val = resp.get('result')
+                self.log(f'Received Request Response: \'{resp_val}\'')       
+
+                return resp
             
-            # wait for server reply
-            resp = await self.environment_request_socket.recv_json()
-            resp = json.loads(resp)
-            self.environment_request_lock.release()
-            resp_val = resp.get('result')
-            self.log(f'Received Request Response: \'{resp_val}\'')        
+            elif RequestTypes[req_type] is RequestTypes.AGENT_INFO_REQUEST:
+                req_json = json.dumps(req)
+
+                # submit request
+                self.log(f'Sending Agent Info Request...')
+                await self.environment_request_lock.acquire()
+                await self.environment_request_socket.send_json(req_json)
+                self.log('Agent Info request sent successfully. Awaiting response...')
+                
+                # wait for server reply
+                resp = await self.environment_request_socket.recv_json()
+                resp = json.loads(resp)
+                self.environment_request_lock.release()
+                resp_val = resp.get('result')
+                self.log(f'Received Request Response: \'{resp_val}\'')       
+
+                return resp
             
-            return resp
-
-        elif RequestTypes[req_type] is RequestTypes.GS_ACCESS_REQUEST:
-            target = req['target']            
-            req_json = json.dumps(req)
-
-            # submit request
-            self.log(f'Sending Ground Station Access Request (from {self.name} to {target})...')
-            await self.environment_request_lock.acquire()
-            await self.environment_request_socket.send_json(req_json)
-            self.log('Ground Station Access request sent successfully. Awaiting response...')
-            
-            # wait for server reply
-            resp = await self.environment_request_socket.recv_json()
-            resp = json.loads(resp)
-            self.environment_request_lock.release()
-            resp_val = resp.get('result')
-            self.log(f'Received Request Response: \'{resp_val}\'')       
-
-            return resp
-        
-        elif RequestTypes[req_type] is RequestTypes.AGENT_INFO_REQUEST:
-            req_json = json.dumps(req)
-
-            # submit request
-            self.log(f'Sending Agent Info Request...')
-            await self.environment_request_lock.acquire()
-            await self.environment_request_socket.send_json(req_json)
-            self.log('Agent Info request sent successfully. Awaiting response...')
-            
-            # wait for server reply
-            resp = await self.environment_request_socket.recv_json()
-            resp = json.loads(resp)
-            self.environment_request_lock.release()
-            resp_val = resp.get('result')
-            self.log(f'Received Request Response: \'{resp_val}\'')       
-
-            return resp
-        
-        else:
-            raise Exception(f'Request of type {req_type} not supported by request submitter.')
+            else:
+                raise Exception(f'Request of type {req_type} not supported by request submitter.')
+        except asyncio.CancelledError:
+            pass
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:

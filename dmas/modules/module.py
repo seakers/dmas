@@ -257,7 +257,6 @@ class Module:
                 t_end = self.sim_time.level + delay       
                 tic_msg = RequestTypes.create_tic_event_message(self.name, 'ENV', t_end)
 
-                self.log(f'Submitting a tic request for server clock at t={t_end}')
                 await self.submit_request(tic_msg)
 
                 await self.sim_time.when_geq_than(t_end)

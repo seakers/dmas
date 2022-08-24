@@ -174,14 +174,27 @@ class EnvironmentServer(Module):
             3- 'broadcast_handler': receives broadcast requests and publishes them to all agents
         """
         sim_end_timer = asyncio.create_task(self.sim_wait(self.DURATION))
+        sim_end_timer.set_name('sim_timer')
         request_handler = asyncio.create_task(self.request_handler())
+        request_handler.set_name('req_handler')
         broadcast_handler = asyncio.create_task(self.broadcast_handler())
+        broadcast_handler.set_name('broadast_handler')
+        routines = [sim_end_timer, request_handler, broadcast_handler]
 
-        await sim_end_timer
-        request_handler.cancel()
-        broadcast_handler.cancel()
-        await request_handler
-        await broadcast_handler
+        _, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
+        print('DONE')
+
+        done_name = None
+        for coroutine in routines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+        self.log(f"{done_name} completed!", level=logging.INFO)
+
+        for p in pending:
+            self.log(f"Terminating {p.get_name()}...")
+            p.cancel()
+            await p
+
         self.log(f"Simulation time completed!", level=logging.INFO)
 
     async def internal_message_handler(self, msg):
@@ -235,111 +248,118 @@ class EnvironmentServer(Module):
         Only tic request create future broadcast tasks. The rest require an immediate response from the environment.
         """
         async def request_worker(request):
-            # check request message format
-            if not RequestTypes.format_check(request):
-                # if request does not match any of the standard request format, dump and continue
-                self.log(f'Request does not match the standard format for a request message. Dumping request...')
+            try:
+                # check request message format
+                if not RequestTypes.format_check(request):
+                    # if request does not match any of the standard request format, dump and continue
+                    self.log(f'Request does not match the standard format for a request message. Dumping request...')
+                    await self.reqservice.send_string('')
+                    return
+        
+                # unpackage message type and handle accordingly 
+                req_type = request.get('@type')
+                req_type = RequestTypes[req_type]
+
+                if req_type is RequestTypes.TIC_REQUEST:
+                    # send reception confirmation to agent
+                    await self.reqservice.send_string('')
+
+                    # schedule tic request
+                    t_req = request.get('t')
+                    self.log(f'Received tic request for t_req={t_req}!')
+
+                    # change source and destination to internal modules
+                    request['src'] = self.name
+                    request['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
+
+                    # send to internal message router for forwarding
+                    await self.put_message(request)
+
+                elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
+                    # unpackage message
+                    src = request['src']
+                    target = request['target']
+                    
+                    t_curr = self.get_current_time()
+                    self.log(f'Received agent access request from {src} to {target} at simulation time t={t_curr}!')
+
+                    # query agent access database
+                    request['result'] = self.orbit_data[src].is_accessing_agent(target, t_curr) 
+                    req_json = json.dumps(request)
+                    
+                    # send reception confirmation to agent
+                    await self.reqservice.send_json(req_json)
+                
+                # elif req_type is RequestTypes.GP_ACCESS_REQUEST:
+                #     # unpackage message
+                #     src = request['src']
+                #     lat, lon= request['target']
+
+                #     pass
+
+                elif req_type is RequestTypes.GS_ACCESS_REQUEST:
+                    # unpackage message
+                    src = request['src']
+                    target = request['target']
+
+                    t_curr = self.get_current_time()
+                    self.log(f'Received ground station access request from {src} to {target} at simulation time t={t_curr}!')
+
+                    # query agent access database
+                    request['result'] = self.orbit_data[src].is_accessing_ground_station(target, t_curr) 
+                    req_json = json.dumps(request)
+                    
+                    # send reception confirmation to agent
+                    await self.reqservice.send_json(req_json)
+
+                elif req_type is RequestTypes.AGENT_INFO_REQUEST:
+                    # unpackage message
+                    src = request['src']
+
+                    t_curr = self.get_current_time()
+                    self.log(f'Received agent information request from {src} at simulation time t={t_curr}!')
+
+                    # query agent access database
+                    pos, vel, is_eclipse = self.orbit_data[src].get_orbit_state( t_curr) 
+                    results = dict()
+                    results['pos'] = pos
+                    results['vel'] = vel
+                    results['eclipse'] = is_eclipse
+
+                    request['result'] = results
+                    req_json = json.dumps(request)
+                    
+                    # send reception confirmation to agent
+                    await self.reqservice.send_json(req_json)
+
+                # elif req_type is RequestTypes.OBSERVATION_REQUEST:
+                #     await self.reqservice.send_string('')
+                #     pass
+
+                elif req_type is RequestTypes.AGENT_END_CONFIRMATION:
+                    # register that agent node has gone offline mid-simulation
+                    # (this agent node won't be considered when broadcasting simulation end)
+                    src = request['src']
+
+                    if src not in self.offline_subscribers:
+                        self.offline_subscribers.append(src)
+
+                else:
+                    # if request type is not supported, dump and ignore message
+                    self.log(f'Request of type {req_type.value} not yet supported. Dumping request.')
+                    self.reqservice.send_string('')
+                    return
+            except asyncio.CancelledError:
+                self.log('Request handling cancelled. Sending blank response...')
                 await self.reqservice.send_string('')
-                return
-    
-            # unpackage message type and handle accordingly 
-            req_type = request.get('@type')
-            req_type = RequestTypes[req_type]
 
-            if req_type is RequestTypes.TIC_REQUEST:
-                # send reception confirmation to agent
-                await self.reqservice.send_string('')
-
-                # schedule tic request
-                t_req = request.get('t')
-                self.log(f'Received tic request for t_req={t_req}!')
-
-                # change source and destination to internal modules
-                request['src'] = self.name
-                request['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
-
-                # send to internal message router for forwarding
-                await self.put_message(request)
-
-            elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
-                # unpackage message
-                src = request['src']
-                target = request['target']
-                
-                t_curr = self.get_current_time()
-                self.log(f'Received agent access request from {src} to {target} at simulation time t={t_curr}!')
-
-                # query agent access database
-                request['result'] = self.orbit_data[src].is_accessing_agent(target, t_curr) 
-                req_json = json.dumps(request)
-                
-                # send reception confirmation to agent
-                await self.reqservice.send_json(req_json)
-            
-            # elif req_type is RequestTypes.GP_ACCESS_REQUEST:
-            #     # unpackage message
-            #     src = request['src']
-            #     lat, lon= request['target']
-
-            #     pass
-
-            elif req_type is RequestTypes.GS_ACCESS_REQUEST:
-                # unpackage message
-                src = request['src']
-                target = request['target']
-
-                t_curr = self.get_current_time()
-                self.log(f'Received ground station access request from {src} to {target} at simulation time t={t_curr}!')
-
-                # query agent access database
-                request['result'] = self.orbit_data[src].is_accessing_ground_station(target, t_curr) 
-                req_json = json.dumps(request)
-                
-                # send reception confirmation to agent
-                await self.reqservice.send_json(req_json)
-
-            elif req_type is RequestTypes.AGENT_INFO_REQUEST:
-                # unpackage message
-                src = request['src']
-
-                t_curr = self.get_current_time()
-                self.log(f'Received agent information request from {src} at simulation time t={t_curr}!')
-
-                # query agent access database
-                pos, vel, is_eclipse = self.orbit_data[src].get_orbit_state( t_curr) 
-                results = dict()
-                results['pos'] = pos
-                results['vel'] = vel
-                results['eclipse'] = is_eclipse
-
-                request['result'] = results
-                req_json = json.dumps(request)
-                
-                # send reception confirmation to agent
-                await self.reqservice.send_json(req_json)
-
-            # elif req_type is RequestTypes.OBSERVATION_REQUEST:
-            #     await self.reqservice.send_string('')
-            #     pass
-
-            # elif req_type is RequestTypes.AGENT_END_CONFIRMATION:
-            #     # register that agent node has gone offline mid-simulation
-            #     # (this agent node won't be considered when broadcasting simulation end)
-            #     src = request['src']
-
-            #     if src not in self.offline_subscribers:
-            #         self.offline_subscribers.append(src)
-
-            else:
-                # if request type is not supported, dump and ignore message
-                self.log(f'Request of type {req_type.value} not yet supported. Dumping request.')
-                self.reqservice.send_string('')
-                return
-
+        
         try:            
-            # with ThreadPoolExecutor() as executor:
-            # TODO see how to improve performance by handling requests in parallel using multithreading
+            await self.reqservice_lock.acquire()
             while True:
+                req_str = None
+                worker_task = None
+
                 # listen for requests
                 self.log('Waiting for agent requests...')
                 req_str = await self.reqservice.recv_json()
@@ -349,11 +369,23 @@ class EnvironmentServer(Module):
                 req = json.loads(req_str)
 
                 # handle request
-                # executor.submit( request_worker(req) )
-                await request_worker(req)
+                self.log(f'Handling request...')
+                worker_task = asyncio.create_task(request_worker(req))
+                await worker_task
 
         except asyncio.CancelledError:
-            # await self.reqservice.send_string('')
+            if req_str is not None:
+                self.log('Request received during shutdown process. Sending blank response...')
+                await self.reqservice.send_string('')
+            elif worker_task is None:
+                self.log('Request received during shutdown process. Sending blank response...')
+                await self.reqservice.send_string('')
+            elif worker_task is not None:
+                self.log('Handling request during shutdown process. Cancelling response...')
+                worker_task.cancel()
+                await worker_task
+            
+            self.reqservice_lock.release()
             return
 
     async def broadcast_handler(self):
@@ -448,6 +480,7 @@ class EnvironmentServer(Module):
             raise Exception(f"{self.request_port_number} port already in use")
         self.reqservice = self.context.socket(zmq.REP)
         self.reqservice.bind(f"tcp://*:{self.request_port_number}")
+        self.reqservice_lock = asyncio.Lock()
 
     async def sync_agents(self):
         """
@@ -537,6 +570,10 @@ class EnvironmentServer(Module):
         Broadcasts a message announcing the end of the simulation to all agents subscribed to this environment. 
         All agents must aknowledge that they have received and processed this message for the simulation to end.
         """
+        # wait for other processes to submit their final responses to other agents.
+        self.log(f'Awating access to request service socket...')
+        await self.reqservice_lock.acquire()
+        
         # broadcast simulation end to all subscribers
         msg_dict = dict()
         msg_dict['src'] = self.name
@@ -544,13 +581,13 @@ class EnvironmentServer(Module):
         msg_dict['@type'] =  BroadcastTypes.SIM_END_EVENT.name
         msg_dict['server_clock'] = time.perf_counter() - self.START_TIME
         kill_msg = json.dumps(msg_dict)
-
+        
         t = msg_dict['server_clock']
         self.message_logger.debug(f'Broadcasting simulation end at t={t}[s]')
         self.log(f'Broadcasting simulation end at t={t}[s]')
         
         await self.publisher.send_json(kill_msg)
-
+        
         # wait for all agents to send their confirmation
         self.request_logger.info(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...')
         self.log(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...', level=logging.INFO)
@@ -564,6 +601,8 @@ class EnvironmentServer(Module):
 
             if RequestTypes[msg_type] is not RequestTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
+                self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
+                await self.reqservice.send(b'')
                 continue
             
             self.request_logger.info(f'Received simulation end confirmation from {msg_src}!')
@@ -575,6 +614,8 @@ class EnvironmentServer(Module):
                     self.offline_subscribers.append(agent_name)
                     self.log(f"{agent_name} has ended its processes ({len(self.offline_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     break
+        
+        self.reqservice_lock.release()
 
     def set_up_results_directory(self, scenario_dir):
         scenario_results_path = scenario_dir + '/results'
@@ -651,9 +692,9 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    # duration = 6048
+    duration = 6048
     # duration = 40
-    duration = 70
+    # duration = 70
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)
