@@ -43,18 +43,16 @@ class Container:
 
         def accept():
             return self.level + value <= self.capacity
-
+        
         await self.lock.acquire()
-
-        if accept():
-            self.level += value
-            self.updated.set()
-            self.lock.release()
-        else:
+        while not accept():
             self.lock.release()
             self.updated.clear()
             await self.updated.wait()
-            await self.put(value)
+            await self.lock.acquire()        
+        self.level += value
+        self.updated.set()
+        self.lock.release()
 
     async def get(self, value):
         if self.updated is None:
@@ -63,24 +61,24 @@ class Container:
         def accept():
             return self.level - value >= 0
         
-        if accept():
-            self.level -= value
-            self.updated.set()
-        else:
+        await self.lock.acquire()
+        while not accept():
+            self.lock.release()
             self.updated.clear()
-            await self.updated.wait()         
-            await self.get(value)
+            await self.updated.wait()
+            await self.lock.acquire()        
+        self.level -= value
+        self.updated.set()
+        self.lock.release()
 
     async def when_cond(self, cond):
         if self.updated is None:
             raise Exception('Container not activated in event loop')
              
-        if cond():
-            return True
-        else:
+        while not cond():
             self.updated.clear()
-            await self.updated.wait()  
-            await self.when_cond(cond)
+            await self.updated.wait()
+        return True
 
     async def when_not_empty(self):
         def accept():
@@ -119,15 +117,18 @@ class Container:
         await self.when_cond(accept)
 
 async def f1(container: Container):
-    print('tast1 starting...')
-    await container.put(1)
+    print('tast1 starting...')    
     await asyncio.sleep(1)
-    await container.get(1)
-
+    await container.put(1)
+    
 async def f2(container: Container):
     print('tast2 starting...')
     # await asyncio.sleep(0.5)
-    await container.put(1)
+    print(f'current container level: {container.level}')
+    # await container.when_greater_than(0)
+    
+    await container.get(1)
+    print(f'current container level: {container.level}')
 
 async def f3(container: Container):
     for _ in range(100):
@@ -135,7 +136,7 @@ async def f3(container: Container):
         await asyncio.sleep(random.random()/10)
         await container.get(1)
 
-async def col():
+async def main():
     container = Container(0, 100)
 
     # t1 = asyncio.create_task(f1(container))
@@ -143,7 +144,9 @@ async def col():
     t1 = asyncio.create_task(f3(container))
     t2 = asyncio.create_task(f3(container))
     
+    print(f'Initial container level: {container.level}')
     await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
+    print(f'Final container level: {container.level}')
 
 if __name__ == '__main__':
-    asyncio.run(col())
+    asyncio.run(main())

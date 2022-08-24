@@ -54,7 +54,10 @@ class BroadcastTypes(Enum):
         elif (BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
               or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
               or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
-            return True
+            result = msg.get('result', None)
+            
+            if result is None:
+                return False
         else:
             return False
         
@@ -172,11 +175,12 @@ class RequestTypes(Enum):
             if target is None:
                 return False
         
-        # elif RequestTypes[msg_type] is RequestTypes.GP_ACCESS_REQUEST:
-        #     target = msg.get('target', None)
+        elif RequestTypes[msg_type] is RequestTypes.GP_ACCESS_REQUEST:
+            lat = msg.get('lat', None)
+            lon = msg.get('lon', None)
             
-        #     if target is None or not isinstance(target, list) or len(target) != 2:
-        #         return False
+            if lat is None or lon is None:
+                return False
 
         elif RequestTypes[msg_type] is RequestTypes.GS_ACCESS_REQUEST:
             target = msg.get('target', None)
@@ -196,11 +200,47 @@ class RequestTypes(Enum):
         
         return True
     
-    def create_tic_event_message(src: str, dst: str, t: float):
-        tic_msg = dict()
-        tic_msg['src'] = src
-        tic_msg['dst'] = dst
-        tic_msg['@type'] = RequestTypes.TIC_REQUEST.name
-        tic_msg['t'] = t
+    def create_tic_request(src: str, dst: str, t: float):
+        tic_req_msg = dict()
+        tic_req_msg['src'] = src
+        tic_req_msg['dst'] = dst
+        tic_req_msg['@type'] = RequestTypes.TIC_REQUEST.name
+        tic_req_msg['t'] = t
 
-        return tic_msg
+        return tic_req_msg
+
+    def create_agent_access_request(src: str, dst: str, target: str):
+        access_req_msg = dict()
+        access_req_msg['src'] = src
+        access_req_msg['dst'] = dst
+        access_req_msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
+        access_req_msg['target'] = target
+
+        return access_req_msg
+
+    def create_ground_station_access_request(src: str, dst: str, target: str):
+        gs_access_req_msg = dict()
+        gs_access_req_msg['src'] = src
+        gs_access_req_msg['dst'] = dst
+        gs_access_req_msg['@type'] = RequestTypes.GS_ACCESS_REQUEST.name
+        gs_access_req_msg['target'] = target
+
+        return gs_access_req_msg
+
+    def create_ground_point_access_request(src: str, dst: str, lat: float, lon: float):
+        gs_access_req_msg = dict()
+        gs_access_req_msg['src'] = src
+        gs_access_req_msg['dst'] = dst
+        gs_access_req_msg['@type'] = RequestTypes.GP_ACCESS_REQUEST.name
+        gs_access_req_msg['lat'] = lat
+        gs_access_req_msg['lon'] = lon
+
+        return gs_access_req_msg
+
+    def create_agent_info_request(src: str, dst: str):
+        msg = dict()
+        msg['src'] = src
+        msg['dst'] = dst
+        msg['@type'] = RequestTypes.AGENT_INFO_REQUEST.name
+
+        return msg

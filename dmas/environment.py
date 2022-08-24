@@ -285,17 +285,34 @@ class EnvironmentServer(Module):
 
                     # query agent access database
                     request['result'] = self.orbit_data[src].is_accessing_agent(target, t_curr) 
+                    
+                    # change source and destination for response message
+                    request['dst'] = request['src']
+                    request['src'] = self.name
                     req_json = json.dumps(request)
                     
-                    # send reception confirmation to agent
+                    # send response to agent
                     await self.reqservice.send_json(req_json)
                 
-                # elif req_type is RequestTypes.GP_ACCESS_REQUEST:
-                #     # unpackage message
-                #     src = request['src']
-                #     lat, lon= request['target']
+                elif req_type is RequestTypes.GP_ACCESS_REQUEST:
+                    # unpackage message
+                    src = request['src']
+                    lat = request['lat']
+                    lon = request['lon']
 
-                #     pass
+                    t_curr = self.get_current_time()
+                    self.log(f'Received ground point access request from {src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
+
+                    # query ground point access database
+                    request['result'] = self.orbit_data[src].is_accessing_ground_point(lat, lon, t_curr)                    
+                    
+                    # change source and destination for response message
+                    request['dst'] = request['src']
+                    request['src'] = self.name
+                    req_json = json.dumps(request)
+                    
+                    # send response to agent
+                    await self.reqservice.send_json(req_json)
 
                 elif req_type is RequestTypes.GS_ACCESS_REQUEST:
                     # unpackage message
@@ -305,11 +322,15 @@ class EnvironmentServer(Module):
                     t_curr = self.get_current_time()
                     self.log(f'Received ground station access request from {src} to {target} at simulation time t={t_curr}!')
 
-                    # query agent access database
+                    # query ground point access database
                     request['result'] = self.orbit_data[src].is_accessing_ground_station(target, t_curr) 
+                    
+                    # change source and destination for response message
+                    request['dst'] = request['src']
+                    request['src'] = self.name
                     req_json = json.dumps(request)
                     
-                    # send reception confirmation to agent
+                    # send response to agent
                     await self.reqservice.send_json(req_json)
 
                 elif req_type is RequestTypes.AGENT_INFO_REQUEST:
@@ -319,7 +340,7 @@ class EnvironmentServer(Module):
                     t_curr = self.get_current_time()
                     self.log(f'Received agent information request from {src} at simulation time t={t_curr}!')
 
-                    # query agent access database
+                    # query agent state database
                     pos, vel, is_eclipse = self.orbit_data[src].get_orbit_state( t_curr) 
                     results = dict()
                     results['pos'] = pos
@@ -327,9 +348,13 @@ class EnvironmentServer(Module):
                     results['eclipse'] = is_eclipse
 
                     request['result'] = results
+                    
+                    # change source and destination for response message
+                    request['dst'] = request['src']
+                    request['src'] = self.name                    
                     req_json = json.dumps(request)
                     
-                    # send reception confirmation to agent
+                    # send response to agent
                     await self.reqservice.send_json(req_json)
 
                 # elif req_type is RequestTypes.OBSERVATION_REQUEST:
@@ -355,13 +380,14 @@ class EnvironmentServer(Module):
 
         
         try:            
+            self.log('Acquiring access to request service port...')
             await self.reqservice_lock.acquire()
             while True:
                 req_str = None
                 worker_task = None
 
                 # listen for requests
-                self.log('Waiting for agent requests...')
+                self.log('Waiting for agent requests.')
                 req_str = await self.reqservice.recv_json()
                 self.log(f'Request received!')
                 
@@ -375,16 +401,23 @@ class EnvironmentServer(Module):
 
         except asyncio.CancelledError:
             if req_str is not None:
-                self.log('Request received during shutdown process. Sending blank response...')
-                await self.reqservice.send_string('')
-            elif worker_task is None:
-                self.log('Request received during shutdown process. Sending blank response...')
+                self.log('Sending blank response...')
                 await self.reqservice.send_string('')
             elif worker_task is not None:
-                self.log('Handling request during shutdown process. Cancelling response...')
-                worker_task.cancel()
+                self.log('Cancelling response...')
                 await worker_task
-            
+            else:
+                poller = zmq.asyncio.Poller()
+                poller.register(self.reqservice, zmq.POLLIN)
+                poller.register(self.reqservice, zmq.POLLOUT)
+
+                evnt = await poller.poll(1000)
+                if len(evnt) > 0:
+                    self.log('Request received during shutdown process. Sending blank response..')
+                    await self.reqservice.send_string('')
+
+            # await self.reqservice.send_string('')
+            self.log('Releasing request service port...')
             self.reqservice_lock.release()
             return
 
@@ -405,7 +438,7 @@ class EnvironmentServer(Module):
                 if not BroadcastTypes.format_check(msg):
                     # if broadcast task does not meet the desired format, reject and dump
                     self.log('Broadcast task did not meet format specifications. Task dumped.')
-                    return
+                    # return
 
                 # change from internal message to external message
                 msg['src'] = self.name
@@ -437,6 +470,7 @@ class EnvironmentServer(Module):
                 await self.publisher.send_json(msg_json)
                 self.log('Broadcast sent')
                 self.publisher_lock.release()
+
         except asyncio.CancelledError:
             return
         finally:
@@ -692,9 +726,12 @@ MAIN
 if __name__ == '__main__':
     print('Initializing environment...')
     scenario_dir = './scenarios/sim_test/'
-    duration = 6048
+    dt = 4.6656879355937875
+    # duration = 6048
     # duration = 40
     # duration = 70
+    duration = 215 * dt 
+    print(duration)
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)

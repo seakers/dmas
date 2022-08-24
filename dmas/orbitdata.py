@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import re
@@ -87,7 +88,7 @@ class OrbitData:
         Returns the next access to a ground point
         """
         # find closest gridpoint 
-        grid_index, gp_index = self.find_gp_index(lat,lon)
+        grid_index, gp_index, _, _ = self.find_gp_index(lat, lon)
 
         # find next access
 
@@ -118,20 +119,42 @@ class OrbitData:
         t = t/self.time_step
         nrows, _ = self.isl_data[target].query('`start index` <= @t & @t <= `end index`').shape
                
-        return nrows > 0
+        return bool(nrows > 0)
 
     def is_accessing_ground_station(self, target: str, t: float):
         t = t/self.time_step
         nrows, _ = self.gs_access_data.query('`start index` <= @t & @t <= `end index` & `gndStn name` == @target').shape
                
-        return nrows > 0
+        return bool(nrows > 0)
+
+    def is_accessing_ground_point(self, lat: float, lon: float, t: float):
+        t = t/self.time_step
+        t_u = t + 1
+        t_l = t - 1
+
+        grid_index, gp_index, _, _ = self.find_gp_index(lat, lon)
+
+        access_data = self.gp_access_data \
+                            .query('@t_l < `time index` < @t_u & `grid index` == @grid_index & `GP index` == @gp_index') \
+                            .sort_values(by=['time index'])
+
+        nrows, _ = access_data.shape
+
+        if nrows == 0:
+            return False
+        elif nrows == 1:
+            for _, row in access_data.iterrows():
+                return bool(np.absolute(row['time index'] - t) <= 1e-9)
+        else:
+            return True
+               
 
 
     def is_eclipse(self, t: float):
         t = t/self.time_step
         nrows, _ = self.eclipse_data.query('`start index` <= @t & @t <= `end index`').shape
 
-        return nrows > 0
+        return bool(nrows > 0)
 
     def get_position(self, t: float):
         pos, _, _ = self.get_orbit_state(t)
@@ -185,7 +208,33 @@ class OrbitData:
 
         lat, lon must be given in degrees
         """
-        return -1, -1
+        grid_compiled = None
+        for grid in self.grid_data:
+            
+            if grid_compiled is None:
+                grid_compiled = grid
+            else:
+                grid_compiled = pd.concat([grid_compiled, grid])
+        
+        grid_compiled['dr'] = np.sqrt( 
+                                        np.power(np.cos( grid_compiled['lat [deg]'] * np.pi / 360 ) * np.cos( grid_compiled['lon [deg]'] * np.pi / 360 ) \
+                                                - np.cos( lat * np.pi / 360 ) * np.cos( lon * np.pi / 360 ), 2) \
+                                        + np.power(np.cos( grid_compiled['lat [deg]'] * np.pi / 360 ) * np.sin( grid_compiled['lon [deg]'] * np.pi / 360 ) \
+                                                - np.cos( lat * np.pi / 360 ) * np.sin( lon * np.pi / 360 ), 2) \
+                                        + np.power(np.sin( grid_compiled['lat [deg]'] * np.pi / 360 ) \
+                                                - np.sin( lat * np.pi / 360 ), 2)
+                                    )
+        min_dist = grid_compiled['dr'].min()
+        min_rows = grid_compiled.query('dr == @min_dist')
+
+        for _, row in min_rows.iterrows():
+            grid_index = row['grid index']
+            gp_index = row['GP index']
+            gp_lat = row['lat [deg]']
+            gp_lon = row['lon [deg]']
+
+            return grid_index, gp_index, gp_lat, gp_lon
+        return -1, -1, -1, -1
 
     def from_directory(scenario_dir: str):
         """
@@ -414,3 +463,26 @@ class OrbitData:
                 data[name] = OrbitData(name, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data, grid_data_compiled)
 
             return data
+
+"""
+TESTING
+"""
+async def main(scenario_dir):
+    orbit_data_list = OrbitData.from_directory(scenario_dir)
+
+    # expected val: (grid, point) = 0, 0
+    for agent in orbit_data_list:
+        lat = 1.0
+        lon = 158.0
+        t = 210.5
+
+        grid, point, gp_lat, gp_lon = orbit_data_list[agent].find_gp_index(lat, lon)
+        print(f'({lat}, {lon}) = G{grid}, P{point}, Lat{gp_lat}, Lon{gp_lon}')
+
+        print(orbit_data_list[agent].is_accessing_ground_point(lat, lon, t))
+        break
+
+
+if __name__ == '__main__':
+    scenario_dir = './scenarios/sim_test/'
+    asyncio.run(main(scenario_dir))

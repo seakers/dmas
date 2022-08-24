@@ -55,6 +55,19 @@
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             }
+        },
+
+        {
+            "name": "OrbitData debugger",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/dmas/orbitdata.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
         }
 
         // {

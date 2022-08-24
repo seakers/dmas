@@ -486,6 +486,26 @@ class AgentNode(Module):
 
                 return resp
             
+            elif RequestTypes[req_type] is RequestTypes.GP_ACCESS_REQUEST:
+                req_json = json.dumps(req)
+                lat = req['lat']
+                lon = req['lon']
+
+                # submit request
+                self.log(f'Sending Groung Point Access Request for ({lat}°,{lon}°)...')
+                await self.environment_request_lock.acquire()
+                await self.environment_request_socket.send_json(req_json)
+                self.log('Groung Point Access request sent successfully. Awaiting response...')
+                
+                # wait for server reply
+                resp = await self.environment_request_socket.recv_json()
+                resp = json.loads(resp)
+                self.environment_request_lock.release()
+                resp_val = resp.get('result')
+                self.log(f'Received Request Response: \'{resp_val}\'')       
+
+                return resp
+
             else:
                 raise Exception(f'Request of type {req_type} not supported by request submitter.')
         except asyncio.CancelledError:
@@ -526,31 +546,38 @@ class SubModule(Module):
 
                 await self.parent_module.put_message(msg)
 
-                await self.sim_wait(1)
+                # await self.sim_wait(1)
+                await self.sim_wait(random.random())
 
-                # agent access req
-                # msg = dict()
-                # msg['src'] = self.name
-                # msg['dst'] = self.parent_module.parent_module.name
-                # msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
-                # msg['target'] = 'Mars2'
+                # # # agent access req
+                # msg = RequestTypes.create_agent_access_request(self.name, 
+                #                                                 EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
+                #                                                 'Mars2')
+                # _ = await self.submit_request(msg)
+                # await self.sim_wait(random.random())
 
                 # gs access req
-                # msg = dict()
-                # msg['src'] = self.name
-                # msg['dst'] = self.parent_module.parent_module.name
-                # msg['@type'] = RequestTypes.GS_ACCESS_REQUEST.name
-                # msg['target'] = 'NEN2'
+                msg = RequestTypes.create_ground_station_access_request(self.name, 
+                                                                        EnvironmentServer.ENVIRONMENT_SERVER_NAME,
+                                                                        'NEN2')
+                _ = await self.submit_request(msg)
+                # await self.sim_wait(random.random())
 
-                # agent info req 
-                msg = dict()
-                msg['src'] = self.name
-                msg['dst'] = self.parent_module.parent_module.name
-                msg['@type'] = RequestTypes.AGENT_INFO_REQUEST.name
+                # gp access req
+                lat = 1.0
+                lon = 158.0
+                msg = RequestTypes.create_ground_point_access_request(self.name, 
+                                                                      EnvironmentServer.ENVIRONMENT_SERVER_NAME,
+                                                                      lat, lon)
+                _ = await self.submit_request(msg)
+                # await self.sim_wait(random.random())
 
-                resp = await self.submit_request(msg)
+                # # agent info req 
+                # msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
+                # _ = await self.submit_request(msg)
 
-                await self.sim_wait(20)
+                await self.sim_wait(4.6656879355937875)
+                # await self.sim_wait(20)
                 
         except asyncio.CancelledError:
             self.log('Periodic print routine cancelled')
