@@ -438,7 +438,9 @@ class EnvironmentServer(Module):
                 if not BroadcastTypes.format_check(msg):
                     # if broadcast task does not meet the desired format, reject and dump
                     self.log('Broadcast task did not meet format specifications. Task dumped.')
-                    # return
+                    print(msg)
+                    # raise Exception(msg)
+                    continue
 
                 # change from internal message to external message
                 msg['src'] = self.name

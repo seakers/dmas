@@ -549,19 +549,19 @@ class SubModule(Module):
                 # await self.sim_wait(1)
                 await self.sim_wait(random.random())
 
-                # # # agent access req
-                # msg = RequestTypes.create_agent_access_request(self.name, 
-                #                                                 EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
-                #                                                 'Mars2')
-                # _ = await self.submit_request(msg)
-                # await self.sim_wait(random.random())
+                # # agent access req
+                msg = RequestTypes.create_agent_access_request(self.name, 
+                                                                EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
+                                                                'Mars2')
+                _ = await self.submit_request(msg)
+                await self.sim_wait(random.random())
 
                 # gs access req
                 msg = RequestTypes.create_ground_station_access_request(self.name, 
                                                                         EnvironmentServer.ENVIRONMENT_SERVER_NAME,
                                                                         'NEN2')
                 _ = await self.submit_request(msg)
-                # await self.sim_wait(random.random())
+                await self.sim_wait(random.random())
 
                 # gp access req
                 lat = 1.0
@@ -570,13 +570,13 @@ class SubModule(Module):
                                                                       EnvironmentServer.ENVIRONMENT_SERVER_NAME,
                                                                       lat, lon)
                 _ = await self.submit_request(msg)
-                # await self.sim_wait(random.random())
+                await self.sim_wait(random.random())
 
-                # # agent info req 
-                # msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
-                # _ = await self.submit_request(msg)
+                # agent info req 
+                msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
+                _ = await self.submit_request(msg)
 
-                await self.sim_wait(4.6656879355937875)
+                await self.sim_wait(4.6656879355937875 * random.random())
                 # await self.sim_wait(20)
                 
         except asyncio.CancelledError:

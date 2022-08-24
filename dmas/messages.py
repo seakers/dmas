@@ -51,12 +51,21 @@ class BroadcastTypes(Enum):
             return True
         elif (BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT):
             return True
-        elif (BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
-              or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+        elif (BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT):
+            lat = msg.get('lat', None)
+            lon = msg.get('lon', None)
+            rise = msg.get('rise', None)
+            agent = msg.get('agent', None)
+
+            if lat is None or lon is None or rise is None or agent is None:
+                return False
+
+        elif (BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
               or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT):
-            result = msg.get('result', None)
+            rise = msg.get('rise', None)
+            agent = msg.get('agent', None)
             
-            if result is None:
+            if rise is None or agent is None:
                 return False
         else:
             return False
