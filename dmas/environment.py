@@ -425,11 +425,11 @@ class EnvironmentServer(Module):
         """
         Listens to internal message inbox to see if any submodule wishes to broadcast information to all agents.
         Broadcast types supported:
-            1- 'tic': communicates the current environment clock
-            2- 'eclipse_event': communicates which agents just entered or exited eclipse
-            3- 'access_event': communicates when an agent just started or stopped accessing a ground point or another agent
-
-            TODO: Add measurement requests from the ground?
+            1- tic: informs all agents of environment server's current time
+            2- eclipse_event: informs agents that an agent has entered eclipse. agents must ignore transmission if they are not the agent affected by the event
+            3- gp_access_event: informs an agent that it can access or can no longer access a ground point. agents must ignore transmission if they are not the agent affected by the event
+            4- gs_access_event: informs an agent that it can access or can no longer access a ground station. agents must ignore transmission if they are not the agent affected by the event
+            5- agent_access_event: informs an agent that it can access or can no longer access another agent. agents must ignore transmission if they are not the agent affected by the event
         """
         try:
             while True:
@@ -444,12 +444,12 @@ class EnvironmentServer(Module):
 
                 # change from internal message to external message
                 msg['src'] = self.name
-                msg['dst'] = 'all'
                 msg_type = msg['@type']
 
                 self.log(f'Broadcast task of type {msg_type} received! Publishing to all agents...')
 
                 if BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT:
+                    msg['dst'] = 'all'
                     t_next = msg['server_clock']
                     self.log(f'Updating internal clock to t={t_next}')
                     await self.sim_time.set_level(t_next)
@@ -462,7 +462,8 @@ class EnvironmentServer(Module):
                     msg.pop('agent')
                 
                 else:
-                    raise Exception(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
+                    self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
+                    continue
 
                 # broadcast message
                 self.log('Awaiting access to publisher socket...')

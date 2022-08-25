@@ -16,8 +16,11 @@ class BroadcastTypes(Enum):
     Types of broadcasts sent from the environemnt to all agents.
         1- tic: informs all agents of environment server's current time
         2- eclipse_event: informs agents that an agent has entered eclipse. agents must ignore transmission if they are not the agent affected by the event
-        3- sim_start: notifies all agents that the simulation has started
-        4- sim_end: notifies all agents that the simulation has ended 
+        3- gp_access_event: informs an agent that it can access or can no longer access a ground point. agents must ignore transmission if they are not the agent affected by the event
+        4- gs_access_event: informs an agent that it can access or can no longer access a ground station. agents must ignore transmission if they are not the agent affected by the event
+        5- agent_access_event: informs an agent that it can access or can no longer access another agent. agents must ignore transmission if they are not the agent affected by the event
+        6- sim_start: notifies all agents that the simulation has started
+        7- sim_end: notifies all agents that the simulation has ended 
     """
     TIC_EVENT = 'TIC_EVENT'
     ECLIPSE_EVENT = 'ECLIPSE_EVENT'

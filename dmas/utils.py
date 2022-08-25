@@ -4,10 +4,13 @@ from enum import Enum, IntEnum
 import random
 import numpy
 
+class SpacecraftModules(Enum):
+    ENGINEERING_MODULE = 'ENGINEERING_MODULE'
+    SCIENCE_MODULE = 'SCIENCE_MODULE'
+    SCHEDULING_MODULE = 'SCHEDULING_MODULE'
+
 class SimClocks(Enum):
-    """
-    asynchronized clocks
-    """
+    # asynchronized clocks
     # -Each node in the network carries their own clocks to base their waits with
     REAL_TIME = 'REAL_TIME'             # runs simulations in real-time. 
     REAL_TIME_FAST = 'REAL_TIME_FAST'   # runs simulations in spead up real-time. Each real time second represents a user-given amount of simulation seconds

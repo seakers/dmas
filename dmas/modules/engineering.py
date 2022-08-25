@@ -1,5 +1,4 @@
 import json
-from dmas.agent import AgentNode
 from dmas.modules.module import Module, SubModule
 import asyncio
 
@@ -27,15 +26,15 @@ class EngineeringModule(Module):
     PLATFORM_SIM = 'PLATFORM_SIMULATOR'
     NETWORK_SIM = 'NETWORK_SIMULATOR'
 
-    def __init__(self, parent_agent, component_list: list, 
-                    agent_comms_socket_in, agent_comms_socket_out, 
-                    environment_broadcast_socket, environment_request_socket, environment_request_lock) -> None:
+    def __init__(self, parent_agent, component_list: list) -> None:
+        self.agent_comms_socket_in = parent_agent.agent_comms_socket_in 
+        self.agent_comms_socket_out = parent_agent.agent_comms_socket_out
         # network_simulator = NetworkSimulator(self, parent_agent)
-        platform_simulator = PlatformSimulator(self, component_list, environment_broadcast_socket)
+        platform_simulator = PlatformSimulator(self, component_list)
         # operations_planner = OperationsPlanner()
 
         submodules = []
-        super().__init__('engineering_mod', parent_agent, submodules)
+        super().__init__('ENGINEERING_MODULE', parent_agent, submodules)
 
 """
 --------------------
@@ -47,11 +46,9 @@ class PlatformSimulator(Module):
     Simulates and keeps track of the state of the agent.
 
     """
-    def __init__(self, parent_module: Module, component_list, environment_request_socket, environment_request_lock) -> None:
+    def __init__(self, parent_module: Module, component_list) -> None:
         super().__init__(EngineeringModule.PLATFORM_SIM.value, parent_module, submodules=[])
         self.parent_agent = self.parent_module.parent_module
-        self.environment_request_socket = environment_request_socket
-        self.environment_request_lock = environment_request_lock
         self.component_list = []
         for component in component_list:
             self.component_list.append(component)
