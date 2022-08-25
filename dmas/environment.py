@@ -304,7 +304,10 @@ class EnvironmentServer(Module):
                     self.log(f'Received ground point access request from {src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
 
                     # query ground point access database
-                    request['result'] = self.orbit_data[src].is_accessing_ground_point(lat, lon, t_curr)                    
+                    _, _, gp_lat, gp_lon = self.orbit_data[src].find_gp_index(lat, lon)
+                    request['result'] = self.orbit_data[src].is_accessing_ground_point(gp_lat, gp_lon, t_curr)
+                    request['gp_lat'] = gp_lat
+                    request['gp_lon'] = gp_lon
                     
                     # change source and destination for response message
                     request['dst'] = request['src']

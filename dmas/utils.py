@@ -4,6 +4,31 @@ from enum import Enum, IntEnum
 import random
 import numpy
 
+class EventPair:
+    def __init__(self) -> None:
+        self.start = asyncio.Event()
+        self.end = asyncio.Event()
+
+        self.end.set()
+
+    def trigger_start(self):
+        if not self.start.is_set():
+            self.start.set()
+        if self.end.is_set():
+            self.end.clear()
+    
+    def trigger_end(self):
+        if self.start.is_set():
+            self.start.clear()
+        if not self.end.is_set():
+            self.end.set()
+
+    async def wait_start(self):
+        return await self.start.wait()
+
+    async def wait_end(self):
+        return await self.end.wait()
+
 class SpacecraftModules(Enum):
     ENGINEERING_MODULE = 'ENGINEERING_MODULE'
     SCIENCE_MODULE = 'SCIENCE_MODULE'

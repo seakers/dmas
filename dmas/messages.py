@@ -256,3 +256,6 @@ class RequestTypes(Enum):
         msg['@type'] = RequestTypes.AGENT_INFO_REQUEST.name
 
         return msg
+
+class AgentInternalMessageType(Enum):
+    pass
