@@ -2,7 +2,7 @@ from psutil import process_iter
 from signal import SIGKILL
 from multiprocessing import Process
 from dmas.environment import EnvironmentServer
-from agents.agent import AgentNode
+from agent import AgentNode
 
 def is_port_in_use(port: int) -> bool:
     import socket

@@ -2,6 +2,8 @@ import json
 from dmas.modules.module import Module, SubModule
 import asyncio
 
+from utils import SpacecraftModules
+
 """
 --------------------------------------------------------
  ____                                                                              
@@ -34,7 +36,7 @@ class EngineeringModule(Module):
         # operations_planner = OperationsPlanner()
 
         submodules = []
-        super().__init__('ENGINEERING_MODULE', parent_agent, submodules)
+        super().__init__(SpacecraftModules.ENGINEERING_MODULE.value, parent_agent, submodules)
 
 """
 --------------------

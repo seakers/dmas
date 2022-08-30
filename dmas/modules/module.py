@@ -281,6 +281,22 @@ class Module:
         else:
             return await self.parent_module.submit_request(req)
 
+    @abstractmethod
+    async def message_transmitter(self, msg):
+        """
+        transmits a message of any type to an agent
+        """
+        pass
+
+    async def transmit_message(self, msg):
+        """
+        transmits a message to another agent and returns response from said agent
+        """
+        if self.parent_module is None:
+            return await self.message_transmitter(msg)
+        else:
+            return await self.parent_module.transmit_message(msg)
+
     async def sim_wait_to(self, t, module_name=None):
         """
         awaits until simulation time reaches a time t

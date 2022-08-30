@@ -1,14 +1,18 @@
+from abc import abstractclassmethod
 import asyncio
 from curses import def_prog_mode
 import json
 import os
+
+from environment import EnvironmentServer
+
 import random
 import sys
 import time
 import zmq
 import zmq.asyncio
 import logging
-from environment import EnvironmentServer
+
 from messages import BroadcastTypes
 from utils import SimClocks, Container
 from messages import RequestTypes
@@ -214,20 +218,24 @@ class AgentNode(Module):
         try:
             while True:
                 msg_string = await self.environment_broadcast_socket.recv_json()
-                msg_dict = json.loads(msg_string)
+                msg = json.loads(msg_string)
 
-                src = msg_dict['src']
-                dst = msg_dict['dst']
-                msg_type = msg_dict['@type']
-                t_server = msg_dict['server_clock']
+                src = msg['src']
+                dst = msg['dst']
+                msg_type = msg['@type']
+                t_server = msg['server_clock']
 
                 self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
                 self.log(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
                 if self.name == dst or 'all' == dst:
+                    # broadcast intended for this or all agents
+
                     msg_type = BroadcastTypes[msg_type]
                     if msg_type is BroadcastTypes.SIM_END_EVENT:
+                        # if simulation end broadcast is received, terminate agent.
                         self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
+
                         return
 
                     elif msg_type is BroadcastTypes.TIC_EVENT:
@@ -239,12 +247,21 @@ class AgentNode(Module):
                             self.message_logger.info(f'Updating internal clock.')
                             await self.sim_time.set_level(t_server)
                             self.log('Updated internal clock.')
+
                     else:
-                        self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
+                        await self.handle_broadcast(msg)
                 else:
+                    # broadcast was intended for someone else, discarding
                     self.log('Broadcast not intended for this agent. Discarding message...')
         except asyncio.CancelledError:
             return
+
+    @abstractclassmethod
+    async def handle_broadcast(self, msg):
+        # if other type of broadcast is received, ignore message 
+        msg_type = msg['@type']
+        self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
+        return
 
     """
     --------------------

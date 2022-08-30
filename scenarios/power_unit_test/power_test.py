@@ -1,6 +1,6 @@
 import os
 
-from dmas.agents.agent import AbstractAgent
+from agent import AbstractAgent
 from dmas.agents.components.components import *
 from dmas.agents.components.instruments import *
 from dmas.environment import SimulationEnvironment

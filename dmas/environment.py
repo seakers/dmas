@@ -305,6 +305,7 @@ class EnvironmentServer(Module):
 
                     # query ground point access database
                     _, _, gp_lat, gp_lon = self.orbit_data[src].find_gp_index(lat, lon)
+
                     request['result'] = self.orbit_data[src].is_accessing_ground_point(gp_lat, gp_lon, t_curr)
                     request['gp_lat'] = gp_lat
                     request['gp_lon'] = gp_lon
@@ -313,7 +314,7 @@ class EnvironmentServer(Module):
                     request['dst'] = request['src']
                     request['src'] = self.name
                     req_json = json.dumps(request)
-                    
+
                     # send response to agent
                     await self.reqservice.send_json(req_json)
 

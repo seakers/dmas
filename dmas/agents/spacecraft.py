@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from agents.agent import AgentNode
+from agent import AgentNode
 from components import Battery, OnBoardComputer, SolarPanel, Transceiver
 from messages import BroadcastTypes
 from modules.engineering import EngineeringModule

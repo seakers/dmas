@@ -216,35 +216,36 @@ class OrbitData:
             else:
                 grid_compiled = pd.concat([grid_compiled, grid])
         
-        perfect_match = grid_compiled.query('`lat [deg]` == lat & `lon [deg]` == lon')
-        nrows, _ = perfect_match.shape
-        if nrows == 1:
-            grid_index = perfect_match['grid index']
-            gp_index = perfect_match['GP index']
-            gp_lat = perfect_match['lat [deg]']
-            gp_lon = perfect_match['lon [deg]']
+        perfect_match = grid_compiled.query('`lat [deg]` == @lat & `lon [deg]` == @lon')
+
+        for _, row in perfect_match.iterrows():
+            grid_index = row['grid index']
+            gp_index = row['GP index']
+            gp_lat = row['lat [deg]']
+            gp_lon = row['lon [deg]']
 
             return grid_index, gp_index, gp_lat, gp_lon
-        else:
-            grid_compiled['dr'] = np.sqrt( 
-                                            np.power(np.cos( grid_compiled['lat [deg]'] * np.pi / 360 ) * np.cos( grid_compiled['lon [deg]'] * np.pi / 360 ) \
-                                                    - np.cos( lat * np.pi / 360 ) * np.cos( lon * np.pi / 360 ), 2) \
-                                            + np.power(np.cos( grid_compiled['lat [deg]'] * np.pi / 360 ) * np.sin( grid_compiled['lon [deg]'] * np.pi / 360 ) \
-                                                    - np.cos( lat * np.pi / 360 ) * np.sin( lon * np.pi / 360 ), 2) \
-                                            + np.power(np.sin( grid_compiled['lat [deg]'] * np.pi / 360 ) \
-                                                    - np.sin( lat * np.pi / 360 ), 2)
-                                        )
-            min_dist = grid_compiled['dr'].min()
-            min_rows = grid_compiled.query('dr == @min_dist')
+            
+        grid_compiled['dr'] = np.sqrt( 
+                                        np.power(np.cos( grid_compiled['lat [deg]'] * np.pi / 360 ) * np.cos( grid_compiled['lon [deg]'] * np.pi / 360 ) \
+                                                - np.cos( lat * np.pi / 360 ) * np.cos( lon * np.pi / 360 ), 2) \
+                                        + np.power(np.cos( grid_compiled['lat [deg]'] * np.pi / 360 ) * np.sin( grid_compiled['lon [deg]'] * np.pi / 360 ) \
+                                                - np.cos( lat * np.pi / 360 ) * np.sin( lon * np.pi / 360 ), 2) \
+                                        + np.power(np.sin( grid_compiled['lat [deg]'] * np.pi / 360 ) \
+                                                - np.sin( lat * np.pi / 360 ), 2)
+                                    )
+        min_dist = grid_compiled['dr'].min()
+        min_rows = grid_compiled.query('dr == @min_dist')
 
-            for _, row in min_rows.iterrows():
-                grid_index = row['grid index']
-                gp_index = row['GP index']
-                gp_lat = row['lat [deg]']
-                gp_lon = row['lon [deg]']
+        for _, row in min_rows.iterrows():
+            grid_index = row['grid index']
+            gp_index = row['GP index']
+            gp_lat = row['lat [deg]']
+            gp_lon = row['lon [deg]']
 
-                return grid_index, gp_index, gp_lat, gp_lon
-            return -1, -1, -1, -1
+            return grid_index, gp_index, gp_lat, gp_lon
+
+        return -1, -1, -1, -1
 
     def from_directory(scenario_dir: str):
         """
