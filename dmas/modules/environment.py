@@ -32,6 +32,7 @@ class EnvironmentModuleTypes(Enum):
     GP_ACCESS_EVENT_MODULE = 'GP_ACCESS_EVENT_MODULE'
     GS_ACCESS_EVENT_MODULE = 'GS_ACCESS_EVENT_MODULE'
     AGENT_ACCESS_EVENT_MODULE = 'AGENT_ACCESS_EVENT_MODULE'
+    SCENARIO_SIMULATION_MODULE = 'SCENARIO_SIMULATION_MODULE'
 
 class TicRequestModule(Module):
     def __init__(self, parent_environment) -> None:
@@ -49,7 +50,7 @@ class TicRequestModule(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_message(msg)
+                await self.put_in_inbox(msg)
             else:
                 if 'REQUEST' in msg['@type'] and RequestTypes[msg['@type']] is RequestTypes.TIC_REQUEST:
                     # if a tic request is received, add to tic_request_queue
@@ -96,7 +97,7 @@ class TicRequestModule(Module):
                         t = msg_dict['server_clock']
                         self.log(f'Submitting broadcast request for tic with server clock at t={t}')
 
-                        await self.put_message(msg_dict)
+                        await self.put_in_inbox(msg_dict)
                 else:
                     await self.sim_wait(1e6, module_name=self.name)
         except asyncio.CancelledError:
@@ -120,8 +121,8 @@ class ScheduledEventModule(Module):
 
         # get scheduled event time-step
         self.time_step = -1
-        for agent_name in self.parent_module.orbit_data:
-            orbit_data = self.parent_module.orbit_data[agent_name]
+        for agent_name in self.parent_module.parent_module.orbit_data:
+            orbit_data = self.parent_module.parent_module.orbit_data[agent_name]
             self.time_step = orbit_data.time_step
             break
 
@@ -142,21 +143,6 @@ class ScheduledEventModule(Module):
         Initiates event scheduling by loading event information
         """
         await super().activate()
-        
-        # # initialize scheduled events data and sort
-        # self.event_data = self.compile_event_data()
-        # self.event_data = self.event_data.sort_values(by=['time index'])
-
-        # # if data does not have proper format, reject
-        # if not self.check_data_format():
-        #     raise Exception('Event data loaded in an incorrect format.')
-
-        # # get scheduled event time-step
-        # self.time_step = -1
-        # for agent_name in self.parent_module.orbit_data:
-        #     orbit_data = self.parent_module.orbit_data[agent_name]
-        #     self.time_step = orbit_data.time_step
-        #     break
     
     def check_data_format(self) -> bool:
         """
@@ -184,7 +170,7 @@ class ScheduledEventModule(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_message(msg)
+                await self.put_in_inbox(msg)
             else:
                 # dumps all incoming messages
                 return
@@ -213,7 +199,7 @@ class ScheduledEventModule(Module):
                     self.log(f'Submitting broadcast request for {broadcast_type} end with server clock at t={t_next} for agent {agent_name}', module_name=self.name)
 
                 # send a broadcast request to parent environment      
-                await self.put_message(msg_dict)
+                await self.put_in_inbox(msg_dict)
 
             # once all events have occurred, go to sleep until the end of the simulation
             while True:
@@ -233,10 +219,10 @@ class EclipseEventModule(ScheduledEventModule):
         agent_name = row['agent name']
         rise = row['rise']
 
-        return BroadcastTypes.create_eclipse_event_broadcast(self.name, self.parent_module.name, agent_name, rise, t_next)
+        return BroadcastTypes.create_eclipse_event_broadcast(self.name, self.parent_module.parent_module.name, agent_name, rise, t_next)
         
     def compile_event_data(self) -> pd.DataFrame:
-        orbit_data = self.parent_module.orbit_data
+        orbit_data = self.parent_module.parent_module.orbit_data
         eclipse_data = pd.DataFrame(columns=['time index', 'agent name', 'rise'])
         
         for agent in orbit_data:
@@ -275,11 +261,11 @@ class GndStatAccessEventModule(ScheduledEventModule):
         lat = row['lat [deg]']
         lon = row['lon [deg]']
 
-        return BroadcastTypes.create_gs_access_event_broadcast(self.name, self.parent_module.name, agent_name, rise, t_next,
+        return BroadcastTypes.create_gs_access_event_broadcast(self.name, self.parent_module.parent_module.name, agent_name, rise, t_next,
                                                                 gndStat_name, gndStat_id, lat, lon)
 
     def compile_event_data(self) -> pd.DataFrame:
-        orbit_data = self.parent_module.orbit_data
+        orbit_data = self.parent_module.parent_module.orbit_data
         gs_access_data = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'gndStn id', 'gndStn name','lat [deg]','lon [deg]'])
 
         for agent in orbit_data:
@@ -321,11 +307,11 @@ class GPAccessEventModule(ScheduledEventModule):
         lat = row['lat [deg]']
         lon = row['lon [deg]']
 
-        return BroadcastTypes.create_gp_access_event_broadcast(self.name, self.parent_module.name, agent_name, rise, t_next,
+        return BroadcastTypes.create_gp_access_event_broadcast(self.name, self.parent_module.parent_module.name, agent_name, rise, t_next,
                                                                 grid_index, gp_index, lat, lon)
 
     def compile_event_data(self) -> pd.DataFrame:
-        orbit_data = self.parent_module.orbit_data
+        orbit_data = self.parent_module.parent_module.orbit_data
         coverage_data = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'instrument', 'mode', 'grid index', 'GP index', 'pnt-opt index', 'lat [deg]', 'lon [deg]',])
 
         for agent in orbit_data:
@@ -393,10 +379,10 @@ class AgentAccessEventModule(ScheduledEventModule):
         rise = row['rise']
         target = row['target']
 
-        return BroadcastTypes.create_agent_access_event_broadcast(self.name, self.parent_module.name, rise, t_next, agent_name, target)
+        return BroadcastTypes.create_agent_access_event_broadcast(self.name, self.parent_module.parent_module.name, rise, t_next, agent_name, target)
 
     def compile_event_data(self) -> pd.DataFrame:
-        orbit_data = self.parent_module.orbit_data  
+        orbit_data = self.parent_module.parent_module.orbit_data  
         agent_access_data = pd.DataFrame(columns=['time index', 'agent name', 'rise', 'target'])
         
         for src in orbit_data:
@@ -427,3 +413,17 @@ class AgentAccessEventModule(ScheduledEventModule):
                     agent_access_data = pd.concat([agent_access_data, access_merged])
         
         return agent_access_data
+
+class ScenarioSimulator(Module):
+    """
+    Module in charge of propagating the state of the world in the simulated scenario
+    """
+    def __init__(self, parent_module) -> None:
+        super().__init__(EnvironmentModuleTypes.SCENARIO_SIMULATION_MODULE, 
+                            parent_module, 
+                            submodules=[], 
+                            n_timed_coroutines=1)
+        self.submodules = [EclipseEventModule(self), 
+                            GPAccessEventModule(self),
+                            GndStatAccessEventModule(self),
+                            AgentAccessEventModule(self)]

@@ -166,7 +166,7 @@ class AgentNode(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_message(msg)
+                await self.put_in_inbox(msg)
             else:
                 msg_type = msg['@type']
 
@@ -249,20 +249,19 @@ class AgentNode(Module):
                             self.log('Updated internal clock.')
 
                     else:
-                        await self.handle_broadcast(msg)
+                        self.handle_broadcast(msg)
                 else:
                     # broadcast was intended for someone else, discarding
                     self.log('Broadcast not intended for this agent. Discarding message...')
         except asyncio.CancelledError:
             return
 
-    @abstractclassmethod
-    async def handle_broadcast(self, msg):
+    def handle_broadcast(self, msg):
         # if other type of broadcast is received, ignore message 
         msg_type = msg['@type']
-        self.log(f'Broadcasts of type {msg_type.name} not yet supported.')
-        return
 
+        self.log(content=f'Broadcasts of type {msg_type} not yet supported.')
+        
     """
     --------------------
     HELPING FUNCTIONS
@@ -298,6 +297,7 @@ class AgentNode(Module):
         self.agent_socket_in.bind(f"tcp://*:{self.agent_port_in}")
 
         self.agent_socket_out = self.context.socket(zmq.REQ)
+        self.agent_socket_out_lock = asyncio.Lock()
 
     async def sync_environment(self):
         """
@@ -528,6 +528,9 @@ class AgentNode(Module):
         except asyncio.CancelledError:
             pass
 
+    async def message_transmitter(self, msg):
+        return await super().message_transmitter(msg)
+
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
         pass
@@ -538,8 +541,8 @@ class AgentState:
 --------------------
 """
 class TestAgent(AgentNode):    
-    def __init__(self, scenario_dir) -> None:
-        super().__init__('Mars1', scenario_dir)
+    def __init__(self, name, scenario_dir) -> None:
+        super().__init__(name, scenario_dir)
         self.submodules = [TestModule(self)]  
 
 """
@@ -561,23 +564,29 @@ class SubModule(Module):
                 msg['@type'] = 'PRINT'
                 msg['content'] = 'TEST_PRINT'
 
-                await self.parent_module.put_message(msg)
+                await self.parent_module.put_in_inbox(msg)
 
                 # await self.sim_wait(1)
                 await self.sim_wait(random.random())
 
                 # # agent access req
+                target = 'Mars2'
                 msg = RequestTypes.create_agent_access_request(self.name, 
                                                                 EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
-                                                                'Mars2')
-                _ = await self.submit_request(msg)
+                                                                target)
+                response = await self.submit_request(msg)
+                result = response['result']
+                self.log(f'Access to {target}: {result}')
                 await self.sim_wait(random.random())
 
                 # gs access req
+                gs_name = 'NEN2'
                 msg = RequestTypes.create_ground_station_access_request(self.name, 
                                                                         EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                                                                        'NEN2')
-                _ = await self.submit_request(msg)
+                                                                        gs_name)
+                response = await self.submit_request(msg)
+                result = response['result']
+                self.log(f'Access to GS({gs_name}): {result}')
                 await self.sim_wait(random.random())
 
                 # gp access req
@@ -586,12 +595,17 @@ class SubModule(Module):
                 msg = RequestTypes.create_ground_point_access_request(self.name, 
                                                                       EnvironmentServer.ENVIRONMENT_SERVER_NAME,
                                                                       lat, lon)
-                _ = await self.submit_request(msg)
+                response = await self.submit_request(msg)
+                result = response['result']
+                self.log(f'Access to GP({lat}°,{lon}°): {result}')
                 await self.sim_wait(random.random())
 
                 # agent info req 
                 msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
-                _ = await self.submit_request(msg)
+                
+                response = await self.submit_request(msg)
+                result = response['result']
+                self.log(f'Agent external state: {result}')
 
                 await self.sim_wait(4.6656879355937875 * random.random())
                 # await self.sim_wait(20)
@@ -611,8 +625,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing agent...')
-    scenario_dir = './scenarios/sim_test'
     
-    agent = TestAgent(scenario_dir)
+    agent = TestAgent('Mars1', './scenarios/sim_test')
     
     asyncio.run(agent.live())

@@ -16,7 +16,7 @@ class ScienceModule(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_message(msg)
+                await self.put_in_inbox(msg)
             else:
                 if msg['@type'] == 'PRINT':
                     content = msg['content']

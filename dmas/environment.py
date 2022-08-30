@@ -8,7 +8,7 @@ import random
 import time
 from urllib import request
 import zmq.asyncio
-from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule
+from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule, ScenarioSimulator
 from orbitdata import OrbitData
 
 from messages import BroadcastTypes, RequestTypes
@@ -47,6 +47,11 @@ def is_port_in_use(port: int) -> bool:
         return s.connect_ex(('localhost', port)) == 0
 
 class EnvironmentServer(Module):
+    """
+    Server encompasing all environment processes. Main module regulates simulation start and end as well as managing network ledgers for all agents to communicate with eachother.
+    Submodules manage the environment clock and the scenario simulation. The latter concerns propagating the state of the environment as a function of time as well as propagating
+    the external states of the agents. 
+    """
     ENVIRONMENT_SERVER_NAME = 'ENV'
 
     def __init__(self, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
@@ -83,10 +88,11 @@ class EnvironmentServer(Module):
 
         # set up submodules
         self.submodules = [ TicRequestModule(self), 
-                            EclipseEventModule(self), 
-                            GPAccessEventModule(self),
-                            GndStatAccessEventModule(self),
-                            AgentAccessEventModule(self)
+                            # EclipseEventModule(self), 
+                            # GPAccessEventModule(self),
+                            # GndStatAccessEventModule(self),
+                            # AgentAccessEventModule(self),
+                            ScenarioSimulator(self)
                           ]
         
         # set up results dir
@@ -205,7 +211,7 @@ class EnvironmentServer(Module):
             dst_name = msg['dst']
             if dst_name != self.name:
                 self.log(f'Message not intended for this module. Rerouting.')
-                await self.put_message(msg)
+                await self.put_in_inbox(msg)
             else:
                 # if the message is of type broadcast, send to broadcast handler
                 msg_type = msg['@type']
@@ -225,7 +231,7 @@ class EnvironmentServer(Module):
                     msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE
                     
                     self.log(f'Forwarding Tic request to relevant submodule...')
-                    await self.put_message(msg)
+                    await self.put_in_inbox(msg)
                 else:
                     self.log(f'Dumping internal message of type {msg_type}.')
 
@@ -273,7 +279,7 @@ class EnvironmentServer(Module):
                     request['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
 
                     # send to internal message router for forwarding
-                    await self.put_message(request)
+                    await self.put_in_inbox(request)
 
                 elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
                     # unpackage message
@@ -723,7 +729,7 @@ class EnvironmentServer(Module):
             req['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
         else:
             raise Exception(f'Internal Handling of request type {req_type} not yet supported')
-        await self.put_message(req)
+        await self.put_in_inbox(req)
         
 """
 --------------------
@@ -738,9 +744,10 @@ if __name__ == '__main__':
     # duration = 40
     # duration = 70
     duration = 215 * dt 
-    print(duration)
+    print(f'Simulation duration: {duration}[s]')
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
-    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)
+    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)
+    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_STEP)
     
     asyncio.run(environment.live())

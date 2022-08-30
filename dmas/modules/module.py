@@ -146,7 +146,7 @@ class Module:
                                 self.log(f'couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
                     self.log(f'forwarding message to {dst.name}...')
-                    await dst.put_message(msg)
+                    await dst.put_in_inbox(msg)
 
         except asyncio.CancelledError:
             return
@@ -167,7 +167,7 @@ class Module:
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_message(msg)
+                await self.put_in_inbox(msg)
             else:
                 if msg['@type'] == 'PRINT':
                     content = msg['content']
@@ -190,9 +190,12 @@ class Module:
     """
     HELPING FUNCTIONS
     """
-    async def put_message(self, msg):
+    async def send_internal_message(self, msg):
+        await self.put_in_inbox(msg)
+
+    async def put_in_inbox(self, msg):
         """
-        Places a message in this modules inbox.
+        Places a message in this module's inbox.
         Intended to be executed by other modules for sending messages to this module.
         """
         await self.inbox.put(msg)
