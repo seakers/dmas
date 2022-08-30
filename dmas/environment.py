@@ -8,7 +8,7 @@ import random
 import time
 from urllib import request
 import zmq.asyncio
-from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule, ScenarioSimulator
+from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule, AgentExternalStatePropagator
 from orbitdata import OrbitData
 
 from messages import BroadcastTypes, RequestTypes
@@ -88,11 +88,7 @@ class EnvironmentServer(Module):
 
         # set up submodules
         self.submodules = [ TicRequestModule(self), 
-                            # EclipseEventModule(self), 
-                            # GPAccessEventModule(self),
-                            # GndStatAccessEventModule(self),
-                            # AgentAccessEventModule(self),
-                            ScenarioSimulator(self)
+                            AgentExternalStatePropagator(self)
                           ]
         
         # set up results dir
@@ -415,6 +411,7 @@ class EnvironmentServer(Module):
                 await self.reqservice.send_string('')
             elif worker_task is not None:
                 self.log('Cancelling response...')
+                worker_task.cancel()
                 await worker_task
             else:
                 poller = zmq.asyncio.Poller()
@@ -426,7 +423,6 @@ class EnvironmentServer(Module):
                     self.log('Request received during shutdown process. Sending blank response..')
                     await self.reqservice.send_string('')
 
-            # await self.reqservice.send_string('')
             self.log('Releasing request service port...')
             self.reqservice_lock.release()
             return

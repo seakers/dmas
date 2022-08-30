@@ -190,9 +190,6 @@ class Module:
     """
     HELPING FUNCTIONS
     """
-    async def send_internal_message(self, msg):
-        await self.put_in_inbox(msg)
-
     async def put_in_inbox(self, msg):
         """
         Places a message in this module's inbox.

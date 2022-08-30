@@ -32,7 +32,7 @@ class EnvironmentModuleTypes(Enum):
     GP_ACCESS_EVENT_MODULE = 'GP_ACCESS_EVENT_MODULE'
     GS_ACCESS_EVENT_MODULE = 'GS_ACCESS_EVENT_MODULE'
     AGENT_ACCESS_EVENT_MODULE = 'AGENT_ACCESS_EVENT_MODULE'
-    SCENARIO_SIMULATION_MODULE = 'SCENARIO_SIMULATION_MODULE'
+    AGENT_EXTERNAL_PROPAGATOR_MODULE = 'AGENT_EXTERNAL_PROPAGATOR_MODULE'
 
 class TicRequestModule(Module):
     def __init__(self, parent_environment) -> None:
@@ -414,12 +414,12 @@ class AgentAccessEventModule(ScheduledEventModule):
         
         return agent_access_data
 
-class ScenarioSimulator(Module):
+class AgentExternalStatePropagator(Module):
     """
-    Module in charge of propagating the state of the world in the simulated scenario
+    Module in charge of propagating the external state of the agents present in this simulated scenario
     """
     def __init__(self, parent_module) -> None:
-        super().__init__(EnvironmentModuleTypes.SCENARIO_SIMULATION_MODULE, 
+        super().__init__(EnvironmentModuleTypes.AGENT_EXTERNAL_PROPAGATOR_MODULE, 
                             parent_module, 
                             submodules=[], 
                             n_timed_coroutines=1)

@@ -187,8 +187,12 @@ class AgentNode(Module):
             coroutines = []
             
             broadcast_reception_handler = asyncio.create_task(self.broadcast_reception_handler())
-            broadcast_reception_handler.set_name (f'{self.name}_internal_message_router')
+            broadcast_reception_handler.set_name (f'{self.name}_broadcast_reception_handler')
             coroutines.append(broadcast_reception_handler)
+
+            reception_handler = asyncio.create_task(self.reception_handler())
+            reception_handler.set_name (f'{self.name}_reception_handler')
+            coroutines.append(reception_handler)
 
             _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
 
@@ -261,7 +265,62 @@ class AgentNode(Module):
         msg_type = msg['@type']
 
         self.log(content=f'Broadcasts of type {msg_type} not yet supported.')
-        
+
+    async def reception_handler(self):
+        """
+        Listens for messages from other agents. Stops processes when simulation end-command is received.
+        """
+        try:            
+            self.log('Acquiring access to agent-in port...')
+            await self.agent_socket_in_lock.acquire()
+            self.log('Access to agent-in port acquired.')
+            while True:
+                req_str = None
+                worker_task = None
+
+                # listen for requests
+                self.log('Waiting for agent requests.')
+                req_str = await self.agent_socket_in.recv_json()
+                self.log(f'Request received!')
+                
+                # convert request to json
+                req = json.loads(req_str)
+
+                # handle request
+                self.log(f'Handling agent request...')
+                worker_task = asyncio.create_task(self.reception_worker(req))
+                await worker_task
+
+        except asyncio.CancelledError:
+            if req_str is not None:
+                self.log('Sending blank response...')
+                await self.agent_socket_in.send_string('')
+            elif worker_task is not None:
+                self.log('Cancelling response...')
+                worker_task.cancel()
+                await worker_task
+            else:
+                poller = zmq.asyncio.Poller()
+                poller.register(self.agent_socket_in, zmq.POLLIN)
+                poller.register(self.agent_socket_in, zmq.POLLOUT)
+
+                evnt = await poller.poll(1000)
+                if len(evnt) > 0:
+                    self.log('Agent request message received during shutdown process. Sending blank response..')
+                    await self.reqservice.send_string('')
+
+            self.log('Releasing agent-in port...')
+            self.agent_socket_in_lock.release()
+            return
+
+    async def reception_worker(self, request):
+        try:
+            # if request does not match any of the standard request format, dump and continue
+            self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
+            await self.agent_socket_in.send_string('')
+        except asyncio.CancelledError:
+            await self.agent_socket_in.send_string('')
+
     """
     --------------------
     HELPING FUNCTIONS
@@ -295,6 +354,7 @@ class AgentNode(Module):
         self.agent_socket_in = self.context.socket(zmq.REP)
         self.agent_port_in = get_next_available_port()
         self.agent_socket_in.bind(f"tcp://*:{self.agent_port_in}")
+        self.agent_socket_in_lock = asyncio.Lock()
 
         self.agent_socket_out = self.context.socket(zmq.REQ)
         self.agent_socket_out_lock = asyncio.Lock()
@@ -422,7 +482,6 @@ class AgentNode(Module):
     async def request_submitter(self, req):
         try:
             req_type = req['@type']
-            src_module = req['src'] 
             req['src'] = self.name
 
             req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
@@ -529,7 +588,24 @@ class AgentNode(Module):
             pass
 
     async def message_transmitter(self, msg):
-        return await super().message_transmitter(msg)
+        # reformat message
+        msg_type = msg['@type']
+        msg['src'] = self.name
+        msg['dst'] = msg['target']
+        target = msg['target']
+
+        req_json = json.dumps(msg)
+
+        # submit request
+        self.log(f'Transmitting a message of type {msg_type} (from {self.name} to {target})...')
+        await self.agent_socket_out_lock.acquire()
+        await self.agent_socket_out.send_json(req_json)
+        self.log(f'{msg_type} message sent successfully. Awaiting response...')
+        
+        # wait for server reply
+        await self.agent_socket_out.recv_json()
+        self.agent_socket_out_lock.release()
+        self.log(f'Received message reception confirmation!')      
 
 class AgentState:
     def __init__(self, agent: AgentNode, component_list) -> None:
