@@ -2,7 +2,7 @@ from psutil import process_iter
 from signal import SIGKILL
 from multiprocessing import Process
 from dmas.environment import EnvironmentServer
-from agent import AgentNode
+from agent import AgentClient
 
 def is_port_in_use(port: int) -> bool:
     import socket
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     agent_to_port_map['AGENT0'] = '5557'
     
     environment = EnvironmentServer("ENV", scenario_dir, ['AGENT0'], simulation_frequency=1, duration=10)   
-    agent = AgentNode("AGENT0", scenario_dir, agent_to_port_map, 1)
+    agent = AgentClient("AGENT0", scenario_dir, agent_to_port_map, 1)
     
     env_prcs = Process(target=environment.live)
     agent_prcs = Process(target=agent.live)

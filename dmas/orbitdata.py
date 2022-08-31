@@ -113,6 +113,9 @@ class OrbitData:
     STATE QUERY methods
     """
     def is_accessing_agent(self, target: str, t: float):
+        if target in self.agent_name:
+            return True
+
         if target not in self.isl_data.keys():
             return False 
 

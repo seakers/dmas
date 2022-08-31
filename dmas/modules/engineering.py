@@ -79,7 +79,7 @@ class PlatformSimulator(Module):
                 dst_name = msg['dst']
 
                 if dst_name != self.name:
-                    await self.internal_message_router(msg)
+                    await self._internal_message_router(msg)
                 else:
                     if msg['@type'] == 'PRINT':
                         content = msg['content']

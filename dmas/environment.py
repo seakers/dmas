@@ -144,7 +144,7 @@ class EnvironmentServer(Module):
         self.log(f"Starting simulation...", level=logging.INFO)
         await super().run()
 
-    async def shut_down(self):
+    async def _shut_down(self):
         """
         Terminate processes 
         """
@@ -207,7 +207,7 @@ class EnvironmentServer(Module):
             dst_name = msg['dst']
             if dst_name != self.name:
                 self.log(f'Message not intended for this module. Rerouting.')
-                await self.put_in_inbox(msg)
+                await self.send_internal_message(msg)
             else:
                 # if the message is of type broadcast, send to broadcast handler
                 msg_type = msg['@type']
@@ -227,7 +227,7 @@ class EnvironmentServer(Module):
                     msg['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE
                     
                     self.log(f'Forwarding Tic request to relevant submodule...')
-                    await self.put_in_inbox(msg)
+                    await self.send_internal_message(msg)
                 else:
                     self.log(f'Dumping internal message of type {msg_type}.')
 
@@ -275,7 +275,7 @@ class EnvironmentServer(Module):
                     request['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
 
                     # send to internal message router for forwarding
-                    await self.put_in_inbox(request)
+                    await self.send_internal_message(request)
 
                 elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
                     # unpackage message
@@ -637,7 +637,6 @@ class EnvironmentServer(Module):
         while len(self.offline_subscribers) < self.NUMBER_AGENTS:
             # wait for synchronization request
             msg_str = await self.reqservice.recv_json() 
-            self.reqservice.send_string('')
             msg_dict = json.loads(msg_str)
             msg_src = msg_dict['src']
             msg_type = msg_dict['@type']
@@ -645,7 +644,7 @@ class EnvironmentServer(Module):
             if RequestTypes[msg_type] is not RequestTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
                 self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
-                await self.reqservice.send(b'')
+                await self.reqservice.send_string('')
                 continue
             
             self.request_logger.info(f'Received simulation end confirmation from {msg_src}!')
@@ -657,6 +656,9 @@ class EnvironmentServer(Module):
                     self.offline_subscribers.append(agent_name)
                     self.log(f"{agent_name} has ended its processes ({len(self.offline_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     break
+            
+            # send blank response
+            await self.reqservice.send_string('')
         
         self.reqservice_lock.release()
 
@@ -724,8 +726,8 @@ class EnvironmentServer(Module):
         if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
             req['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
         else:
-            raise Exception(f'Internal Handling of request type {req_type} not yet supported')
-        await self.put_in_inbox(req)
+            raise Exception(f'Internal handling of request type {req_type} not yet supported')
+        await self.send_internal_message(req)
         
 """
 --------------------
@@ -737,9 +739,9 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    # duration = 40
+    # duration = 10
     # duration = 70
-    duration = 215 * dt 
+    duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)

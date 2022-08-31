@@ -50,7 +50,7 @@ class TicRequestModule(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_in_inbox(msg)
+                await self.send_internal_message(msg)
             else:
                 if 'REQUEST' in msg['@type'] and RequestTypes[msg['@type']] is RequestTypes.TIC_REQUEST:
                     # if a tic request is received, add to tic_request_queue
@@ -97,7 +97,7 @@ class TicRequestModule(Module):
                         t = msg_dict['server_clock']
                         self.log(f'Submitting broadcast request for tic with server clock at t={t}')
 
-                        await self.put_in_inbox(msg_dict)
+                        await self.send_internal_message(msg_dict)
                 else:
                     await self.sim_wait(1e6, module_name=self.name)
         except asyncio.CancelledError:
@@ -143,6 +143,7 @@ class ScheduledEventModule(Module):
         Initiates event scheduling by loading event information
         """
         await super().activate()
+        self.log(self.event_data)
     
     def check_data_format(self) -> bool:
         """
@@ -170,7 +171,7 @@ class ScheduledEventModule(Module):
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_in_inbox(msg)
+                await self.send_internal_message(msg)
             else:
                 # dumps all incoming messages
                 return
@@ -199,7 +200,7 @@ class ScheduledEventModule(Module):
                     self.log(f'Submitting broadcast request for {broadcast_type} end with server clock at t={t_next} for agent {agent_name}', module_name=self.name)
 
                 # send a broadcast request to parent environment      
-                await self.put_in_inbox(msg_dict)
+                await self.send_internal_message(msg_dict)
 
             # once all events have occurred, go to sleep until the end of the simulation
             while True:
@@ -358,6 +359,8 @@ class GPAccessEventModule(ScheduledEventModule):
                         access_rise['rise'] = [True]
 
                         access_set = gp_data.query('`time index` == @t_set').copy()
+                        # nrows, _ = access_set.shape
+                        # access_set['time index'] = access_set + [1] * nrows
                         access_set['rise'] = [False]
 
                         access_merged = pd.concat([access_rise, access_set])

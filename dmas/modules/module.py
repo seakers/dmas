@@ -66,7 +66,7 @@ class Module:
             routine_task.set_name (f'{self.name}_routine')
             coroutines.append(routine_task)
             
-            router_task = asyncio.create_task(self.internal_message_router())
+            router_task = asyncio.create_task(self._internal_message_router())
             router_task.set_name (f'{self.name}_internal_message_router')
             coroutines.append(router_task)
 
@@ -99,9 +99,9 @@ class Module:
             return
 
         finally:
-            await self.shut_down()
+            await self._shut_down()
     
-    async def internal_message_router(self):
+    async def _internal_message_router(self):
         """
         Listens for internal messages being sent between modules and routes them to their respective destinations.
         If this module is the intended destination for this message, then handle the message.
@@ -152,7 +152,7 @@ class Module:
             return
 
     @abstractmethod
-    async def shut_down(self):
+    async def _shut_down(self):
         """
         Cleanup subroutine that should be used to terminate any thread-sensitive or envent-loop sensitive variables
         """
@@ -167,7 +167,7 @@ class Module:
         try:
             dst_name = msg['dst']
             if dst_name != self.name:
-                await self.put_in_inbox(msg)
+                await self.send_internal_message(msg)
             else:
                 if msg['@type'] == 'PRINT':
                     content = msg['content']
@@ -183,17 +183,28 @@ class Module:
         """
         try:
             while True:
-                await self.sim_wait(1000)     
+                await self.sim_wait(1e6)     
         except asyncio.CancelledError:
             return
     
     """
     HELPING FUNCTIONS
     """
+    @abstractmethod
+    async def send_internal_message(self, msg):
+        """
+        Sends message to its intended destination within this agent's modules. 
+        By default it places the message in this module's inbox, which will then be handled by the internal
+        message router. The router uses depth-first-search to find its intended destination module. This 
+        'send_internal_message' method may be modified to create more analogous communications network between
+        modules that better represent the agent being designed. 
+        """
+        await self.inbox.put(msg)
+
     async def put_in_inbox(self, msg):
         """
         Places a message in this module's inbox.
-        Intended to be executed by other modules for sending messages to this module.
+        Intended to be called by other modules for sending messages to this module.
         """
         await self.inbox.put(msg)
 
@@ -230,7 +241,7 @@ class Module:
             else:
                 raise Exception(f'Clock of type {self.CLOCK_TYPE.value} not yet supported')
         else:
-            self.parent_module.get_current_time()
+            return self.parent_module.get_current_time()
 
     def get_current_real_time(self):
         """

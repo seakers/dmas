@@ -29,14 +29,7 @@ from modules.module import Module
    \ \_\ \_\ \____ \ \____\ \_\ \_\ \__\    \ \____//\____\\ \_\ \____\ \_\ \_\ \__\
     \/_/\/_/\/___L\ \/____/\/_/\/_/\/__/     \/___/ \/____/ \/_/\/____/\/_/\/_/\/__/
               /\____/                                                               
-              \_/__/
- __  __              __            
-/\ \/\ \            /\ \           
-\ \ `\\ \    ___    \_\ \     __   
- \ \ , ` \  / __`\  /'_` \  /'__`\ 
-  \ \ \`\ \/\ \L\ \/\ \L\ \/\  __/ 
-   \ \_\ \_\ \____/\ \___,_\ \____\
-    \/_/\/_/\/___/  \/__,_ /\/____/                                                                                                                                                 
+              \_/__/                                                                                                                      
 --------------------------------------------------------
 """
 
@@ -57,7 +50,7 @@ def count_number_of_subroutines(module: Module):
             count += count_number_of_subroutines(submodule)
         return count
 
-class AgentNode(Module):
+class AgentClient(Module):
     def __init__(self, name, scenario_dir, modules=[], env_port_number = '5561', env_request_port_number = '5562') -> None:
         super().__init__(name, submodules=modules, n_timed_coroutines=0)
         
@@ -121,7 +114,7 @@ class AgentNode(Module):
         self.log(f"Starting simulation...", level=logging.INFO)
         await super().run()
 
-    async def shut_down(self):
+    async def _shut_down(self):
         """
         Terminate processes 
         """
@@ -186,9 +179,9 @@ class AgentNode(Module):
             # create coroutine tasks
             coroutines = []
             
-            broadcast_reception_handler = asyncio.create_task(self.broadcast_reception_handler())
-            broadcast_reception_handler.set_name (f'{self.name}_broadcast_reception_handler')
-            coroutines.append(broadcast_reception_handler)
+            broadcast_handler = asyncio.create_task(self.broadcast_handler())
+            broadcast_handler.set_name (f'{self.name}_broadcast_handler')
+            coroutines.append(broadcast_handler)
 
             reception_handler = asyncio.create_task(self.reception_handler())
             reception_handler.set_name (f'{self.name}_reception_handler')
@@ -215,7 +208,7 @@ class AgentNode(Module):
                 await subroutine
             return
 
-    async def broadcast_reception_handler(self):
+    async def broadcast_handler(self):
         """
         Listens for broadcasts from the environment. Stops processes when simulation end-command is received.
         """
@@ -290,6 +283,7 @@ class AgentNode(Module):
                 self.log(f'Handling agent request...')
                 worker_task = asyncio.create_task(self.reception_worker(req))
                 await worker_task
+                self.log(f'Agent request handled')
 
         except asyncio.CancelledError:
             if req_str is not None:
@@ -316,7 +310,12 @@ class AgentNode(Module):
     async def reception_worker(self, request):
         try:
             # if request does not match any of the standard request format, dump and continue
-            self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
+            req_type = request['@type']
+
+            if req_type in 'HELLO_WORLD':
+                self.log(request['content'])
+            else:
+                self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
             await self.agent_socket_in.send_string('')
         except asyncio.CancelledError:
             await self.agent_socket_in.send_string('')
@@ -587,28 +586,38 @@ class AgentNode(Module):
         except asyncio.CancelledError:
             pass
 
-    async def message_transmitter(self, msg):
+    async def message_transmitter(self, msg: dict):
         # reformat message
-        msg_type = msg['@type']
         msg['src'] = self.name
-        msg['dst'] = msg['target']
-        target = msg['target']
+        msg_type = msg['@type']
+        dst = msg['dst']
 
         req_json = json.dumps(msg)
 
+        # connect socket to destination 
+        port = self.AGENT_TO_PORT_MAP[dst]
+        self.log(f'Connecting to agent {dst} through port number {port}...')
+        self.agent_socket_out.connect(f"tcp://localhost:{port}")
+        self.log(f'Connected to agent {dst}!')
+
         # submit request
-        self.log(f'Transmitting a message of type {msg_type} (from {self.name} to {target})...')
+        self.log(f'Transmitting a message of type {msg_type} (from {self.name} to {dst})...')
         await self.agent_socket_out_lock.acquire()
         await self.agent_socket_out.send_json(req_json)
         self.log(f'{msg_type} message sent successfully. Awaiting response...')
         
         # wait for server reply
-        await self.agent_socket_out.recv_json()
+        await self.agent_socket_out.recv()
         self.agent_socket_out_lock.release()
         self.log(f'Received message reception confirmation!')      
 
+        # disconnect socket from destination
+        self.log(f'Disconnecting from agent {dst}...')
+        self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
+        self.log(f'Disconnected from agent {dst}!')
+
 class AgentState:
-    def __init__(self, agent: AgentNode, component_list) -> None:
+    def __init__(self, agent: AgentClient, component_list) -> None:
         pass
 
 """
@@ -616,7 +625,7 @@ class AgentState:
   TESTING AGENTS
 --------------------
 """
-class TestAgent(AgentNode):    
+class TestAgent(AgentClient):    
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
         self.submodules = [TestModule(self)]  
@@ -626,73 +635,92 @@ class TestAgent(AgentNode):
   TESTING MODULES
 --------------------
 """
+class TestModule(Module):
+    def __init__(self, parent_agent) -> None:
+        super().__init__('test', parent_agent, [SubModule('sub_test', self)])
+
 class SubModule(Module):
     def __init__(self, name, parent_module) -> None:
         super().__init__(name, parent_module, submodules=[])
 
     async def coroutines(self):
         try:
+            sent_requests = False
+            messages_sent = 0
+            n_messages = 1
             self.log('Starting periodic print routine...')
             while True:
-                msg = dict()
-                msg['src'] = self.name
-                msg['dst'] = self.parent_module.name
-                msg['@type'] = 'PRINT'
-                msg['content'] = 'TEST_PRINT'
+                if not sent_requests:
+                    # test message to parent module
+                    msg = dict()
+                    msg['src'] = self.name
+                    msg['dst'] = self.parent_module.name
+                    msg['@type'] = 'PRINT'
+                    msg['content'] = 'TEST_PRINT'
 
-                await self.parent_module.put_in_inbox(msg)
+                    await self.parent_module.send_internal_message(msg)
 
-                # await self.sim_wait(1)
-                await self.sim_wait(random.random())
+                    await self.sim_wait_to(int(self.get_current_time()) + 1)
 
-                # # agent access req
-                target = 'Mars2'
-                msg = RequestTypes.create_agent_access_request(self.name, 
-                                                                EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
-                                                                target)
-                response = await self.submit_request(msg)
-                result = response['result']
-                self.log(f'Access to {target}: {result}')
-                await self.sim_wait(random.random())
+                    # # agent access req
+                    target = 'Mars2'
+                    msg = RequestTypes.create_agent_access_request(self.name, 
+                                                                    EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
+                                                                    target)
+                    _ = await self.submit_request(msg)
+                    # result = response['result']
+                    # self.log(f'Access to {target}: {result}')
+                    await self.sim_wait(random.random())
 
-                # gs access req
-                gs_name = 'NEN2'
-                msg = RequestTypes.create_ground_station_access_request(self.name, 
+                    # gs access req
+                    gs_name = 'NEN2'
+                    msg = RequestTypes.create_ground_station_access_request(self.name, 
+                                                                            EnvironmentServer.ENVIRONMENT_SERVER_NAME,
+                                                                            gs_name)
+                    _ = await self.submit_request(msg)
+                    # result = response['result']
+                    # self.log(f'Access to GS({gs_name}): {result}')
+                    await self.sim_wait(random.random())
+
+                    # gp access req
+                    lat = 1.0
+                    lon = 158.0
+                    msg = RequestTypes.create_ground_point_access_request(self.name, 
                                                                         EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                                                                        gs_name)
-                response = await self.submit_request(msg)
-                result = response['result']
-                self.log(f'Access to GS({gs_name}): {result}')
-                await self.sim_wait(random.random())
+                                                                        lat, lon)
+                    _ = await self.submit_request(msg)
+                    # result = response['result']
+                    # self.log(f'Access to GP({lat}°,{lon}°): {result}')
+                    await self.sim_wait(random.random())
 
-                # gp access req
-                lat = 1.0
-                lon = 158.0
-                msg = RequestTypes.create_ground_point_access_request(self.name, 
-                                                                      EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                                                                      lat, lon)
-                response = await self.submit_request(msg)
-                result = response['result']
-                self.log(f'Access to GP({lat}°,{lon}°): {result}')
-                await self.sim_wait(random.random())
+                    # agent info req 
+                    msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
+                    
+                    _ = await self.submit_request(msg)
+                    # result = response['result']
+                    # self.log(f'Agent external state: {result}')
 
-                # agent info req 
-                msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
-                
-                response = await self.submit_request(msg)
-                result = response['result']
-                self.log(f'Agent external state: {result}')
+                    await self.sim_wait(4.6656879355937875 * random.random())
+                    sent_requests = True
+                else:
+                    await self.sim_wait( 1e6 )
 
-                await self.sim_wait(4.6656879355937875 * random.random())
+                if messages_sent < n_messages and '1' in self.parent_module.parent_module.name:
+                    msg = dict()
+                    msg['src'] = self.name
+                    msg['dst'] = 'Mars2'
+                    msg['content'] = 'Howdy'
+                    msg['@type'] = 'HELLO_WORLD'
+
+                    await self.transmit_message(msg)
+
+                    messages_sent += 1
+
                 # await self.sim_wait(20)
                 
         except asyncio.CancelledError:
             self.log('Periodic print routine cancelled')
             return
-
-class TestModule(Module):
-    def __init__(self, parent_agent) -> None:
-        super().__init__('test', parent_agent, [SubModule('sub_test', self)])
 
 """
 --------------------
