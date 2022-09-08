@@ -3,7 +3,7 @@ import asyncio
 from enum import Enum
 import pandas as pd
 
-from modules.module import Module
+from modules import Module
 from messages import RequestTypes, BroadcastTypes
 from utils import SimClocks
 
@@ -359,8 +359,6 @@ class GPAccessEventModule(ScheduledEventModule):
                         access_rise['rise'] = [True]
 
                         access_set = gp_data.query('`time index` == @t_set').copy()
-                        # nrows, _ = access_set.shape
-                        # access_set['time index'] = access_set + [1] * nrows
                         access_set['rise'] = [False]
 
                         access_merged = pd.concat([access_rise, access_set])

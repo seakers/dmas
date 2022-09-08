@@ -17,7 +17,7 @@ from messages import BroadcastTypes
 from utils import SimClocks, Container
 from messages import RequestTypes
 
-from modules.module import Module
+from modules import Module
 
 """    
 --------------------------------------------------------

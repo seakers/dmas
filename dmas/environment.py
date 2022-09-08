@@ -8,12 +8,12 @@ import random
 import time
 from urllib import request
 import zmq.asyncio
-from modules.environment import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule, AgentExternalStatePropagator
+from modules import EclipseEventModule, GPAccessEventModule, GndStatAccessEventModule, AgentAccessEventModule, AgentExternalStatePropagator
 from orbitdata import OrbitData
 
 from messages import BroadcastTypes, RequestTypes
-from modules.module import  Module
-from modules.environment import EnvironmentModuleTypes, TicRequestModule
+from modules import  Module
+from modules import EnvironmentModuleTypes, TicRequestModule
 from utils import Container, SimClocks
 
 """

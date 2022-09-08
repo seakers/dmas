@@ -1,5 +1,5 @@
 import json
-from dmas.modules.module import Module, SubModule
+from modules import Module, SubModule
 import asyncio
 
 from utils import SpacecraftModules

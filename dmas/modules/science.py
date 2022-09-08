@@ -1,5 +1,5 @@
 import asyncio
-from modules.module import Module
+from modules import Module
 
 
 class ScienceModule(Module):
