@@ -1,7 +1,10 @@
 from abc import abstractclassmethod
 from enum import Enum
+from this import s
 
-
+"""
+INTER AGENT MESSAGES
+"""
 class MessageTypes(Enum):
     @abstractclassmethod
     def format_check(msg: dict):
@@ -257,5 +260,44 @@ class RequestTypes(Enum):
 
         return msg
 
+"""
+INTRA AGENT MESSAGES
+"""
+
 class AgentInternalMessageType(Enum):
     pass
+
+class InternalMessage:
+    """
+    Abstract message used to for inter-module communication
+    """
+    def __init__(self, src: str, dst: str, msg) -> None:
+        """
+        src: name of the module sending the message
+        dst: name of the module to receive the message
+        msg: content of the message being transmitted
+        """
+        self.src = src  
+        self.dst = dst 
+        self.msg = msg
+
+class AgentRequestOut(InternalMessage):
+    """
+    Internal message containing a request to be sent out to another agent
+    """
+    def __init__(self, src, dst, req_out) -> None:
+        super().__init__(src, dst, req_out)
+
+class EnvironmentRequestOut(InternalMessage):
+    """
+    Internal message containing a request to be sent out to the environment
+    """
+    def __init__(self, src, dst, req_out) -> None:
+        super().__init__(src, dst, req_out)
+
+class TransmissionOut(InternalMessage):
+    """
+    Internal message meant to be transmitted out to another agent
+    """
+    def __init__(self, src, dst, msg_out) -> None:
+        super().__init__(src, dst, msg_out)
