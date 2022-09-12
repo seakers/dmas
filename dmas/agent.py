@@ -481,10 +481,6 @@ class AgentClient(Module):
     async def request_submitter(self, req):
         try:
             req_type = req['@type']
-            req['src'] = self.name
-
-            req['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-
             self.log(f'Submitting a request of type {req_type}.')
 
             if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:

@@ -4,6 +4,7 @@ from enum import Enum
 import logging
 import random
 import time
+from messages import InternalMessage, PrintMessage
 from messages import BroadcastTypes, RequestTypes
 
 from utils import Container, SimClocks
@@ -110,10 +111,11 @@ class Module:
             while True:
                 # wait for any incoming internal messages
                 msg = await self.inbox.get()
-                src_name = msg.get('src',None)
-                dst_name = msg.get('dst',None)
+                src_name = msg.src
+                dst_name = msg.dst
 
-                if dst_name is None or src_name is None:
+                # if dst_name is None or src_name is None:
+                if not isinstance(msg, InternalMessage):
                     self.log(f'Received invalid internal message. Discarting message: {msg}')
                     continue
 
@@ -143,7 +145,7 @@ class Module:
                             # found yet, perform depth-first search with all submodules until the destination is found
                             dst = self.dfs(self, dst_name)
                             if dst is None:
-                                self.log(f'couldn\'t find destination to forward message to. Disregarding message...')
+                                self.log(f'Couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
                     self.log(f'forwarding message to {dst.name}...')
                     await dst.put_in_inbox(msg)
@@ -160,18 +162,22 @@ class Module:
         pass
     
     @abstractmethod
-    async def internal_message_handler(self, msg):
+    async def internal_message_handler(self, msg: InternalMessage):
         """
-        Handles message intended for this module and performs actions accordingly.
+        Handles message intended for this module and performs actions accordingly. By default it only handles messages
+        of the type 
         """
         try:
-            dst_name = msg['dst']
+            # dst_name = msg['dst']
+            dst_name = msg.dst
             if dst_name != self.name:
                 await self.send_internal_message(msg)
             else:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    self.log(content)                
+                if isinstance(msg, PrintMessage):
+                    content = msg.content
+                    self.log(content)    
+                else:
+                    self.log(f'Internal messages of type: {type(msg)} not yet supported. Discarting message.')
         except asyncio.CancelledError:
             return
 
@@ -191,7 +197,7 @@ class Module:
     HELPING FUNCTIONS
     """
     @abstractmethod
-    async def send_internal_message(self, msg):
+    async def send_internal_message(self, msg: InternalMessage):
         """
         Sends message to its intended destination within this agent's modules. 
         By default it places the message in this module's inbox, which will then be handled by the internal
@@ -199,9 +205,12 @@ class Module:
         'send_internal_message' method may be modified to create more analogous communications network between
         modules that better represent the agent being designed. 
         """
+        if not isinstance(msg, InternalMessage):
+            raise TypeError
+
         await self.inbox.put(msg)
 
-    async def put_in_inbox(self, msg):
+    async def put_in_inbox(self, msg: InternalMessage):
         """
         Places a message in this module's inbox.
         Intended to be called by other modules for sending messages to this module.
@@ -212,6 +221,7 @@ class Module:
         """
         Performs depth-first search to find a module in that corresponds to the name being searched
         """
+        print(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
         if module.name == dst_name:
             return module
         elif len(module.submodules) == 0:
@@ -266,7 +276,7 @@ class Module:
 
                 # if the clock is server-step, then submit a tic request to environment
                 t_end = self.sim_time.level + delay       
-                tic_msg = RequestTypes.create_tic_request(self.name, 'ENV', t_end)
+                tic_msg = RequestTypes.create_tic_request(self.name, t_end)
 
                 await self.submit_request(tic_msg)
 
@@ -341,117 +351,5 @@ class Module:
                 self.actions_logger.critical(out)
         else:
             self.parent_module.log(content, level, module_name)
-
-
-
-"""
---------------------------------------------------------
- ____                                                                              
-/\  _`\                   __                                __                     
-\ \ \L\_\    ___      __ /\_\    ___      __     __   _ __ /\_\    ___      __     
- \ \  _\L  /' _ `\  /'_ `\/\ \ /' _ `\  /'__`\ /'__`\/\`'__\/\ \ /' _ `\  /'_ `\   
-  \ \ \L\ \/\ \/\ \/\ \L\ \ \ \/\ \/\ \/\  __//\  __/\ \ \/ \ \ \/\ \/\ \/\ \L\ \  
-   \ \____/\ \_\ \_\ \____ \ \_\ \_\ \_\ \____\ \____\\ \_\  \ \_\ \_\ \_\ \____ \ 
-    \/___/  \/_/\/_/\/___L\ \/_/\/_/\/_/\/____/\/____/ \/_/   \/_/\/_/\/_/\/___L\ \
-                      /\____/                                               /\____/
-                      \_/__/                                                \_/__/    
- /'\_/`\            /\ \         /\_ \            
-/\      \    ___    \_\ \  __  __\//\ \      __   
-\ \ \__\ \  / __`\  /'_` \/\ \/\ \ \ \ \   /'__`\ 
- \ \ \_/\ \/\ \L\ \/\ \L\ \ \ \_\ \ \_\ \_/\  __/ 
-  \ \_\\ \_\ \____/\ \___,_\ \____/ /\____\ \____\
-   \/_/ \/_/\/___/  \/__,_ /\/___/  \/____/\/____/                                                                                                                                                    
---------------------------------------------------------
-"""
-class Component(Module):
-    """
-    Describes a generic component of an agent's platform.
-    Each component is in charge of performing tasks given to it and checking if it is in a nominal state.
-    Components can fail. Their failure is to be handled by their parent subsystem.
-    """
-    def __init__(self, name, max_power_usage, max_power_generation, power_storage_capacity, max_data_generation, data_storage_capacity, parent_subsystem, n_timed_coroutines) -> None:
-        super().__init__(name, parent_subsystem, [], n_timed_coroutines)
-        self.power_specs = [max_power_usage, max_power_generation, power_storage_capacity]
-        self.data_specs = [max_data_generation, data_storage_capacity]
-
-
-    async def activate(self):
-        await super().activate()
-
-        # state events
-        self.nominal = asyncio.Event()
-        self.critical = asyncio.Event()
-        self.failure = asyncio.Event()
-
-        # power state metrics
-        self.power_usage = Container(level=0, capacity=self.power_specs[0])
-        self.power_generation = Container(level=0, capacity=self.power_specs[1])
-        self.power_storage = Container(level=self.power_specs[2], capacity=self.power_specs[2])
-
-        # data state metrics
-        self.power_generation = Container(level=0, capacity=self.power_specs[0])
-        self.power_storage = Container(level=0, capacity=self.power_specs[1])
-
-        # log last update time
-        self.t_update = self.get_current_time()
-
-    async def coroutines(self):
-        # create coroutine tasks
-        coroutines = []
-
-        ## Internal coroutines
-        nominal_operations = asyncio.create_task(self.nominal_operations())
-        nominal_operations.set_name (f'{self.name}_nom_ops')
-        coroutines.append(nominal_operations)
-        
-        crit_monitor = asyncio.create_task(self.crit_monitor())
-        crit_monitor.set_name (f'{self.name}_crit_monitor')
-        coroutines.append(crit_monitor)
-
-        failure_monitor = asyncio.create_task(self.failure_monitor())
-        failure_monitor.set_name (f'{self.name}_failure_monitor')
-        coroutines.append(failure_monitor)
-
-        # wait for the first coroutine to complete
-        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
-        
-        done_name = None
-        for coroutine in coroutines:
-            if coroutine not in pending:
-                done_name = coroutine.get_name()
-
-        # cancell all other coroutine tasks
-        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
-        for subroutine in pending:
-            subroutine.cancel()
-            await subroutine
-        return
-
-
-
-    @abstractmethod
-    async def nominal_operations(self):
-        """
-        Performs instructions given to component
-        """
-        pass
-
-    @abstractmethod
-    async def crit_monitor(self):
-        """
-        Monitors component state and triggers critical event if a critical state is detected
-        """
-        pass
-
-    @abstractmethod
-    async def failure_monitor(self):
-        """
-        Monitors component state and triggers failure event if a failure state is detected
-        """
-        pass
-
-class Battery(Component):
-    def __init__(self, name, max_power_generation, power_storage_capacity, parent_subsystem) -> None:
-        super().__init__(name, 0, max_power_generation, power_storage_capacity, 0, 0, parent_subsystem, n_timed_coroutines=1)
 
     

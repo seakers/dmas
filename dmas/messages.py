@@ -1,19 +1,8 @@
-from abc import abstractclassmethod
 from enum import Enum
-from this import s
 
 """
 INTER AGENT MESSAGES
 """
-class MessageTypes(Enum):
-    @abstractclassmethod
-    def format_check(msg: dict):
-        """
-        Checks if a message of type request contains the proper contents and format.
-        Returns a boolean that indicates if this message meets these criterea.
-        """
-        pass
-
 class BroadcastTypes(Enum):
     """
     Types of broadcasts sent from the environemnt to all agents.
@@ -78,19 +67,27 @@ class BroadcastTypes(Enum):
         
         return True
 
-    def create_eclipse_event_broadcast(src: str, dst: str, agent_name: str, rise: bool, t: float) -> dict:
+    def create_tic_event_broadcast(src: str, t: float, dst: str = 'all') -> dict:
+        msg_dict = dict()
+        msg_dict['src'] = src
+        msg_dict['dst'] = dst
+        msg_dict['@type'] = BroadcastTypes.TIC_EVENT.name
+        msg_dict['server_clock'] = t
+
+        return msg_dict
+
+    def create_eclipse_event_broadcast(src: str, dst: str, rise: bool, t: float) -> dict:
         msg_dict = dict()
 
         msg_dict['src'] = src
         msg_dict['dst'] = dst
         msg_dict['@type'] = BroadcastTypes.ECLIPSE_EVENT.name
         msg_dict['server_clock'] = t
-        msg_dict['agent'] = agent_name
         msg_dict['rise'] = rise
 
         return msg_dict
 
-    def create_gs_access_event_broadcast(src: str, dst: str, agent_name: str, rise: bool, t: float, 
+    def create_gs_access_event_broadcast(src: str, dst: str, rise: bool, t: float, 
                                         gndStat_name: str, gndStat_id: str, lat: float, lon: float) -> dict:
         msg_dict = dict()
 
@@ -98,7 +95,6 @@ class BroadcastTypes(Enum):
         msg_dict['dst'] = dst
         msg_dict['@type'] = BroadcastTypes.GS_ACCESS_EVENT.name
         msg_dict['server_clock'] = t
-        msg_dict['agent'] = agent_name
         msg_dict['rise'] = rise
         msg_dict['gndStat_name'] = gndStat_name
         msg_dict['gndStat_id'] = gndStat_id
@@ -107,7 +103,7 @@ class BroadcastTypes(Enum):
 
         return msg_dict
 
-    def create_gp_access_event_broadcast(src: str, dst: str, agent_name: str, rise: bool, t: float, 
+    def create_gp_access_event_broadcast(src: str, dst: str, rise: bool, t: float, 
                                         grid_index: int, gp_index: int, lat: float, lon: float) -> dict:
         msg_dict = dict()
 
@@ -115,7 +111,6 @@ class BroadcastTypes(Enum):
         msg_dict['dst'] = dst
         msg_dict['@type'] = BroadcastTypes.GP_ACCESS_EVENT.name
         msg_dict['server_clock'] = t
-        msg_dict['agent'] = agent_name
         msg_dict['rise'] = rise
         msg_dict['grid_index'] = grid_index
         msg_dict['gp_index'] = gp_index
@@ -124,7 +119,7 @@ class BroadcastTypes(Enum):
 
         return msg_dict
 
-    def create_agent_access_event_broadcast(src: str, dst: str, rise: bool, t: float, agent_name: str, target: str) -> dict:
+    def create_agent_access_event_broadcast(src: str, dst: str, rise: bool, t: float, target: str) -> dict:
         msg_dict = dict()
 
         msg_dict['src'] = src
@@ -132,14 +127,17 @@ class BroadcastTypes(Enum):
         msg_dict['@type'] = BroadcastTypes.AGENT_ACCESS_EVENT.name
         msg_dict['server_clock'] = t
         msg_dict['rise'] = rise
-        msg_dict['agent'] = agent_name
         msg_dict['target'] = target
 
         return msg_dict
 
 class RequestTypes(Enum):
     """
-    Types of requests between agents and environment.
+    Contains information on requests available to be sent from an agent to the environment.
+    Agents can only talk to the environment via json files. The environment may respond with a any other type of file supported by the zmq library. 
+    The agent must know in advance which kind of response it will receive in order to guarantee a safe reception of the message.
+
+    Types of requests between agents and environment:
         0- sync_request: agent notifies environment server that it is online and ready to start the simulation. Only used before the start of the simulation
         1- tic_request: agents ask to be notified when a certain time has passed in the environment's clock    
         2- agent_access_request: agent asks the enviroment if the agent is capable of accessing another agent at the current simulation time
@@ -215,71 +213,80 @@ class RequestTypes(Enum):
         
         return True
     
-    def create_tic_request(src: str, dst: str, t: float):
+    def create_tic_request(src: str, t: float):
         tic_req_msg = dict()
         tic_req_msg['src'] = src
-        tic_req_msg['dst'] = dst
+        tic_req_msg['dst'] = 'ENV'
         tic_req_msg['@type'] = RequestTypes.TIC_REQUEST.name
         tic_req_msg['t'] = t
 
         return tic_req_msg
 
-    def create_agent_access_request(src: str, dst: str, target: str):
+    def create_agent_access_request(src: str, target: str):
         access_req_msg = dict()
         access_req_msg['src'] = src
-        access_req_msg['dst'] = dst
+        access_req_msg['dst'] = 'ENV'
         access_req_msg['@type'] = RequestTypes.AGENT_ACCESS_REQUEST.name
         access_req_msg['target'] = target
 
         return access_req_msg
 
-    def create_ground_station_access_request(src: str, dst: str, target: str):
+    def create_ground_station_access_request(src: str, target: str):
         gs_access_req_msg = dict()
         gs_access_req_msg['src'] = src
-        gs_access_req_msg['dst'] = dst
+        gs_access_req_msg['dst'] = 'ENV'
         gs_access_req_msg['@type'] = RequestTypes.GS_ACCESS_REQUEST.name
         gs_access_req_msg['target'] = target
 
         return gs_access_req_msg
 
-    def create_ground_point_access_request(src: str, dst: str, lat: float, lon: float):
+    def create_ground_point_access_request(src: str, lat: float, lon: float):
         gs_access_req_msg = dict()
         gs_access_req_msg['src'] = src
-        gs_access_req_msg['dst'] = dst
+        gs_access_req_msg['dst'] = 'ENV'
         gs_access_req_msg['@type'] = RequestTypes.GP_ACCESS_REQUEST.name
         gs_access_req_msg['lat'] = lat
         gs_access_req_msg['lon'] = lon
 
         return gs_access_req_msg
 
-    def create_agent_info_request(src: str, dst: str):
+    def create_agent_info_request(src: str):
         msg = dict()
         msg['src'] = src
-        msg['dst'] = dst
+        msg['dst'] = 'ENV'
         msg['@type'] = RequestTypes.AGENT_INFO_REQUEST.name
 
         return msg
 
 """
-INTRA AGENT MESSAGES
+INTER MODULE MESSAGES
 """
-
-class AgentInternalMessageType(Enum):
-    pass
-
 class InternalMessage:
-    """
-    Abstract message used to for inter-module communication
-    """
-    def __init__(self, src: str, dst: str, msg) -> None:
+    def __init__(self, src: str, dst: str, content) -> None:
         """
-        src: name of the module sending the message
-        dst: name of the module to receive the message
-        msg: content of the message being transmitted
+        Abstract message used to for inter-module communication
+
+        src: 
+            name of the module sending the message
+        dst: 
+            name of the module to receive the message
+        content: 
+            content of the message being transmitted
         """
         self.src = src  
         self.dst = dst 
-        self.msg = msg
+        self.content = content
+
+class PrintMessage(InternalMessage):
+    """
+    Test message. Meant to be handled by default internal message handler.
+    """
+    def __init__(self, src: str, dst: str, msg: str) -> None:
+        super().__init__(src, dst, msg)
+
+class EnvironmentBroadcast(InternalMessage):
+    def __init__(self, src: str, dst: str, broadcast_dict) -> None:
+        super().__init__(src, dst, broadcast_dict)
 
 class AgentRequestOut(InternalMessage):
     """
