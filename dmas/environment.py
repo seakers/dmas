@@ -58,18 +58,28 @@ class TicRequestModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if msg.dst != self.name:
+            if msg.dst_module != self.name:
                 await self.send_internal_message(msg)
             else:
-                content = msg.content
-                if 'REQUEST' in content['@type'] and RequestTypes[content['@type']] is RequestTypes.TIC_REQUEST:
+                if isinstance(msg, TicRequestMessage):
                     # if a tic request is received, add to tic_request_queue
-                    t = content['t']
+                    t = msg.get_t()
                     self.log(f'Received tic request for time {t}!')
                     await self.tic_request_queue.put(t)
                 else:
-                    # if not a tic request, dump message 
+                    # if not a tic request, dump message
                     return
+            
+            # else:
+                # content = msg.content
+                # if 'REQUEST' in content['@type'] and RequestTypes[content['@type']] is RequestTypes.TIC_REQUEST:
+                    # # if a tic request is received, add to tic_request_queue
+                    # t = content['t']
+                    # self.log(f'Received tic request for time {t}!')
+                    # await self.tic_request_queue.put(t)
+                # else:
+                #     # if not a tic request, dump message 
+                #     return
         except asyncio.CancelledError:
             return
 
@@ -77,7 +87,7 @@ class TicRequestModule(Module):
         try:
             n_routines = self.parent_module.NUMBER_OF_TIMED_COROUTINES_AGENTS + self.parent_module.NUMBER_OF_TIMED_COROUTINES
             while True:
-                if self.CLOCK_TYPE is SimClocks.SERVER_STEP:
+                if self.CLOCK_TYPE is SimClocks.SERVER_EVENTS:
                     # append tic request to request list
                     self.log(f'Waiting for next tic request ({len(self.tic_request_queue_sorted)} / {n_routines})...')
 
@@ -177,7 +187,7 @@ class ScheduledEventModule(Module):
         Does not interact with other modules. Any message received will be ignored
         """
         try:
-            dst_name = msg.dst
+            dst_name = msg.dst_module
             if dst_name != self.name:
                 await self.send_internal_message(msg)
             else:
@@ -507,7 +517,7 @@ class EnvironmentServer(Module):
             self.SIMULATION_FREQUENCY = 1
         elif self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
             self.SIMULATION_FREQUENCY = simulation_frequency            # Ratio of simulation-time seconds to real-time seconds
-        elif self.CLOCK_TYPE != SimClocks.SERVER_STEP:
+        elif self.CLOCK_TYPE != SimClocks.SERVER_EVENTS:
             raise Exception(f'Simulation clock of type {clock_type.value} not yet supported')
         
         if simulation_frequency < 0 and self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
@@ -634,7 +644,7 @@ class EnvironmentServer(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if msg.dst != self.name:
+            if msg.dst_module != self.name:
                 self.log(f'Message not intended for this module. Rerouting.')
                 await self.send_internal_message(msg)
             else:
@@ -654,7 +664,7 @@ class EnvironmentServer(Module):
                         
                 elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
                     # if an submodule sends a tic request, forward to tic request submodule
-                    msg.dst = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
+                    msg.dst_module = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
                     
                     self.log(f'Forwarding Tic request to relevant submodule...')
                     await self.send_internal_message(msg)
@@ -1028,7 +1038,7 @@ class EnvironmentServer(Module):
         self.START_TIME = time.perf_counter()
 
         # initiate tic request queue if simulation uses a synchronized server clock
-        if self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+        if self.CLOCK_TYPE == SimClocks.SERVER_EVENTS:
             self.tic_request_queue = asyncio.Queue()
             self.tic_request_queue_sorted = []
             
@@ -1173,6 +1183,6 @@ if __name__ == '__main__':
 
     # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)
-    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_STEP)
+    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())

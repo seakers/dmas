@@ -236,7 +236,7 @@ class AgentClient(Module):
                         return
 
                     elif msg_type is BroadcastTypes.TIC_EVENT:
-                        if (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
+                        if (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
                             

@@ -169,7 +169,7 @@ class Module:
         """
         try:
             # dst_name = msg['dst']
-            dst_name = msg.dst
+            dst_name = msg.dst_module
             if dst_name != self.name:
                 await self.send_internal_message(msg)
             else:
@@ -246,7 +246,7 @@ class Module:
                     self.sim_time = (time.perf_counter() - self.START_TIME) * self.SIMULATION_FREQUENCY
                 
                 return self.sim_time
-            elif self.CLOCK_TYPE == SimClocks.SERVER_STEP:
+            elif self.CLOCK_TYPE == SimClocks.SERVER_EVENTS:
                 return self.sim_time.level
             else:
                 raise Exception(f'Clock of type {self.CLOCK_TYPE.value} not yet supported')
@@ -270,7 +270,7 @@ class Module:
         if self.parent_module is None:
             if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                 await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
-            elif (self.CLOCK_TYPE == SimClocks.SERVER_STEP 
+            elif (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
 

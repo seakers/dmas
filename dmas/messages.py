@@ -1,4 +1,7 @@
+from abc import abstractmethod
 from enum import Enum
+import json
+from re import T
 
 """
 INTER AGENT MESSAGES
@@ -259,52 +262,566 @@ class RequestTypes(Enum):
         return msg
 
 """
-INTER MODULE MESSAGES
+------------------------
+INTER NODE MESSAGES
+------------------------
 """
-class InternalMessage:
-    def __init__(self, src: str, dst: str, content) -> None:
+class SimulationMessage:
+    def __init__(self, src: str, dst: str, _type) -> None:
         """
-        Abstract message used to for inter-module communication
-
-        src: 
-            name of the module sending the message
-        dst: 
-            name of the module to receive the message
-        content: 
-            content of the message being transmitted
+        Abstract class for a message being sent between two nodes in the simulation
+        
+        src:
+            name of the simulation node sending the message
+        dst:
+            name of the simulation node receiving the message
+        _type:
+            type of message being sent
         """
-        self.src = src  
-        self.dst = dst 
-        self.content = content
+        self.src = src
+        self.dst = dst
+        self.type = _type
+    
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        req_dict = dict()
+        req_dict['src'] = self.src
+        req_dict['dst'] = self.dst
+        req_dict['@type'] = self._type.name
+        return req_dict
 
-class PrintMessage(InternalMessage):
-    """
-    Test message. Meant to be handled by default internal message handler.
-    """
-    def __init__(self, src: str, dst: str, msg: str) -> None:
-        super().__init__(src, dst, msg)
+    @abstractmethod
+    def from_dict(d):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        pass
 
-class EnvironmentBroadcast(InternalMessage):
-    def __init__(self, src: str, dst: str, broadcast_dict) -> None:
-        super().__init__(src, dst, broadcast_dict)
+    @abstractmethod
+    def to_json(self):
+        """
+        Creates a json file from this message class object
+        """
+        pass
 
-class AgentRequestOut(InternalMessage):
-    """
-    Internal message containing a request to be sent out to another agent
-    """
-    def __init__(self, src, dst, req_out) -> None:
-        super().__init__(src, dst, req_out)
+    @abstractmethod
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        pass
 
-class EnvironmentRequestOut(InternalMessage):
+class InterNodeMessageTypes(Enum):
     """
-    Internal message containing a request to be sent out to the environment
-    """
-    def __init__(self, src, dst, req_out) -> None:
-        super().__init__(src, dst, req_out)
+    Contains information on requests available to be sent from an agent to the environment.
+    Agents can only talk to the environment via json files. The environment may respond with a any other type of file supported by the zmq library. 
+    The agent must know in advance which kind of response it will receive in order to guarantee a safe reception of the message.
 
-class TransmissionOut(InternalMessage):
+    Types of requests between agents and the environment:
+        0- sync_request: agent notifies environment server that it is online and ready to start the simulation. Only used before the start of the simulation
+        1- tic_request: agents ask to be notified when a certain time has passed in the environment's clock    
+        2- agent_access_sense: agent asks the enviroment if the agent is capable of accessing another agent at the current simulation time
+        3- gp_access_sense: agent asks the enviroment if the agent is capable of accessing a ground point at the current simulation time
+        4- gs_access_sense: agent asks the enviroment if the agent is capable of accessing a ground station at the current simulation time
+        5- agent_information_sense: agent asks for information regarding its current position, velocity, and eclipse at the current simulation time
+        6- observation_sense: agent requests environment information regarding a the state of a ground point at the current simulation time
+        7- agent_end_confirmation: agent notifies the environment that it has successfully terminated its operations
     """
-    Internal message meant to be transmitted out to another agent
+    SYNC_REQUEST = 'SYNC_REQUEST'
+    TIC_REQUEST = 'TIC_REQUEST'
+    AGENT_ACCESS_SENSE = 'AGENT_ACCESS_SENSE'
+    GP_ACCESS_SENSE = 'GP_ACCESS_SENSE'
+    GS_ACCESS_SENSE = 'GS_ACCESS_SENSE'
+    AGENT_INFO_SENSE = 'AGENT_INFO_SENSE'
+    OBSERVATION_SENSE = 'OBSERVATION_SENSE'
+    AGENT_END_CONFIRMATION = 'AGENT_END_CONFIRMATION'
+
+class InterNodeMessage(SimulationMessage): 
+    def __init__(self, src: str, dst: str, _type: InterNodeMessageTypes) -> None:
+        """
+        Abstract class for a message being sent between two agents or between an agent and its environment
+        
+        src:
+            name of the simulation node sending the message
+        dst:
+            name of the simulation node receiving the message
+        _type:
+            type of message being sent
+        """
+        super().__init__(src, dst, _type)
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        return super().to_dict()
+
+    def from_dict(d):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+
+        if src is None or dst is None or type_name is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+
+        return InterNodeMessage(src, dst, _type)
+
+    def to_json(self):
+        """
+        Creates a json file from this message 
+        """
+        return json.dumps(self.to_dict())
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return InterNodeMessage.from_dict(json.loads(j))
+
+class SyncRequestMessage(InterNodeMessage):
+    def __init__(self, src, dst) -> None:
+        """
+        Message from a node requesting to be synchronized to the environment server at the beginning of the simulation.
+
+        src:
+            name of the node making the request
+        dst:
+            name of the environment receiving the request
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.SYNC_REQUEST)
+
+    def from_json(d):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return SyncRequestMessage.from_dict(json.loads(d))
+
+class TicRequestMessage(InterNodeMessage):
+    def __init__(self, src, dst, t_req) -> None:
+        """
+        Message from an agent or an internal environment module to the environemnt requesting to be notified when 
+        the current simulation time reaches a desired value.
+
+        src:
+            name of the node making the request
+        dst:
+            name of the node receiving the request
+        t_req:
+            time requested by source node
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.TIC_REQUEST)
+        self.t_req = t_req
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        req_dict = super().to_dict()
+        req_dict['t'] = self.t_req
+        return req_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        t_req = d.get('t', None)
+
+        if src is None or dst is None or type_name is None or t_req is None:
+            raise Exception('Dictionary does not contain necessary information to construct a Tic Request object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not InterNodeMessageTypes.TIC_REQUEST:
+            raise Exception(f'Cannot load a Tic Request from a dictionary request of type {type_name}.')
+
+        return TicRequestMessage(src, dst, t_req)
+    
+    def from_json(d):
+        """
+        Creates an instance of a Request class object from a json object 
+        """
+        return TicRequestMessage.from_dict(json.loads(d))
+
+class AccessSenseMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, _type: InterNodeMessageTypes, target, result: bool=None) -> None:
+        """
+        Abstract message from an agent to the environment asking to be informed if it has access to a generic target
+
+        src:
+            name of the node sending the message
+        dst:
+            name of the node receiving the message
+        _type:
+            type of access sense being performed
+        target:
+            name of the target to be accessed by the source node
+        result:
+            result from sensing if the agent is accessing the target
+        """
+        super().__init__(src, dst, _type)
+        self.target = target
+        self.result = result
+
+    def set_result(self, result):
+        self.result = result
+    
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        req_dict = super().to_dict()
+        req_dict['target'] = self.target
+
+        if self.response is None:
+            req_dict['result'] = 'None'
+        else:
+            req_dict['result'] = self.result
+
+        return req_dict
+    
+    def from_dict(d):
+        """
+        Creates an instance of a Access Sense Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        target = d.get('target', None)
+        result = d.get('result', None)
+
+        if src is None or dst is None or type_name is None or target is None or result is None:
+            raise Exception('Dictionary does not contain necessary information to construct a message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif (_type is not InterNodeMessageTypes.AGENT_ACCESS_SENSE 
+                or _type is not InterNodeMessageTypes.GP_ACCESS_SENSE
+                or _type is not InterNodeMessageTypes.GS_ACCESS_SENSE):
+            raise Exception(f'Cannot load a Access Sense Message from a dictionary of type {type_name}.')
+
+        if result == 'None':
+            result = None
+
+        return AccessSenseMessage(src, dst, target, _type, result)
+
+    def from_json(d):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return AccessSenseMessage.from_dict(json.loads(d))
+
+class AgentAccessSenseMessage(AccessSenseMessage):
+    def __init__(self, src: str, dst: str, target: str, result: bool=None) -> None:
+        """
+        Message from an agent node to the environment asking to be informed if it has access to a particular agent node
+
+        src:
+            name of the agent node sending the message
+        dst:
+            name of the environment node receiving the message
+        target:
+            name of the target node to be accessed by the source node
+        result:
+            result from sensing if the agent is accessing the target
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.AGENT_ACCESS_SENSE, target, result)
+
+class GndStnAccessSenseMessage(AccessSenseMessage):
+    def __init__(self, src: str, dst: str, target, result: bool=None) -> None:
+        """
+        Message from an agent node to the environment asking to be informed if it has access to a particular Ground Station
+
+        src:
+            name of the agent node sending the message
+        dst:
+            name of the environment node receiving the message
+        target:
+            name of the target ground station to be accessed by the source node
+        result:
+            result from sensing if the agent is accessing the target
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.GS_ACCESS_SENSE, target, result)
+
+class GndPntAccessSenseMessage(AccessSenseMessage):
+    def __init__(self, src: str, dst: str, lat: float, lon: float, result: bool=None) -> None:
+        """
+        Message from an agent node to the environment asking to be informed if it has access to a particular Ground Station
+
+        src:
+            name of the agent node sending the message
+        dst:
+            name of the environment node receiving the message
+        lat:
+            latitude of the target ground point to be accessed by the source node (in degrees)
+        lon:
+            lingitude of the target ground point to be accessed by the source node (in degrees)
+        result:
+            result from sensing if the agent is accessing the target
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.GP_ACCESS_SENSE, [lat, lon], result)
+
+class AgentSenseMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, internal_state: dict, pos: list=None, vel: list=None, eclipse: bool=None) -> None:
+        """
+        Message from an agent node to the environment asking to be informed about its current position, velocity, and eclipse state
+
+        src:
+            name of the agent node sending the message
+        dst:
+            name of the environment node receiving the message
+        internal_state:
+            internal_state of the source node 
+        pos:
+            position vector of the source node (result from sensing)
+        vel:
+            velocity vector of the source node (result from sensing)
+        eclipse:
+            eclipse state of the source node (result from sensing)
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.AGENT_INFO_SENSE)
+        self.internal_state = internal_state
+
+        self.pos = []
+        for x_i in pos:
+            self.pos.append(x_i)
+
+        self.vel = []
+        for v_i in vel:
+            self.vel.append(v_i)
+
+        self.eclipse = eclipse
+
+    def set_result(self, pos, vel, eclipse):
+        self.pos = []
+        for x_i in pos:
+            self.pos.append(x_i)
+
+        self.vel = []
+        for v_i in vel:
+            self.vel.append(v_i)
+
+        self.eclipse = eclipse
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        req_dict = super().to_dict()
+
+        req_dict['internal state'] = self.internal_state
+
+        if self.pos is None:
+            req_dict['pos'] = 'None'
+        else:
+            req_dict['pos'] = self.pos
+
+        if self.vel is None:
+            req_dict['vel'] = 'None'
+        else:
+            req_dict['vel'] = self.pos
+
+        if self.vel is None:
+            req_dict['eclipse'] = 'None'
+        else:
+            req_dict['eclipse'] = self.eclipse       
+
+        return req_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of a Access Sense Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        internal_state = d.get('target', None)
+        pos = d.get('pos', None)
+        vel = d.get('vel', None)
+        eclipse = d.get('eclipse', None)
+
+        if src is None or dst is None or type_name is None or internal_state is None or pos is None or vel is None or eclipse is None:
+            raise Exception('Dictionary does not contain necessary information to construct a message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not InterNodeMessageTypes.AGENT_INFO_SENSE:
+            raise Exception(f'Cannot load a Agent State Sense Message from a dictionary of type {type_name}.')
+
+        if pos == 'None':
+            pos = None
+        if vel == 'None':
+            vel = None
+        if eclipse == 'None':
+            eclipse = None
+
+        return AgentSenseMessage(src, dst, internal_state, pos, vel, eclipse)
+
+    def from_json(d):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return AgentSenseMessage.from_dict(json.loads(d))
+
+class AgentEndConfirmationMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str) -> None:
+        """
+        Message being sent from a client to an environment server confirming that it has successfully terminated its 
+        processes at the end of the simulation
+
+        src:
+            name of the cleint node sending the message
+        dst:
+            name of the server node receiving the message
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.AGENT_END_CONFIRMATION)
+
+
+class BroadcastMessageTypes(Enum):
     """
-    def __init__(self, src, dst, msg_out) -> None:
-        super().__init__(src, dst, msg_out)
+    Types of broadcasts sent from the environemnt to all agents.
+        1- tic: informs all agents of environment server's current time
+        2- eclipse_event: informs agents that an agent has entered eclipse. agents must ignore transmission if they are not the agent affected by the event
+        3- gp_access_event: informs an agent that it can access or can no longer access a ground point. agents must ignore transmission if they are not the agent affected by the event
+        4- gs_access_event: informs an agent that it can access or can no longer access a ground station. agents must ignore transmission if they are not the agent affected by the event
+        5- agent_access_event: informs an agent that it can access or can no longer access another agent. agents must ignore transmission if they are not the agent affected by the event
+        6- sim_start: notifies all agents that the simulation has started
+        7- sim_end: notifies all agents that the simulation has ended 
+    """
+    TIC_EVENT = 'TIC_EVENT'
+    ECLIPSE_EVENT = 'ECLIPSE_EVENT'
+    GP_ACCESS_EVENT = 'GP_ACCESS_EVENT'
+    GS_ACCESS_EVENT = 'GS_ACCESS_EVENT'
+    AGENT_ACCESS_EVENT = 'AGENT_ACCESS_EVENT'
+    SIM_START_EVENT = 'SIM_START_EVENT'
+    SIM_END_EVENT = 'SIM_END_EVENT'
+
+class BroadcastMessage(SimulationMessage): 
+    def __init__(self, src: str, dst: str, _type: BroadcastMessageTypes) -> None:   
+        """
+        Abstract class for a message being sent from an environment server to all simulation node clients that are subscribed to it
+        
+        src:
+            name of the simulation node sending the message
+        dst:
+            name of the simulation node receiving the message
+        _type:
+            type of request
+        """
+        super().__init__(src, dst, _type)
+
+# """
+# ------------------------
+# INTER MODULE MESSAGES
+# ------------------------
+# """
+# class InternalMessage:
+#     def __init__(self, src_module: str, dst_module: str, content) -> None:
+#         """
+#         Abstract message used to for inter-module communication
+
+#         src_module: 
+#             name of the module sending the message
+#         dst_module: 
+#             name of the module to receive the message
+#         content: 
+#             content of the message being transmitted
+#         """
+#         self.src_module = src_module  
+#         self.dst_module = dst_module 
+#         self.content = content
+
+# class PrintMessage(InternalMessage):
+#     """
+#     Test message. Meant to be handled by default internal message handler.
+#     """
+#     def __init__(self, src_module: str, dst_module: str, msg: str) -> None:
+#         super().__init__(src_module, dst_module, msg)
+
+# """
+# INTRA ENVIRONMENT MESSAGES
+# """
+
+
+# class RequestMessage(InternalMessage):
+#     """
+#     Internal message that carries a request to be handled by the destination module
+#     """
+#     def __init__(self, src_module: str, dst_module: str, req: InterNodeMessage) -> None:
+#         super().__init__(src_module, dst_module, req)
+
+
+# class TicRequestMessage(InternalMessage):
+#     def __init__(self, src_module: str, dst_module: str, t_req: float) -> None:
+#         super().__init__(src_module, dst_module, t_req)
+    
+#     def get_t(self):
+#         return self.content
+
+# class EnvironmentBroadcast(InternalMessage):
+#     def __init__(self, src_module: str, dst_module: str, broadcast_type: BroadcastTypes=None, content=None) -> None:
+#         super().__init__(src_module, dst_module, content)
+#         self.BROADCAST_TYPE = broadcast_type
+
+#     def content_to_dict(self):
+#         msg_dict = dict()
+#         msg_dict['src'] = 'ENV'
+#         msg_dict['dst'] = 'ALL'
+#         msg_dict['@type'] = self.BROADCAST_TYPE
+#         return msg_dict
+
+# class TicBroadcast(EnvironmentBroadcast):
+#     def __init__(self, src: str, dst: str, t_next: float) -> None:
+#         super().__init__(src, dst, BroadcastTypes.TIC_EVENT, t_next)
+
+#     def content_to_dict(self):
+#         msg_dict = super().content_to_dict()
+#         msg_dict['server_clock'] = self.content
+#         return msg_dict
+
+# """
+# INTRA AGENT MESSAGES
+# """
+# class EnvironmentRequestOut(InternalMessage):
+#     """
+#     Internal message containing a request to be sent out to the environment
+#     """
+#     def __init__(self, src, dst, req_out) -> None:
+#         super().__init__(src, dst, req_out)
+
+# class TransmissionOut(InternalMessage):
+#     """
+#     Internal message meant to be transmitted out to another agent
+#     """
+#     def __init__(self, src, dst, msg_out) -> None:
+#         super().__init__(src, dst, msg_out)

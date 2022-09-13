@@ -44,7 +44,7 @@ class SimClocks(Enum):
     # -Each node requests to be notified by the server when a particular time is reached, which they use to base their waits
     SERVER_TIME = 'SERVER_TIC'          # server sends tics at a fixed rate in real-time
     SERVER_TIME_FAST = 'SERVER_TIC'     # server sends tics at a fixed rate in spead up real-time
-    SERVER_STEP = 'SERVER_STEP'         # server waits until all agents have submitted a tic request and fast-forwards to that time
+    SERVER_EVENTS = 'SERVER_EVENTS'     # server waits until all agents have submitted a tic request and fast-forwards to that time
 
 class Container:
     def __init__(self, level: float =0, capacity: float =numpy.Infinity):
