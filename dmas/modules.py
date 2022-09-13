@@ -1,9 +1,12 @@
 from abc import abstractmethod
 import asyncio
+from curses.panel import top_panel
 from enum import Enum
 import logging
 import random
 import time
+from dmas.messages import TicRequestMessage
+from dmas.utils import SimulationConstants
 from messages import InternalMessage, PrintMessage
 from messages import BroadcastTypes, RequestTypes
 
@@ -143,7 +146,7 @@ class Module:
                         else:
                             # if this is the main module with no parent and the destination module has not been 
                             # found yet, perform depth-first search with all submodules until the destination is found
-                            dst = self.dfs(self, dst_name)
+                            dst = self.find_dst(dst_name)
                             if dst is None:
                                 self.log(f'Couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
@@ -171,13 +174,16 @@ class Module:
             # dst_name = msg['dst']
             dst_name = msg.dst_module
             if dst_name != self.name:
+                # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 await self.send_internal_message(msg)
             else:
-                if isinstance(msg, PrintMessage):
-                    content = msg.content
-                    self.log(content)    
+                # this module is the intended receiver for this message. Handling message
+                content = msg.content
+                if isinstance(content, PrintInstruction):
+                    text = content.text_to_print
+                    self.log(text)    
                 else:
-                    self.log(f'Internal messages of type: {type(msg)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(content)} not yet supported. Discarting message.')
         except asyncio.CancelledError:
             return
 
@@ -206,7 +212,7 @@ class Module:
         modules that better represent the agent being designed. 
         """
         if not isinstance(msg, InternalMessage):
-            raise TypeError
+            raise TypeError('Attepmting to send a message of an unknown type')
 
         await self.inbox.put(msg)
 
@@ -217,11 +223,22 @@ class Module:
         """
         await self.inbox.put(msg)
 
+    def find_dst(self, dst_name: str):
+        """
+        Finds Module class object with the same name as the desired destination. Searches all modules in the node using depth-first-search
+        """
+        top_module = self
+
+        while top_module.parent_module is not None:
+            top_module = top_module.parent_module
+
+        return self.dfs(top_module, dst_name)
+
     def dfs(self, module, dst_name):
         """
         Performs depth-first search to find a module in that corresponds to the name being searched
         """
-        print(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
+        self.log(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
         if module.name == dst_name:
             return module
         elif len(module.submodules) == 0:
@@ -263,6 +280,11 @@ class Module:
     async def sim_wait(self, delay, module_name=None):
         """
         awaits until simulation time runs for a given delay
+
+        delay:
+            duration of delay being waited
+        module_name:
+            name of the module requesting the wait
         """
         if module_name is None:
             module_name = self.name
@@ -275,30 +297,49 @@ class Module:
                         or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
 
                 # if the clock is server-step, then submit a tic request to environment
-                t_end = self.sim_time.level + delay       
-                tic_msg = RequestTypes.create_tic_request(self.name, t_end)
+                t_req = self.sim_time.level + delay 
 
-                await self.submit_request(tic_msg)
+                tic_msg = TicRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME, t_req)
+                await self.submit_environment_message(tic_msg)
 
-                await self.sim_time.when_geq_than(t_end)
+                await self.sim_time.when_geq_than(t_req)
             else:
                 raise Exception(f'clock type {self.CLOCK_TYPE} not yet supported by module.')
         else:
             await self.parent_module.sim_wait(delay, module_name)       
 
+    async def sim_wait_to(self, t, module_name=None):
+        """
+        awaits until simulation time reaches a certain time
+
+        t:
+            final time being waited on
+        module_name:
+            name of the module requesting the wait
+        """
+        if module_name is None:
+            module_name = self.name
+
+        if self.parent_module is None:
+            t_curr = self.get_current_time()
+            delay = t - t_curr
+            await self.sim_wait(delay, module_name=module_name)
+        else:
+            await self.parent_module.sim_wait_to(t, module_name) 
+
     @abstractmethod
-    async def request_submitter(self, req):
+    async def environment_message_submitter(self, req):
         """
         submitts a request of any type to the environment
         """
         pass
 
-    async def submit_request(self, req):
+    async def submit_environment_message(self, req):
         """
         submits environment request and returns response from environment server
         """
         if self.parent_module is None:
-            return await self.request_submitter(req)
+            return await self.environment_message_submitter(req)
         else:
             return await self.parent_module.submit_request(req)
 
@@ -317,17 +358,7 @@ class Module:
             return await self.message_transmitter(msg)
         else:
             return await self.parent_module.transmit_message(msg)
-
-    async def sim_wait_to(self, t, module_name=None):
-        """
-        awaits until simulation time reaches a time t
-        """
-        if self.parent_module is None:
-            t_curr = self.get_current_time()
-            delay = t - t_curr
-            await self.sim_wait(delay, module_name=module_name)
-        else:
-            await self.parent_module.sim_wait_to(t, module_name)       
+      
 
     def log(self, content, level=logging.DEBUG, module_name=None):
         if module_name is None:
@@ -360,6 +391,6 @@ class ModuleInstruction:
         self.t_end = t_end
 
 class PrintInstruction(ModuleInstruction):
-    def __init__(self, target: Module, t_start: float, content: str) -> None:
+    def __init__(self, target: Module, t_start: float, text_to_print: str) -> None:
         super().__init__(target, t_start, t_start + 1)
-        self.content = content
+        self.text_to_print = text_to_print

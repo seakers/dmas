@@ -478,7 +478,7 @@ class AgentClient(Module):
             loggers.append(logger)
         return loggers
                 
-    async def request_submitter(self, req):
+    async def environment_message_submitter(self, req):
         try:
             req_type = req['@type']
             self.log(f'Submitting a request of type {req_type}.')
@@ -663,7 +663,7 @@ class SubModule(Module):
                     msg = RequestTypes.create_agent_access_request(self.name, 
                                                                     EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
                                                                     target)
-                    _ = await self.submit_request(msg)
+                    _ = await self.submit_environment_message(msg)
                     # result = response['result']
                     # self.log(f'Access to {target}: {result}')
                     await self.sim_wait(random.random())
@@ -673,7 +673,7 @@ class SubModule(Module):
                     msg = RequestTypes.create_ground_station_access_request(self.name, 
                                                                             EnvironmentServer.ENVIRONMENT_SERVER_NAME,
                                                                             gs_name)
-                    _ = await self.submit_request(msg)
+                    _ = await self.submit_environment_message(msg)
                     # result = response['result']
                     # self.log(f'Access to GS({gs_name}): {result}')
                     await self.sim_wait(random.random())
@@ -684,7 +684,7 @@ class SubModule(Module):
                     msg = RequestTypes.create_ground_point_access_request(self.name, 
                                                                         EnvironmentServer.ENVIRONMENT_SERVER_NAME,
                                                                         lat, lon)
-                    _ = await self.submit_request(msg)
+                    _ = await self.submit_environment_message(msg)
                     # result = response['result']
                     # self.log(f'Access to GP({lat}°,{lon}°): {result}')
                     await self.sim_wait(random.random())
@@ -692,7 +692,7 @@ class SubModule(Module):
                     # agent info req 
                     msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
                     
-                    _ = await self.submit_request(msg)
+                    _ = await self.submit_environment_message(msg)
                     # result = response['result']
                     # self.log(f'Agent external state: {result}')
 

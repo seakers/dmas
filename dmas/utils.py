@@ -29,6 +29,9 @@ class EventPair:
     async def wait_end(self):
         return await self.end.wait()
 
+class SimulationConstants(Enum):
+    ENVIRONMENT_SERVER_NAME = 'ENV'
+
 class SpacecraftModules(Enum):
     ENGINEERING_MODULE = 'ENGINEERING_MODULE'
     SCIENCE_MODULE = 'SCIENCE_MODULE'

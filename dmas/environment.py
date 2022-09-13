@@ -492,7 +492,6 @@ class EnvironmentServer(Module):
     Submodules manage the environment clock and the scenario simulation. The latter concerns propagating the state of the environment as a function of time as well as propagating
     the external states of the agents. 
     """
-    ENVIRONMENT_SERVER_NAME = 'ENV'
 
     def __init__(self, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
         super().__init__(EnvironmentServer.ENVIRONMENT_SERVER_NAME, n_timed_coroutines=1)
@@ -1150,7 +1149,7 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
-    async def request_submitter(self, req):
+    async def environment_message_submitter(self, req):
         """
         Submits requests to itself whenever a submodule requires information that can only be obtained from request messages
         """
