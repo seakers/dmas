@@ -267,7 +267,7 @@ INTER NODE MESSAGES
 ------------------------
 """
 class SimulationMessage:
-    def __init__(self, src: str, dst: str, _type) -> None:
+    def __init__(self, src: str, dst: str, _type: Enum) -> None:
         """
         Abstract class for a message being sent between two nodes in the simulation
         
@@ -280,17 +280,17 @@ class SimulationMessage:
         """
         self.src = src
         self.dst = dst
-        self.type = _type
+        self._type = _type
     
     def to_dict(self):
         """
         Crates a dictionary containing all information contained in this message object
         """
-        req_dict = dict()
-        req_dict['src'] = self.src
-        req_dict['dst'] = self.dst
-        req_dict['@type'] = self._type.name
-        return req_dict
+        msg_dict = dict()
+        msg_dict['src'] = self.src
+        msg_dict['dst'] = self.dst
+        msg_dict['@type'] = self._type.name
+        return msg_dict
 
     @abstractmethod
     def from_dict(d):
@@ -351,12 +351,6 @@ class InterNodeMessage(SimulationMessage):
             type of message being sent
         """
         super().__init__(src, dst, _type)
-
-    def to_dict(self):
-        """
-        Crates a dictionary containing all information contained in this message object
-        """
-        return super().to_dict()
 
     def from_dict(d):
         """
@@ -490,15 +484,15 @@ class AccessSenseMessage(InterNodeMessage):
         """
         Crates a dictionary containing all information contained in this message object
         """
-        req_dict = super().to_dict()
-        req_dict['target'] = self.target
+        msg_dict = super().to_dict()
+        msg_dict['target'] = self.target
 
         if self.response is None:
-            req_dict['result'] = 'None'
+            msg_dict['result'] = 'None'
         else:
-            req_dict['result'] = self.result
+            msg_dict['result'] = self.result
 
-        return req_dict
+        return msg_dict
     
     def from_dict(d):
         """
@@ -521,8 +515,8 @@ class AccessSenseMessage(InterNodeMessage):
         if _type is None:
             raise Exception(f'Could not recognize request of type {type_name}.')
         elif (_type is not InterNodeMessageTypes.AGENT_ACCESS_SENSE 
-                or _type is not InterNodeMessageTypes.GP_ACCESS_SENSE
-                or _type is not InterNodeMessageTypes.GS_ACCESS_SENSE):
+                and _type is not InterNodeMessageTypes.GP_ACCESS_SENSE
+                and _type is not InterNodeMessageTypes.GS_ACCESS_SENSE):
             raise Exception(f'Cannot load a Access Sense Message from a dictionary of type {type_name}.')
 
         if result == 'None':
@@ -632,26 +626,26 @@ class AgentSenseMessage(InterNodeMessage):
         """
         Crates a dictionary containing all information contained in this message object
         """
-        req_dict = super().to_dict()
+        msg_dict = super().to_dict()
 
-        req_dict['internal state'] = self.internal_state
+        msg_dict['internal state'] = self.internal_state
 
         if self.pos is None:
-            req_dict['pos'] = 'None'
+            msg_dict['pos'] = 'None'
         else:
-            req_dict['pos'] = self.pos
+            msg_dict['pos'] = self.pos
 
         if self.vel is None:
-            req_dict['vel'] = 'None'
+            msg_dict['vel'] = 'None'
         else:
-            req_dict['vel'] = self.pos
+            msg_dict['vel'] = self.pos
 
         if self.vel is None:
-            req_dict['eclipse'] = 'None'
+            msg_dict['eclipse'] = 'None'
         else:
-            req_dict['eclipse'] = self.eclipse       
+            msg_dict['eclipse'] = self.eclipse       
 
-        return req_dict
+        return msg_dict
 
     def from_dict(d):
         """
@@ -727,7 +721,7 @@ class BroadcastMessageTypes(Enum):
     SIM_END_EVENT = 'SIM_END_EVENT'
 
 class BroadcastMessage(SimulationMessage): 
-    def __init__(self, src: str, dst: str, _type: BroadcastMessageTypes) -> None:   
+    def __init__(self, src: str, _type: BroadcastMessageTypes, dst: str='all') -> None:   
         """
         Abstract class for a message being sent from an environment server to all simulation node clients that are subscribed to it
         
@@ -740,33 +734,426 @@ class BroadcastMessage(SimulationMessage):
         """
         super().__init__(src, dst, _type)
 
-# """
-# ------------------------
-# INTER MODULE MESSAGES
-# ------------------------
-# """
-# class InternalMessage:
-#     def __init__(self, src_module: str, dst_module: str, content) -> None:
-#         """
-#         Abstract message used to for inter-module communication
+    def from_dict(d):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
 
-#         src_module: 
-#             name of the module sending the message
-#         dst_module: 
-#             name of the module to receive the message
-#         content: 
-#             content of the message being transmitted
-#         """
-#         self.src_module = src_module  
-#         self.dst_module = dst_module 
-#         self.content = content
+        if src is None or dst is None or type_name is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
-# class PrintMessage(InternalMessage):
-#     """
-#     Test message. Meant to be handled by default internal message handler.
-#     """
-#     def __init__(self, src_module: str, dst_module: str, msg: str) -> None:
-#         super().__init__(src_module, dst_module, msg)
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+
+        return BroadcastMessage(src, dst, _type)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return BroadcastMessage.from_dict(json.loads(j))
+    
+class TicEventBroadcast(BroadcastMessage):
+    def __init__(self, src: str, t: float) -> None:
+        """
+        Message from the environment to be broadcasted to all agents containig the latest simulation time 
+        """
+        super().__init__(src, BroadcastMessageTypes.TIC_EVENT)
+        self.t = t
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['server clock'] = self.t
+        return msg_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        t = d.get('server clock', None)
+
+        if src is None or dst is None or type_name is None or t is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+
+        return TicEventBroadcast(src, t)
+
+    def to_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return TicEventBroadcast.from_dict(json.loads(j))
+    
+class EventBroadcastMessage(BroadcastMessage):
+    def __init__(self, src: str, dst: str, _type: BroadcastMessageTypes, rise: bool) -> None:
+        """
+        Message from the environment server informing agents that an event has started or ended
+
+        src:
+            name of the environment server sending the message
+        dst:
+            name of the agent node receiving the message
+        _type:
+            type of event broadcast
+        rise:
+            indicates whether the event in question started or ended
+        """
+        super().__init__(src, _type, dst)
+        self.rise = rise
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['rise'] = self.rise
+        return msg_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of an Event Broadcast Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        rise = d.get('rise', None)
+
+        if src is None or dst is None or type_name is None or rise is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif (_type is not BroadcastMessageTypes.ECLIPSE_EVENT
+                and _type is not BroadcastMessageTypes.AGENT_ACCESS_EVENT
+                and _type is not BroadcastMessageTypes.GP_ACCESS_EVENT
+                and _type is not BroadcastMessageTypes.GS_ACCESS_EVENT):
+            raise Exception(f'Cannot load a Event Broadcast Message from a dictionary of type {type_name}.')
+
+        return EventBroadcastMessage(src, dst, _type, rise)
+
+    def from_json(d):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return AccessSenseMessage.from_dict(json.loads(d))
+
+class EcliseEventBroadcastMessage(EventBroadcastMessage):
+    def __init__(self, src: str, dst: str, rise: bool) -> None:
+        """
+        Message from the environment server informing a specific agent that an eclipse event has started or ended
+
+        src:
+            name of the environment server sending the event message
+        dst:
+            name of the agent node affected by this event
+        rise:
+            indicates whether the eclipse event started or ended
+        """
+        super().__init__(src, dst, BroadcastMessageTypes.ECLIPSE_EVENT, rise)
+
+class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
+    def __init__(self, src: str, dst: str, target: str, rise: bool) -> None:
+        """
+        Message from the environment server informing a specific agent that an access event with another agent has started or ended
+
+        src:
+            name of the environment server sending the event message
+        dst:
+            name of the agent node affected by this event
+        target:
+            name of the agent being accessed by the destination agent
+        rise:
+            indicates whether the access event started or ended
+        """
+        super().__init__(src, dst, BroadcastMessageTypes.AGENT_ACCESS_EVENT, rise)
+        self.target = target
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['target'] = self.target
+        return msg_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of an access Event Broadcast Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        target= d.get('target', None)
+        rise = d.get('rise', None)
+
+        if src is None or dst is None or type_name is None or target is None and rise is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not BroadcastMessageTypes.AGENT_ACCESS_EVENT:
+            raise Exception(f'Cannot load a Agent Access Event Broadcast Message from a dictionary of type {type_name}.')
+
+        return AgentAccessEventBroadcastMessage(src, dst, target, rise)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return AgentAccessEventBroadcastMessage.from_dict(json.loads(j))
+
+class GndPointAccessEventBroadcastMessage(EventBroadcastMessage):
+    def __init__(self, src: str, dst: str, lat: float, lon: float, grid_index: int, gp_index: int, rise: bool) -> None:
+        """
+        Message from the environment server informing a specific agent that an access event with a ground point has started or ended
+
+        src:
+            name of the environment server sending the event message
+        dst:
+            name of the agent node affected by this event
+        lat:
+            latitude of ground point in question (in degrees)
+        lon:
+            longitude of ground point in question (in degrees)
+        grid_index:
+            index of the grid used to define this ground point
+        gp_index:
+            index of the ground point within the grid's ground point definition
+        rise:
+            indicates whether the access event started or ended
+        """
+        super().__init__(src, dst, BroadcastMessageTypes.GP_ACCESS_EVENT, rise)
+        self.lat = lat
+        self.lon = lon
+        self.grid_index= grid_index
+        self.gp_index = gp_index
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['lat'] = self.lat
+        msg_dict['lon'] = self.lat
+        msg_dict['grid index'] = self.grid_index
+        msg_dict['point index'] = self.gp_index
+        return msg_dict
+    
+    def from_dict(d):
+        """
+        Creates an instance of an access Event Broadcast Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        lat = d.get('lat', None)
+        lon = d.get('lon', None)
+        grid_index = d.get('grid index', None)
+        gp_index = d.get('point index', None)
+        rise = d.get('rise', None)
+
+        if src is None or dst is None or type_name is None or lat is None or lon is None or grid_index is None or gp_index is None and rise is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not BroadcastMessageTypes.GP_ACCESS_EVENT:
+            raise Exception(f'Cannot load a Ground Point Access Event Broadcast Message from a dictionary of type {type_name}.')
+
+        return GndPointAccessEventBroadcastMessage(src, dst, lat, lon, grid_index, gp_index, rise)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return GndPointAccessEventBroadcastMessage.from_dict(json.loads(j))
+
+class GndStationAccessEventBroadcastMessage(EventBroadcastMessage):
+    def __init__(self, src: str, dst: str, target: str, rise: bool) -> None:
+        """
+        Message from the environment server informing a specific agent that an access event with a ground station has started or ended
+
+        src:
+            name of the environment server sending the event message
+        dst:
+            name of the agent node affected by this event
+        target:
+            name of the ground station being accessed by the destination agent
+        rise:
+            indicates whether the access event started or ended
+        """
+        super().__init__(src, dst, BroadcastMessageTypes.GS_ACCESS_EVENT, rise)
+        self.target = target
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['target'] = self.target
+        return msg_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of an access Event Broadcast Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        target= d.get('target', None)
+        rise = d.get('rise', None)
+
+        if src is None or dst is None or type_name is None or target is None and rise is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not BroadcastMessageTypes.GS_ACCESS_EVENT:
+            raise Exception(f'Cannot load a Ground Station Access Event Broadcast Message from a dictionary of type {type_name}.')
+
+        return GndStationAccessEventBroadcastMessage(src, dst, target, rise)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return GndStationAccessEventBroadcastMessage.from_dict(json.loads(j))
+
+
+class SimulationStartBroadcastMessage(BroadcastMessage):
+    def __init__(self, src: str, port_ledger: dict, clock_info: dict) -> None:
+        """
+        Message from the environment server informing all agent nodes that the simulation has started. 
+        It also gives all agents general information about the simulation.
+
+        src:
+            name of the environment server sending the event message
+        port_ledger:
+            dictionary mapping agent node names to port addresses to be used for inter-agent communication
+        clock_info:
+            dictionary containing information about the clock being used in this simulation
+        """
+        super().__init__(src, BroadcastMessageTypes.SIM_START_EVENT)
+        self.port_ledger = port_ledger
+        self.clock_info = clock_info
+
+    def to_dict(self):
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['port ledger'] = self.port_ledger.copy()
+        msg_dict['clock info'] = self.clock_info.copy()
+
+    def from_dict(d):
+        """
+        Creates an instance of a Simulation Start Broadcast Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        port_ledger = d.get('port ledger', None)
+        clock_info = d.get('clock info', None)
+
+        if src is None or dst is None or type_name:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not BroadcastMessageTypes.SIM_START_EVENT:
+            raise Exception(f'Cannot load a Simulation Start Event Broadcast Message from a dictionary of type {type_name}.')
+
+        return SimulationStartBroadcastMessage(src, port_ledger, clock_info)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return SimulationStartBroadcastMessage.from_dict(json.loads(j))
+        
+
+class SimulationEndBroadcastMessage(BroadcastMessage):
+    def __init__(self, src: str) -> None:
+        """
+        Message from the environment server informing all agent nodes that the simulation has ended.
+
+        src:
+            name of the environment server sending the event message
+        """
+        super().__init__(src, BroadcastMessageTypes.SIM_END_EVENT)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return SimulationEndBroadcastMessage.from_dict(json.loads(j))
+
+"""
+------------------------
+INTER MODULE MESSAGES
+------------------------
+"""
+class InternalMessage:
+    def __init__(self, src_module: str, dst_module: str, content) -> None:
+        """
+        Abstract message used to for inter-module communication
+
+        src_module: 
+            name of the module sending the message
+        dst_module: 
+            name of the module to receive the message
+        content: 
+            content of the message being sent
+        """
+        self.src_module = src_module  
+        self.dst_module = dst_module 
+        self.content = content
 
 # """
 # INTRA ENVIRONMENT MESSAGES

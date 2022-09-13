@@ -353,3 +353,13 @@ class Module:
             self.parent_module.log(content, level, module_name)
 
     
+class ModuleInstruction:
+    def __init__(self, target: Module, t_start: float, t_end: float) -> None:
+        self.target = target
+        self.t_start = t_start
+        self.t_end = t_end
+
+class PrintInstruction(ModuleInstruction):
+    def __init__(self, target: Module, t_start: float, content: str) -> None:
+        super().__init__(target, t_start, t_start + 1)
+        self.content = content
