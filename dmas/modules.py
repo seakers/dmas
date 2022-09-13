@@ -225,13 +225,10 @@ class Module:
 
     def find_dst(self, dst_name: str):
         """
-        Finds Module class object with the same name as the desired destination. Searches all modules in the node using depth-first-search
+        Finds Module class object with the same name as the desired destination.
+        Searches all modules in the node using depth-first-search.
         """
-        top_module = self
-
-        while top_module.parent_module is not None:
-            top_module = top_module.parent_module
-
+        top_module = self.get_top_module()
         return self.dfs(top_module, dst_name)
 
     def dfs(self, module, dst_name):
@@ -359,6 +356,15 @@ class Module:
         else:
             return await self.parent_module.transmit_message(msg)
       
+    def get_top_module(self):
+        """
+        Finds top-most module that the current module belongs to within its simulation node
+        """
+        top = self
+        while top.parent_module is not None:
+            top = top.parent_module
+
+        return top
 
     def log(self, content, level=logging.DEBUG, module_name=None):
         if module_name is None:

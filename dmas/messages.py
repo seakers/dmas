@@ -385,6 +385,9 @@ class InterNodeMessage(SimulationMessage):
         """
         return InterNodeMessage.from_dict(json.loads(j))
 
+    def get_type(self):
+        return self._type.name
+
 class SyncRequestMessage(InterNodeMessage):
     def __init__(self, src, dst) -> None:
         """
@@ -806,7 +809,7 @@ class TicEventBroadcast(BroadcastMessage):
         return TicEventBroadcast.from_dict(json.loads(j))
     
 class EventBroadcastMessage(BroadcastMessage):
-    def __init__(self, src: str, dst: str, _type: BroadcastMessageTypes, rise: bool) -> None:
+    def __init__(self, src: str, dst: str, _type: BroadcastMessageTypes, t: float, rise: bool) -> None:
         """
         Message from the environment server informing agents that an event has started or ended
 
@@ -816,10 +819,13 @@ class EventBroadcastMessage(BroadcastMessage):
             name of the agent node receiving the message
         _type:
             type of event broadcast
+        t:
+            simulation time at which the event will occur
         rise:
             indicates whether the event in question started or ended
         """
         super().__init__(src, _type, dst)
+        self.t = t
         self.rise = rise
 
     def to_dict(self):
@@ -828,6 +834,7 @@ class EventBroadcastMessage(BroadcastMessage):
         """
         msg_dict = super().to_dict()
         msg_dict['rise'] = self.rise
+        msg_dict['t'] = self.t
         return msg_dict
 
     def from_dict(d):
@@ -837,9 +844,10 @@ class EventBroadcastMessage(BroadcastMessage):
         src = d.get('src', None)
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
+        t = d.get('t', None)
         rise = d.get('rise', None)
 
-        if src is None or dst is None or type_name is None or rise is None:
+        if src is None or dst is None or type_name is None or t is None or rise is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
@@ -855,7 +863,7 @@ class EventBroadcastMessage(BroadcastMessage):
                 and _type is not BroadcastMessageTypes.GS_ACCESS_EVENT):
             raise Exception(f'Cannot load a Event Broadcast Message from a dictionary of type {type_name}.')
 
-        return EventBroadcastMessage(src, dst, _type, rise)
+        return EventBroadcastMessage(src, dst, _type, t, rise)
 
     def from_json(d):
         """
@@ -863,8 +871,8 @@ class EventBroadcastMessage(BroadcastMessage):
         """
         return AccessSenseMessage.from_dict(json.loads(d))
 
-class EcliseEventBroadcastMessage(EventBroadcastMessage):
-    def __init__(self, src: str, dst: str, rise: bool) -> None:
+class EclipseEventBroadcastMessage(EventBroadcastMessage):
+    def __init__(self, src: str, dst: str, t: float, rise: bool) -> None:
         """
         Message from the environment server informing a specific agent that an eclipse event has started or ended
 
@@ -872,13 +880,15 @@ class EcliseEventBroadcastMessage(EventBroadcastMessage):
             name of the environment server sending the event message
         dst:
             name of the agent node affected by this event
+        t:
+            simulation time at which the event will occur
         rise:
             indicates whether the eclipse event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.ECLIPSE_EVENT, rise)
+        super().__init__(src, dst, BroadcastMessageTypes.ECLIPSE_EVENT, t, rise)
 
 class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
-    def __init__(self, src: str, dst: str, target: str, rise: bool) -> None:
+    def __init__(self, src: str, dst: str, target: str, t: float, rise: bool) -> None:
         """
         Message from the environment server informing a specific agent that an access event with another agent has started or ended
 
@@ -888,10 +898,12 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
             name of the agent node affected by this event
         target:
             name of the agent being accessed by the destination agent
+        t:
+            simulation time at which the event will occur
         rise:
             indicates whether the access event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.AGENT_ACCESS_EVENT, rise)
+        super().__init__(src, dst, BroadcastMessageTypes.AGENT_ACCESS_EVENT, t, rise)
         self.target = target
 
     def to_dict(self):
@@ -910,9 +922,10 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
         target= d.get('target', None)
+        t = d.get('t', None)
         rise = d.get('rise', None)
 
-        if src is None or dst is None or type_name is None or target is None and rise is None:
+        if src is None or dst is None or type_name is None or target is None or t is None or rise is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
@@ -925,7 +938,7 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
         elif _type is not BroadcastMessageTypes.AGENT_ACCESS_EVENT:
             raise Exception(f'Cannot load a Agent Access Event Broadcast Message from a dictionary of type {type_name}.')
 
-        return AgentAccessEventBroadcastMessage(src, dst, target, rise)
+        return AgentAccessEventBroadcastMessage(src, dst, target, t, rise)
 
     def from_json(j):
         """
@@ -934,7 +947,7 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
         return AgentAccessEventBroadcastMessage.from_dict(json.loads(j))
 
 class GndPointAccessEventBroadcastMessage(EventBroadcastMessage):
-    def __init__(self, src: str, dst: str, lat: float, lon: float, grid_index: int, gp_index: int, rise: bool) -> None:
+    def __init__(self, src: str, dst: str, lat: float, lon: float, grid_index: int, gp_index: int, t: float, rise: bool) -> None:
         """
         Message from the environment server informing a specific agent that an access event with a ground point has started or ended
 
@@ -950,10 +963,12 @@ class GndPointAccessEventBroadcastMessage(EventBroadcastMessage):
             index of the grid used to define this ground point
         gp_index:
             index of the ground point within the grid's ground point definition
+        t:
+            simulation time at which the event will occur
         rise:
             indicates whether the access event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.GP_ACCESS_EVENT, rise)
+        super().__init__(src, dst, BroadcastMessageTypes.GP_ACCESS_EVENT, t, rise)
         self.lat = lat
         self.lon = lon
         self.grid_index= grid_index
@@ -981,9 +996,10 @@ class GndPointAccessEventBroadcastMessage(EventBroadcastMessage):
         lon = d.get('lon', None)
         grid_index = d.get('grid index', None)
         gp_index = d.get('point index', None)
+        t = d.get('t', None)
         rise = d.get('rise', None)
 
-        if src is None or dst is None or type_name is None or lat is None or lon is None or grid_index is None or gp_index is None and rise is None:
+        if src is None or dst is None or type_name is None or lat is None or lon is None or grid_index is None or gp_index is None or t is None or rise is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
@@ -996,7 +1012,7 @@ class GndPointAccessEventBroadcastMessage(EventBroadcastMessage):
         elif _type is not BroadcastMessageTypes.GP_ACCESS_EVENT:
             raise Exception(f'Cannot load a Ground Point Access Event Broadcast Message from a dictionary of type {type_name}.')
 
-        return GndPointAccessEventBroadcastMessage(src, dst, lat, lon, grid_index, gp_index, rise)
+        return GndPointAccessEventBroadcastMessage(src, dst, lat, lon, grid_index, gp_index, t, rise)
 
     def from_json(j):
         """
@@ -1005,7 +1021,7 @@ class GndPointAccessEventBroadcastMessage(EventBroadcastMessage):
         return GndPointAccessEventBroadcastMessage.from_dict(json.loads(j))
 
 class GndStationAccessEventBroadcastMessage(EventBroadcastMessage):
-    def __init__(self, src: str, dst: str, target: str, rise: bool) -> None:
+    def __init__(self, src: str, dst: str, target: str, t: float, rise: bool) -> None:
         """
         Message from the environment server informing a specific agent that an access event with a ground station has started or ended
 
@@ -1015,10 +1031,12 @@ class GndStationAccessEventBroadcastMessage(EventBroadcastMessage):
             name of the agent node affected by this event
         target:
             name of the ground station being accessed by the destination agent
+        t:
+            simulation time at which the event will occur
         rise:
             indicates whether the access event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.GS_ACCESS_EVENT, rise)
+        super().__init__(src, dst, BroadcastMessageTypes.GS_ACCESS_EVENT, t, rise)
         self.target = target
 
     def to_dict(self):
@@ -1037,9 +1055,10 @@ class GndStationAccessEventBroadcastMessage(EventBroadcastMessage):
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
         target= d.get('target', None)
+        t = d.get('t', None)
         rise = d.get('rise', None)
 
-        if src is None or dst is None or type_name is None or target is None and rise is None:
+        if src is None or dst is None or type_name is None or target is None or t is None or rise is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
@@ -1052,7 +1071,7 @@ class GndStationAccessEventBroadcastMessage(EventBroadcastMessage):
         elif _type is not BroadcastMessageTypes.GS_ACCESS_EVENT:
             raise Exception(f'Cannot load a Ground Station Access Event Broadcast Message from a dictionary of type {type_name}.')
 
-        return GndStationAccessEventBroadcastMessage(src, dst, target, rise)
+        return GndStationAccessEventBroadcastMessage(src, dst, target, t, rise)
 
     def from_json(j):
         """

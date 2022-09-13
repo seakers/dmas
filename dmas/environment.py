@@ -10,6 +10,7 @@ import random
 import time
 from urllib import request
 import zmq.asyncio
+from dmas.utils import EnvironmentModuleTypes
 from orbitdata import OrbitData
 
 from messages import *
@@ -35,15 +36,6 @@ import pandas as pd
    \/_/ \/_/\/___/  \/__,_ /\/___/  \/____/\/____/                                                                                                                                                    
 --------------------------------------------------------
 """
-
-class EnvironmentModuleTypes(Enum):
-    TIC_REQUEST_MODULE = 'TIC_REQUEST_MODULE'
-    ECLIPSE_EVENT_MODULE = 'ECLIPSE_EVENT_MODULE'
-    GP_ACCESS_EVENT_MODULE = 'GP_ACCESS_EVENT_MODULE'
-    GS_ACCESS_EVENT_MODULE = 'GS_ACCESS_EVENT_MODULE'
-    AGENT_ACCESS_EVENT_MODULE = 'AGENT_ACCESS_EVENT_MODULE'
-    AGENT_EXTERNAL_PROPAGATOR_MODULE = 'AGENT_EXTERNAL_PROPAGATOR_MODULE'
-
 class TicRequestModule(Module):
     def __init__(self, parent_environment) -> None:
         super().__init__(EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, parent_environment, submodules=[], n_timed_coroutines=0)
@@ -59,27 +51,18 @@ class TicRequestModule(Module):
         """
         try:
             if msg.dst_module != self.name:
+                # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 await self.send_internal_message(msg)
             else:
-                if isinstance(msg, TicRequestMessage):
+                if isinstance(msg.content, TicRequestMessage):
                     # if a tic request is received, add to tic_request_queue
-                    t = msg.get_t()
+                    tic_msg = msg.content
+                    t = tic_msg.t_req
                     self.log(f'Received tic request for time {t}!')
                     await self.tic_request_queue.put(t)
                 else:
                     # if not a tic request, dump message
                     return
-            
-            # else:
-                # content = msg.content
-                # if 'REQUEST' in content['@type'] and RequestTypes[content['@type']] is RequestTypes.TIC_REQUEST:
-                    # # if a tic request is received, add to tic_request_queue
-                    # t = content['t']
-                    # self.log(f'Received tic request for time {t}!')
-                    # await self.tic_request_queue.put(t)
-                # else:
-                #     # if not a tic request, dump message 
-                #     return
         except asyncio.CancelledError:
             return
 
@@ -108,12 +91,10 @@ class TicRequestModule(Module):
                         t_next = self.tic_request_queue_sorted.pop()
 
                         # send a broadcast request to parent environment              
-                        broadcast_dict = BroadcastTypes.create_tic_event_broadcast(self.parent_module.name, t_next)
-
-                        t = broadcast_dict['server_clock']
-                        self.log(f'Submitting broadcast request for tic with server clock at t={t}')
-
-                        msg_out = EnvironmentBroadcast(self.name, self.parent_module.name, broadcast_dict)
+                        self.log(f'Submitting broadcast request for tic with server clock at t={t_next}')
+                        parent_env = self.get_top_module()
+                        tic_broadcast = TicEventBroadcast(parent_env.name, t_next)
+                        msg_out = InternalMessage(self.name, parent_env.name, tic_broadcast)
 
                         await self.send_internal_message(msg_out)
                 else:
@@ -152,8 +133,10 @@ class ScheduledEventModule(Module):
         pass
 
     @abstractmethod
-    def row_to_msg_dict(self, row) -> dict:
-        """converts a row of from 'event_data' into a message to be broadcast to other agents"""
+    def row_to_broadcast_msg(self, row) -> BroadcastMessage:
+        """
+        converts a row of from 'event_data' into a message to be broadcast to other agents
+        """
         pass
 
     async def activate(self):
@@ -182,16 +165,16 @@ class ScheduledEventModule(Module):
 
         return True
 
-    async def internal_message_handler(self, msg):
+    async def internal_message_handler(self, msg: InternalMessage):
         """
         Does not interact with other modules. Any message received will be ignored
         """
         try:
-            dst_name = msg.dst_module
-            if dst_name != self.name:
+            if msg.dst_module != self.name:
                 await self.send_internal_message(msg)
             else:
-                # dumps all incoming messages
+                # ignores all incoming messages
+                # TODO: allow for this module to be reactive to any changes in the predetermined scheduled events via incoming messages
                 return
         except asyncio.CancelledError:
             return    
@@ -203,30 +186,23 @@ class ScheduledEventModule(Module):
         try:
             for _, row in self.event_data.iterrows():
                 # get next scheduled event message
-                broadcast_dict = self.row_to_msg_dict(row)
+                event_broadcast = self.row_to_broadcast_msg(row)
 
                 # wait for said event to start
-                t_next = broadcast_dict['server_clock']
+                t_next = event_broadcast.t
                 await self.sim_wait_to(t_next, module_name=self.name)
 
-                broadcast_type = broadcast_dict['@type']
-                agent_name = broadcast_dict['dst']
+                broadcast_type = event_broadcast.get_type()
+                agent_name = event_broadcast.dst
 
-                if row['rise']:
-                    self.log(f'Submitting broadcast request for {broadcast_type} start with server clock at t={t_next} for agent {agent_name}', module_name=self.name)
+                if event_broadcast.rise:
+                    self.log(f'Submitting broadcast for event type {broadcast_type} START at t={t_next} for agent {agent_name}', module_name=self.name)
                 else:
-                    self.log(f'Submitting broadcast request for {broadcast_type} end with server clock at t={t_next} for agent {agent_name}', module_name=self.name)
-
-                if self.parent_module is None:
-                    dst = self
-                else:
-                    dst = self.parent_module
-                    while dst.parent_module is not None:
-                        dst = dst.parent_module
-
-                msg = EnvironmentBroadcast(self.name, dst.name, broadcast_dict)
+                    self.log(f'Submitting broadcast for event type {broadcast_type} END at t={t_next} for agent {agent_name}', module_name=self.name)
 
                 # send a broadcast request to parent environment      
+                dst =  self.get_top_module()
+                msg = InternalMessage(self.name, dst.name, event_broadcast)               
                 await self.send_internal_message(msg)
 
             # once all events have occurred, go to sleep until the end of the simulation
@@ -242,12 +218,13 @@ class EclipseEventModule(ScheduledEventModule):
     def __init__(self, parent_environment) -> None:
         super().__init__(EnvironmentModuleTypes.ECLIPSE_EVENT_MODULE.name, parent_environment)
 
-    def row_to_msg_dict(self, row) -> dict:
+    def row_to_broadcast_msg(self, row) -> EclipseEventBroadcastMessage:
         t_next = row['time index'] * self.time_step
         agent_name = row['agent name']
         rise = row['rise']
 
-        return BroadcastTypes.create_eclipse_event_broadcast(self.name, self.parent_module.parent_module.name, rise, t_next)
+        src = self.get_top_module()
+        return EclipseEventBroadcastMessage(src.name, agent_name, t_next, rise)
         
     def compile_event_data(self) -> pd.DataFrame:
         orbit_data = self.parent_module.parent_module.orbit_data
@@ -280,7 +257,7 @@ class GndStatAccessEventModule(ScheduledEventModule):
     def __init__(self, parent_environment) -> None:
         super().__init__(EnvironmentModuleTypes.GS_ACCESS_EVENT_MODULE.name, parent_environment)
 
-    def row_to_msg_dict(self, row) -> dict:
+    def row_to_broadcast_msg(self, row) -> GndStationAccessEventBroadcastMessage:
         t_next = row['time index'] * self.time_step
         agent_name = row['agent name']
         rise = row['rise']
@@ -288,9 +265,9 @@ class GndStatAccessEventModule(ScheduledEventModule):
         gndStat_name = row['gndStn name']
         lat = row['lat [deg]']
         lon = row['lon [deg]']
+        src = self.get_top_module()
 
-        return BroadcastTypes.create_gs_access_event_broadcast(self.name, self.parent_module.parent_module.name, rise, t_next,
-                                                                gndStat_name, gndStat_id, lat, lon)
+        return GndStationAccessEventBroadcastMessage(src, agent_name, gndStat_name, t_next, rise)
 
     def compile_event_data(self) -> pd.DataFrame:
         orbit_data = self.parent_module.parent_module.orbit_data
@@ -326,7 +303,7 @@ class GPAccessEventModule(ScheduledEventModule):
     def __init__(self, parent_environment) -> None:
         super().__init__(EnvironmentModuleTypes.GP_ACCESS_EVENT_MODULE.name, parent_environment)
 
-    def row_to_msg_dict(self, row) -> dict:
+    def row_to_broadcast_msg(self, row) -> GndPointAccessEventBroadcastMessage:
         t_next = row['time index'] * self.time_step
         agent_name = row['agent name']
         rise = row['rise']
@@ -334,9 +311,9 @@ class GPAccessEventModule(ScheduledEventModule):
         gp_index = row['GP index']
         lat = row['lat [deg]']
         lon = row['lon [deg]']
+        src = self.get_top_module()
 
-        return BroadcastTypes.create_gp_access_event_broadcast(self.name, self.parent_module.parent_module.name, rise, t_next,
-                                                                grid_index, gp_index, lat, lon)
+        return GndPointAccessEventBroadcastMessage(src, agent_name, lat, lon, grid_index, gp_index, t_next, rise)
 
     def compile_event_data(self) -> pd.DataFrame:
         orbit_data = self.parent_module.parent_module.orbit_data
@@ -401,13 +378,14 @@ class AgentAccessEventModule(ScheduledEventModule):
     def __init__(self, parent_environment) -> None:
         super().__init__(EnvironmentModuleTypes.AGENT_ACCESS_EVENT_MODULE.name, parent_environment)
 
-    def row_to_msg_dict(self, row) -> dict:
+    def row_to_broadcast_msg(self, row) -> AgentAccessEventBroadcastMessage:
         t_next = row['time index'] * self.time_step
         agent_name = row['agent name']
         rise = row['rise']
         target = row['target']
+        src = self.get_top_module()
 
-        return BroadcastTypes.create_agent_access_event_broadcast(self.name, self.parent_module.parent_module.name, rise, t_next, target)
+        return AgentAccessEventBroadcastMessage(src, agent_name, target, t_next, rise)
 
     def compile_event_data(self) -> pd.DataFrame:
         orbit_data = self.parent_module.parent_module.orbit_data  

@@ -32,7 +32,15 @@ class EventPair:
 class SimulationConstants(Enum):
     ENVIRONMENT_SERVER_NAME = 'ENV'
 
-class SpacecraftModules(Enum):
+class EnvironmentModuleTypes(Enum):
+    TIC_REQUEST_MODULE = 'TIC_REQUEST_MODULE'
+    ECLIPSE_EVENT_MODULE = 'ECLIPSE_EVENT_MODULE'
+    GP_ACCESS_EVENT_MODULE = 'GP_ACCESS_EVENT_MODULE'
+    GS_ACCESS_EVENT_MODULE = 'GS_ACCESS_EVENT_MODULE'
+    AGENT_ACCESS_EVENT_MODULE = 'AGENT_ACCESS_EVENT_MODULE'
+    AGENT_EXTERNAL_PROPAGATOR_MODULE = 'AGENT_EXTERNAL_PROPAGATOR_MODULE'
+
+class SpacecraftModuleTypes(Enum):
     ENGINEERING_MODULE = 'ENGINEERING_MODULE'
     SCIENCE_MODULE = 'SCIENCE_MODULE'
     SCHEDULING_MODULE = 'SCHEDULING_MODULE'
@@ -146,6 +154,12 @@ class Container:
             return self.level >= val
         
         await self.when_cond(accept)
+
+"""
+---------------------------
+Container Class Testing 
+---------------------------
+"""
 
 async def f1(container: Container):
     print('tast1 starting...')    
