@@ -627,26 +627,39 @@ class EnvironmentServer(Module):
             else:
                 # if the message is of type broadcast, send to broadcast handler
                 content = msg.content
-                msg_type = content['@type']
-                self.log(f'Handling message of type {msg_type}...')
+                # msg_type = content['@type']
+                # self.log(f'Handling message of type {msg_type}...')
 
-                if ('REQUEST' not in msg_type and 
-                    (BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
-                    or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT)):
-                        self.log(f'Submitting message of type {msg_type} for publishing...')
-                        await self.publisher_queue.put(content)
+                # if ('REQUEST' not in msg_type and 
+                #     (BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT
+                #     or BroadcastTypes[msg_type] is BroadcastTypes.ECLIPSE_EVENT
+                #     or BroadcastTypes[msg_type] is BroadcastTypes.GP_ACCESS_EVENT
+                #     or BroadcastTypes[msg_type] is BroadcastTypes.GS_ACCESS_EVENT
+                #     or BroadcastTypes[msg_type] is BroadcastTypes.AGENT_ACCESS_EVENT)):
+                #         self.log(f'Submitting message of type {msg_type} for publishing...')
+                #         await self.publisher_queue.put(content)
                         
-                elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
+                # elif RequestTypes[msg_type] is RequestTypes.TIC_REQUEST:
+                #     # if an submodule sends a tic request, forward to tic request submodule
+                #     msg.dst_module = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
+                    
+                #     self.log(f'Forwarding Tic request to relevant submodule...')
+                #     await self.send_internal_message(msg)
+                # else:
+                #     self.log(f'Dumping internal message of type {msg_type}.')
+
+                if isinstance(content, BroadcastMessage):
+                    self.log(f'Submitting message of type {content.get_type()} for publishing...')
+                    await self.publisher_queue.put(content)
+                elif isinstance(content, TicRequestMessage):
                     # if an submodule sends a tic request, forward to tic request submodule
                     msg.dst_module = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
-                    
+
                     self.log(f'Forwarding Tic request to relevant submodule...')
                     await self.send_internal_message(msg)
+
                 else:
-                    self.log(f'Dumping internal message of type {msg_type}.')
+                    self.log(f'Dumping internal message of type {type(content)}.')
 
                 self.log(f'Done handling message.')
                 return
@@ -666,138 +679,123 @@ class EnvironmentServer(Module):
 
         Only tic request create future broadcast tasks. The rest require an immediate response from the environment.
         """
-        async def request_worker(request):
-            try:
-                # check request message format
-                if not RequestTypes.format_check(request):
-                    # if request does not match any of the standard request format, dump and continue
-                    self.log(f'Request does not match the standard format for a request message. Dumping request...')
-                    await self.reqservice.send_string('')
-                    return
-        
+        async def request_worker(d: dict):
+            try:        
                 # unpackage message type and handle accordingly 
-                req_type = request.get('@type')
-                req_type = RequestTypes[req_type]
+                req_type = d.get('@type', None)
+                if req_type is None:
+                    # if request type is not supported, dump and ignore message
+                    self.log(f'Invalid message received through request port. Dumping message.')
+                    self.reqservice.send_string('')
+                    return
 
-                if req_type is RequestTypes.TIC_REQUEST:
+                if InterNodeMessageTypes[req_type] is InterNodeMessageTypes.TIC_REQUEST:
+                    # load tic request
+                    request = TicRequestMessage.from_dict(d)
+
                     # send reception confirmation to agent
                     await self.reqservice.send_string('')
 
                     # schedule tic request
-                    t_req = request.get('t')
+                    t_req = request.t_req
                     self.log(f'Received tic request for t_req={t_req}!')
 
-                    # change source and destination to internal modules
-                    request['src'] = self.name
-                    request['dst'] = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
-
                     # send to internal message router for forwarding
-                    tic_req = InternalMessage(self.name, self.name, request)
+                    tic_req = InternalMessage(self.name, EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, request)
                     await self.send_internal_message(tic_req)
 
-                elif req_type is RequestTypes.AGENT_ACCESS_REQUEST:
+                elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.AGENT_ACCESS_SENSE:
                     # unpackage message
-                    src = request['src']
-                    target = request['target']
+                    agent_access_msg = AgentAccessSenseMessage.from_dict(d)
                     
                     t_curr = self.get_current_time()
-                    self.log(f'Received agent access request from {src} to {target} at simulation time t={t_curr}!')
+                    self.log(f'Received agent access request from {agent_access_msg.src} to {agent_access_msg.target} at simulation time t={t_curr}!')
 
                     # query agent access database
-                    request['result'] = self.orbit_data[src].is_accessing_agent(target, t_curr) 
+                    is_accessing = self.orbit_data[agent_access_msg.src].is_accessing_agent(agent_access_msg.target, t_curr)
+                    agent_access_msg.set_result(is_accessing)
                     
                     # change source and destination for response message
-                    request['dst'] = request['src']
-                    request['src'] = self.name
-                    req_json = json.dumps(request)
+                    agent_access_msg.dst = agent_access_msg.src
+                    agent_access_msg.src = self.name
                     
                     # send response to agent
-                    await self.reqservice.send_json(req_json)
-                
-                elif req_type is RequestTypes.GP_ACCESS_REQUEST:
+                    await self.reqservice.send_json(agent_access_msg.to_json())
+
+                elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.GS_ACCESS_SENSE:
                     # unpackage message
-                    src = request['src']
-                    lat = request['lat']
-                    lon = request['lon']
+                    gs_access_msg = GndPointAccessEventBroadcastMessage.from_dict(d)
 
                     t_curr = self.get_current_time()
-                    self.log(f'Received ground point access request from {src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
+                    self.log(f'Received ground station access request from {gs_access_msg.src} to {gs_access_msg.target} at simulation time t={t_curr}!')
 
                     # query ground point access database
-                    _, _, gp_lat, gp_lon = self.orbit_data[src].find_gp_index(lat, lon)
-
-                    request['result'] = self.orbit_data[src].is_accessing_ground_point(gp_lat, gp_lon, t_curr)
-                    request['gp_lat'] = gp_lat
-                    request['gp_lon'] = gp_lon
+                    is_accessing = self.orbit_data[gs_access_msg.src].is_accessing_ground_station(gs_access_msg.target, t_curr) 
+                    gs_access_msg.set_result(is_accessing)
                     
                     # change source and destination for response message
-                    request['dst'] = request['src']
-                    request['src'] = self.name
-                    req_json = json.dumps(request)
-
+                    gs_access_msg.dst = gs_access_msg.src
+                    gs_access_msg.src = self.name
+                    
                     # send response to agent
-                    await self.reqservice.send_json(req_json)
+                    await self.reqservice.send_json(gs_access_msg.to_json())
 
-                elif req_type is RequestTypes.GS_ACCESS_REQUEST:
+                elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.GP_ACCESS_SENSE:
                     # unpackage message
-                    src = request['src']
-                    target = request['target']
+                    gp_access_msg = GndPntAccessSenseMessage.from_dict(d)
 
+                    lat, lon = gp_access_msg.target
                     t_curr = self.get_current_time()
-                    self.log(f'Received ground station access request from {src} to {target} at simulation time t={t_curr}!')
+                    self.log(f'Received ground point access request from {gp_access_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
 
                     # query ground point access database
-                    request['result'] = self.orbit_data[src].is_accessing_ground_station(target, t_curr) 
+                    _, _, gp_lat, gp_lon = self.orbit_data[gp_access_msg.src].find_gp_index(lat, lon)
+
+                    is_accessing = self.orbit_data[gp_access_msg.src].is_accessing_ground_point(gp_lat, gp_lon, t_curr)
+                    gp_access_msg.set_result(is_accessing)
                     
                     # change source and destination for response message
-                    request['dst'] = request['src']
-                    request['src'] = self.name
-                    req_json = json.dumps(request)
-                    
-                    # send response to agent
-                    await self.reqservice.send_json(req_json)
+                    gp_access_msg.dst = gp_access_msg.src
+                    gp_access_msg.src = self.name
 
-                elif req_type is RequestTypes.AGENT_INFO_REQUEST:
+                    # send response to agent
+                    await self.reqservice.send_json(gp_access_msg.to_json())
+
+                elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.AGENT_INFO_SENSE:
                     # unpackage message
-                    src = request['src']
+                    agent_sense_msg = AgentSenseMessage.from_dict(d)
 
                     t_curr = self.get_current_time()
-                    self.log(f'Received agent information request from {src} at simulation time t={t_curr}!')
+                    self.log(f'Received agent information request from {agent_sense_msg.src} at simulation time t={t_curr}!')
 
                     # query agent state database
-                    pos, vel, is_eclipse = self.orbit_data[src].get_orbit_state( t_curr) 
-                    results = dict()
-                    results['pos'] = pos
-                    results['vel'] = vel
-                    results['eclipse'] = is_eclipse
-
-                    request['result'] = results
+                    pos, vel, is_eclipsed = self.orbit_data[agent_sense_msg.src].get_orbit_state( t_curr) 
+                    agent_sense_msg.set_result(pos, vel, is_eclipsed)
                     
                     # change source and destination for response message
-                    request['dst'] = request['src']
-                    request['src'] = self.name                    
-                    req_json = json.dumps(request)
+                    agent_sense_msg.dst = agent_sense_msg.src
+                    agent_sense_msg.src = self.name     
                     
                     # send response to agent
-                    await self.reqservice.send_json(req_json)
+                    await self.reqservice.send_json(agent_sense_msg.to_json())
 
-                # elif req_type is RequestTypes.OBSERVATION_REQUEST:
-                #     await self.reqservice.send_string('')
-                #     pass
-
-                elif req_type is RequestTypes.AGENT_END_CONFIRMATION:
+                elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.AGENT_END_CONFIRMATION:
                     # register that agent node has gone offline mid-simulation
                     # (this agent node won't be considered when broadcasting simulation end)
-                    src = request['src']
-
-                    if src not in self.offline_subscribers:
-                        self.offline_subscribers.append(src)
+                    agent_end_conf_msg = AgentEndConfirmationMessage.from_dict(d)
+                    
+                    if agent_end_conf_msg.src not in self.offline_subscribers:
+                        self.offline_subscribers.append(agent_end_conf_msg.src)
+                    
+                    # send blank response to agent
+                    # self.reqservice.send_string('')
 
                 else:
                     # if request type is not supported, dump and ignore message
                     self.log(f'Request of type {req_type.value} not yet supported. Dumping request.')
                     self.reqservice.send_string('')
                     return
+
             except asyncio.CancelledError:
                 self.log('Request handling cancelled. Sending blank response...')
                 await self.reqservice.send_string('')
@@ -816,11 +814,11 @@ class EnvironmentServer(Module):
                 self.log(f'Request received!')
                 
                 # convert request to json
-                req = json.loads(req_str)
+                req_dict = json.loads(req_str)
 
                 # handle request
                 self.log(f'Handling request...')
-                worker_task = asyncio.create_task(request_worker(req))
+                worker_task = asyncio.create_task(request_worker(req_dict))
                 await worker_task
 
         except asyncio.CancelledError:
@@ -859,35 +857,58 @@ class EnvironmentServer(Module):
             while True:
                 msg = await self.publisher_queue.get()
 
-                if not BroadcastTypes.format_check(msg):
-                    # if broadcast task does not meet the desired format, reject and dump
-                    self.log('Broadcast task did not meet format specifications. Task dumped.')
+                # if not BroadcastTypes.format_check(msg):
+                    # # if broadcast task does not meet the desired format, reject and dump
+                    # self.log('Broadcast task did not meet format specifications. Task dumped.')
+                    # print(msg)
+                    # # raise Exception(msg)
+                    # continue
+
+                # # change from internal message to external message
+                # msg['src'] = self.name
+                # msg_type = msg['@type']
+
+                # self.log(f'Broadcast task of type {msg_type} received! Publishing to all agents...')
+
+                # if BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT:
+                #     msg['dst'] = 'all'
+                #     t_next = msg['server_clock']
+                    # self.log(f'Updating internal clock to t={t_next}')
+                    # await self.sim_time.set_level(t_next)
+                
+                # else:
+                #     self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
+                #     continue
+
+                if not isinstance(msg, BroadcastMessage):
+                    # if message to be broadcasted is not of any supported format, reject and dump
+                    self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarting task...')
                     print(msg)
-                    # raise Exception(msg)
                     continue
+                else:
+                    if msg.src != self.name:
+                        msg.src = self.name
+                    
+                    if msg.dst == self.name:
+                        self.log(f'Broadcast task of type {msg.get_type()} received! Destination originally set to this environment server. Discarting task...')
+                        continue
 
-                # change from internal message to external message
-                msg['src'] = self.name
-                msg_type = msg['@type']
+                    self.log(f'Broadcast task of type {msg.get_type()} received! Publishing to all agents...')
 
-                self.log(f'Broadcast task of type {msg_type} received! Publishing to all agents...')
-
-                if BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT:
-                    msg['dst'] = 'all'
-                    t_next = msg['server_clock']
+                if isinstance(msg, TicEventBroadcast):
+                    t_next = msg.t
                     self.log(f'Updating internal clock to t={t_next}')
                     await self.sim_time.set_level(t_next)
-                
-                else:
-                    self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
-                    continue
 
                 # broadcast message
                 self.log('Awaiting access to publisher socket...')
                 await self.publisher_lock.acquire()
                 self.log('Access to publisher socket acquired.')
-                msg_json = json.dumps(msg)
-                await self.publisher.send_json(msg_json)
+                
+                # msg_json = json.dumps(msg)
+                # await self.publisher.send_json(msg_json)
+
+                await self.publisher.send_json(msg.to_json())
                 self.log('Broadcast sent')
                 self.publisher_lock.release()
 
@@ -953,12 +974,17 @@ class EnvironmentServer(Module):
             msg_str = await self.reqservice.recv_json() 
             msg = json.loads(msg_str)
             msg_type = msg['@type']
-            if RequestTypes[msg_type] != RequestTypes.SYNC_REQUEST or msg.get('port') is None:
+
+            if InterNodeMessageTypes[msg_type] != InterNodeMessageTypes.SYNC_REQUEST or msg.get('port', None) is None:
+                # ignore all messages that are not Sync Requests
                 continue
             
-            msg_src = msg.get('src', None)
-            src_port = msg.get('port')
-            self.NUMBER_OF_TIMED_COROUTINES_AGENTS += msg.get('n_coroutines')
+            # unpackage sync request
+            sync_req = SyncRequestMessage.from_dict(msg_type)
+
+            msg_src = sync_req.src
+            src_port = sync_req.port
+            self.NUMBER_OF_TIMED_COROUTINES_AGENTS += sync_req.n_coroutines
 
             self.log(f'Received sync request from {msg_src}! Checking if already synchronized...', level=logging.INFO) 
 
@@ -978,8 +1004,6 @@ class EnvironmentServer(Module):
             # send synchronization reply
             await self.reqservice.send_string('')
 
-        # self.NUMBER_OF_TIMED_COROUTINES = count_number_of_subroutines(self)
-
         return subscriber_to_port_map
                     
     async def broadcast_sim_start(self, subscriber_to_port_map):
@@ -989,13 +1013,6 @@ class EnvironmentServer(Module):
         communications. This message also contains information about the clock-type being used in this simulation.
         """
         # create message
-        msg_dict = dict()
-        msg_dict['src'] = self.name
-        msg_dict['dst'] = 'ALL'
-        msg_dict['@type'] = BroadcastTypes.SIM_START_EVENT.name
-        
-        # include subscriber-to-port map to message
-        msg_dict['port_map'] = subscriber_to_port_map
         
         # include clock information to message
         clock_info = dict()
@@ -1005,11 +1022,11 @@ class EnvironmentServer(Module):
             self.sim_time = 0
         else:
             self.sim_time = Container()
-        msg_dict['clock_info'] = clock_info
+        
+        sim_start_msg = SimulationStartBroadcastMessage(self.name, subscriber_to_port_map, clock_info)
 
         # package message and broadcast
-        msg_json = json.dumps(msg_dict)
-        await self.publisher.send_json(msg_json)
+        await self.publisher.send_json(sim_start_msg.to_json())
 
         # log simulation start time
         self.START_TIME = time.perf_counter()
@@ -1029,41 +1046,46 @@ class EnvironmentServer(Module):
         await self.reqservice_lock.acquire()
         
         # broadcast simulation end to all subscribers
-        msg_dict = dict()
-        msg_dict['src'] = self.name
-        msg_dict['dst'] = 'all'
-        msg_dict['@type'] =  BroadcastTypes.SIM_END_EVENT.name
-        msg_dict['server_clock'] = time.perf_counter() - self.START_TIME
-        kill_msg = json.dumps(msg_dict)
+        t_end = time.perf_counter() - self.START_TIME
+        kill_msg = SimulationEndBroadcastMessage(self.name, t_end)
+
+        # msg_dict = dict()
+        # msg_dict['src'] = self.name
+        # msg_dict['dst'] = 'all'
+        # msg_dict['@type'] =  BroadcastTypes.SIM_END_EVENT.name
+        # msg_dict['server_clock'] = time.perf_counter() - self.START_TIME
+        # kill_msg = json.dumps(msg_dict)
         
-        t = msg_dict['server_clock']
-        self.message_logger.debug(f'Broadcasting simulation end at t={t}[s]')
-        self.log(f'Broadcasting simulation end at t={t}[s]')
+        self.message_logger.debug(f'Broadcasting simulation end at t={t_end}[s]')
+        self.log(f'Broadcasting simulation end at t={t_end}[s]')
         
-        await self.publisher.send_json(kill_msg)
+        # await self.publisher.send_json(kill_msg)
+        await self.publisher.send_json(kill_msg.to_json())
         
         # wait for all agents to send their confirmation
         self.request_logger.info(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...')
         self.log(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...', level=logging.INFO)
+        
         while len(self.offline_subscribers) < self.NUMBER_AGENTS:
             # wait for synchronization request
             msg_str = await self.reqservice.recv_json() 
             msg_dict = json.loads(msg_str)
-            msg_src = msg_dict['src']
             msg_type = msg_dict['@type']
 
-            if RequestTypes[msg_type] is not RequestTypes.AGENT_END_CONFIRMATION:
+            if InterNodeMessageTypes[msg_type] is not InterNodeMessageTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
                 self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
                 await self.reqservice.send_string('')
                 continue
             
-            self.request_logger.info(f'Received simulation end confirmation from {msg_src}!')
-            self.log(f'Received simulation end confirmation from {msg_src}!', level=logging.INFO)
+            confirmation_msg = AgentEndConfirmationMessage.from_dict(msg_dict)
+
+            self.request_logger.info(f'Received simulation end confirmation from {confirmation_msg.src}!')
+            self.log(f'Received simulation end confirmation from {confirmation_msg.src}!', level=logging.INFO)
             
             # log subscriber confirmation
             for agent_name in self.AGENT_NAME_LIST:
-                if agent_name in msg_src and not agent_name in self.offline_subscribers:
+                if agent_name in confirmation_msg.src and not agent_name in self.offline_subscribers:
                     self.offline_subscribers.append(agent_name)
                     self.log(f"{agent_name} has ended its processes ({len(self.offline_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     break
