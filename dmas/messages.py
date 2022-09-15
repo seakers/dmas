@@ -880,6 +880,81 @@ class AgentEndConfirmationMessage(InterNodeMessage):
         """
         return AgentEndConfirmationMessage.from_dict(json.loads(d))
 
+class ObservationSenseMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, internal_state: dict, lat: float, lon: float, obs: str) -> None:
+        """
+        Message from an agent node to the environment asking to be informed about a GP's current state
+
+        src:
+            name of the agent node sending the message
+        dst:
+            name of the environment node receiving the message
+        internal_state:
+            internal_state of the source node 
+        lat:
+            latitude of the target ground point to be accessed by the source node (in degrees)
+        lon:
+            lingitude of the target ground point to be accessed by the source node (in degrees)
+        result:
+            result from sensing if the agent is accessing the target
+        """
+        super().__init__(src, dst, InterNodeMessageTypes.OBSERVATION_SENSE)
+        self.target = [lat, lon]
+
+    def to_dict(self) -> dict:
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+
+        msg_dict['internal state'] = self.internal_state
+        msg_dict['obs'] = self.obs
+
+        if self.lat is None:
+            msg_dict['lat'] = 'None'
+        else:
+            msg_dict['lat'] = self.lat
+
+        if self.lon is None:
+            msg_dict['lon'] = 'None'
+        else:
+            msg_dict['lon'] = self.lon   
+
+        return msg_dict
+
+    def from_dict(d):
+        """
+        Creates an instance of a Access Sense Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        internal_state = d.get('target', None)
+        lat = d.get('lat', None)
+        lon = d.get('lon', None)
+        obs = d.get('obs', None)
+
+        if src is None or dst is None or type_name is None or internal_state is None or lat is None or lon is None or obs is None:
+            raise Exception('Dictionary does not contain necessary information to construct a message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not InterNodeMessageTypes.OBSERVATION_SENSE:
+            raise Exception(f'Cannot load a Observation Sense Message from a dictionary of type {type_name}.')
+
+
+        return ObservationSenseMessage(src, dst, internal_state, lat, lon, obs)
+
+    def from_json(d):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return ObservationSenseMessage.from_dict(json.loads(d))
 
 class BroadcastMessageTypes(Enum):
     """
