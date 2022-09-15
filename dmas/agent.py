@@ -12,7 +12,7 @@ import zmq
 import zmq.asyncio
 import logging
 
-from messages import AgentEndConfirmationMessage, BroadcastTypes, InternalMessage, SimulationStartBroadcastMessage, SyncRequestMessage
+from messages import AgentAccessEventBroadcastMessage, AgentEndConfirmationMessage, BroadcastMessage, BroadcastMessageTypes, BroadcastTypes, EclipseEventBroadcastMessage, GndPointAccessEventBroadcastMessage, GndStationAccessEventBroadcastMessage, InternalMessage, SimulationEndBroadcastMessage, SimulationStartBroadcastMessage, SyncRequestMessage, TicEventBroadcast
 from utils import SimClocks, Container, SimulationConstants
 from messages import RequestTypes
 
@@ -190,16 +190,16 @@ class AgentClient(Module):
 
             # cancell all other coroutine tasks
             self.log(f'{done_name} ended. Terminating all other coroutines...', level=logging.INFO)
-            for subroutine in pending:
-                subroutine.cancel()
-                await subroutine
+            for coroutine in pending:
+                coroutine.cancel()
+                await coroutine
             return
 
         except asyncio.CancelledError: 
             self.log('Cancelling all coroutines...')
-            for subroutine in coroutines:
-                subroutine.cancel()
-                await subroutine
+            for coroutine in coroutines:
+                coroutine.cancel()
+                await coroutine
             return
 
     async def broadcast_handler(self):
@@ -208,50 +208,96 @@ class AgentClient(Module):
         """
         try:
             while True:
-                msg_string = await self.environment_broadcast_socket.recv_json()
-                msg = json.loads(msg_string)
+                # msg_string = await self.environment_broadcast_socket.recv_json()
+                # msg = json.loads(msg_string)
 
-                src = msg['src']
-                dst = msg['dst']
-                msg_type = msg['@type']
-                t_server = msg['server_clock']
+                # src = msg['src']
+                # dst = msg['dst']
+                # msg_type = msg['@type']
+                # t_server = msg['server_clock']
 
-                self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-                self.log(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+                # self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
+                # self.log(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
 
-                if self.name == dst or 'all' == dst:
-                    # broadcast intended for this or all agents
+                # if self.name == dst or 'all' == dst:
+                #     # broadcast intended for this or all agents
 
-                    msg_type = BroadcastTypes[msg_type]
-                    if msg_type is BroadcastTypes.SIM_END_EVENT:
-                        # if simulation end broadcast is received, terminate agent.
-                        self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
+                #     msg_type = BroadcastTypes[msg_type]
+                #     if msg_type is BroadcastTypes.SIM_END_EVENT:
+                        # # if simulation end broadcast is received, terminate agent.
+                        # self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
 
-                        return
+                        # return
 
-                    elif msg_type is BroadcastTypes.TIC_EVENT:
+                #     elif msg_type is BroadcastTypes.TIC_EVENT:
+                        # if (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
+                        #     or self.CLOCK_TYPE == SimClocks.SERVER_TIME
+                        #     or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
+                            
+                        #     # use server clock broadcasts to update internal clock
+                        #     self.message_logger.info(f'Updating internal clock.')
+                        #     await self.sim_time.set_level(t_server)
+                        #     self.log('Updated internal clock.')
+
+                #     else:
+                #         self.handle_broadcast(msg)
+                # else:
+                    # # broadcast was intended for someone else, discarding
+                    # self.log('Broadcast not intended for this agent. Discarding message...')
+
+                broadcast_msg = await self.environment_broadcast_socket.recv_json()
+
+                broadcast_type = BroadcastMessageTypes[[broadcast_msg['@type']]]
+                broadcast_src = broadcast_msg['src']
+                broadcast_dst = broadcast_msg['dst']
+
+                self.message_logger.info(f'Received broadcast message of type {broadcast_type} from {broadcast_src} intended for {broadcast_dst}!')
+                self.log(f'Received broadcast message of type {broadcast_type} from {broadcast_src} intended for {broadcast_dst}!')
+
+                if self.name == broadcast_dst or 'all' == broadcast_dst:                  
+                    if broadcast_type is BroadcastMessageTypes.TIC_EVENT:
                         if (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
                             
                             # use server clock broadcasts to update internal clock
-                            self.message_logger.info(f'Updating internal clock.')
-                            await self.sim_time.set_level(t_server)
+                            broadcast = TicEventBroadcast.from_dict(broadcast_msg)
+
+                            self.message_logger.info(f'Updating internal clock to T={broadcast.t}[s].')
+                            await self.sim_time.set_level(broadcast.t)
                             self.log('Updated internal clock.')
 
+                            continue
+                        
+                    # elif broadcast_type is BroadcastMessageTypes.ECLIPSE_EVENT:
+                    #     broadcast = EclipseEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+                    # elif broadcast_type is BroadcastMessageTypes.GP_ACCESS_EVENT:
+                    #     broadcast = GndPointAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+                    # elif broadcast_type is BroadcastMessageTypes.GS_ACCESS_EVENT:
+                    #     broadcast = GndStationAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+                    # elif broadcast_type is BroadcastMessageTypes.AGENT_ACCESS_EVENT:
+                    #     broadcast = AgentAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+                    
+                    elif broadcast_type is BroadcastMessageTypes.SIM_END_EVENT:
+                        # if simulation end broadcast is received, terminate agent.
+
+                        broadcast = SimulationEndBroadcastMessage.from_dict(broadcast_msg)
+                        self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
+
+                        return
                     else:
-                        self.handle_broadcast(msg)
+                        self.log(content=f'Broadcasts of type {broadcast_type} not yet supported.')
                 else:
                     # broadcast was intended for someone else, discarding
                     self.log('Broadcast not intended for this agent. Discarding message...')
+                    
+
         except asyncio.CancelledError:
             return
-
-    def handle_broadcast(self, msg):
-        # if other type of broadcast is received, ignore message 
-        msg_type = msg['@type']
-
-        self.log(content=f'Broadcasts of type {msg_type} not yet supported.')
 
     async def reception_handler(self):
         """
