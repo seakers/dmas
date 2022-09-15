@@ -17,6 +17,7 @@ from messages import *
 from modules import  Module
 from utils import Container, SimClocks
 import pandas as pd
+import base64
 
 """
 --------------------------------------------------------
@@ -789,6 +790,26 @@ class EnvironmentServer(Module):
                     
                     # send blank response to agent
                     # self.reqservice.send_string('')
+
+                elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.OBSERVATION_SENSE:
+                    # unpackage message
+                    observation_sense_msg = ObservationSenseMessage.from_dict(d)
+
+                    lat, lon = observation_sense_msg.target
+                    t_curr = self.get_current_time()
+                    self.log(f'Received observation request from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
+                    
+
+                    with open("sample_landsat_image.png", "rb") as image_file:
+                        encoded_string = base64.b64encode(image_file.read())
+                    observation_sense_msg.set_obs(encoded_string)
+                    
+                    # change source and destination for response message
+                    observation_sense_msg.dst = observation_sense_msg.src
+                    observation_sense_msg.src = self.name 
+
+                    # send response to agent
+                    await self.reqservice.send_json(observation_sense_msg.to_json())
 
                 else:
                     # if request type is not supported, dump and ignore message
