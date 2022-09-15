@@ -1,4 +1,3 @@
-from abc import abstractclassmethod
 import asyncio
 from curses import def_prog_mode
 import json
@@ -13,8 +12,8 @@ import zmq
 import zmq.asyncio
 import logging
 
-from messages import BroadcastTypes
-from utils import SimClocks, Container
+from messages import AgentEndConfirmationMessage, BroadcastTypes, InternalMessage, SimulationStartBroadcastMessage, SyncRequestMessage
+from utils import SimClocks, Container, SimulationConstants
 from messages import RequestTypes
 
 from modules import Module
@@ -121,16 +120,19 @@ class AgentClient(Module):
         self.log(f"Shutting down agent...", level=logging.INFO)
         
         # send a reception confirmation
-        end_msg = dict()
-        end_msg['src'] = self.name
-        end_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-        end_msg['@type'] = RequestTypes.AGENT_END_CONFIRMATION.name
-        end_json = json.dumps(end_msg)
+        # end_msg = dict()
+        # end_msg['src'] = self.name
+        # end_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+        # end_msg['@type'] = RequestTypes.AGENT_END_CONFIRMATION.name
+        # end_json = json.dumps(end_msg)
+        end_msg = AgentEndConfirmationMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value)
 
         self.log('Awaiting access to environment request socket...')
         await self.environment_request_lock.acquire()
         self.log('Access to environment request socket obtained! Sending agent termination confirmation...')
-        await self.environment_request_socket.send_json(end_json)
+        # await self.environment_request_socket.send_json(end_json)
+        await self.environment_request_socket.send_json(end_msg.to_json())
+
         self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
         self.log('Agent termination aknowledgement sent. Awaiting environment response...')
 
@@ -152,24 +154,16 @@ class AgentClient(Module):
     CO-ROUTINES AND TASKS
     --------------------
     """
-    async def internal_message_handler(self, msg):
+    async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            dst_name = msg['dst']
-            if dst_name != self.name:
+            if msg.dst_module != self.name:
                 await self.put_in_inbox(msg)
             else:
-                msg_type = msg['@type']
-
-                self.log(f'Received internal message of type {msg_type}.')
-
-                if msg_type == 'PRINT':
-                    content = msg['content']
-                    self.log(content)                       
-                elif 'REQUEST' in msg_type:
-                    await self.request_submittion_queue.put(msg)
+                self.log(f'Received internal message of type {type(msg.content)}.')
+                self.log(f'No handler specified, dumping message...')
 
         except asyncio.CancelledError:
             return
@@ -365,22 +359,24 @@ class AgentClient(Module):
         self.log('Connection to environment established!')
         await self.environment_request_lock.acquire()
 
-        sync_msg = dict()
-        sync_msg['src'] = self.name
-        sync_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-        sync_msg['@type'] = RequestTypes.SYNC_REQUEST.name
-        sync_msg['port'] = self.agent_port_in
-        sync_msg['n_coroutines'] = count_number_of_subroutines(self)
-        sync_json = json.dumps(sync_msg)
+        # sync_msg = dict()
+        # sync_msg['src'] = self.name
+        # sync_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
+        # sync_msg['@type'] = RequestTypes.SYNC_REQUEST.name
+        # sync_msg['port'] = self.agent_port_in
+        # sync_msg['n_coroutines'] = count_number_of_subroutines(self)
+        # sync_json = json.dumps(sync_msg)
 
-        await self.environment_request_socket.send_json(sync_json)
+        sync_req = SyncRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
+
+        # await self.environment_request_socket.send_json(sync_json)
+
+        await self.environment_request_socket.send_json(sync_req.to_json())
         self.log('Synchronization request sent. Awaiting environment response...')
 
         # wait for synchronization reply
         await self.environment_request_socket.recv()  
         self.environment_request_lock.release()
-
-        self.request_submittion_queue = asyncio.Queue()
 
     async def wait_sim_start(self):
         """
@@ -389,21 +385,23 @@ class AgentClient(Module):
         The message also contains information about the clock-type being used in this simulation.
         """
         # await for start message 
-        start_msg = await self.environment_broadcast_socket.recv_json()
+        # start_msg = await self.environment_broadcast_socket.recv_json()
+        start_msg_dict = await self.environment_broadcast_socket.recv_json()
+        start_msg = SimulationStartBroadcastMessage.from_dict(start_msg_dict)
 
         # log simulation start time
         self.START_TIME = time.perf_counter()
 
         # register agent-to-port map
-        start_dict = json.loads(start_msg)
-        agent_to_port_map = start_dict['port_map']
+        port_ledger = start_msg.port_ledger
+
         self.AGENT_TO_PORT_MAP = dict()
-        for agent in agent_to_port_map:
-            self.AGENT_TO_PORT_MAP[agent] = agent_to_port_map[agent]
+        for agent in port_ledger:
+            self.AGENT_TO_PORT_MAP[agent] = port_ledger[agent]
         self.log(f'Agent to port map received: {self.AGENT_TO_PORT_MAP}')
 
         # setup clock information
-        clock_info = start_dict['clock_info']
+        clock_info = start_msg.clock_info
         self.CLOCK_TYPE = SimClocks[clock_info['@type']]
 
         if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
