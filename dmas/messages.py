@@ -343,6 +343,7 @@ class InterNodeMessageTypes(Enum):
     AGENT_INFO_SENSE = 'AGENT_INFO_SENSE'
     OBSERVATION_SENSE = 'OBSERVATION_SENSE'
     AGENT_END_CONFIRMATION = 'AGENT_END_CONFIRMATION'
+    PRINT_REQUEST = 'PRINT_REQUEST'
 
 class InterNodeMessage(SimulationMessage): 
     def __init__(self, src: str, dst: str, _type: InterNodeMessageTypes) -> None:
@@ -955,6 +956,52 @@ class ObservationSenseMessage(InterNodeMessage):
         Creates an instance of a message class object from a json object 
         """
         return ObservationSenseMessage.from_dict(json.loads(d))
+
+class PrintRequestMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, content: str) -> None:
+        super().__init__(src, dst, InterNodeMessageTypes.PRINT_REQUEST)
+        self.content = content
+
+    def to_dict(self) -> dict:
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        req_dict = super().to_dict()
+        req_dict['content'] = self.conten
+
+    def from_dict(d):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        content = d.get('content', None)
+
+        if src is None or dst is None or type_name is None or content is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+
+        return PrintRequestMessage(src, dst, content)
+
+    def to_json(self):
+        """
+        Creates a json file from this message 
+        """
+        return json.dumps(self.to_dict())
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return PrintRequestMessage.from_dict(json.loads(j))
 
 class BroadcastMessageTypes(Enum):
     """

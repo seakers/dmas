@@ -12,7 +12,7 @@ import zmq
 import zmq.asyncio
 import logging
 
-from messages import AgentAccessEventBroadcastMessage, AgentEndConfirmationMessage, BroadcastMessage, BroadcastMessageTypes, BroadcastTypes, EclipseEventBroadcastMessage, GndPointAccessEventBroadcastMessage, GndStationAccessEventBroadcastMessage, InternalMessage, SimulationEndBroadcastMessage, SimulationStartBroadcastMessage, SyncRequestMessage, TicEventBroadcast
+from messages import AgentAccessEventBroadcastMessage, AgentEndConfirmationMessage, BroadcastMessage, BroadcastMessageTypes, BroadcastTypes, EclipseEventBroadcastMessage, GndPointAccessEventBroadcastMessage, GndStationAccessEventBroadcastMessage, InterNodeMessageTypes, InternalMessage, PrintRequestMessage, SimulationEndBroadcastMessage, SimulationStartBroadcastMessage, SyncRequestMessage, TicEventBroadcast
 from utils import SimClocks, Container, SimulationConstants
 from messages import RequestTypes
 
@@ -269,19 +269,6 @@ class AgentClient(Module):
 
                             continue
                         
-                    # elif broadcast_type is BroadcastMessageTypes.ECLIPSE_EVENT:
-                    #     broadcast = EclipseEventBroadcastMessage.from_dict(broadcast_msg)
-                    #     pass
-                    # elif broadcast_type is BroadcastMessageTypes.GP_ACCESS_EVENT:
-                    #     broadcast = GndPointAccessEventBroadcastMessage.from_dict(broadcast_msg)
-                    #     pass
-                    # elif broadcast_type is BroadcastMessageTypes.GS_ACCESS_EVENT:
-                    #     broadcast = GndStationAccessEventBroadcastMessage.from_dict(broadcast_msg)
-                    #     pass
-                    # elif broadcast_type is BroadcastMessageTypes.AGENT_ACCESS_EVENT:
-                    #     broadcast = AgentAccessEventBroadcastMessage.from_dict(broadcast_msg)
-                    #     pass
-                    
                     elif broadcast_type is BroadcastMessageTypes.SIM_END_EVENT:
                         # if simulation end broadcast is received, terminate agent.
 
@@ -289,6 +276,23 @@ class AgentClient(Module):
                         self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
 
                         return
+
+                    # elif broadcast_type is BroadcastMessageTypes.ECLIPSE_EVENT:
+                    #     broadcast = EclipseEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+
+                    # elif broadcast_type is BroadcastMessageTypes.GP_ACCESS_EVENT:
+                    #     broadcast = GndPointAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+
+                    # elif broadcast_type is BroadcastMessageTypes.GS_ACCESS_EVENT:
+                    #     broadcast = GndStationAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+
+                    # elif broadcast_type is BroadcastMessageTypes.AGENT_ACCESS_EVENT:
+                    #     broadcast = AgentAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     pass
+
                     else:
                         self.log(content=f'Broadcasts of type {broadcast_type} not yet supported.')
                 else:
@@ -307,26 +311,24 @@ class AgentClient(Module):
             self.log('Acquiring access to agent-in port...')
             await self.agent_socket_in_lock.acquire()
             self.log('Access to agent-in port acquired.')
+
             while True:
-                req_str = None
+                msg_in = None
                 worker_task = None
 
                 # listen for requests
                 self.log('Waiting for agent requests.')
-                req_str = await self.agent_socket_in.recv_json()
+                msg_in = await self.agent_socket_in.recv_json()
                 self.log(f'Request received!')
                 
-                # convert request to json
-                req = json.loads(req_str)
-
                 # handle request
                 self.log(f'Handling agent request...')
-                worker_task = asyncio.create_task(self.reception_worker(req))
+                worker_task = asyncio.create_task(self.reception_worker(msg_in))
                 await worker_task
                 self.log(f'Agent request handled')
 
         except asyncio.CancelledError:
-            if req_str is not None:
+            if msg_in is not None:
                 self.log('Sending blank response...')
                 await self.agent_socket_in.send_string('')
             elif worker_task is not None:
@@ -341,22 +343,43 @@ class AgentClient(Module):
                 evnt = await poller.poll(1000)
                 if len(evnt) > 0:
                     self.log('Agent request message received during shutdown process. Sending blank response..')
-                    await self.reqservice.send_string('')
+                    await self.agent_socket_in.send_string('')
 
             self.log('Releasing agent-in port...')
             self.agent_socket_in_lock.release()
             return
 
-    async def reception_worker(self, request):
-        try:
-            # if request does not match any of the standard request format, dump and continue
-            req_type = request['@type']
+    async def reception_worker(self, msg_in: dict):
+        """
+        Handles received message according to its type
+        """
+        try:            
+            msg_type = InterNodeMessageTypes[[msg_in['@type']]]
+            msg_src = msg_in['src']
+            msg_dst = msg_in['dst']
 
-            if req_type in 'HELLO_WORLD':
-                self.log(request['content'])
+            #TODO check for format of message being sent?
+
+            self.message_logger.info(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
+            self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
+
+            if self.name == msg_dst:
+                if msg_type is InterNodeMessageTypes.PRINT_REQUEST:
+                    msg = PrintRequestMessage.from_dict(msg_in)
+                    self.log(msg.content)
+
+                    # send reception confirmation to sender agent
+                    await self.agent_socket_in.send_string('')
+                else:
+                    # if request does not match any of the standard request format, dump and continue
+                    self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
+
+                    # send reception confirmation to sender agent
+                    await self.agent_socket_in.send_string('')
+
             else:
-                self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
-            await self.agent_socket_in.send_string('')
+                # message was intended for someone else, discard message
+                self.log('Inter agent message not intended for this agent. Discarding message...')
         except asyncio.CancelledError:
             await self.agent_socket_in.send_string('')
 
