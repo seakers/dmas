@@ -5,7 +5,7 @@ from enum import Enum
 import logging
 import random
 import time
-from messages import TicRequestMessage
+from messages import *
 from utils import SimulationConstants
 from messages import InternalMessage
 
@@ -234,7 +234,7 @@ class Module:
         """
         Performs depth-first search to find a module in that corresponds to the name being searched
         """
-        self.log(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
+        # self.log(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
         if module.name == dst_name:
             return module
         elif len(module.submodules) == 0:
@@ -295,7 +295,7 @@ class Module:
                 # if the clock is server-step, then submit a tic request to environment
                 t_req = self.sim_time.level + delay 
 
-                tic_msg = TicRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME, t_req)
+                tic_msg = TicRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, t_req)
                 await self.submit_environment_message(tic_msg, module_name)
 
                 await self.sim_time.when_geq_than(t_req)
@@ -324,13 +324,13 @@ class Module:
             await self.parent_module.sim_wait_to(t, module_name) 
 
     @abstractmethod
-    async def environment_message_submitter(self, req, module_name=None):
+    async def environment_message_submitter(self, msg: InterNodeMessage, module_name: str=None):
         """
         submitts a request of any type to the environment
         """
         pass
 
-    async def submit_environment_message(self, req, module_name=None):
+    async def submit_environment_message(self, msg: InterNodeMessage, module_name: str=None):
         """
         submits environment request and returns response from environment server
         """
@@ -338,9 +338,9 @@ class Module:
             module_name = self.name
 
         if self.parent_module is None:
-            return await self.environment_message_submitter(req, module_name)
+            return await self.environment_message_submitter(msg, module_name)
         else:
-            return await self.parent_module.submit_request(req, module_name)
+            return await self.parent_module.submit_environment_message(msg, module_name)
 
     @abstractmethod
     async def message_transmitter(self, msg):

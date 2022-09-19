@@ -118,19 +118,11 @@ class AgentClient(Module):
         Terminate processes 
         """
         self.log(f"Shutting down agent...", level=logging.INFO)
-        
-        # send a reception confirmation
-        # end_msg = dict()
-        # end_msg['src'] = self.name
-        # end_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-        # end_msg['@type'] = RequestTypes.AGENT_END_CONFIRMATION.name
-        # end_json = json.dumps(end_msg)
         end_msg = AgentEndConfirmationMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value)
 
         self.log('Awaiting access to environment request socket...')
         await self.environment_request_lock.acquire()
         self.log('Access to environment request socket obtained! Sending agent termination confirmation...')
-        # await self.environment_request_socket.send_json(end_json)
         await self.environment_request_socket.send_json(end_msg.to_json())
 
         self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
@@ -162,7 +154,7 @@ class AgentClient(Module):
             if msg.dst_module != self.name:
                 await self.put_in_inbox(msg)
             else:
-                self.log(f'Received internal message of type {type(msg.content)}.')
+                self.log(f'Received internal message with content of type {type(msg.content)}.')
                 self.log(f'No handler specified, dumping message...')
 
         except asyncio.CancelledError:
@@ -245,14 +237,15 @@ class AgentClient(Module):
                     # # broadcast was intended for someone else, discarding
                     # self.log('Broadcast not intended for this agent. Discarding message...')
 
-                broadcast_msg = await self.environment_broadcast_socket.recv_json()
+                broadcast_json = await self.environment_broadcast_socket.recv_json()
 
-                broadcast_type = BroadcastMessageTypes[[broadcast_msg['@type']]]
-                broadcast_src = broadcast_msg['src']
-                broadcast_dst = broadcast_msg['dst']
+                broadcast_dict = json.loads(broadcast_json)
+                broadcast_type = BroadcastMessageTypes[broadcast_dict['@type']]
+                broadcast_src = broadcast_dict['src']
+                broadcast_dst = broadcast_dict['dst']
 
-                self.message_logger.info(f'Received broadcast message of type {broadcast_type} from {broadcast_src} intended for {broadcast_dst}!')
-                self.log(f'Received broadcast message of type {broadcast_type} from {broadcast_src} intended for {broadcast_dst}!')
+                self.message_logger.info(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
+                self.log(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
 
                 if self.name == broadcast_dst or 'all' == broadcast_dst:                  
                     if broadcast_type is BroadcastMessageTypes.TIC_EVENT:
@@ -261,7 +254,7 @@ class AgentClient(Module):
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
                             
                             # use server clock broadcasts to update internal clock
-                            broadcast = TicEventBroadcast.from_dict(broadcast_msg)
+                            broadcast = TicEventBroadcast.from_dict(broadcast_dict)
 
                             self.message_logger.info(f'Updating internal clock to T={broadcast.t}[s].')
                             await self.sim_time.set_level(broadcast.t)
@@ -272,7 +265,7 @@ class AgentClient(Module):
                     elif broadcast_type is BroadcastMessageTypes.SIM_END_EVENT:
                         # if simulation end broadcast is received, terminate agent.
 
-                        broadcast = SimulationEndBroadcastMessage.from_dict(broadcast_msg)
+                        broadcast = SimulationEndBroadcastMessage.from_dict(broadcast_dict)
                         self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
 
                         return
@@ -294,7 +287,7 @@ class AgentClient(Module):
                     #     pass
 
                     else:
-                        self.log(content=f'Broadcasts of type {broadcast_type} not yet supported.')
+                        self.log(content=f'Broadcasts of type {broadcast_type.name} not yet supported. Discarding message...')
                 else:
                     # broadcast was intended for someone else, discarding
                     self.log('Broadcast not intended for this agent. Discarding message...')
@@ -428,19 +421,9 @@ class AgentClient(Module):
         self.log('Connection to environment established!')
         await self.environment_request_lock.acquire()
 
-        # sync_msg = dict()
-        # sync_msg['src'] = self.name
-        # sync_msg['dst'] = EnvironmentServer.ENVIRONMENT_SERVER_NAME
-        # sync_msg['@type'] = RequestTypes.SYNC_REQUEST.name
-        # sync_msg['port'] = self.agent_port_in
-        # sync_msg['n_coroutines'] = count_number_of_subroutines(self)
-        # sync_json = json.dumps(sync_msg)
-
         sync_req = SyncRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
-
-        # await self.environment_request_socket.send_json(sync_json)
-
         await self.environment_request_socket.send_json(sync_req.to_json())
+
         self.log('Synchronization request sent. Awaiting environment response...')
 
         # wait for synchronization reply
@@ -545,107 +528,71 @@ class AgentClient(Module):
             loggers.append(logger)
         return loggers
                 
-    async def environment_message_submitter(self, req):
+    async def environment_message_submitter(self, msg: InterNodeMessage, module_name: str=None):
         try:
-            req_type = req['@type']
-            self.log(f'Submitting a request of type {req_type}.')
+            msg_type = msg.get_type()
+            self.log(f'Submitting a request of type {msg_type}.')
 
-            if RequestTypes[req_type] is RequestTypes.TIC_REQUEST:
-                t_end = req['t']
-                req_json = json.dumps(req)
-
+            if isinstance(msg, TicRequestMessage):
                 # submit request
-                self.log(f'Sending {req_type} for t_end={t_end}. Awaiting access to environment request socket...')
+                self.log(f'Sending {msg_type} for t_end={msg.t_req}. Awaiting access to environment request socket...')
                 await self.environment_request_lock.acquire()
-                self.log('Access to environment request socket confirmed. Sending request...')
-                await self.environment_request_socket.send_json(req_json)
-                self.log('Request sent successfully. Awaiting confirmation...')
+                self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
+                await self.environment_request_socket.send_json(msg.to_json())
+                self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
 
                 # wait for sever reply
                 await self.environment_request_socket.recv()  
                 self.environment_request_lock.release()
                 self.log('Tic request reception confirmation received.')         
 
-                return   
+                return
 
-            elif RequestTypes[req_type] is RequestTypes.AGENT_ACCESS_REQUEST:
-                target = req['target']
-                req_json = json.dumps(req)
-
+            elif isinstance(msg, AccessSenseMessage): 
                 # submit request
-                self.log(f'Sending Agent Access Request (from {self.name} to {target})...')
+                self.log(f'Sending Agent Access Message (from {self.name} to {msg.target})...')
                 await self.environment_request_lock.acquire()
-                await self.environment_request_socket.send_json(req_json)
-                self.log('Agent Access request sent successfully. Awaiting response...')
+                self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
+                await self.environment_request_socket.send_json(msg.to_json())
+                self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
                 
                 # wait for server reply
-                resp = await self.environment_request_socket.recv_json()
-                resp = json.loads(resp)
+                resp_json = await self.environment_request_socket.recv_json()
                 self.environment_request_lock.release()
-                resp_val = resp.get('result')
-                self.log(f'Received Request Response: \'{resp_val}\'')        
+
+                if resp_json == json.dumps(dict()):
+                    self.log(f'Received Request Response: \'None\'') 
+                    return None
+                    
+                resp = AccessSenseMessage.from_json(resp_json)
+                self.log(f'Received Request Response: \'{resp.result}\'')        
                 
                 return resp
 
-            elif RequestTypes[req_type] is RequestTypes.GS_ACCESS_REQUEST:
-                target = req['target']            
-                req_json = json.dumps(req)
-
+            elif isinstance(msg, AgentSenseMessage):
                 # submit request
-                self.log(f'Sending Ground Station Access Request (from {self.name} to {target})...')
+                self.log(f'Sending Agent Info Message...')
                 await self.environment_request_lock.acquire()
-                await self.environment_request_socket.send_json(req_json)
-                self.log('Ground Station Access request sent successfully. Awaiting response...')
+                self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
+                await self.environment_request_socket.send_json(msg.to_json())
+                self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
                 
                 # wait for server reply
-                resp = await self.environment_request_socket.recv_json()
-                resp = json.loads(resp)
+                resp_json = await self.environment_request_socket.recv_json()
                 self.environment_request_lock.release()
-                resp_val = resp.get('result')
-                self.log(f'Received Request Response: \'{resp_val}\'')       
 
-                return resp
-            
-            elif RequestTypes[req_type] is RequestTypes.AGENT_INFO_REQUEST:
-                req_json = json.dumps(req)
-
-                # submit request
-                self.log(f'Sending Agent Info Request...')
-                await self.environment_request_lock.acquire()
-                await self.environment_request_socket.send_json(req_json)
-                self.log('Agent Info request sent successfully. Awaiting response...')
+                if resp_json == json.dumps(dict()):
+                    self.log(f'Received Response: \'None\'') 
+                    return None
+                    
+                resp = AgentSenseMessage.from_json(resp_json)
+                self.log(f'Received Response: \'{[resp.pos, resp.vel, resp.eclipse]}\'')        
                 
-                # wait for server reply
-                resp = await self.environment_request_socket.recv_json()
-                resp = json.loads(resp)
-                self.environment_request_lock.release()
-                resp_val = resp.get('result')
-                self.log(f'Received Request Response: \'{resp_val}\'')       
-
-                return resp
-            
-            elif RequestTypes[req_type] is RequestTypes.GP_ACCESS_REQUEST:
-                req_json = json.dumps(req)
-                lat = req['lat']
-                lon = req['lon']
-
-                # submit request
-                self.log(f'Sending Groung Point Access Request for ({lat}°,{lon}°)...')
-                await self.environment_request_lock.acquire()
-                await self.environment_request_socket.send_json(req_json)
-                self.log('Groung Point Access request sent successfully. Awaiting response...')
-                
-                # wait for server reply
-                resp = await self.environment_request_socket.recv_json()
-                resp = json.loads(resp)
-                self.environment_request_lock.release()
-                resp_val = resp.get('result')
-                self.log(f'Received Request Response: \'{resp_val}\'')       
-
                 return resp
 
             else:
-                raise Exception(f'Request of type {req_type} not supported by request submitter.')
+                raise Exception(f'Request of type {msg_type} not supported by request submitter.')
+
         except asyncio.CancelledError:
             pass
 
@@ -715,52 +662,52 @@ class SubModule(Module):
             while True:
                 if not sent_requests:
                     # test message to parent module
-                    msg = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
+                    instruction = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
+                    msg = InternalMessage(self.name, self.parent_module.name, instruction)
 
+                    self.log('Sending print instruction to parent module.')
                     await self.send_internal_message(msg)
 
+                    self.log('Waiting for 1 second')
                     await self.sim_wait_to(int(self.get_current_time()) + 1)
+                    self.log('Wait over!')
 
-                #     # # agent access req
-                #     target = 'Mars2'
-                #     msg = RequestTypes.create_agent_access_request(self.name, 
-                #                                                     EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
-                #                                                     target)
-                #     _ = await self.submit_environment_message(msg)
-                #     # result = response['result']
-                #     # self.log(f'Access to {target}: {result}')
-                #     await self.sim_wait(random.random())
-
-                #     # gs access req
-                #     gs_name = 'NEN2'
-                #     msg = RequestTypes.create_ground_station_access_request(self.name, 
-                #                                                             EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                #                                                             gs_name)
-                #     _ = await self.submit_environment_message(msg)
-                #     # result = response['result']
-                #     # self.log(f'Access to GS({gs_name}): {result}')
-                #     await self.sim_wait(random.random())
-
-                #     # gp access req
-                #     lat = 1.0
-                #     lon = 158.0
-                #     msg = RequestTypes.create_ground_point_access_request(self.name, 
-                #                                                         EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                #                                                         lat, lon)
-                #     _ = await self.submit_environment_message(msg)
-                #     # result = response['result']
-                #     # self.log(f'Access to GP({lat}°,{lon}°): {result}')
-                #     await self.sim_wait(random.random())
-
-                #     # agent info req 
-                #     msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
+                    # sense requests
+                    src = self.get_top_module()
+                    sense_msgs = []
                     
-                #     _ = await self.submit_environment_message(msg)
-                #     # result = response['result']
-                #     # self.log(f'Agent external state: {result}')
+                    ## agent access req
+                    target = 'Mars2'
+                    msg = AgentAccessSenseMessage(src.name, target)
+                    sense_msgs.append(msg)
 
-                #     await self.sim_wait(4.6656879355937875 * random.random())
-                #     sent_requests = True
+                    # gs access req
+                    target = 'NEN2'
+                    msg = GndStnAccessSenseMessage(src.name, target)
+                    sense_msgs.append(msg)
+
+                    # gp access req
+                    lat, lon = 1.0, 158.0
+                    msg = GndPntAccessSenseMessage(src.name, lat, lon)
+                    sense_msgs.append(msg)
+
+                    for sense_msg in sense_msgs:
+                        self.log(f'Sending access sense message of type {msg.get_type()} for target {target}.')
+                        response = await self.submit_environment_message(sense_msg)
+
+                        if response is not None:
+                            self.log(f'Access to {response.target}: {response.result}')
+                            await self.sim_wait(1.1)
+
+                     # agent info req 
+                    msg = AgentSenseMessage(src.name, dict())
+                    self.log(f'Sending Agent Info sense message to Envirnment.')
+                    response = await self.submit_environment_message(msg)
+
+                    if response is not None:
+                        self.log(f'Current state: pos:{response.pos}, vel=[{response.vel}], eclipse={response.eclipse}')
+                        await self.sim_wait(1.1)
+
                 # else:
                 #     await self.sim_wait( 1e6 )
 

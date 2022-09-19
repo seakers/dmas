@@ -722,7 +722,7 @@ class EnvironmentServer(Module):
 
                 elif InterNodeMessageTypes[req_type] is InterNodeMessageTypes.GS_ACCESS_SENSE:
                     # unpackage message
-                    gs_access_msg = GndPointAccessEventBroadcastMessage.from_dict(d)
+                    gs_access_msg = GndStnAccessSenseMessage.from_dict(d)
 
                     t_curr = self.get_current_time()
                     self.log(f'Received ground station access request from {gs_access_msg.src} to {gs_access_msg.target} at simulation time t={t_curr}!')
@@ -811,12 +811,12 @@ class EnvironmentServer(Module):
                 else:
                     # if request type is not supported, dump and ignore message
                     self.log(f'Request of type {req_type.value} not yet supported. Dumping request.')
-                    self.reqservice.send_string('')
+                    await self.send_blanc_response()
                     return
 
             except asyncio.CancelledError:
                 self.log('Request handling cancelled. Sending blank response...')
-                await self.reqservice.send_string('')
+                await self.send_blanc_response()
 
         
         try:            
@@ -855,7 +855,7 @@ class EnvironmentServer(Module):
                 evnt = await poller.poll(1000)
                 if len(evnt) > 0:
                     self.log('Request received during shutdown process. Sending blank response..')
-                    await self.reqservice.send_string('')
+                    await self.send_blanc_response()
 
             self.log('Releasing request service port...')
             self.reqservice_lock.release()
@@ -1013,11 +1013,11 @@ class EnvironmentServer(Module):
             self.sim_time = 0
         else:
             self.sim_time = Container()
-        
-        sim_start_msg = SimulationStartBroadcastMessage(self.name, subscriber_to_port_map, clock_info)
 
         # package message and broadcast
-        await self.publisher.send_json(sim_start_msg.to_json())
+        sim_start_msg = SimulationStartBroadcastMessage(self.name, subscriber_to_port_map, clock_info)
+        sim_start_json = sim_start_msg.to_json()
+        await self.publisher.send_json(sim_start_json)
 
         # log simulation start time
         self.START_TIME = time.perf_counter()
@@ -1066,7 +1066,7 @@ class EnvironmentServer(Module):
             if InterNodeMessageTypes[msg_type] is not InterNodeMessageTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
                 self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
-                await self.reqservice.send_string('')
+                await self.send_blanc_response()
                 continue
             
             confirmation_msg = AgentEndConfirmationMessage.from_dict(msg_dict)
@@ -1140,13 +1140,16 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
-    async def environment_message_submitter(self, req, module_name):
+    async def environment_message_submitter(self, msg, module_name):
         """
         Submits requests to itself whenever a submodule requires information that can only be obtained from request messages
-        """
-        msg = InternalMessage(module_name, self.name, req)
-        
-        await self.send_internal_message(msg)
+        """        
+        await self.send_internal_message(InternalMessage(module_name, self.name, msg))
+
+    async def send_blanc_response(self):
+        blanc = dict()
+        blanc_json = json.dumps(blanc)
+        await self.reqservice.send_json(blanc_json)
         
 """
 --------------------
