@@ -10,7 +10,7 @@ import random
 import time
 from urllib import request
 import zmq.asyncio
-from dmas.utils import EnvironmentModuleTypes
+from utils import EnvironmentModuleTypes
 from orbitdata import OrbitData
 
 from messages import *
@@ -262,10 +262,7 @@ class GndStatAccessEventModule(ScheduledEventModule):
         t_next = row['time index'] * self.time_step
         agent_name = row['agent name']
         rise = row['rise']
-        gndStat_id = row['gndStn id']
         gndStat_name = row['gndStn name']
-        lat = row['lat [deg]']
-        lon = row['lon [deg]']
         src = self.get_top_module()
 
         return GndStationAccessEventBroadcastMessage(src, agent_name, gndStat_name, t_next, rise)
@@ -603,7 +600,6 @@ class EnvironmentServer(Module):
         routines = [sim_end_timer, request_handler, broadcast_handler]
 
         _, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
-        print('DONE')
 
         done_name = None
         for coroutine in routines:
@@ -879,33 +875,9 @@ class EnvironmentServer(Module):
             while True:
                 msg = await self.publisher_queue.get()
 
-                # if not BroadcastTypes.format_check(msg):
-                    # # if broadcast task does not meet the desired format, reject and dump
-                    # self.log('Broadcast task did not meet format specifications. Task dumped.')
-                    # print(msg)
-                    # # raise Exception(msg)
-                    # continue
-
-                # # change from internal message to external message
-                # msg['src'] = self.name
-                # msg_type = msg['@type']
-
-                # self.log(f'Broadcast task of type {msg_type} received! Publishing to all agents...')
-
-                # if BroadcastTypes[msg_type] is BroadcastTypes.TIC_EVENT:
-                #     msg['dst'] = 'all'
-                #     t_next = msg['server_clock']
-                    # self.log(f'Updating internal clock to t={t_next}')
-                    # await self.sim_time.set_level(t_next)
-                
-                # else:
-                #     self.log(f'Broadcast task of type {msg_type} not yet supported. Dumping task...')
-                #     continue
-
                 if not isinstance(msg, BroadcastMessage):
                     # if message to be broadcasted is not of any supported format, reject and dump
                     self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarting task...')
-                    print(msg)
                     continue
                 else:
                     if msg.src != self.name:
@@ -926,9 +898,6 @@ class EnvironmentServer(Module):
                 self.log('Awaiting access to publisher socket...')
                 await self.publisher_lock.acquire()
                 self.log('Access to publisher socket acquired.')
-                
-                # msg_json = json.dumps(msg)
-                # await self.publisher.send_json(msg_json)
 
                 await self.publisher.send_json(msg.to_json())
                 self.log('Broadcast sent')
@@ -1002,7 +971,7 @@ class EnvironmentServer(Module):
                 continue
             
             # unpackage sync request
-            sync_req = SyncRequestMessage.from_dict(msg_type)
+            sync_req = SyncRequestMessage.from_dict(msg)
 
             msg_src = sync_req.src
             src_port = sync_req.port
@@ -1171,19 +1140,11 @@ class EnvironmentServer(Module):
             loggers.append(logger)
         return loggers
 
-    async def environment_message_submitter(self, req):
+    async def environment_message_submitter(self, req, module_name):
         """
         Submits requests to itself whenever a submodule requires information that can only be obtained from request messages
         """
-        dst = self.parent_module
-        
-        if dst is None:
-            dst = self
-        else:
-            while dst.parent_module is not None:
-                dst = dst.parent_module
-
-        msg = InternalMessage(self.name, dst.name, req)
+        msg = InternalMessage(module_name, self.name, req)
         
         await self.send_internal_message(msg)
         
@@ -1197,13 +1158,13 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    # duration = 10
+    duration = 10
     # duration = 70
-    duration = 537 * dt 
+    # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
 
-    # environment = EnvironmentServer('ENV', scenario_dir, ['AGENT0'], 5, clock_type=SimClocks.REAL_TIME)
-    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_STEP)
-    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    # environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())

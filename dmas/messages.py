@@ -1057,11 +1057,17 @@ class BroadcastMessage(SimulationMessage):
 
         return BroadcastMessage(src, dst, _type)
 
+    def to_json(self):
+        """
+        Creates a json file from this message 
+        """
+        return super().to_json()
+
     def from_json(j):
         """
         Creates an instance of a message class object from a json object 
         """
-        return BroadcastMessage.from_dict(json.loads(j))
+        return InterNodeMessage.from_dict(json.loads(j))
     
 class TicEventBroadcast(BroadcastMessage):
     def __init__(self, src: str, t: float) -> None:
@@ -1101,7 +1107,7 @@ class TicEventBroadcast(BroadcastMessage):
 
         return TicEventBroadcast(src, t)
 
-    def to_json(j):
+    def from_json(j):
         """
         Creates an instance of a message class object from a json object 
         """
@@ -1185,6 +1191,37 @@ class EclipseEventBroadcastMessage(EventBroadcastMessage):
             indicates whether the eclipse event started or ended
         """
         super().__init__(src, dst, BroadcastMessageTypes.ECLIPSE_EVENT, t, rise)
+
+    def from_dict(d):
+        """
+        Creates an instance of an access Event Broadcast Message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        t = d.get('t', None)
+        rise = d.get('rise', None)
+
+        if src is None or dst is None or type_name is None or t is None or rise is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in BroadcastMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize request of type {type_name}.')
+        elif _type is not BroadcastMessageTypes.ECLIPSE_EVENT:
+            raise Exception(f'Cannot load a Eclipse Event Broadcast Message from a dictionary of type {type_name}.')
+
+        return EclipseEventBroadcastMessage(src, dst, t, rise)
+
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return EclipseEventBroadcastMessage.from_dict(json.loads(j))
 
 class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
     def __init__(self, src: str, dst: str, target: str, t: float, rise: bool) -> None:

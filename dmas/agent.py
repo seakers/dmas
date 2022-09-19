@@ -2,6 +2,7 @@ import asyncio
 from curses import def_prog_mode
 import json
 import os
+from modules import PrintInstruction
 
 from environment import EnvironmentServer
 
@@ -12,9 +13,8 @@ import zmq
 import zmq.asyncio
 import logging
 
-from messages import AgentAccessEventBroadcastMessage, AgentEndConfirmationMessage, BroadcastMessage, BroadcastMessageTypes, BroadcastTypes, EclipseEventBroadcastMessage, GndPointAccessEventBroadcastMessage, GndStationAccessEventBroadcastMessage, InterNodeMessageTypes, InternalMessage, PrintRequestMessage, SimulationEndBroadcastMessage, SimulationStartBroadcastMessage, SyncRequestMessage, TicEventBroadcast
+from messages import *
 from utils import SimClocks, Container, SimulationConstants
-from messages import RequestTypes
 
 from modules import Module
 
@@ -456,7 +456,7 @@ class AgentClient(Module):
         # await for start message 
         # start_msg = await self.environment_broadcast_socket.recv_json()
         start_msg_dict = await self.environment_broadcast_socket.recv_json()
-        start_msg = SimulationStartBroadcastMessage.from_dict(start_msg_dict)
+        start_msg = SimulationStartBroadcastMessage.from_json(start_msg_dict)
 
         # log simulation start time
         self.START_TIME = time.perf_counter()
@@ -715,69 +715,65 @@ class SubModule(Module):
             while True:
                 if not sent_requests:
                     # test message to parent module
-                    msg = dict()
-                    msg['src'] = self.name
-                    msg['dst'] = self.parent_module.name
-                    msg['@type'] = 'PRINT'
-                    msg['content'] = 'TEST_PRINT'
+                    msg = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
 
-                    await self.parent_module.send_internal_message(msg)
+                    await self.send_internal_message(msg)
 
                     await self.sim_wait_to(int(self.get_current_time()) + 1)
 
-                    # # agent access req
-                    target = 'Mars2'
-                    msg = RequestTypes.create_agent_access_request(self.name, 
-                                                                    EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
-                                                                    target)
-                    _ = await self.submit_environment_message(msg)
-                    # result = response['result']
-                    # self.log(f'Access to {target}: {result}')
-                    await self.sim_wait(random.random())
+                #     # # agent access req
+                #     target = 'Mars2'
+                #     msg = RequestTypes.create_agent_access_request(self.name, 
+                #                                                     EnvironmentServer.ENVIRONMENT_SERVER_NAME, 
+                #                                                     target)
+                #     _ = await self.submit_environment_message(msg)
+                #     # result = response['result']
+                #     # self.log(f'Access to {target}: {result}')
+                #     await self.sim_wait(random.random())
 
-                    # gs access req
-                    gs_name = 'NEN2'
-                    msg = RequestTypes.create_ground_station_access_request(self.name, 
-                                                                            EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                                                                            gs_name)
-                    _ = await self.submit_environment_message(msg)
-                    # result = response['result']
-                    # self.log(f'Access to GS({gs_name}): {result}')
-                    await self.sim_wait(random.random())
+                #     # gs access req
+                #     gs_name = 'NEN2'
+                #     msg = RequestTypes.create_ground_station_access_request(self.name, 
+                #                                                             EnvironmentServer.ENVIRONMENT_SERVER_NAME,
+                #                                                             gs_name)
+                #     _ = await self.submit_environment_message(msg)
+                #     # result = response['result']
+                #     # self.log(f'Access to GS({gs_name}): {result}')
+                #     await self.sim_wait(random.random())
 
-                    # gp access req
-                    lat = 1.0
-                    lon = 158.0
-                    msg = RequestTypes.create_ground_point_access_request(self.name, 
-                                                                        EnvironmentServer.ENVIRONMENT_SERVER_NAME,
-                                                                        lat, lon)
-                    _ = await self.submit_environment_message(msg)
-                    # result = response['result']
-                    # self.log(f'Access to GP({lat}°,{lon}°): {result}')
-                    await self.sim_wait(random.random())
+                #     # gp access req
+                #     lat = 1.0
+                #     lon = 158.0
+                #     msg = RequestTypes.create_ground_point_access_request(self.name, 
+                #                                                         EnvironmentServer.ENVIRONMENT_SERVER_NAME,
+                #                                                         lat, lon)
+                #     _ = await self.submit_environment_message(msg)
+                #     # result = response['result']
+                #     # self.log(f'Access to GP({lat}°,{lon}°): {result}')
+                #     await self.sim_wait(random.random())
 
-                    # agent info req 
-                    msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
+                #     # agent info req 
+                #     msg = RequestTypes.create_agent_info_request(self.name, EnvironmentServer.ENVIRONMENT_SERVER_NAME)
                     
-                    _ = await self.submit_environment_message(msg)
-                    # result = response['result']
-                    # self.log(f'Agent external state: {result}')
+                #     _ = await self.submit_environment_message(msg)
+                #     # result = response['result']
+                #     # self.log(f'Agent external state: {result}')
 
-                    await self.sim_wait(4.6656879355937875 * random.random())
-                    sent_requests = True
-                else:
-                    await self.sim_wait( 1e6 )
+                #     await self.sim_wait(4.6656879355937875 * random.random())
+                #     sent_requests = True
+                # else:
+                #     await self.sim_wait( 1e6 )
 
-                if messages_sent < n_messages and '1' in self.parent_module.parent_module.name:
-                    msg = dict()
-                    msg['src'] = self.name
-                    msg['dst'] = 'Mars2'
-                    msg['content'] = 'Howdy'
-                    msg['@type'] = 'HELLO_WORLD'
+                # if messages_sent < n_messages and '1' in self.parent_module.parent_module.name:
+                #     msg = dict()
+                #     msg['src'] = self.name
+                #     msg['dst'] = 'Mars2'
+                #     msg['content'] = 'Howdy'
+                #     msg['@type'] = 'HELLO_WORLD'
 
-                    await self.transmit_message(msg)
+                #     await self.transmit_message(msg)
 
-                    messages_sent += 1
+                #     messages_sent += 1
 
                 # await self.sim_wait(20)
                 

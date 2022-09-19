@@ -5,8 +5,8 @@ from enum import Enum
 import logging
 import random
 import time
-from dmas.messages import TicRequestMessage
-from dmas.utils import SimulationConstants
+from messages import TicRequestMessage
+from utils import SimulationConstants
 from messages import InternalMessage
 
 from utils import Container, SimClocks
@@ -113,14 +113,14 @@ class Module:
             while True:
                 # wait for any incoming internal messages
                 msg = await self.inbox.get()
-                src_name = msg.src
-                dst_name = msg.dst
 
                 # if dst_name is None or src_name is None:
                 if not isinstance(msg, InternalMessage):
                     self.log(f'Received invalid internal message. Discarting message: {msg}')
                     continue
-
+                
+                src_name = msg.src_module
+                dst_name = msg.dst_module
                 self.log(f'Received internal message from \'{src_name}\' intended for \'{dst_name}\'')
 
                 # check destination
@@ -296,7 +296,7 @@ class Module:
                 t_req = self.sim_time.level + delay 
 
                 tic_msg = TicRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME, t_req)
-                await self.submit_environment_message(tic_msg)
+                await self.submit_environment_message(tic_msg, module_name)
 
                 await self.sim_time.when_geq_than(t_req)
             else:
@@ -324,20 +324,23 @@ class Module:
             await self.parent_module.sim_wait_to(t, module_name) 
 
     @abstractmethod
-    async def environment_message_submitter(self, req):
+    async def environment_message_submitter(self, req, module_name=None):
         """
         submitts a request of any type to the environment
         """
         pass
 
-    async def submit_environment_message(self, req):
+    async def submit_environment_message(self, req, module_name=None):
         """
         submits environment request and returns response from environment server
         """
+        if module_name is None:
+            module_name = self.name
+
         if self.parent_module is None:
-            return await self.environment_message_submitter(req)
+            return await self.environment_message_submitter(req, module_name)
         else:
-            return await self.parent_module.submit_request(req)
+            return await self.parent_module.submit_request(req, module_name)
 
     @abstractmethod
     async def message_transmitter(self, msg):
