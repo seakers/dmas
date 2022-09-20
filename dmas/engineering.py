@@ -247,7 +247,6 @@ class ComponentModule(Module):
             if self.update_lock.locked() and acquired:
                 # if this process had acquired the update_lock and has not released it, then release
                 self.update_lock.release()
-
                
 
     async def update_properties(self, dt):
@@ -263,39 +262,61 @@ class ComponentModule(Module):
         """
         Returns a state class object capturing the current state of this component 
         """
-        # wait for any possible update process to finish
-        await self.update_lock.acquire()
+        try:
+            # process indicators
+            acquired = False
 
-        # get state object from component status
-        state = ComponentState.from_component(self)
+            # wait for any possible update process to finish
+            await self.update_lock.acquire()
+            acquired = True
 
-        # release update lock
-        self.update_lock.release()
+            # get state object from component status
+            state = ComponentState.from_component(self)
 
-        return state
+            # release update lock
+            self.update_lock.release()
+
+            return state
+        except asyncio.CancelledError:
+            if self.update_lock.locked() and acquired:
+                # if this process had acquired the update_lock and has not released it, then release
+                self.update_lock.release()
+
+
+class Instrument(ComponentModule):
+    def __init__(self, name: str, f_update: float, 
+                average_power_usage: Union[int, float], 
+                data_rate: Union[int, float], 
+                data_buffer_capacity: Union[int, float], 
+                parent_subsystem: str, n_timed_coroutines: int, 
+                status: ComponentStatus = ComponentStatus.DISABLED) -> None:
+        super().__init__(name, f_update, average_power_usage, parent_subsystem, n_timed_coroutines, status)
+        self.
+
 
 class ComponentState:
     def __init__(self, name: str, component_type: type,
-                power_in: float, power_consumed: float, power_generated: float, energy_stored: float, energy_capacity: float,
-                data_rate_in: float, data_rate_generated: float, data_stored: float, data_capacity: float, 
-                status: ComponentStatus) -> None:
+                # power_in: float, power_consumed: float, power_generated: float, energy_stored: float, energy_capacity: float,
+                # data_rate_in: float, data_rate_generated: float, data_stored: float, data_capacity: float, 
+                status: ComponentStatus
+                ) -> None:
 
         # component info
         self.component_name = name
         self.component_type = component_type
 
-        # power state
-        self.power_in = power_in
-        self.power_consumed = power_consumed
-        self.power_generated = power_generated
-        self.energy_stored = energy_stored
-        self.energy_capacity = energy_capacity
+        # # power state
+        # self.power_in = power_in
+        # self.power_consumed = power_consumed
+        # self.power_generated = power_generated
+        # self.energy_stored = energy_stored
+        # self.energy_capacity = energy_capacity
 
-        # data state 
-        self.data_rate_in = data_rate_in
-        self.data_rate_generated = data_rate_generated
-        self.data_stored = data_stored
-        self.data_capacity = data_capacity
+        # # data state 
+        # self.data_rate_in = data_rate_in
+        # self.data_rate_generated = data_rate_generated
+        # self.data_stored = data_stored
+        # self.data_capacity = data_capacity
 
         # component status
         self.status = status
