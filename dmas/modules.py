@@ -167,7 +167,7 @@ class Module:
     async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly. By default it only handles messages
-        of the type 
+        of the type 'PrintInstruction'.
         """
         try:
             # dst_name = msg['dst']
@@ -324,13 +324,13 @@ class Module:
             await self.parent_module.sim_wait_to(t, module_name) 
 
     @abstractmethod
-    async def environment_message_submitter(self, msg: InterNodeMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
         """
         submitts a request of any type to the environment
         """
         pass
 
-    async def submit_environment_message(self, msg: InterNodeMessage, module_name: str=None):
+    async def submit_environment_message(self, msg: NodeMessage, module_name: str=None):
         """
         submits environment request and returns response from environment server
         """

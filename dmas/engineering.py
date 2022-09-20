@@ -1,29 +1,37 @@
+from abc import abstractmethod
+import asyncio
+import logging
+from messages import *
+from utils import *
+from modules import Module
+
 """
---------------------------------------------------------
- ____                                                                              
-/\  _`\                   __                                __                     
-\ \ \L\_\    ___      __ /\_\    ___      __     __   _ __ /\_\    ___      __     
- \ \  _\L  /' _ `\  /'_ `\/\ \ /' _ `\  /'__`\ /'__`\/\`'__\/\ \ /' _ `\  /'_ `\   
-  \ \ \L\ \/\ \/\ \/\ \L\ \ \ \/\ \/\ \/\  __//\  __/\ \ \/ \ \ \/\ \/\ \/\ \L\ \  
-   \ \____/\ \_\ \_\ \____ \ \_\ \_\ \_\ \____\ \____\\ \_\  \ \_\ \_\ \_\ \____ \ 
-    \/___/  \/_/\/_/\/___L\ \/_/\/_/\/_/\/____/\/____/ \/_/   \/_/\/_/\/_/\/___L\ \
-                      /\____/                                               /\____/
-                      \_/__/                                                \_/__/    
- /'\_/`\            /\ \         /\_ \            
-/\      \    ___    \_\ \  __  __\//\ \      __   
-\ \ \__\ \  / __`\  /'_` \/\ \/\ \ \ \ \   /'__`\ 
- \ \ \_/\ \/\ \L\ \/\ \L\ \ \ \_\ \ \_\ \_/\  __/ 
-  \ \_\\ \_\ \____/\ \___,_\ \____/ /\____\ \____\
-   \/_/ \/_/\/___/  \/__,_ /\/___/  \/____/\/____/                                                                                                                                                    
---------------------------------------------------------
+ ________  ___  ___  ________  ________       ___    ___ ________  _________  _______   _____ ______      
+|\   ____\|\  \|\  \|\   __  \|\   ____\     |\  \  /  /|\   ____\|\___   ___\\  ___ \ |\   _ \  _   \    
+\ \  \___|\ \  \\\  \ \  \|\ /\ \  \___|_    \ \  \/  / | \  \___|\|___ \  \_\ \   __/|\ \  \\\__\ \  \   
+ \ \_____  \ \  \\\  \ \   __  \ \_____  \    \ \    / / \ \_____  \   \ \  \ \ \  \_|/_\ \  \\|__| \  \  
+  \|____|\  \ \  \\\  \ \  \|\  \|____|\  \    \/  /  /   \|____|\  \   \ \  \ \ \  \_|\ \ \  \    \ \  \ 
+    ____\_\  \ \_______\ \_______\____\_\  \ __/  / /       ____\_\  \   \ \__\ \ \_______\ \__\    \ \__\
+   |\_________\|_______|\|_______|\_________\\___/ /       |\_________\   \|__|  \|_______|\|__|     \|__|
+   \|_________|                  \|_________\|___|/        \|_________|                                   
+
+ _____ ______   ________  ________  ___  ___  ___       _______   ________      
+|\   _ \  _   \|\   __  \|\   ___ \|\  \|\  \|\  \     |\  ___ \ |\   ____\     
+\ \  \\\__\ \  \ \  \|\  \ \  \_|\ \ \  \\\  \ \  \    \ \   __/|\ \  \___|_    
+ \ \  \\|__| \  \ \  \\\  \ \  \ \\ \ \  \\\  \ \  \    \ \  \_|/_\ \_____  \   
+  \ \  \    \ \  \ \  \\\  \ \  \_\\ \ \  \\\  \ \  \____\ \  \_|\ \|____|\  \  
+   \ \__\    \ \__\ \_______\ \_______\ \_______\ \_______\ \_______\____\_\  \ 
+    \|__|     \|__|\|_______|\|_______|\|_______|\|_______|\|_______|\_________\
+                                                                    \|_________|
 """
 class Component(Module):
-    """
-    Describes a generic component of an agent's platform.
-    Each component is in charge of performing tasks given to it and checking if it is in a nominal state.
-    Components can fail. Their failure is to be handled by their parent subsystem.
-    """
     def __init__(self, name, max_power_usage, max_power_generation, power_storage_capacity, max_data_generation, data_storage_capacity, parent_subsystem, n_timed_coroutines) -> None:
+        """
+        Describes a generic component of an agent's platform.
+        Each component is in charge of performing tasks given to it by the command and data handling module as well as checking if the module itself is in a nominal state.
+        Components can detect if it is in a critical state or if it is in a failure state. Component failure leads to no actions being able to be performed by this 
+        component. Subsystem-wide failure is to be handled by their parent subsystem.
+        """
         super().__init__(name, parent_subsystem, [], n_timed_coroutines)
         self.power_specs = [max_power_usage, max_power_generation, power_storage_capacity]
         self.data_specs = [max_data_generation, data_storage_capacity]
@@ -81,7 +89,8 @@ class Component(Module):
             await subroutine
         return
 
-
+    async def internal_message_handler(self, msg: InternalMessage):
+        return await super().internal_message_handler(msg)
 
     @abstractmethod
     async def nominal_operations(self):
@@ -107,3 +116,26 @@ class Component(Module):
 class Battery(Component):
     def __init__(self, name, max_power_generation, power_storage_capacity, parent_subsystem) -> None:
         super().__init__(name, 0, max_power_generation, power_storage_capacity, 0, 0, parent_subsystem, n_timed_coroutines=1)
+
+"""
+--------------------------------------------------------
+ ____                                                                              
+/\  _`\                   __                                __                     
+\ \ \L\_\    ___      __ /\_\    ___      __     __   _ __ /\_\    ___      __     
+ \ \  _\L  /' _ `\  /'_ `\/\ \ /' _ `\  /'__`\ /'__`\/\`'__\/\ \ /' _ `\  /'_ `\   
+  \ \ \L\ \/\ \/\ \/\ \L\ \ \ \/\ \/\ \/\  __//\  __/\ \ \/ \ \ \/\ \/\ \/\ \L\ \  
+   \ \____/\ \_\ \_\ \____ \ \_\ \_\ \_\ \____\ \____\\ \_\  \ \_\ \_\ \_\ \____ \ 
+    \/___/  \/_/\/_/\/___L\ \/_/\/_/\/_/\/____/\/____/ \/_/   \/_/\/_/\/_/\/___L\ \
+                      /\____/                                               /\____/
+                      \_/__/                                                \_/__/    
+ /'\_/`\            /\ \         /\_ \            
+/\      \    ___    \_\ \  __  __\//\ \      __   
+\ \ \__\ \  / __`\  /'_` \/\ \/\ \ \ \ \   /'__`\ 
+ \ \ \_/\ \/\ \L\ \/\ \L\ \ \ \_\ \ \_\ \_/\  __/ 
+  \ \_\\ \_\ \____/\ \___,_\ \____/ /\____\ \____\
+   \/_/ \/_/\/___/  \/__,_ /\/___/  \/____/\/____/                                                                                                                                                    
+--------------------------------------------------------
+"""
+class EngineeringModule(Module):
+    def __init__(self, name, parent_module=None, submodules=..., n_timed_coroutines=1) -> None:
+        super().__init__(name, parent_module, submodules, n_timed_coroutines)
