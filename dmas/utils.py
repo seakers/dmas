@@ -29,10 +29,26 @@ class EventPair:
     async def wait_end(self):
         return await self.end.wait()
 
-class SimulationConstants(Enum):
-    ENVIRONMENT_SERVER_NAME = 'ENV'
+class ComponentStatus(Enum):
+    ENABLED = 'ENABLED'
+    DISABLED = 'DISABLED'    
 
-class EnvironmentModuleTypes(Enum):
+class ComponentHealth(Enum):
+    NOMINAL = 'NOMINAL'
+    CRITIAL = 'CRITICAL'
+    FAILURE = 'FAILURE'
+
+class TaskStatus(Enum):
+    """
+    Describes the state of a task being performed by a module
+    """
+    PENDING = 'PENDING'
+    IN_PROCESS = 'IN_PROCESS'
+    DONE = 'DONE'
+    ABORTED = 'ABORTED'
+
+class EnvironmentModuleTypes(Enum):    
+    ENVIRONMENT_SERVER_NAME = 'ENV'
     TIC_REQUEST_MODULE = 'TIC_REQUEST_MODULE'
     ECLIPSE_EVENT_MODULE = 'ECLIPSE_EVENT_MODULE'
     GP_ACCESS_EVENT_MODULE = 'GP_ACCESS_EVENT_MODULE'

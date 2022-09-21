@@ -9,7 +9,7 @@ from orbitdata import OrbitData
 
 from messages import *
 from modules import  Module
-from utils import Container, SimClocks, SimulationConstants
+from utils import Container, SimClocks, EnvironmentModuleTypes
 import pandas as pd
 import base64
 
@@ -465,7 +465,7 @@ class EnvironmentServer(Module):
     """
 
     def __init__(self, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
-        super().__init__(SimulationConstants.ENVIRONMENT_SERVER_NAME.value, n_timed_coroutines=1)
+        super().__init__(EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, n_timed_coroutines=1)
         # Constants
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation

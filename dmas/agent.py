@@ -14,7 +14,7 @@ import zmq.asyncio
 import logging
 
 from messages import *
-from utils import SimClocks, Container, SimulationConstants
+from utils import SimClocks, Container, EnvironmentModuleTypes
 
 from modules import Module
 
@@ -118,7 +118,7 @@ class AgentClient(Module):
         Terminate processes 
         """
         self.log(f"Shutting down agent...", level=logging.INFO)
-        end_msg = AgentEndConfirmationMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value)
+        end_msg = AgentEndConfirmationMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value)
 
         self.log('Awaiting access to environment request socket...')
         await self.environment_request_lock.acquire()
@@ -384,7 +384,7 @@ class AgentClient(Module):
         self.log('Connection to environment established!')
         await self.environment_request_lock.acquire()
 
-        sync_req = SyncRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
+        sync_req = SyncRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
         await self.environment_request_socket.send_json(sync_req.to_json())
 
         self.log('Synchronization request sent. Awaiting environment response...')

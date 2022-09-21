@@ -6,7 +6,7 @@ import logging
 import random
 import time
 from messages import *
-from utils import SimulationConstants
+from utils import EnvironmentModuleTypes
 from messages import InternalMessage
 
 from utils import Container, SimClocks
@@ -62,7 +62,7 @@ class Module:
         try:
             self.log('Starting module coroutines...', level=logging.INFO)
             # create coroutine tasks
-            coroutines = []
+            coroutines : list = []
 
             ## Internal coroutines
             routine_task = asyncio.create_task(self.coroutines())
@@ -75,6 +75,7 @@ class Module:
 
             ## Submodule coroutines
             for submodule in self.submodules:
+                submodule : Module
                 task = asyncio.create_task(submodule.run())
                 task.set_name (f'{self.name}_run')
                 coroutines.append(task)
@@ -85,11 +86,13 @@ class Module:
             done_name = None
             for coroutine in coroutines:
                 if coroutine not in pending:
+                    coroutine : asyncio.Task
                     done_name = coroutine.get_name()
 
             # cancell all other coroutine tasks
             self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
             for subroutine in pending:
+                subroutine : asyncio.Task
                 subroutine.cancel()
                 await subroutine
             return
@@ -97,6 +100,7 @@ class Module:
         except asyncio.CancelledError: 
             self.log('Cancelling all coroutines...')
             for subroutine in coroutines:
+                subroutine : asyncio.Task
                 subroutine.cancel()
                 await subroutine
             return
@@ -295,7 +299,7 @@ class Module:
                 # if the clock is server-step, then submit a tic request to environment
                 t_req = self.sim_time.level + delay 
 
-                tic_msg = TicRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, t_req)
+                tic_msg = TicRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, t_req)
                 await self.submit_environment_message(tic_msg, module_name)
 
                 await self.sim_time.when_geq_than(t_req)

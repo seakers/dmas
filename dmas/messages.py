@@ -4,7 +4,7 @@ import json
 from re import T
 from unittest import result
 
-from utils import SimulationConstants
+from utils import EnvironmentModuleTypes, TaskStatus
 
 """
 ------------------------
@@ -277,7 +277,7 @@ class AccessSenseMessage(NodeMessage):
         result:
             result from sensing if the agent is accessing the target
         """
-        super().__init__(src, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, _type)
+        super().__init__(src, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, _type)
         self.target = target
         self.result = result
 
@@ -504,7 +504,7 @@ class AgentSenseMessage(NodeMessage):
         eclipse:
             eclipse state of the source node (result from sensing)
         """
-        super().__init__(src, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, NodeMessageTypes.AGENT_INFO_SENSE)
+        super().__init__(src, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, NodeMessageTypes.AGENT_INFO_SENSE)
         self.internal_state = internal_state
 
         self.pos = []
@@ -1354,92 +1354,105 @@ class InternalMessage:
         self.dst_module = dst_module 
         self.content = content
 
+    def generate_response(self):
+        return InternalMessage(src_module=self.dst_module, dst_module=self.src_module, content=self.content)
 
-"""
--------------------------------
-MODULE INSTRUCTIONS
--------------------------------
-"""
-class InstructionStatus(Enum):
-    """
-    Describes the state of an instruction being performed by a module
-    """
-    PENDING = 'PENDING'
-    IN_PROCESS = 'IN_PROCESS'
-    DONE = 'DONE'
-    ABORTED = 'ABORTED'
-
-"""
--------------------------------
-COMPONENT INSTRUCTIONS
--------------------------------
-"""
-class ComponentInstruction:
-    def __init__(self, component: str, instruction_status : InstructionStatus = InstructionStatus.PENDING) -> None:
+class ComponentStateMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, state) -> None:
         """
-        Abstract component instruction class meant to communicate an instruction to a specific component
+        Inter module communicating the state of a module to another
+        """
+        super().__init__(src_module, dst_module, state)
+
+"""
+-------------------------------
+MODULE TASKS
+-------------------------------
+"""
+
+"""
+COMPONENT TASKS
+"""
+class ComponentTask:
+    def __init__(self, component: str, task_status : TaskStatus = TaskStatus.PENDING) -> None:
+        """
+        Abstract component task class meant to communicate a task to be performed by a specific component
 
         component:
-            Name of component to perform instruction
-        instruction_status:
-            Initial instruction status
+            Name of component to perform the task
+        task_status:
+            Initial task status
         """
         self.component : str = component
-        self._instruction_status : InstructionStatus = instruction_status
+        self._task_status : TaskStatus = task_status
     
-    def set_instruction_status(self, status: InstructionStatus):
+    def set_status(self, status: TaskStatus):
         """
-        Sets the status of the instruction being performed
+        Sets the status of the task being performed
         """
-        self._instruction_status = status
+        self._task_status = status
 
-class ComponentActuationInstruction(ComponentInstruction):
-    def __init__(self, component: str, component_status: bool) -> None:
+    def get_status(self):
         """
-        Actuates a specific component
+        returns the status of the task being performed
+        """
+        return self._task_status
+
+class ComponentActuationTask(ComponentTask):
+    def __init__(self, component: str, actuation_status: bool) -> None:
+        """
+        Tasks a specific component to actuate on or off
 
         component:
             Name of component to be actuated
-        status:
-            Status of the component to be set by this instruction. 
-            True for turning ON the component and False for turning OFF the component
+        actuation_status:
+            Status of the component actuation to be set by this task. 
+            True for turning the component ON and False for turning the component OFF
         """
         super().__init__(component)
-        self.component_status : bool = component_status
-
+        self.component_status : bool = actuation_status
 
 """
--------------------------------
-SUBSYSTEM INSTRUCTIONS
--------------------------------
+COMPONENT TASK MESSAGES
 """
-class SubsystemInstruction:
-    def __init__(self, subsystem: str, instruction_status : InstructionStatus = InstructionStatus.PENDING) -> None:
+class ComponentTaskMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, task: ComponentTask) -> None:
         """
-        Abstract subsystem instruction class meant to communicate an instruction to a particular subsystem
+        Intermodule message carrying a component task
+        """
+        super().__init__(src_module, dst_module, task)
+
+    def get_task(self) -> ComponentTask:
+        return self.content
+
+"""
+SUBSYSTEM TASK
+"""
+class SubsystemTask:
+    def __init__(self, subsystem: str, task_status : TaskStatus = TaskStatus.PENDING) -> None:
+        """
+        Abstract subsystem task class meant to communicate a task to be performed by a particular subsystem
 
         subsystem:
-            Name of subsystem to perform instruction
-        instruction_status:
-            Initial instruction status
+            Name of subsystem to perform the task
+        task_status:
+            Initial task status
         """
         self.subsystem : str = subsystem
-        self._instruction_status : InstructionStatus = instruction_status
+        self._task_status : TaskStatus = task_status
     
-    def set_instruction_status(self, status: InstructionStatus):
+    def set_task_status(self, status: TaskStatus):
         """
-        Sets the status of the instruction being performed
+        Sets the status of the task being performed
         """
-        self._instruction_status = status
+        self._task_status = status
 
 """
--------------------------------
-COMPONENT INSTRUCTION MESSAGES
--------------------------------
+SUBSYSTEM TASK MESSAGES
 """
-class ComponentInstructionMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, instruction: ComponentInstruction) -> None:
+class SubsystemTaskMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, task: SubsystemTask) -> None:
         """
-        Intermodule message carrying a component instruction
+        Intermodule message carrying a subsystem task
         """
-        super().__init__(src_module, dst_module, instruction)
+        super().__init__(src_module, dst_module, task)

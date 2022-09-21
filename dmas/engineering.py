@@ -7,6 +7,7 @@ from utils import *
 from modules import Module
 
 """
+--------------------------------------------------------
  ________  ___  ___  ________  ________       ___    ___ ________  _________  _______   _____ ______      
 |\   ____\|\  \|\  \|\   __  \|\   ____\     |\  \  /  /|\   ____\|\___   ___\\  ___ \ |\   _ \  _   \    
 \ \  \___|\ \  \\\  \ \  \|\ /\ \  \___|_    \ \  \/  / | \  \___|\|___ \  \_\ \   __/|\ \  \\\__\ \  \   
@@ -24,51 +25,60 @@ from modules import Module
    \ \__\    \ \__\ \_______\ \_______\ \_______\ \_______\ \_______\____\_\  \ 
     \|__|     \|__|\|_______|\|_______|\|_______|\|_______|\|_______|\_________\
                                                                     \|_________|
+--------------------------------------------------------
 """
-class ComponentStatus(Enum):
-    NOMINAL = 'NOMINAL'
-    DISABLED = 'DISABLED'
-    CRITIAL = 'CRITICAL'
-    FAILURE = 'FAILURE'
 
+"""
+-------------------------------
+CCOMPONENT MODULES
+-------------------------------
+"""
 class ComponentModule(Module):
     def __init__(self, name: str,  
                 f_update: float, 
-                average_power_usage: Union[int, float], 
+                average_power_usage: float, 
                 parent_subsystem: str, 
                 n_timed_coroutines: int,
+                health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.DISABLED) -> None:
         """
         Describes a generic component of an agent's platform.
         """
         super().__init__(name, parent_subsystem, [], n_timed_coroutines)
-        self.average_power_usage = average_power_usage
-        self.F_UPDATE = f_update
-        self.t_update = 0
-        self.status = status
+        self.average_power_usage : float = average_power_usage
+        self.F_UPDATE : float = f_update
+        self.t_update : float = 0.0
+        self.health : ComponentHealth = health
+        self.status : ComponentStatus = status
 
     async def activate(self):
         await super().activate()
 
-        # state status events
-        self.nominal = asyncio.Event()
-        self.disabled = asyncio.Event()
+        # component state events
+        self.nominal = asyncio.Event() 
         self.critical = asyncio.Event()
         self.failure = asyncio.Event()
+
+        self.enabled = asyncio.Event()       
+        self.disabled = asyncio.Event()
+
         self.updated = asyncio.Event()
 
         # trigger state events
-        if self.status is ComponentStatus.NOMINAL:
+        if self.health is ComponentHealth.NOMINAL:
             self.nominal.set()
-        elif self.status is ComponentStatus.DISABLED:
-            self.disabled.set()
-        elif self.status is ComponentStatus.CRITIAL:
+        elif self.health is ComponentHealth.CRITIAL:
             self.critical.set()
-        elif self.status is ComponentStatus.FAILURE:
+        elif self.health is ComponentHealth.FAILURE:
             self.failure.set()
 
+        if self.status is ComponentStatus.ENABLED:
+            self.enabled.set()
+        elif self.status is ComponentStatus.DISABLED:
+            self.disabled.set()
+
         # initiate update time
-        self.t_update: Union[int, float] = self.get_current_time()
+        self.t_update : Union[int, float] = self.get_current_time()
 
         # initiate component properties
         await self.activate_properties()
@@ -84,9 +94,9 @@ class ComponentModule(Module):
         Activates event-loop-sensitive component properties such as containers and indicators.
         Base case only initiates power used by and power being fed to the component.
         """
-        self.power_usage = Container(level=0, capacity=self.average_power_usage)
-        self.power_in = Container()
-        self.dp = Container(level=self.power_in.level - self.power_usage.level)
+        self.power_usage = Container(level=0, capacity=self.average_power_usage)    # power currently being used by this component
+        self.power_in = Container(level=0)                                          # power currently being fed to this component
+        self.dp = Container(level=self.power_in.level - self.power_usage.level)     # curent difference between power in and power usage
 
     """
     --------------------
@@ -103,18 +113,78 @@ class ComponentModule(Module):
             if dst_name != self.name:
                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 await self.send_internal_message(msg)
-            elif not isinstance(msg, ComponentInstructionMessage):
-                self.log(f'Received internal messages of type {type(content)} and not of type {type(InternalMessage)}. Discarting message.')
-            else:
-                # this module is the intended receiver for this message. Handling message
-                content = msg.content
-                if not isinstance(content, ComponentInstruction):
-                    text = content.text_to_print
-                    self.log(text)    
+            elif self.failure.is_set():
+                # TODO add capability to recover component depending on instruction being given
+                # msg : ComponentInstructionMessage
+                # instruction = msg.get_instruction()
+                # instruction_status = await self.perform_troubleshooting_instruction(instruction)
+
+                self.log(f'Component is in failure state. Ignoring message...')
+            elif isinstance(msg, ComponentTaskMessage):
+                # unpackage instruction
+                self.log(f'Received Component Task message from \'{msg.src_module}\'!')
+                task = msg.get_task()
+                task_process = asyncio.create_task(self.perform_component_task(task))
+                conditions = [self.failure, task_process]
+
+                # perform instruction              
+                _, pending = await asyncio.wait(conditions, asyncio.FIRST_COMPLETED)
+
+                if self.failure in pending:
+                    # task completed
+                    task_status = TaskStatus.DONE
                 else:
-                    self.log(f'Internal messages with contents of type: {type(content)} not yet supported. Discarting message.')
+                    # failure state detected before task was completed, aborting task
+                    task_process.cancel()
+                    await task_process
+                    task_status = TaskStatus.ABORTED
+                task.set_status(task_status)
+
+                # communicate instruction status to instructor module 
+                self.log(f'Sending task performance message to \'{msg.src_module}\' with task status \'{task_status}\'.')
+                msg_resp = ComponentTaskMessage(self.name, msg.src_module, task)
+                await self.send_internal_message(msg_resp)
+
+            else:
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+            
         except asyncio.CancelledError:
             return
+
+    async def perform_component_task(self, task: ComponentTask) -> TaskStatus:
+        try:
+            # update component state
+            self.log(f'Starting task of type {type(task)}...')
+            await self.update()
+
+            # check if component was the intended performer of this task
+            if task.component != self.name:
+                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
+                raise asyncio.CancelledError
+
+            # perform task
+            if isinstance(task, ComponentActuationTask):                
+                if task.component_status:
+                    self.status = ComponentStatus.ENABLED
+                else:
+                    self.status = ComponentStatus.DISABLED
+                self.log(f'Component status set to {self.status.name}!')
+
+            elif isinstance(task, ComponentPowerSupplyTask):
+                await self.power_in.set_level(task.power_suppied)
+                self.log(f'Received power supply of {task.power_suppied}!')
+            else:
+                self.log(f'Task of type {type(task)} not yet supported. Aborting task...')
+                raise asyncio.CancelledError
+
+            # update component state 
+            self.log(f'Task of type {type(task)} successfully completed!')
+            await self.update()
+
+        except asyncio.CancelledError:
+            self.log(f'Task of type {type(task)} aborted!')
+            return
+    
 
     """
     --------------------
@@ -167,7 +237,6 @@ class ComponentModule(Module):
             await subroutine
         return
 
-    @abstractmethod
     async def periodic_update(self):
         """
         Performs periodic update of the component's state
@@ -180,19 +249,163 @@ class ComponentModule(Module):
         except asyncio.CancelledError:
             return
 
-    @abstractmethod
-    async def crit_monitor(self):
+    """
+    CRITICAL STATE MONITOR
+    """
+    async def crit_monitor(self) -> None:
         """
         Monitors component state and triggers critical event if a critical state is detected
+        """
+        try:
+            while True:
+                # check if failure event was triggered
+                if self.failure.is_set():
+                    # wait for component to be updated
+                    await self.updated  
+
+                # check if critical
+                elif self.is_critical():
+                    # erease critical timer object
+                    critical_timer = None
+
+                    # set current status to critical
+                    if not self.failure.is_set():
+                        self.health = ComponentHealth.CRITIAL
+
+                    # trigger critical state event if it hasn't been triggered already
+                    if not self.critical.is_set():
+                        self.critical.set()
+
+                    # communicate critical state to parent submodule
+                    state_msg = ComponentStateMessage(self.name, self.parent_module.name, self.get_state())
+                    await self.send_internal_message(state_msg)
+                    
+                    # wait for component to be updated
+                    await self.updated  
+
+                else:
+                    # reset critical event if it has been previously triggered
+                    if self.critical.is_set():
+                        self.critical.clear()
+
+                        if not self.failure.is_set():
+                            self.health = ComponentHealth.NOMINAL
+
+                    # initiate critical state timer
+                    critical_timer = asyncio.create_task(self.wait_for_critical())
+                    critical_timer.set_name (f'{self.name}_critical_timer')
+                    
+                    # wait for the critical timer to run out or for the component to update its state
+                    conditions = [self.updated, critical_timer]
+                    _, pending = await asyncio.wait(conditions, return_when=asyncio.FIRST_COMPLETED)
+
+                    if self.updated in pending:                 # critical timer ran out before agent updated its state                      
+                        while not self.is_critical():
+                            # if not critical, check periodically until critical state is detected
+                            dt = 1/self.SIMULATION_FREQUENCY
+                            await self.sim_wait(dt)                      
+                    else:                                       # component updated its state before critical timer ran out
+                        # interrupt critical timer and check again
+                        critical_timer.cancel()
+                        await critical_timer
+
+        except asyncio.CancelledError:
+            if critical_timer is not None:
+                critical_timer.cancel()
+                await critical_timer
+
+    @abstractmethod
+    def is_critical(self) -> bool:
+        """
+        Returns true if the current state of the component is critical
         """
         pass
 
     @abstractmethod
+    async def wait_for_critical(self) -> None:
+        """
+        Count downs to the next predicted critical state of this component given that the current configuration is maintained
+        """
+        try:
+            pass
+        except asyncio.CancelledError:
+            return
+
+    """
+    FAILURE STATE MONITOR
+    """
     async def failure_monitor(self):
         """
         Monitors component state and triggers failure event if a failure state is detected
         """
+        try:
+            while True: 
+                # check if in failure state
+                if self.is_failed():
+                    # erease failure timer object
+                    failure_timer = None
+
+                    # set current status to critical
+                    self.health = ComponentHealth.FAILURE
+
+                    # trigger failure state event if it hasn't been triggered already
+                    if not self.failure.is_set():
+                        self.failure.set()                   
+
+                        # communicate FAILURE state to parent submodule only if it hasn't been communicated already
+                        state_msg = ComponentStateMessage(self.name, self.parent_module.name, self.get_state())
+                        await self.send_internal_message(state_msg)
+                    
+                    # wait for component to be updated
+                    await self.updated  
+
+                else:
+                    # reset failure event if it has been previously triggered
+                    if self.failure.is_set():
+                        self.failure.clear()
+
+                        if not self.critical.is_set():
+                            self.health = ComponentHealth.NOMINAL
+                        else:
+                            self.health = ComponentHealth.CRITIAL
+
+                    # initiate critical state timer
+                    failure_timer = asyncio.create_task(self.wait_for_failure())
+                    failure_timer.set_name (f'{self.name}_failure_timer')
+                    
+                    # wait for the critical timer to run out or for the component to update its state
+                    conditions = [self.updated, failure_timer]
+                    done, _ = await asyncio.wait(conditions, return_when=asyncio.FIRST_COMPLETED)
+
+                    if failure_timer in done:                   # failure timer ran out before agent updated its state                      
+                        while not self.is_failed():
+                            # if not failed, check periodically until failure state is detected
+                            dt = 1/self.SIMULATION_FREQUENCY
+                            await self.sim_wait(dt)     
+                    else:                                       # component updated its state before critical timer ran out
+                        # interrupt critical timer and check again
+                        failure_timer.cancel()
+                        await failure_timer
+
+        except asyncio.CancelledError:
+            return
+
+    @abstractmethod
+    def is_failed(self) -> bool:
+        """
+        Returns true if the current state of the component is a failure state
+        """
         pass
+
+    @abstractmethod
+    async def wait_for_failure(self) -> None:
+        """
+        Count downs to the next predicted failure state of this component given that the current configuration is maintained
+        """
+        try:
+            pass
+        except asyncio.CancelledError:
+            return
 
     """
     --------------------
@@ -246,15 +459,18 @@ class ComponentModule(Module):
 
             if self.update_lock.locked() and acquired:
                 # if this process had acquired the update_lock and has not released it, then release
-                self.update_lock.release()
-               
+                self.update_lock.release()               
 
     async def update_properties(self, dt):
         """
         Updates the current state of the component given a time-step dt
         """
         try:
+            # update power differential tracker
             await self.dp.set_level(self.power_in.level - self.power_usage.level)
+
+            # log state
+            self.log_state()
         except asyncio.CancelledError:
             return
 
@@ -283,22 +499,25 @@ class ComponentModule(Module):
                 self.update_lock.release()
 
 
-class Instrument(ComponentModule):
-    def __init__(self, name: str, f_update: float, 
-                average_power_usage: Union[int, float], 
-                data_rate: Union[int, float], 
-                data_buffer_capacity: Union[int, float], 
-                parent_subsystem: str, n_timed_coroutines: int, 
-                status: ComponentStatus = ComponentStatus.DISABLED) -> None:
-        super().__init__(name, f_update, average_power_usage, parent_subsystem, n_timed_coroutines, status)
-        self.
+    def log_state(self) -> None:
+        return self.parent_module.log_state()
+
+# class Instrument(ComponentModule):
+#     def __init__(self, name: str, f_update: float, 
+#                 average_power_usage: Union[int, float], 
+#                 data_rate: Union[int, float], 
+#                 data_buffer_capacity: Union[int, float], 
+#                 parent_subsystem: str, n_timed_coroutines: int, 
+#                 status: ComponentHealth = ComponentHealth.DISABLED) -> None:
+#         super().__init__(name, f_update, average_power_usage, parent_subsystem, n_timed_coroutines, status)
+#         # self.
 
 
 class ComponentState:
     def __init__(self, name: str, component_type: type,
                 # power_in: float, power_consumed: float, power_generated: float, energy_stored: float, energy_capacity: float,
                 # data_rate_in: float, data_rate_generated: float, data_stored: float, data_capacity: float, 
-                status: ComponentStatus
+                status: ComponentHealth
                 ) -> None:
 
         # component info
@@ -306,17 +525,9 @@ class ComponentState:
         self.component_type = component_type
 
         # # power state
-        # self.power_in = power_in
-        # self.power_consumed = power_consumed
-        # self.power_generated = power_generated
-        # self.energy_stored = energy_stored
-        # self.energy_capacity = energy_capacity
-
-        # # data state 
-        # self.data_rate_in = data_rate_in
-        # self.data_rate_generated = data_rate_generated
-        # self.data_stored = data_stored
-        # self.data_capacity = data_capacity
+        self.power_in = self.power_in.level
+        self.power_consumed = self.power_consumed.level
+        self.dp = self.dp.level
 
         # component status
         self.status = status
@@ -327,6 +538,16 @@ class ComponentState:
 # class Battery(Component):
 #     def __init__(self, name, max_power_generation, power_storage_capacity, parent_subsystem) -> None:
 #         super().__init__(name, 0, max_power_generation, power_storage_capacity, 0, 0, parent_subsystem, n_timed_coroutines=1)
+
+"""
+-------------------------------
+SUBSYSTEM MODULES
+-------------------------------
+"""
+class SubsystemModule(Module):
+    def __init__(self, name, parent_module) -> None:
+        super().__init__(name, parent_module, [], n_timed_coroutines=1)
+        self.submodules = []
 
 """
 --------------------------------------------------------
