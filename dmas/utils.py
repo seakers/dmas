@@ -1,6 +1,5 @@
-from abc import abstractclassmethod
 import asyncio
-from enum import Enum, IntEnum
+from enum import Enum
 import random
 import numpy
 
@@ -37,6 +36,11 @@ class ComponentHealth(Enum):
     NOMINAL = 'NOMINAL'
     CRITIAL = 'CRITICAL'
     FAILURE = 'FAILURE'
+
+class ComponentNames(Enum):
+    IMU = 'IMU'
+    GPS = 'GPS'
+    SUN_SENSOR = 'SUN_SENSOR'
 
 class TaskStatus(Enum):
     """

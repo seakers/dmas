@@ -667,7 +667,7 @@ class SubModule(Module):
                             self.log(f'Access to {response.target}: {response.result}')
                             await self.sim_wait(1.1)
 
-                     # agent info req 
+                    # agent info req 
                     msg = AgentSenseMessage(src.name, dict())
                     self.log(f'Sending Agent Info sense message to Envirnment.')
                     response = await self.submit_environment_message(msg)

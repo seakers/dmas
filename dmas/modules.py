@@ -250,7 +250,7 @@ class Module:
                     return dst
             return None
 
-    def get_current_time(self):
+    def get_current_time(self) -> float:
         """
         Returns the current simulation time
         """
@@ -270,7 +270,7 @@ class Module:
         else:
             return self.parent_module.get_current_time()
 
-    def get_current_real_time(self):
+    def get_current_real_time(self) -> float:
         """
         Returns current time from the start of the simulation
         """
@@ -395,7 +395,29 @@ class Module:
         else:
             self.parent_module.log(content, level, module_name)
 
-    
+    # def log_state(self, content, level=logging.DEBUG, module_name=None):
+    #     if module_name is None:
+    #         module_name = self.name
+
+    #     if self.parent_module is None:
+    #         if self.name == module_name:
+    #             out = f'{module_name} @ T{self.get_current_time():.{3}f}: {content}'
+    #         else:
+    #             out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
+
+    #         if level == logging.DEBUG:
+    #             self.actions_logger.debug(out)
+    #         elif level == logging.INFO:
+    #             self.actions_logger.info(out)
+    #         elif level == logging.WARNING:
+    #             self.actions_logger.warning(out)
+    #         elif level == logging.ERROR:
+    #             self.actions_logger.error(out)
+    #         elif level == logging.CRITICAL:
+    #             self.actions_logger.critical(out)
+    #     else:
+    #         self.parent_module.log_state(content, level, module_name)
+
 class ModuleInstruction:
     def __init__(self, target: Module, t_start: float, t_end: float) -> None:
         self.target = target

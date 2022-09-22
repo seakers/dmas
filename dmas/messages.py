@@ -489,7 +489,7 @@ class GndPntAccessSenseMessage(AccessSenseMessage):
         return GndPntAccessSenseMessage.from_dict(json.loads(d))
 
 class AgentSenseMessage(NodeMessage):
-    def __init__(self, src: str, internal_state: dict, pos: list=[None, None, None], vel: list=[None, None, None], eclipse: bool=None) -> None:
+    def __init__(self, src: str, internal_state: dict = dict(), pos: list=[None, None, None], vel: list=[None, None, None], eclipse: bool=None) -> None:
         """
         Message from an agent node to the environment asking to be informed about its current position, velocity, and eclipse state
 
@@ -1411,6 +1411,14 @@ class ComponentActuationTask(ComponentTask):
         """
         super().__init__(component)
         self.component_status : bool = actuation_status
+
+class ComponentPowerSupplyTask(ComponentTask):
+    def __init__(self, component: str, power_supplied : float) -> None:
+        """
+        Tasks a specific component to receive a finite amount of power defined by this task
+        """
+        super().__init__(component)
+        self.power_suppied = power_supplied
 
 """
 COMPONENT TASK MESSAGES
