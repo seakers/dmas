@@ -18,3 +18,5 @@ instrupy/*
 orbitpy
 orbitpy/*
 .vscode/*
+.DS_Store
+*.pyc

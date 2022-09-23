@@ -7,7 +7,7 @@ from messages import *
 from neo4j import GraphDatabase
 
 class PlanningModule(Module):
-    def __init__(self, name, parent_module, scenario_dir, submodules=[], n_timed_coroutines=2) -> None:
+    def __init__(self, name, parent_module, scenario_dir, submodules=[], n_timed_coroutines=3) -> None:
         self.scenario_dir = scenario_dir
         super().__init__(name, parent_module, submodules, n_timed_coroutines)
         self.submodules = [
@@ -45,7 +45,7 @@ class InstrumentCapabilityModule(Module):
         self.to_be_sent = False
         self.msg_content = None
         super().__init__('Instrument Capability Module', parent_module, submodules=[],
-                         n_timed_coroutines=0)
+                         n_timed_coroutines=2)
 
     async def activate(self):
         await super().activate()
@@ -64,20 +64,23 @@ class InstrumentCapabilityModule(Module):
     async def coroutines(self):
         self.log("Running instrument capability module coroutines")
         check_database = asyncio.create_task(self.check_database())
-        broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
+        #broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
         await check_database
-        await broadcast_meas_req
+        self.log("1")
         check_database.cancel()
-        broadcast_meas_req.cancel()
+        self.log("2")
+        #await broadcast_meas_req
+        self.log("3")
+        #broadcast_meas_req.cancel()
         self.log("Finished instrument capability module coroutines")
 
 
     async def broadcast_meas_req(self):
         try:
             while True:
-                self.log(f'in broadcast_meas_req in instrument capability module')
+                self.log(f'In broadcast meas req')
                 if self.to_be_sent:
-                    self.log(f'Broadcasting measurement request')
+                    self.log(f'In self to be sent')
                     msg = InternalMessage(self.name, "MCCBA Module", self.msg_content)
                     await self.parent_module.send_internal_message(msg)
                     self.to_be_sent = False
@@ -109,9 +112,7 @@ class InstrumentCapabilityModule(Module):
     def print_observers(self,driver,sc_name):
         with driver.session() as session:
             observers = session.read_transaction(self.get_observers, title="Ocean chlorophyll concentration")
-            self.log(f'In print observers!')
             for observer in observers:
-                print(observer.get("name"))
                 if(observer.get("name") == sc_name):
                     self.log(f'Matching instrument!')
                     self.to_be_sent = True

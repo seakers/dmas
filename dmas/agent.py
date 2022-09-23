@@ -18,7 +18,7 @@ import zmq.asyncio
 import logging
 
 from messages import *
-from utils import SimClocks, Container, SimulationConstants
+from utils import SimClocks, Container, EnvironmentModuleTypes
 
 from modules import Module
 
@@ -122,7 +122,7 @@ class AgentClient(Module):
         Terminate processes 
         """
         self.log(f"Shutting down agent...", level=logging.INFO)
-        end_msg = AgentEndConfirmationMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value)
+        end_msg = AgentEndConfirmationMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value)
 
         self.log('Awaiting access to environment request socket...')
         await self.environment_request_lock.acquire()
@@ -204,43 +204,6 @@ class AgentClient(Module):
         """
         try:
             while True:
-                # msg_string = await self.environment_broadcast_socket.recv_json()
-                # msg = json.loads(msg_string)
-
-                # src = msg['src']
-                # dst = msg['dst']
-                # msg_type = msg['@type']
-                # t_server = msg['server_clock']
-
-                # self.message_logger.info(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-                # self.log(f'Received message of type {msg_type} from {src} intended for {dst} with server time of t={t_server}!')
-
-                # if self.name == dst or 'all' == dst:
-                #     # broadcast intended for this or all agents
-
-                #     msg_type = BroadcastTypes[msg_type]
-                #     if msg_type is BroadcastTypes.SIM_END_EVENT:
-                        # # if simulation end broadcast is received, terminate agent.
-                        # self.log('Simulation end broadcast received! Terminating agent...', level=logging.INFO)
-
-                        # return
-
-                #     elif msg_type is BroadcastTypes.TIC_EVENT:
-                        # if (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
-                        #     or self.CLOCK_TYPE == SimClocks.SERVER_TIME
-                        #     or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
-                            
-                        #     # use server clock broadcasts to update internal clock
-                        #     self.message_logger.info(f'Updating internal clock.')
-                        #     await self.sim_time.set_level(t_server)
-                        #     self.log('Updated internal clock.')
-
-                #     else:
-                #         self.handle_broadcast(msg)
-                # else:
-                    # # broadcast was intended for someone else, discarding
-                    # self.log('Broadcast not intended for this agent. Discarding message...')
-
                 broadcast_json = await self.environment_broadcast_socket.recv_json()
 
                 broadcast_dict = json.loads(broadcast_json)
@@ -279,11 +242,11 @@ class AgentClient(Module):
                     #     pass
 
                     # elif broadcast_type is BroadcastMessageTypes.GP_ACCESS_EVENT:
-                    #     broadcast = GndPointAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     broadcast = GndPntAccessEventBroadcastMessage.from_dict(broadcast_msg)
                     #     pass
 
                     # elif broadcast_type is BroadcastMessageTypes.GS_ACCESS_EVENT:
-                    #     broadcast = GndStationAccessEventBroadcastMessage.from_dict(broadcast_msg)
+                    #     broadcast = GndStnAccessEventBroadcastMessage.from_dict(broadcast_msg)
                     #     pass
 
                     # elif broadcast_type is BroadcastMessageTypes.AGENT_ACCESS_EVENT:
@@ -304,6 +267,40 @@ class AgentClient(Module):
         """
         Listens for messages from other agents. Stops processes when simulation end-command is received.
         """
+        async def reception_worker(self, msg_in: dict):
+            """
+            Handles received message according to its type
+            """
+            try:            
+                msg_type = NodeMessageTypes[[msg_in['@type']]]
+                msg_src = msg_in['src']
+                msg_dst = msg_in['dst']
+
+                #TODO check for format of message being sent?
+
+                self.message_logger.info(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
+                self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
+
+                if self.name == msg_dst:
+                    if msg_type is NodeMessageTypes.PRINT_REQUEST:
+                        msg = PrintRequestMessage.from_dict(msg_in)
+                        self.log(f'Print instruction received with content: \'{msg.content}\'')
+
+                        # send reception confirmation to sender agent
+                        await self.send_blanc_response()
+                    else:
+                        # if request does not match any of the standard request format, dump and continue
+                        self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
+
+                        # send reception confirmation to sender agent
+                        await self.send_blanc_response()
+
+                else:
+                    # message was intended for someone else, discard message
+                    self.log('Inter agent message not intended for this agent. Discarding message...')
+            except asyncio.CancelledError:
+                await self.send_blanc_response()
+
         try:            
             self.log('Acquiring access to agent-in port...')
             await self.agent_socket_in_lock.acquire()
@@ -313,21 +310,21 @@ class AgentClient(Module):
                 msg_in = None
                 worker_task = None
 
-                # listen for requests
-                self.log('Waiting for agent requests.')
+                # listen for messages from other agents
+                self.log('Waiting for agent messages...')
                 msg_in = await self.agent_socket_in.recv_json()
-                self.log(f'Request received!')
+                self.log(f'Agent message received!')
                 
                 # handle request
-                self.log(f'Handling agent request...')
-                worker_task = asyncio.create_task(self.reception_worker(msg_in))
+                self.log(f'Handling agent message...')
+                worker_task = asyncio.create_task(reception_worker(msg_in))
                 await worker_task
-                self.log(f'Agent request handled')
+                self.log(f'Agent message handled.')
 
         except asyncio.CancelledError:
             if msg_in is not None:
                 self.log('Sending blank response...')
-                await self.agent_socket_in.send_string('')
+                await self.send_blanc_response()
             elif worker_task is not None:
                 self.log('Cancelling response...')
                 worker_task.cancel()
@@ -339,46 +336,12 @@ class AgentClient(Module):
 
                 evnt = await poller.poll(1000)
                 if len(evnt) > 0:
-                    self.log('Agent request message received during shutdown process. Sending blank response..')
-                    await self.agent_socket_in.send_string('')
+                    self.log('Agent message received during shutdown process. Sending blank response..')
+                    await self.send_blanc_response()
 
             self.log('Releasing agent-in port...')
             self.agent_socket_in_lock.release()
             return
-
-    async def reception_worker(self, msg_in: dict):
-        """
-        Handles received message according to its type
-        """
-        try:            
-            msg_type = InterNodeMessageTypes[[msg_in['@type']]]
-            msg_src = msg_in['src']
-            msg_dst = msg_in['dst']
-
-            #TODO check for format of message being sent?
-
-            self.message_logger.info(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
-            self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
-
-            if self.name == msg_dst:
-                if msg_type is InterNodeMessageTypes.PRINT_REQUEST:
-                    msg = PrintRequestMessage.from_dict(msg_in)
-                    self.log(msg.content)
-
-                    # send reception confirmation to sender agent
-                    await self.agent_socket_in.send_string('')
-                else:
-                    # if request does not match any of the standard request format, dump and continue
-                    self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
-
-                    # send reception confirmation to sender agent
-                    await self.agent_socket_in.send_string('')
-
-            else:
-                # message was intended for someone else, discard message
-                self.log('Inter agent message not intended for this agent. Discarding message...')
-        except asyncio.CancelledError:
-            await self.agent_socket_in.send_string('')
 
     """
     --------------------
@@ -425,7 +388,7 @@ class AgentClient(Module):
         self.log('Connection to environment established!')
         await self.environment_request_lock.acquire()
 
-        sync_req = SyncRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
+        sync_req = SyncRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
         await self.environment_request_socket.send_json(sync_req.to_json())
 
         self.log('Synchronization request sent. Awaiting environment response...')
@@ -495,6 +458,8 @@ class AgentClient(Module):
 
         logging.root.setLevel(logging.NOTSET)
         logging.basicConfig(level=logging.NOTSET)
+        logging.getLogger("neo4j").setLevel(logging.CRITICAL)
+        logging.getLogger("PIL.PngImagePlugin").setLevel(logging.CRITICAL)
         
         logger_names = ['agent_messages', 'env_requests', 'measurements', 'state', 'actions']
 
@@ -532,7 +497,7 @@ class AgentClient(Module):
             loggers.append(logger)
         return loggers
                 
-    async def environment_message_submitter(self, msg: InterNodeMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
         try:
             msg_type = msg.get_type()
             self.log(f'Submitting a request of type {msg_type}.')
@@ -651,6 +616,11 @@ class AgentClient(Module):
         self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
         self.log(f'Disconnected from agent {dst}!')
 
+    async def send_blanc_response(self):
+        blanc = dict()
+        blanc_json = json.dumps(blanc)
+        await self.agent_socket_out.send_json(blanc_json)
+
 class AgentState:
     def __init__(self, agent: AgentClient, component_list) -> None:
         pass
@@ -724,7 +694,7 @@ class SubModule(Module):
                             self.log(f'Access to {response.target}: {response.result}')
                             await self.sim_wait(1.1)
 
-                     # agent info req 
+                    # agent info req 
                     msg = AgentSenseMessage(src.name, dict())
                     self.log(f'Sending Agent Info sense message to Envirnment.')
                     response = await self.submit_environment_message(msg)
@@ -733,7 +703,7 @@ class SubModule(Module):
                         self.log(f'Current state: pos:{response.pos}, vel=[{response.vel}], eclipse={response.eclipse}')
                         await self.sim_wait(1.1)
 
-                    lat, lon = 69.927615, -112.3046
+                    lat, lon = 45.590934, 47.716708
                     obs = "radiances"
                     msg = ObservationSenseMessage(src.name, lat, lon, obs)
                     self.log(f'Sending Observation Sense message to Environment.')

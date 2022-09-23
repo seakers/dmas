@@ -58,7 +58,7 @@ class ScienceModule(Module):
         data_product_dict["filepath"] = filepath
         pd.write_csv(filepath,data)
         self.data_products.append(data_product_dict)
-        with open('dataprod'+lat+lon+time+product_type+'.txt') as datafile:
+        with open('./scenarios/sim_test/results/sd/dataprod'+lat+lon+time+product_type+'.txt') as datafile:
             datafile.write(json.dumps(data_product_dict))
 
     async def activate(self):
@@ -91,6 +91,7 @@ class ScienceValueModule(Module):
     def __init__(self, parent_module, sd) -> None:
         self.sd = sd
         self.to_be_sent = False
+        self.to_be_valued = False
         self.request_msg = None
         super().__init__('Science Value Module', parent_module, submodules=[],
                          n_timed_coroutines=0)
@@ -107,6 +108,7 @@ class ScienceValueModule(Module):
         try:
             self.log(f'Internal message handler in science value module')
             self.to_be_sent = True
+            self.to_be_valued = True
             self.request_msg = msg
             # dst_name = msg['dst']
             # if dst_name != self.name:
@@ -123,23 +125,45 @@ class ScienceValueModule(Module):
         except asyncio.CancelledError:
             return
 
+    # async def coroutines(self):
+    #     self.log("Running Science Value module coroutines")
+    #     compute_science_value = asyncio.create_task(self.compute_science_value())
+    #     await compute_science_value
+    #     compute_science_value.cancel()
+    #     broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
+    #     await broadcast_meas_req
+    #     broadcast_meas_req.cancel()
+    #     self.log("Completed science value module coroutines")
+
     async def coroutines(self):
+        """
+        Executes list of coroutine tasks to be executed by the science value module. These coroutine task incluide:
+        """
         self.log("Running Science Value module coroutines")
-        # compute_science_value = asyncio.create_task(self.compute_science_value())
-        # await compute_science_value
-        # compute_science_value.cancel()
+        compute_science_value = asyncio.create_task(self.compute_science_value())
+        compute_science_value.set_name('compute_science_value')
         broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
-        await broadcast_meas_req
-        broadcast_meas_req.cancel()
-        self.log("Completed science value module coroutines")
+        broadcast_meas_req.set_name('broadcast_meas_req')
+        routines = [compute_science_value, broadcast_meas_req]
+
+        _, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
+
+        done_name = None
+        for coroutine in routines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+        self.log(f"{done_name} completed!")
+
+        for p in pending:
+            self.log(f"Terminating {p.get_name()}...")
+            p.cancel()
+            await p
 
 
     async def broadcast_meas_req(self):
         try:
             while True:
-                self.log(f'in broadcast_meas_req')
-                if self.to_be_sent:
-                    self.log(f'Broadcasting measurement request')
+                if self.to_be_sent and not self.to_be_valued:
                     msg = InternalMessage(self.name, "Instrument Capability Module", self.request_msg)
                     await self.parent_module.send_internal_message(msg)
                     self.to_be_sent = False
@@ -158,19 +182,33 @@ class ScienceValueModule(Module):
     async def compute_science_value(self):
         try:
             while True:
-                for i in range(len(self.prop_meas_obs_metrics)):
-                    if(self.prop_meas_obs_metrics[i]['result'] == None):
-                        obs = self.prop_meas_obs_metrics[i]
-                        dataprod = get_data_product(self.sd,obs["lat"],obs["lon"],obs["time"],obs["product_type"])
-                        result = 1.0 # CHANGE THIS TO ACTUAL CALC
-                        self.announce_computed_science_value(self.prop_meas_obs_metrics[i],result)
-                        self.log("Computed science value")
-                    else:
-                        self.prop_meas_obs_metrics.pop(i)
+                if self.to_be_valued:
+                    points = np.zeros(shape=(2000, 5))
+                    content = self.request_msg.content
+                    with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+                        reader = csv.reader(csvfile)
+                        count = 0
+                        for row in reader:
+                            if count == 0:
+                                count = 1
+                                continue
+                            points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                            count = count + 1
+                    pop = self.get_pop(content["lat"], content["lon"], points)
+                    content["value"] = pop
+                    self.request_msg.content = content
+                    self.to_be_valued = False
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
+    def get_pop(self, lat, lon, points):
+        pop = 0.0
+        for i in range(len(points[:, 0])):
+            if (float(lat)-points[i, 1] < 0.01) and (float(lon) - points[i, 0] < 0.01):
+                pop = points[i,4]
+                break
+        return pop
 
 
 
@@ -221,9 +259,9 @@ class OnboardProcessingModule(Module):
                     lat = meas_result.lat
                     lon = meas_result.lon
                     self.log(f'Received measurement result from ({lat}°, {lon}°)!')
-                    b4,b5,stored_data_filepath = self.store_measurement(meas_result.obs)
+                    b4,b5,prefix,stored_data_filepath = self.store_measurement(meas_result.obs)
                     processed_data = self.compute_chlorophyll_obs_value(b4,b5)
-                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a","chla_"+stored_data_filepath,processed_data)
+                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
                     # if(self.meas_results[i]["level"] == 0):
                     #     data = self.meas_results[i]
                     #     processed_data = self.compute_chlorophyll_obs_value(data)
@@ -238,9 +276,6 @@ class OnboardProcessingModule(Module):
         im = Image.open(BytesIO(base64.b64decode(dataprod)))
 
         img_np = np.array(im)
-        print(img_np.shape)
-        print(img_np[:,:,1])
-        print(img_np[:,:,2])
         b5 = img_np[:,:,0]
         b4 = img_np[:,:,1]
         img_np = np.delete(img_np,3,2)
@@ -253,8 +288,9 @@ class OnboardProcessingModule(Module):
         value = np.hstack([pixel_numbers, xy_coords, rgb])
 
         # Properly save as CSV
-        np.savetxt("outputdata.csv", value, delimiter='\t', fmt='%4d')
-        return b4, b5, "outputdata.csv"
+        prefix = "./scenarios/sim_test/results/sd/"
+        np.savetxt(prefix+"outputdata.csv", value, delimiter='\t', fmt='%4d')
+        return b4, b5, prefix, "outputdata.csv"
 
     def compute_chlorophyll_obs_value(self,b4,b5):
         bda = b5 - b5/b4 + b4
@@ -269,7 +305,7 @@ class OnboardProcessingModule(Module):
         data_product_dict["filepath"] = filepath
         pd.DataFrame(data).to_csv(filepath,index=False,header=False)
         sd.append(data_product_dict)
-        with open("dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
+        with open("./scenarios/sim_test/results/sd/dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
             datafile.write(json.dumps(data_product_dict))
         return sd
 
@@ -347,33 +383,31 @@ class ScienceReasoningModule(Module):
         mean = 0.0
         sd = 0.0
         for i in range(len(points[:, 0])):
-            if (float(lat)-points[i, 1] < 0.01) and (float(lon) - points[i, 0] < 0.01):
+            if (float(lat)-points[i, 0] < 0.01) and (float(lon) - points[i, 1] < 0.01):
                 mean = points[i, 2]
                 sd = points[i, 3]
-                lat = points[i, 1]
-                lon = points[i, 0]
+                lat = points[i, 0]
+                lon = points[i, 1]
                 break
         return mean, sd, lat, lon
 
     async def check_chlorophyll_outliers(self,sd):
         try:
             while True:
-                points = np.zeros(shape=(2000, 4))
+                points = np.zeros(shape=(2000, 5))
                 chlorophyll_outliers = []
-                with open('/home/ben/repos/dmaspy/scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+                with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
                     reader = csv.reader(csvfile)
                     count = 0
                     for row in reader:
                         if count == 0:
                             count = 1
                             continue
-                        points[count-1,:] = [row[0], row[1], row[2], row[3]]
+                        points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
                         count = count + 1
                 for item in sd:
                     mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
                     pixel_value = self.get_pixel_value_from_image(item,lat,lon,30)
-                    print("pixel_value: "+str(pixel_value))
-                    print("mean+stddev" + str(mean+stddev))
                     pixel_value = 100000
                     if pixel_value > mean+stddev:
                         item["severity"] = (pixel_value-mean) / stddev

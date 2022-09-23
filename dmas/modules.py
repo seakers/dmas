@@ -6,7 +6,7 @@ import logging
 import random
 import time
 from messages import *
-from utils import SimulationConstants
+from utils import EnvironmentModuleTypes
 from messages import InternalMessage
 
 from utils import Container, SimClocks
@@ -62,7 +62,7 @@ class Module:
         try:
             self.log('Starting module coroutines...', level=logging.INFO)
             # create coroutine tasks
-            coroutines = []
+            coroutines : list = []
 
             ## Internal coroutines
             routine_task = asyncio.create_task(self.coroutines())
@@ -75,6 +75,7 @@ class Module:
 
             ## Submodule coroutines
             for submodule in self.submodules:
+                submodule : Module
                 task = asyncio.create_task(submodule.run())
                 task.set_name (f'{self.name}_run')
                 coroutines.append(task)
@@ -85,11 +86,13 @@ class Module:
             done_name = None
             for coroutine in coroutines:
                 if coroutine not in pending:
+                    coroutine : asyncio.Task
                     done_name = coroutine.get_name()
 
             # cancell all other coroutine tasks
             self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
             for subroutine in pending:
+                subroutine : asyncio.Task
                 subroutine.cancel()
                 await subroutine
             return
@@ -97,6 +100,7 @@ class Module:
         except asyncio.CancelledError: 
             self.log('Cancelling all coroutines...')
             for subroutine in coroutines:
+                subroutine : asyncio.Task
                 subroutine.cancel()
                 await subroutine
             return
@@ -167,7 +171,7 @@ class Module:
     async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly. By default it only handles messages
-        of the type 
+        of the type 'PrintInstruction'.
         """
         try:
             # dst_name = msg['dst']
@@ -212,7 +216,6 @@ class Module:
         """
         if not isinstance(msg, InternalMessage):
             raise TypeError('Attepmting to send a message of an unknown type')
-        self.log(f'Sending internal message!')
 
         await self.inbox.put(msg)
 
@@ -247,7 +250,7 @@ class Module:
                     return dst
             return None
 
-    def get_current_time(self):
+    def get_current_time(self) -> float:
         """
         Returns the current simulation time
         """
@@ -267,7 +270,7 @@ class Module:
         else:
             return self.parent_module.get_current_time()
 
-    def get_current_real_time(self):
+    def get_current_real_time(self) -> float:
         """
         Returns current time from the start of the simulation
         """
@@ -296,7 +299,7 @@ class Module:
                 # if the clock is server-step, then submit a tic request to environment
                 t_req = self.sim_time.level + delay 
 
-                tic_msg = TicRequestMessage(self.name, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, t_req)
+                tic_msg = TicRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, t_req)
                 await self.submit_environment_message(tic_msg, module_name)
 
                 await self.sim_time.when_geq_than(t_req)
@@ -325,13 +328,13 @@ class Module:
             await self.parent_module.sim_wait_to(t, module_name) 
 
     @abstractmethod
-    async def environment_message_submitter(self, msg: InterNodeMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
         """
         submitts a request of any type to the environment
         """
         pass
 
-    async def submit_environment_message(self, msg: InterNodeMessage, module_name: str=None):
+    async def submit_environment_message(self, msg: NodeMessage, module_name: str=None):
         """
         submits environment request and returns response from environment server
         """
@@ -392,7 +395,29 @@ class Module:
         else:
             self.parent_module.log(content, level, module_name)
 
-    
+    # def log_state(self, content, level=logging.DEBUG, module_name=None):
+    #     if module_name is None:
+    #         module_name = self.name
+
+    #     if self.parent_module is None:
+    #         if self.name == module_name:
+    #             out = f'{module_name} @ T{self.get_current_time():.{3}f}: {content}'
+    #         else:
+    #             out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
+
+    #         if level == logging.DEBUG:
+    #             self.actions_logger.debug(out)
+    #         elif level == logging.INFO:
+    #             self.actions_logger.info(out)
+    #         elif level == logging.WARNING:
+    #             self.actions_logger.warning(out)
+    #         elif level == logging.ERROR:
+    #             self.actions_logger.error(out)
+    #         elif level == logging.CRITICAL:
+    #             self.actions_logger.critical(out)
+    #     else:
+    #         self.parent_module.log_state(content, level, module_name)
+
 class ModuleInstruction:
     def __init__(self, target: Module, t_start: float, t_end: float) -> None:
         self.target = target
