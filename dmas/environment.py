@@ -792,14 +792,15 @@ class EnvironmentServer(Module):
                     # unpackage message
                     observation_sense_msg = ObservationSenseMessage.from_dict(d)
 
-                    lat, lon = observation_sense_msg.target
+                    lat = observation_sense_msg.lat
+                    lon = observation_sense_msg.lon
                     t_curr = self.get_current_time()
                     self.log(f'Received observation request from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
                     
 
-                    with open("sample_landsat_image.png", "rb") as image_file:
+                    with open("./scenarios/sim_test/sample_landsat_image.png", "rb") as image_file:
                         encoded_string = base64.b64encode(image_file.read())
-                    observation_sense_msg.set_obs(encoded_string)
+                    observation_sense_msg.obs = encoded_string.decode('utf-8')
                     
                     # change source and destination for response message
                     observation_sense_msg.dst = observation_sense_msg.src
@@ -1161,7 +1162,7 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 10
+    duration = 20
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')

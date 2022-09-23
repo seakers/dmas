@@ -6,6 +6,10 @@ from modules import PrintInstruction
 
 from environment import EnvironmentServer
 
+from science import ScienceModule
+
+from planning import PlanningModule
+
 import random
 import sys
 import time
@@ -590,6 +594,27 @@ class AgentClient(Module):
                 
                 return resp
 
+            elif isinstance(msg, ObservationSenseMessage):
+                # submit request
+                self.log(f'Sending Observation Sense Message...')
+                await self.environment_request_lock.acquire()
+                self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
+                await self.environment_request_socket.send_json(msg.to_json())
+                self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
+                
+                # wait for server reply
+                resp_json = await self.environment_request_socket.recv_json()
+                self.environment_request_lock.release()
+
+                if resp_json == json.dumps(dict()):
+                    self.log(f'Received Response: \'None\'') 
+                    return None
+                    
+                resp = ObservationSenseMessage.from_json(resp_json)
+                self.log(f'Received Observation Sense Message')        
+                
+                return resp
+
             else:
                 raise Exception(f'Request of type {msg_type} not supported by request submitter.')
 
@@ -638,7 +663,7 @@ class AgentState:
 class TestAgent(AgentClient):    
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
-        self.submodules = [TestModule(self)]  
+        self.submodules = [TestModule(self),ScienceModule("science",self,scenario_dir),PlanningModule("planning",self,scenario_dir)]  
 
 """
 --------------------
@@ -707,6 +732,22 @@ class SubModule(Module):
                     if response is not None:
                         self.log(f'Current state: pos:{response.pos}, vel=[{response.vel}], eclipse={response.eclipse}')
                         await self.sim_wait(1.1)
+
+                    lat, lon = 69.927615, -112.3046
+                    obs = "radiances"
+                    msg = ObservationSenseMessage(src.name, lat, lon, obs)
+                    self.log(f'Sending Observation Sense message to Environment.')
+                    response = await self.submit_environment_message(msg)
+
+                    if response is not None:
+                        #self.log(f'Current status: {response.obs}')
+                        self.log(f'Received response observation')
+                        await self.sim_wait(0.1)
+                    self.log('done waiting')
+                    msg = InternalMessage(self.name, "Onboard Processing Module", response)
+
+                    self.log('Sending measurement result to onboard processing module.')
+                    await self.send_internal_message(msg)
 
                 # else:
                 #     await self.sim_wait( 1e6 )

@@ -1,0 +1,1 @@
+{"lat": 69.929615, "lon": -112.3046, "time": 0.01, "product_type": "chlorophyll-a", "filepath": "chla_outputdata.csv"}

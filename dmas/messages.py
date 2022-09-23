@@ -636,26 +636,19 @@ class AgentEndConfirmationMessage(InterNodeMessage):
         """
         return AgentEndConfirmationMessage.from_dict(json.loads(d))
 
+
 class ObservationSenseMessage(InterNodeMessage):
-    def __init__(self, src: str, dst: str, internal_state: dict, lat: float, lon: float, obs: str) -> None:
+    def __init__(self, src: str, lat: float, lon: float, obs: str) -> None:
         """
-        Message from an agent node to the environment asking to be informed about a GP's current state
+        Message from an agent node to the environment asking to be informed about its current position, velocity, and eclipse state
 
         src:
             name of the agent node sending the message
-        dst:
-            name of the environment node receiving the message
-        internal_state:
-            internal_state of the source node 
-        lat:
-            latitude of the target ground point to be accessed by the source node (in degrees)
-        lon:
-            lingitude of the target ground point to be accessed by the source node (in degrees)
-        result:
-            result from sensing if the agent is accessing the target
         """
-        super().__init__(src, dst, InterNodeMessageTypes.OBSERVATION_SENSE)
-        self.target = [lat, lon]
+        super().__init__(src, SimulationConstants.ENVIRONMENT_SERVER_NAME.value, InterNodeMessageTypes.OBSERVATION_SENSE)
+        self.lat = lat
+        self.lon = lon
+        self.obs = obs
 
     def to_dict(self) -> dict:
         """
@@ -663,7 +656,6 @@ class ObservationSenseMessage(InterNodeMessage):
         """
         msg_dict = super().to_dict()
 
-        msg_dict['internal state'] = self.internal_state
         msg_dict['obs'] = self.obs
 
         if self.lat is None:
@@ -680,17 +672,15 @@ class ObservationSenseMessage(InterNodeMessage):
 
     def from_dict(d):
         """
-        Creates an instance of a Access Sense Message class object from a dictionary
+        Creates an instance of a Observation Sense Message class object from a dictionary
         """
         src = d.get('src', None)
-        dst = d.get('dst', None)
         type_name = d.get('@type', None)
-        internal_state = d.get('target', None)
         lat = d.get('lat', None)
         lon = d.get('lon', None)
         obs = d.get('obs', None)
 
-        if src is None or dst is None or type_name is None or internal_state is None or lat is None or lon is None or obs is None:
+        if src is None or type_name is None or lat is None or lon is None or obs is None:
             raise Exception('Dictionary does not contain necessary information to construct a message object.')
 
         _type = None
@@ -704,7 +694,7 @@ class ObservationSenseMessage(InterNodeMessage):
             raise Exception(f'Cannot load a Observation Sense Message from a dictionary of type {type_name}.')
 
 
-        return ObservationSenseMessage(src, dst, internal_state, lat, lon, obs)
+        return ObservationSenseMessage(src,lat, lon, obs)
 
     def from_json(d):
         """

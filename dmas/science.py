@@ -4,7 +4,11 @@ import os
 import pandas as pd
 import numpy as np
 import csv
+import base64
+from PIL import Image
+from io import BytesIO
 from modules import Module
+from messages import *
 
 def get_data_product(sd,lat,lon,time,product_type):
         for item in sd:
@@ -78,7 +82,7 @@ class ScienceModule(Module):
     async def coroutines(self):
         try:
             while True:
-                await self.sim_wait(1e6, module_name=self.name)
+                await self.sim_wait(1.0, module_name=self.name)
         except asyncio.CancelledError:
             return
 
@@ -86,6 +90,8 @@ class ScienceModule(Module):
 class ScienceValueModule(Module):
     def __init__(self, parent_module, sd) -> None:
         self.sd = sd
+        self.to_be_sent = False
+        self.request_msg = None
         super().__init__('Science Value Module', parent_module, submodules=[],
                          n_timed_coroutines=0)
 
@@ -99,38 +105,55 @@ class ScienceValueModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            dst_name = msg['dst']
-            if dst_name != self.name:
-                await self.put_message(msg)
-            else:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    self.log(content)
-                if msg['@type'] == 'PROP_MEAS_OBS_METRIC':
-                    self.prop_meas_obs_metrics.append(msg)
-                if msg['@type'] == 'ALGAL BLOOM':
-                    event = msg['content']
-                    self.broadcast_meas_req(event,event["severity"])
+            self.log(f'Internal message handler in science value module')
+            self.to_be_sent = True
+            self.request_msg = msg
+            # dst_name = msg['dst']
+            # if dst_name != self.name:
+            #     await self.put_message(msg)
+            # else:
+            #     if msg['@type'] == 'PRINT':
+            #         content = msg['content']
+            #         self.log(content)
+            #     if msg['@type'] == 'PROP_MEAS_OBS_METRIC':
+            #         self.prop_meas_obs_metrics.append(msg)
+            #     if msg['@type'] == 'ALGAL BLOOM':
+            #         event = msg['content']
+            #         self.broadcast_meas_req(event,event["severity"])
         except asyncio.CancelledError:
             return
 
     async def coroutines(self):
         self.log("Running Science Value module coroutines")
-        compute_science_value = asyncio.create_task(self.compute_science_value())
-        await compute_science_value
-        compute_science_value.cancel()
+        # compute_science_value = asyncio.create_task(self.compute_science_value())
+        # await compute_science_value
+        # compute_science_value.cancel()
+        broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
+        await broadcast_meas_req
+        broadcast_meas_req.cancel()
         self.log("Completed science value module coroutines")
 
 
-    async def broadcast_meas_req(self, param_msg, result):
-        msg_dict = dict()
-        msg_dict['src'] = self.name
-        msg_dict['dst'] = 'Planner'
-        msg_dict['@type'] = 'MEAS_REQ'
-        msg_dict['content'] = param_msg
-        msg_dict['result'] = result
-        msg_json = json.dumps(msg_dict)
-        await self.publisher.send_json(msg_json)
+    async def broadcast_meas_req(self):
+        try:
+            while True:
+                self.log(f'in broadcast_meas_req')
+                if self.to_be_sent:
+                    self.log(f'Broadcasting measurement request')
+                    msg = InternalMessage(self.name, "Instrument Capability Module", self.request_msg)
+                    await self.parent_module.send_internal_message(msg)
+                    self.to_be_sent = False
+                # msg_dict = dict()
+                # msg_dict['src'] = self.name
+                # msg_dict['dst'] = 'Planner'
+                # msg_dict['@type'] = 'MEAS_REQ'
+                # msg_dict['content'] = param_msg
+                # msg_dict['result'] = result
+                # msg_json = json.dumps(msg_dict)
+                # await self.publisher.send_json(msg_json)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return
 
     async def compute_science_value(self):
         try:
@@ -144,7 +167,7 @@ class ScienceValueModule(Module):
                         self.log("Computed science value")
                     else:
                         self.prop_meas_obs_metrics.pop(i)
-                await self.sim_wait(1e6)
+                await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
@@ -167,17 +190,19 @@ class OnboardProcessingModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            dst_name = msg['dst']
-            if dst_name != self.name:
-                await self.put_message(msg)
-            else:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    self.log(content)
-                if msg['@type'] == 'MEAS_RESULT':
-                    self.meas_results.append(msg['content'])
-                if msg['@type'] == 'DATA_PROCESSING_REQUEST':
-                    self.data_processing_requests.append(msg['content'])
+            self.meas_results.append(msg)
+            # dst_name = msg['dst']
+            # if dst_name != self.name:
+            #     await self.put_message(msg)
+            # else:
+            #     if msg['@type'] == 'PRINT':
+            #         content = msg['content']
+            #         self.log(content)
+            #     if msg.type == 'MEAS_RESULT':
+            #         self.log(f'Received measurement result!')
+            #         self.meas_results.append(msg['content'])
+            #     if msg['@type'] == 'DATA_PROCESSING_REQUEST':
+            #         self.data_processing_requests.append(msg['content'])
         except asyncio.CancelledError:
             return
 
@@ -192,32 +217,59 @@ class OnboardProcessingModule(Module):
         try:
             while True:
                 for i in range(len(self.meas_results)):
-                    if(self.meas_results[i]["level"] == 0):
-                        data = self.meas_results[i]
-                        processed_data = self.compute_chlorophyll_obs_value(data)
-                        self.sd = self.add_data_product(self.sd,data["lat"],data["lon"],data["time"],"chlorophyll-a",data["filepath"]+"_chla",processed_data)
-                        self.meas_results.pop(i)
-                        self.log("Computed science value")
-                await self.sim_wait(1e6)
+                    meas_result = self.meas_results[i].content
+                    lat = meas_result.lat
+                    lon = meas_result.lon
+                    self.log(f'Received measurement result from ({lat}°, {lon}°)!')
+                    b4,b5,stored_data_filepath = self.store_measurement(meas_result.obs)
+                    processed_data = self.compute_chlorophyll_obs_value(b4,b5)
+                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a","chla_"+stored_data_filepath,processed_data)
+                    # if(self.meas_results[i]["level"] == 0):
+                    #     data = self.meas_results[i]
+                    #     processed_data = self.compute_chlorophyll_obs_value(data)
+                    #     self.sd = self.add_data_product(self.sd,data["lat"],data["lon"],data["time"],"chlorophyll-a",data["filepath"]+"_chla",processed_data)
+                    #     self.meas_results.pop(i)
+                    #     self.log("Computed science value")
+                await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
-    def compute_chlorophyll_obs_value(dataprod):
-        b5 = dataprod["B5"]
-        b4 = dataprod["B4"]
+    def store_measurement(self,dataprod):
+        im = Image.open(BytesIO(base64.b64decode(dataprod)))
+
+        img_np = np.array(im)
+        print(img_np.shape)
+        print(img_np[:,:,1])
+        print(img_np[:,:,2])
+        b5 = img_np[:,:,0]
+        b4 = img_np[:,:,1]
+        img_np = np.delete(img_np,3,2)
+        # from https://stackoverflow.com/questions/67831382/obtaining-rgb-data-from-image-and-writing-it-to-csv-file-with-the-corresponding
+        xy_coords = np.flip(np.column_stack(np.where(np.all(img_np >= 0, axis=2))), axis=1)
+        rgb = np.reshape(img_np, (np.prod(img_np.shape[:2]), 3))
+
+        # Add pixel numbers in front
+        pixel_numbers = np.expand_dims(np.arange(1, xy_coords.shape[0] + 1), axis=1)
+        value = np.hstack([pixel_numbers, xy_coords, rgb])
+
+        # Properly save as CSV
+        np.savetxt("outputdata.csv", value, delimiter='\t', fmt='%4d')
+        return b4, b5, "outputdata.csv"
+
+    def compute_chlorophyll_obs_value(self,b4,b5):
         bda = b5 - b5/b4 + b4
         return bda
 
-    def add_data_product(sd,lat,lon,time,product_type,filepath,data):
+    def add_data_product(self,sd,lat,lon,time,product_type,filepath,data):
         data_product_dict = dict()
         data_product_dict["lat"] = lat
         data_product_dict["lon"] = lon
         data_product_dict["time"] = time
         data_product_dict["product_type"] = product_type
         data_product_dict["filepath"] = filepath
-        pd.write_csv(filepath,data)
+        pd.DataFrame(data).to_csv(filepath,index=False,header=False)
         sd.append(data_product_dict)
-        with open('dataprod'+lat+lon+time+product_type+'.txt') as datafile:
+        with open("dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
             datafile.write(json.dumps(data_product_dict))
         return sd
 
@@ -253,7 +305,7 @@ class SciencePredictiveModelModule(Module):
     async def coroutines(self):
         try:
             while True:
-                await self.sim_wait(1e6, module_name=self.name)
+                await self.sim_wait(1.0, module_name=self.name)
         except asyncio.CancelledError:
             return
 
@@ -320,17 +372,16 @@ class ScienceReasoningModule(Module):
                 for item in sd:
                     mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
                     pixel_value = self.get_pixel_value_from_image(item,lat,lon,30)
+                    print("pixel_value: "+str(pixel_value))
+                    print("mean+stddev" + str(mean+stddev))
+                    pixel_value = 100000
                     if pixel_value > mean+stddev:
                         item["severity"] = (pixel_value-mean) / stddev
                         chlorophyll_outliers.append(item)
                 for outlier in chlorophyll_outliers:
-                    msg = dict()
-                    msg['src'] = self.name
-                    msg['dst'] = 'Science Value Module'
-                    msg['@type'] = 'ALGAL BLOOM'
-                    msg['content'] = outlier
+                    msg = InternalMessage(self.name, "Science Value Module", outlier)
                     await self.parent_module.send_internal_message(msg)
-                await self.sim_wait(1e6)
+                await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
@@ -339,8 +390,9 @@ class ScienceReasoningModule(Module):
         topleftlon = image["lon"]
         latdiff = lat-topleftlat
         londiff = lon-topleftlon
-        row = (latdiff*111139)/resolution
-        col = (londiff*111139)/resolution
+        row = (latdiff*111139)//resolution
+        col = (londiff*111139)//resolution
         data = pd.read_csv(image["filepath"])
-        pixel_value = data.values[row][col]
+        pixel_values = data.values
+        pixel_value = pixel_values[int(row),int(col)]
         return pixel_value

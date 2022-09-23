@@ -12,3 +12,9 @@ dmas/**.log
 *.xml
 scenarios/*/results
 scenarios/*/orbit_data
+dmas/__pycache__/**.pyc
+instrupy
+instrupy/*
+orbitpy
+orbitpy/*
+.vscode/*

@@ -212,6 +212,7 @@ class Module:
         """
         if not isinstance(msg, InternalMessage):
             raise TypeError('Attepmting to send a message of an unknown type')
+        self.log(f'Sending internal message!')
 
         await self.inbox.put(msg)
 
