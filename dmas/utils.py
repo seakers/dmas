@@ -29,8 +29,8 @@ class EventPair:
         return await self.end.wait()
 
 class ComponentStatus(Enum):
-    ENABLED = 'ENABLED'
-    DISABLED = 'DISABLED'    
+    ON = 'ON'
+    OFF = 'OFF'    
 
 class ComponentHealth(Enum):
     NOMINAL = 'NOMINAL'
@@ -38,9 +38,15 @@ class ComponentHealth(Enum):
     FAILURE = 'FAILURE'
 
 class ComponentNames(Enum):
+    ONBOARD_COMPUTER = 'ONBOARD_COMPUTER'
+    BATTERY = 'BATTERY'
     IMU = 'IMU'
-    GPS = 'GPS'
+    POS = 'POS'
     SUN_SENSOR = 'SUN_SENSOR'
+
+class BatteryChargeStatus(Enum):
+    DISCHARGING = 'DISCHARGING'
+    CHARGING = 'CHARGING'
 
 class TaskStatus(Enum):
     """
@@ -60,7 +66,7 @@ class EnvironmentModuleTypes(Enum):
     AGENT_ACCESS_EVENT_MODULE = 'AGENT_ACCESS_EVENT_MODULE'
     AGENT_EXTERNAL_PROPAGATOR_MODULE = 'AGENT_EXTERNAL_PROPAGATOR_MODULE'
 
-class SpacecraftModuleTypes(Enum):
+class AgentModuleTypes(Enum):
     ENGINEERING_MODULE = 'ENGINEERING_MODULE'
     SCIENCE_MODULE = 'SCIENCE_MODULE'
     SCHEDULING_MODULE = 'SCHEDULING_MODULE'
@@ -174,6 +180,9 @@ class Container:
             return self.level >= val
         
         await self.when_cond(accept)
+
+def mwhr_to_joules(e):
+    return e * 3600.0
 
 """
 ---------------------------

@@ -673,7 +673,7 @@ class SubModule(Module):
                     response = await self.submit_environment_message(msg)
 
                     if response is not None:
-                        self.log(f'Current state: pos:{response.pos}, vel=[{response.vel}], eclipse={response.eclipse}')
+                        self.log(f'Current state: pos=[{response.pos}], vel=[{response.vel}], eclipse={response.eclipse}')
                         await self.sim_wait(1.1)
 
                 # else:

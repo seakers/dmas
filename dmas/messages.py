@@ -3,6 +3,7 @@ from enum import Enum
 import json
 from re import T
 from unittest import result
+from dmas.utils import ComponentNames
 
 from utils import EnvironmentModuleTypes, TaskStatus
 
@@ -451,7 +452,7 @@ class GndPntAccessSenseMessage(AccessSenseMessage):
             result from sensing if the agent is accessing the target
         """
         super().__init__(src, NodeMessageTypes.GP_ACCESS_SENSE, [lat, lon], result)
-        self.target = [lat, lon]
+        self.target = (lat, lon)
 
     def from_dict(d):
         """
@@ -1357,12 +1358,22 @@ class InternalMessage:
     def generate_response(self):
         return InternalMessage(src_module=self.dst_module, dst_module=self.src_module, content=self.content)
 
-class ComponentStateMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, state) -> None:
+class DataMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, data: str) -> None:
         """
-        Inter module communicating the state of a module to another
+        Message carrying sensor data from one module to another
+
+        src_module: 
+            name of the module sending the message
+        dst_module: 
+            name of the module to receive the message
+        data: 
+            data being sent
         """
-        super().__init__(src_module, dst_module, state)
+        super().__init__(src_module, dst_module, data)
+
+    def get_data(self):
+        return self.content
 
 """
 -------------------------------
@@ -1398,6 +1409,21 @@ class ComponentTask:
         """
         return self._task_status
 
+
+class ComponentAbortTask(ComponentTask):
+    def __init__(self, component: str, target_task : ComponentTask) -> None:
+        """
+        Informs a component to abort a task that is currently being performed or is scheduled to be performed
+        
+        component:
+            Name of component to perform the abort command
+        target_task:
+            Task to be aborted
+        """
+        super().__init__(component)
+        self.target_task = target_task
+
+
 class ComponentActuationTask(ComponentTask):
     def __init__(self, component: str, actuation_status: bool) -> None:
         """
@@ -1412,14 +1438,66 @@ class ComponentActuationTask(ComponentTask):
         super().__init__(component)
         self.component_status : bool = actuation_status
 
-class ComponentPowerSupplyTask(ComponentTask):
-    def __init__(self, component: str, power_supplied : float) -> None:
+class ComponentPowerSupplyRequestTask(ComponentTask):
+    def __init__(self, component: str, power_to_supply : float, target : str) -> None:
         """
-        Tasks a specific component to receive a finite amount of power defined by this task
+        Tasks a specific component to generate a finite amount of power for a given component defined by this task
+
+        component:
+            name of component to supply power
+        power_to_supply:
+            amout of power to be supplied in [W]
+        target:
+            name of component to be supplied with power
         """
         super().__init__(component)
-        self.power_suppied = power_supplied
+        self.power_to_supply = power_to_supply
+        self.target = target
 
+class ComponentPowerSupplyTask(ComponentTask):
+    def __init__(self, component: str, power_to_supply : float) -> None:
+        """
+        Tasks a specific component to receive a finite amount of power defined by this task
+
+        component:
+            name of component to supply power
+        power_to_supply:
+            amout of power to be supplied in [W]
+        """
+        super().__init__(component)
+        self.power_to_supply = power_to_supply
+
+class SaveToMemoryTask(ComponentTask):
+    def __init__(self, data : str) -> None:
+        """
+        Instructs component to save data in internal memory 
+        """
+        super().__init__(ComponentNames.ONBOARD_COMPUTER.value)
+        self._data = data
+
+    def get_data(self):
+        return self._data
+        
+class MeasurementTask(ComponentTask):
+    def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, internal_state : dict) -> None:
+        """
+        Instructs an isntrument to perform a measurement.
+
+        instrument_name:
+            name of instrument to perform measurement
+        duration:
+            duration of measurement in [s]
+        target_lat:
+            latitude of target in [°]
+        target_lon:
+            longitude of target in [°]
+        internal_state:
+            compiled internal state of the agent
+        """
+        super().__init__(instrument_name)
+        self.duration = duration
+        self.target = [target_lat, target_lon]
+        self.internal_state = internal_state
 """
 COMPONENT TASK MESSAGES
 """
@@ -1432,6 +1510,21 @@ class ComponentTaskMessage(InternalMessage):
 
     def get_task(self) -> ComponentTask:
         return self.content
+
+class ComponentTaskCompletionMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, task: ComponentTask, status : TaskStatus) -> None:
+        """
+        Internal message informing a module of the status of a component task 
+        """
+        super().__init__(src_module, dst_module, (task, status))
+
+    def get_task(self) -> ComponentTask:
+        task, _ = self.content
+        return task
+
+    def get_task_status(self) -> ComponentTask:
+        _, status = self.content
+        return status
 
 """
 SUBSYSTEM TASK
@@ -1464,3 +1557,13 @@ class SubsystemTaskMessage(InternalMessage):
         Intermodule message carrying a subsystem task
         """
         super().__init__(src_module, dst_module, task)
+
+class ComponentStateMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, state = None) -> None:
+        """
+        Inter module communicating the latest state of a component module
+        """
+        super().__init__(src_module, dst_module, state)
+
+    def get_state(self):
+        return self.content
