@@ -32,7 +32,16 @@ class ComponentStatus(Enum):
     ON = 'ON'
     OFF = 'OFF'    
 
+class SubsystemStatus(Enum):
+    ON = 'ON'
+    OFF = 'OFF'  
+
 class ComponentHealth(Enum):
+    NOMINAL = 'NOMINAL'
+    CRITIAL = 'CRITICAL'
+    FAILURE = 'FAILURE'
+
+class SubsystemHealth(Enum):
     NOMINAL = 'NOMINAL'
     CRITIAL = 'CRITICAL'
     FAILURE = 'FAILURE'
@@ -70,6 +79,12 @@ class AgentModuleTypes(Enum):
     ENGINEERING_MODULE = 'ENGINEERING_MODULE'
     SCIENCE_MODULE = 'SCIENCE_MODULE'
     SCHEDULING_MODULE = 'SCHEDULING_MODULE'
+
+class AgentSubsystemTypes(Enum):
+    EPS = 'ELECTRIC_POWER_SUBSYSTEM'
+    CNDH = 'COMMAND_AND_DATA_HANDLING'
+    PAYLOAD = 'PAYLOAD'
+    GNC = 'GUIDANCE_AND_NAVIGATION'
 
 class SimClocks(Enum):
     # asynchronized clocks

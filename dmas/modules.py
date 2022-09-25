@@ -37,6 +37,7 @@ class Module:
         Initiates any thread-sensitive or envent-loop sensitive variables to be used in this module.
         """
         if self.parent_module is not None:
+            self.parent_module : Module
             self.START_TIME = self.parent_module.START_TIME
             self.SIMULATION_FREQUENCY = self.parent_module.SIMULATION_FREQUENCY
             self.CLOCK_TYPE = self.parent_module.CLOCK_TYPE
@@ -47,6 +48,7 @@ class Module:
 
         self.inbox = asyncio.Queue()   
         for submodule in self.submodules:
+            submodule : Module
             await submodule.activate()
             self.NUMBER_OF_TIMED_COROUTINES += submodule.NUMBER_OF_TIMED_COROUTINES
         

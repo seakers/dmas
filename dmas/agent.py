@@ -203,7 +203,7 @@ class AgentClient(Module):
                 broadcast_json = await self.environment_broadcast_socket.recv_json()
 
                 broadcast_dict = json.loads(broadcast_json)
-                broadcast_type = BroadcastMessageTypes[broadcast_dict['@type']]
+                broadcast_type = EnvironmentBroadcastMessageTypes[broadcast_dict['@type']]
                 broadcast_src = broadcast_dict['src']
                 broadcast_dst = broadcast_dict['dst']
 
@@ -211,7 +211,7 @@ class AgentClient(Module):
                 self.log(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
 
                 if self.name == broadcast_dst or 'all' == broadcast_dst:                  
-                    if broadcast_type is BroadcastMessageTypes.TIC_EVENT:
+                    if broadcast_type is EnvironmentBroadcastMessageTypes.TIC_EVENT:
                         if (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
@@ -225,7 +225,7 @@ class AgentClient(Module):
 
                             continue
                         
-                    elif broadcast_type is BroadcastMessageTypes.SIM_END_EVENT:
+                    elif broadcast_type is EnvironmentBroadcastMessageTypes.SIM_END_EVENT:
                         # if simulation end broadcast is received, terminate agent.
 
                         broadcast = SimulationEndBroadcastMessage.from_dict(broadcast_dict)

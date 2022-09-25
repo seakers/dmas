@@ -764,7 +764,7 @@ class PrintRequestMessage(NodeMessage):
         """
         return PrintRequestMessage.from_dict(json.loads(j))
 
-class BroadcastMessageTypes(Enum):
+class EnvironmentBroadcastMessageTypes(Enum):
     """
     Types of broadcasts sent from the environemnt to all agents.
         1- tic: informs all agents of environment server's current time
@@ -783,8 +783,8 @@ class BroadcastMessageTypes(Enum):
     SIM_START_EVENT = 'SIM_START_EVENT'
     SIM_END_EVENT = 'SIM_END_EVENT'
 
-class BroadcastMessage(SimulationMessage): 
-    def __init__(self, src: str, _type: BroadcastMessageTypes, dst: str='all') -> None:   
+class EnvironmentBroadcastMessage(SimulationMessage): 
+    def __init__(self, src: str, _type: EnvironmentBroadcastMessageTypes, dst: str='all') -> None:   
         """
         Abstract class for a message being sent from an environment server to all simulation node clients that are subscribed to it
         
@@ -809,14 +809,14 @@ class BroadcastMessage(SimulationMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize message of type {type_name}.')
 
-        return BroadcastMessage(src, dst, _type)
+        return EnvironmentBroadcastMessage(src, dst, _type)
 
     def to_json(self):
         """
@@ -830,12 +830,12 @@ class BroadcastMessage(SimulationMessage):
         """
         return NodeMessage.from_dict(json.loads(j))
     
-class TicEventBroadcast(BroadcastMessage):
+class TicEventBroadcast(EnvironmentBroadcastMessage):
     def __init__(self, src: str, t: float) -> None:
         """
         Message from the environment to be broadcasted to all agents containig the latest simulation time 
         """
-        super().__init__(src, BroadcastMessageTypes.TIC_EVENT)
+        super().__init__(src, EnvironmentBroadcastMessageTypes.TIC_EVENT)
         self.t = t
 
     def to_dict(self) -> dict:
@@ -859,7 +859,7 @@ class TicEventBroadcast(BroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
@@ -880,8 +880,8 @@ class TicEventBroadcast(BroadcastMessage):
         """
         return TicEventBroadcast.from_dict(json.loads(j))
     
-class EventBroadcastMessage(BroadcastMessage):
-    def __init__(self, src: str, dst: str, _type: BroadcastMessageTypes, t: float, rise: bool) -> None:
+class EventBroadcastMessage(EnvironmentBroadcastMessage):
+    def __init__(self, src: str, dst: str, _type: EnvironmentBroadcastMessageTypes, t: float, rise: bool) -> None:
         """
         Message from the environment server informing agents that an event has started or ended
 
@@ -923,16 +923,16 @@ class EventBroadcastMessage(BroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif (_type is not BroadcastMessageTypes.ECLIPSE_EVENT
-                and _type is not BroadcastMessageTypes.AGENT_ACCESS_EVENT
-                and _type is not BroadcastMessageTypes.GP_ACCESS_EVENT
-                and _type is not BroadcastMessageTypes.GS_ACCESS_EVENT):
+        elif (_type is not EnvironmentBroadcastMessageTypes.ECLIPSE_EVENT
+                and _type is not EnvironmentBroadcastMessageTypes.AGENT_ACCESS_EVENT
+                and _type is not EnvironmentBroadcastMessageTypes.GP_ACCESS_EVENT
+                and _type is not EnvironmentBroadcastMessageTypes.GS_ACCESS_EVENT):
             raise Exception(f'Cannot load a Event Broadcast Message from a dictionary of type {type_name}.')
 
         return EventBroadcastMessage(src, dst, _type, t, rise)
@@ -963,7 +963,7 @@ class EclipseEventBroadcastMessage(EventBroadcastMessage):
         rise:
             indicates whether the eclipse event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.ECLIPSE_EVENT, t, rise)
+        super().__init__(src, dst, EnvironmentBroadcastMessageTypes.ECLIPSE_EVENT, t, rise)
 
     def from_dict(d):
         """
@@ -979,13 +979,13 @@ class EclipseEventBroadcastMessage(EventBroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif _type is not BroadcastMessageTypes.ECLIPSE_EVENT:
+        elif _type is not EnvironmentBroadcastMessageTypes.ECLIPSE_EVENT:
             raise Exception(f'Cannot load a Eclipse Event Broadcast Message from a dictionary of type {type_name}.')
 
         return EclipseEventBroadcastMessage(src, dst, t, rise)
@@ -1018,7 +1018,7 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
         rise:
             indicates whether the access event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.AGENT_ACCESS_EVENT, t, rise)
+        super().__init__(src, dst, EnvironmentBroadcastMessageTypes.AGENT_ACCESS_EVENT, t, rise)
         self.target = target
 
     def to_dict(self) -> dict:
@@ -1044,13 +1044,13 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif _type is not BroadcastMessageTypes.AGENT_ACCESS_EVENT:
+        elif _type is not EnvironmentBroadcastMessageTypes.AGENT_ACCESS_EVENT:
             raise Exception(f'Cannot load a Agent Access Event Broadcast Message from a dictionary of type {type_name}.')
 
         return AgentAccessEventBroadcastMessage(src, dst, target, t, rise)
@@ -1089,7 +1089,7 @@ class GndPntAccessEventBroadcastMessage(EventBroadcastMessage):
         rise:
             indicates whether the access event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.GP_ACCESS_EVENT, t, rise)
+        super().__init__(src, dst, EnvironmentBroadcastMessageTypes.GP_ACCESS_EVENT, t, rise)
         self.lat = lat
         self.lon = lon
         self.grid_index= grid_index
@@ -1124,13 +1124,13 @@ class GndPntAccessEventBroadcastMessage(EventBroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif _type is not BroadcastMessageTypes.GP_ACCESS_EVENT:
+        elif _type is not EnvironmentBroadcastMessageTypes.GP_ACCESS_EVENT:
             raise Exception(f'Cannot load a Ground Point Access Event Broadcast Message from a dictionary of type {type_name}.')
 
         return GndPntAccessEventBroadcastMessage(src, dst, lat, lon, grid_index, gp_index, t, rise)
@@ -1163,7 +1163,7 @@ class GndStnAccessEventBroadcastMessage(EventBroadcastMessage):
         rise:
             indicates whether the access event started or ended
         """
-        super().__init__(src, dst, BroadcastMessageTypes.GS_ACCESS_EVENT, t, rise)
+        super().__init__(src, dst, EnvironmentBroadcastMessageTypes.GS_ACCESS_EVENT, t, rise)
         self.target = target
 
     def to_dict(self) -> dict:
@@ -1189,13 +1189,13 @@ class GndStnAccessEventBroadcastMessage(EventBroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif _type is not BroadcastMessageTypes.GS_ACCESS_EVENT:
+        elif _type is not EnvironmentBroadcastMessageTypes.GS_ACCESS_EVENT:
             raise Exception(f'Cannot load a Ground Station Access Event Broadcast Message from a dictionary of type {type_name}.')
 
         return GndStnAccessEventBroadcastMessage(src, dst, target, t, rise)
@@ -1213,7 +1213,7 @@ class GndStnAccessEventBroadcastMessage(EventBroadcastMessage):
         return GndStnAccessEventBroadcastMessage.from_dict(json.loads(j))
 
 
-class SimulationStartBroadcastMessage(BroadcastMessage):
+class SimulationStartBroadcastMessage(EnvironmentBroadcastMessage):
     def __init__(self, src: str, port_ledger: dict, clock_info: dict) -> None:
         """
         Message from the environment server informing all agent nodes that the simulation has started. 
@@ -1226,7 +1226,7 @@ class SimulationStartBroadcastMessage(BroadcastMessage):
         clock_info:
             dictionary containing information about the clock being used in this simulation
         """
-        super().__init__(src, BroadcastMessageTypes.SIM_START_EVENT)
+        super().__init__(src, EnvironmentBroadcastMessageTypes.SIM_START_EVENT)
         self.port_ledger = port_ledger
         self.clock_info = clock_info
 
@@ -1253,13 +1253,13 @@ class SimulationStartBroadcastMessage(BroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif _type is not BroadcastMessageTypes.SIM_START_EVENT:
+        elif _type is not EnvironmentBroadcastMessageTypes.SIM_START_EVENT:
             raise Exception(f'Cannot load a Simulation Start Event Broadcast Message from a dictionary of type {type_name}.')
 
         return SimulationStartBroadcastMessage(src, port_ledger, clock_info)
@@ -1277,7 +1277,7 @@ class SimulationStartBroadcastMessage(BroadcastMessage):
         return SimulationStartBroadcastMessage.from_dict(json.loads(j))
         
 
-class SimulationEndBroadcastMessage(BroadcastMessage):
+class SimulationEndBroadcastMessage(EnvironmentBroadcastMessage):
     def __init__(self, src: str, t_end: float) -> None:
         """
         Message from the environment server informing all agent nodes that the simulation has ended.
@@ -1287,7 +1287,7 @@ class SimulationEndBroadcastMessage(BroadcastMessage):
         t_end:
             environment server clock time at the end of the simulation
         """
-        super().__init__(src, BroadcastMessageTypes.SIM_END_EVENT)
+        super().__init__(src, EnvironmentBroadcastMessageTypes.SIM_END_EVENT)
         self.t_end = t_end
 
     def to_dict(self) -> dict:
@@ -1311,13 +1311,13 @@ class SimulationEndBroadcastMessage(BroadcastMessage):
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
-        for name, member in BroadcastMessageTypes.__members__.items():
+        for name, member in EnvironmentBroadcastMessageTypes.__members__.items():
             if name == type_name:
                 _type = member
 
         if _type is None:
             raise Exception(f'Could not recognize broadcast of type {type_name}.')
-        elif _type is not BroadcastMessageTypes.SIM_END_EVENT:
+        elif _type is not EnvironmentBroadcastMessageTypes.SIM_END_EVENT:
             raise Exception(f'Cannot load a Simulation End Event Broadcast Message from a dictionary of type {type_name}.')
 
         return SimulationEndBroadcastMessage(src, t_end)
@@ -1548,6 +1548,19 @@ class SubsystemTask:
         """
         self._task_status = status
 
+class SubsystemAbortTask(SubsystemTask):
+    def __init__(self, subsystem: str, target_task : SubsystemTask) -> None:
+        """
+        Informs a subsystem that it must abort a task that is currently being performed or is scheduled to be performed
+        
+        subsystem:
+            Name of component to perform the abort command
+        target_task:
+            Task to be aborted
+        """
+        super().__init__(subsystem)
+        self.target_task = target_task
+
 """
 SUBSYSTEM TASK MESSAGES
 """
@@ -1558,10 +1571,23 @@ class SubsystemTaskMessage(InternalMessage):
         """
         super().__init__(src_module, dst_module, task)
 
+    def get_task(self) -> SubsystemTask:
+        return self.content
+
 class ComponentStateMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, state = None) -> None:
         """
         Inter module communicating the latest state of a component module
+        """
+        super().__init__(src_module, dst_module, state)
+
+    def get_state(self):
+        return self.content
+
+class SubsystemStateMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, state = None) -> None:
+        """
+        Inter module communicating the latest state of a subsystem module
         """
         super().__init__(src_module, dst_module, state)
 

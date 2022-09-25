@@ -128,7 +128,7 @@ class ScheduledEventModule(Module):
         pass
 
     @abstractmethod
-    def row_to_broadcast_msg(self, row) -> BroadcastMessage:
+    def row_to_broadcast_msg(self, row) -> EnvironmentBroadcastMessage:
         """
         converts a row of from 'event_data' into a message to be broadcast to other agents
         """
@@ -619,7 +619,7 @@ class EnvironmentServer(Module):
                 await self.send_internal_message(msg)
             else:
                 content = msg.content
-                if isinstance(content, BroadcastMessage):
+                if isinstance(content, EnvironmentBroadcastMessage):
                     # if the message is of type broadcast, send to broadcast handler
                     self.log(f'Submitting message of type {content.get_type()} for publishing...')
                     await self.publisher_queue.put(content)
@@ -854,7 +854,7 @@ class EnvironmentServer(Module):
             while True:
                 msg = await self.publisher_queue.get()
 
-                if not isinstance(msg, BroadcastMessage):
+                if not isinstance(msg, EnvironmentBroadcastMessage):
                     # if message to be broadcasted is not of any supported format, reject and dump
                     self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarting task...')
                     continue

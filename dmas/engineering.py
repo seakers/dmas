@@ -1,7 +1,8 @@
 from abc import abstractmethod
 import asyncio
-from ctypes import Union
+import copy
 import logging
+import math
 from telnetlib import XASCII
 from messages import *
 from utils import *
@@ -42,7 +43,7 @@ class ComponentModule(Module):
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
                 f_update: float = 1.0,
-                n_timed_coroutines: int = 3) -> None:
+                n_timed_coroutines: int = 2) -> None:
         """
         Describes a generic component of an agent's platform.
 
@@ -69,6 +70,7 @@ class ComponentModule(Module):
         self.component_state : type = component_state
         self.average_power_consumption : float = average_power_consumption
         self.t_update : float = -1.0
+
         self.health : ComponentHealth = health
         self.status : ComponentStatus = status
 
@@ -98,12 +100,13 @@ class ComponentModule(Module):
         # task queues
         self.tasks = asyncio.Queue()                                    # stores task commands to be executed by this component
         self.aborts = asyncio.Queue()                                   # stores task abort commnands to be executed by this component
+        self.environment_events = asyncio.Queue()                       # stores environment events that may have an effect on this component
 
         # initiate update time
         self.t_update : float = self.get_current_time()                 # tracks when the last component update was performed
 
         # update state
-        self.update_lock = asyncio.Lock()                               # prevents two internal processes from updating the component's state simultaneously  
+        self.state_lock = asyncio.Lock()                                # prevents two internal processes from affecting the component's state simultaneously  
         await self.update()        
 
     async def internal_message_handler(self, msg: InternalMessage):
@@ -128,7 +131,10 @@ class ComponentModule(Module):
                     self.aborts.put(task)
                 else:
                     self.tasks.put(task)
-            # TODO add support for events received from environment
+            
+            elif isinstance(msg.content, EnvironmentBroadcastMessage):
+                self.environment_events.put(msg.content)
+
             else:
                 self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
             
@@ -147,11 +153,13 @@ class ComponentModule(Module):
 
         1- Periodically monitoring its own state
 
-        2- Predicting and detecting critical states
+        2- Detecting critical states
 
         3- Triggering failure states
 
         4- Perform tasks being given to this component
+
+        5- Processes events from the environment that may affect this component
         
         Component failure leads to no actions being able to be performed by this 
         component. Subsystem-wide failure is to be handled by their parent subsystem.
@@ -173,9 +181,13 @@ class ComponentModule(Module):
         failure_monitor.set_name (f'{self.name}_failure_monitor')
         coroutines.append(failure_monitor)
 
-        task_handler = asyncio.create_task(self.task_processor())
-        task_handler.set_name (f'{self.name}_task_processor')
-        coroutines.append(task_handler)
+        task_processor = asyncio.create_task(self.task_processor())
+        task_processor.set_name (f'{self.name}_task_processor')
+        coroutines.append(task_processor)
+
+        environment_event_processor = asyncio.create_task(self.environment_event_processor())
+        environment_event_processor.set_name (f'{self.name}_environment_event_processor')
+        coroutines.append(environment_event_processor)
 
         # wait for the first coroutine to complete
         _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
@@ -185,6 +197,7 @@ class ComponentModule(Module):
             if coroutine not in pending:
                 coroutine : asyncio.Task
                 done_name = coroutine.get_name()
+                break
 
         # cancell all other coroutine tasks
         self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
@@ -229,12 +242,11 @@ class ComponentModule(Module):
                     if self.is_critical():
                         # component is in a critical state
 
-                        # erease critical timer object
-                        critical_timer = None
-
                         # set current status to critical
                         if not self.failure.is_set():
+                            await self.state_lock.acquire()
                             self.health = ComponentHealth.CRITIAL
+                            self.state_lock.release()
 
                         # trigger critical state event if it hasn't been triggered already
                         if not self.critical.is_set():
@@ -256,47 +268,21 @@ class ComponentModule(Module):
 
                         # set internal state to nominal if not in a failure nor critical state
                         if not self.failure.is_set():
+                            await self.state_lock.acquire()
                             self.health = ComponentHealth.NOMINAL
+                            self.state_lock.release()
 
-                        # initiate critical state timer
-                        critical_timer = asyncio.create_task(self.wait_for_critical())
-                        critical_timer.set_name (f'{self.name}_critical_timer')
-                        
-                        # wait for the critical timer to run out or for the component to update its state
-                        conditions = [self.updated, critical_timer]
-                        _, pending = await asyncio.wait(conditions, return_when=asyncio.FIRST_COMPLETED)
-
-                        if self.updated in pending:                 # critical timer ran out before agent updated its state                      
-                            await self.update()
-                            while not self.is_critical():
-                                # if not critical, check periodically until critical state is detected
-                                await self.sim_wait(1/self.UPDATE_FREQUENCY)                      
-                                await self.update()
-                        else:                                       # component updated its state before critical timer ran out
-                            # interrupt critical timer and check again
-                            critical_timer.cancel()
-                            await critical_timer
+                        # wait for next state update 
+                        await self.updated
 
         except asyncio.CancelledError:
-            if critical_timer is not None:
-                critical_timer.cancel()
-                await critical_timer
+            return
 
     def is_critical(self) -> bool:
         """
         Returns true if the current state of the component is critical. 
         """
         return False
-
-    async def wait_for_critical(self) -> None:
-        """
-        Count downs to the next predicted critical state of this component given that the current configuration is maintained
-        """
-        try:
-            while True:
-                await self.sim_wait(1e6)
-        except asyncio.CancelledError:
-            return
 
     async def failure_monitor(self):
         """
@@ -329,12 +315,14 @@ class ComponentModule(Module):
                         # check if component avoided failure state
                         if self.is_failed():
                             # component is still in a possible failure state 
-
-                            # set current status to failure
+                            
+                            # set current status to failure and turn off component
+                            await self.state_lock.acquire()
                             self.health = ComponentHealth.FAILURE
-
-                            # disable component
                             self.status = ComponentStatus.OFF
+                            self.state_lock.release()
+
+                            # update state
                             await self.update()
 
                             # communicate FAILURE state to parent submodule
@@ -347,7 +335,9 @@ class ComponentModule(Module):
                     else:
                         # set internal state to nominal if not in a failure nor critical state
                         if not self.critical.is_set():
+                            await self.state_lock.acquire()
                             self.health = ComponentHealth.NOMINAL
+                            self.state_lock.release()
 
                         # initiate failure state timer
                         failure_timer = asyncio.create_task(self.wait_for_failure())
@@ -392,7 +382,7 @@ class ComponentModule(Module):
 
     """
     --------------------
-    TASKS HANDLER
+    TASKS AND EVENT HANDLER
     --------------------
     """
     async def task_processor(self) -> None:
@@ -414,8 +404,8 @@ class ComponentModule(Module):
                     perform_task.cancel()
                     await perform_task
 
-                else:                          
-                    # task was finished before abort command was received or failure state was reached, cancelling abort listening
+                if listen_for_abort not in done:                          
+                    # task was finished or component reached a failure state before abort command was received, cancelling abort listening task
                     listen_for_abort.cancel()
                     await listen_for_abort
 
@@ -464,7 +454,10 @@ class ComponentModule(Module):
                 raise asyncio.CancelledError
 
             # perform task
+            aquired = await self.state_lock.acquire()
             await self.task_handler(task)
+            self.state_lock.release()
+            aquired = False
 
             # update component state 
             self.log(f'Task of type {type(task)} successfully completed!')
@@ -474,6 +467,10 @@ class ComponentModule(Module):
             return TaskStatus.DONE
 
         except asyncio.CancelledError:
+            # release update lock if cancelled during task handling
+            if self.state_lock.locked() and aquired:
+                self.state_lock.release()
+
             # return task abort status
             self.log(f'Task of type {type(task)} aborted!')
             await self.update()
@@ -499,6 +496,35 @@ class ComponentModule(Module):
             self.log(f'Task of type {type(task)} not yet supported. Aborting task...')
             raise asyncio.CancelledError
 
+    async def environment_event_processor(self):
+        """
+        Processes any incoming events from the environment
+        """
+        try:
+            while True:
+                # wait for an event to be received
+                event_msg = await self.environment_events.get()
+
+                # handle according to event type
+                aquired = await self.state_lock.acquire()
+                affected = self.environment_event_handler(event_msg)
+                self.state_lock.release()
+                aquired = False
+
+                # if the handler affected the component, update its state
+                if affected:
+                    await self.update()
+
+        except asyncio.CancelledError:
+            if self.state_lock.locked() and aquired:
+                self.state_lock.release()
+
+    async def environment_event_handler(self, event_msg) -> bool:
+        """ 
+        Affects the component depending on the type of event being received. Ignores all events by default.
+        """
+        return False
+
     """
     --------------------
     HELPING FUNCTIONS
@@ -509,11 +535,8 @@ class ComponentModule(Module):
         Updates the state of the component
         """
         try:
-            # process indicators
-            acquired = False
-
             # wait for any possible state accessing process to finish
-            acquired = await self.update_lock.acquire()
+            acquired = await self.state_lock.acquire()
 
             # calculate update time-step
             t_curr = self.get_current_time()
@@ -531,12 +554,12 @@ class ComponentModule(Module):
             # inform other processes that the update has finished
             self.updated.set()
             self.updated.clear()
-            self.update_lock.release() 
+            self.state_lock.release() 
 
         except asyncio.CancelledError:
-            if self.update_lock.locked() and acquired:
+            if self.state_lock.locked() and acquired:
                 # if this process had acquired the update_lock and has not released it, release update lock
-                self.update_lock.release()               
+                self.state_lock.release()               
 
     async def update_properties(self, dt):
         """
@@ -560,19 +583,21 @@ class ComponentModule(Module):
             acquired = False
 
             # wait for any possible update process to finish
-            acquired = await self.update_lock.acquire()
+            acquired = await self.state_lock.acquire()
 
             # get state object from component status
+            self.component_state : ComponentState
             state = self.component_state.from_component(self)
 
             # release update lock
-            self.update_lock.release()
+            self.state_lock.release()
 
             return state
         except asyncio.CancelledError:
-            if self.update_lock.locked() and acquired:
+            if self.state_lock.locked() and acquired:
                 # if this process had acquired the update_lock and has not released it, then release
-                self.update_lock.release()
+                self.state_lock.release()
+            return None
 
     def log_state(self) -> None:
         """
@@ -582,7 +607,371 @@ class ComponentModule(Module):
 
 """
 -------------------------------
-CCOMPONENT STATES
+SUBSYSTEM MODULES
+-------------------------------
+"""
+class SubsystemModule(Module):
+    def __init__(self, 
+                name: str, 
+                parent_platform_sim: Module,   
+                subsystem_state : type, 
+                health : ComponentHealth = ComponentHealth.NOMINAL,
+                status : ComponentStatus = ComponentStatus.OFF,
+                n_timed_coroutines: int = 2) -> None:
+        """
+        Describes a generic subsyem of an agent's platform.
+
+        name:
+            name of the subsystem
+        parent_platform_sim:
+            platform simulator that this subsystem belongs to
+        subsystem_state:
+            type of subsystem state describing this subsystem
+        health:
+            health of the subsystem
+        status:
+            status of the subsystem
+        n_timed_coroutines:
+            number of time-dependent corroutines being performed by this component
+        """
+        super().__init__(name, parent_platform_sim, [], n_timed_coroutines)
+        self.subsystem_state = subsystem_state
+        self.health = health
+        self.status = status
+
+    async def activate(self):
+        await super().activate()
+
+        # component health events
+        self.nominal = asyncio.Event()                                  # fires when the subsystem enters a nominal state
+        self.critical = asyncio.Event()                                 # fires when the subsystem enters a critical state
+        self.failure = asyncio.Event()                                  # fires when the subsystem enters a failure state
+
+        # trigger health events
+        if self.health is ComponentHealth.NOMINAL:
+            self.nominal.set()
+        elif self.health is ComponentHealth.CRITIAL:
+            self.critical.set()
+        elif self.health is ComponentHealth.FAILURE:
+            self.failure.set()
+
+        # task queues
+        self.tasks = asyncio.Queue()                                    # stores task commands to be executed by this subsystem
+        self.aborts = asyncio.Queue()                                   # stores task abort commnands to be executed by this subsystem
+        self.component_state_updates = asyncio.Queue()                  # stores component state updates to be processed by this subsystem
+        self.environment_events = asyncio.Queue()                       # stores environment events that may have an effect on this subsystem
+
+        # subsystem update event
+        self.updated = asyncio.Event()                                  # informs other processes that the subsystem's state has been updated
+
+        # initiate update time
+        self.t_update : float = self.get_current_time()                 # tracks when the last component update was performed
+
+        # initiate state
+        self.state_lock = asyncio.Lock()                               # prevents two internal processes from updating the component's state simultaneously  
+        
+        self.component_states = dict()                                  # tracks the state of each component contained in this subsystem
+        await self.state_lock.acquire()
+        for component in self.submodules:
+            component : ComponentModule
+            self.component_states[component.name] = await component.get_state()
+        self.state_lock.release()
+
+    async def internal_message_handler(self, msg: InternalMessage):
+        """
+        Processes messages being sent to this subsystem.
+        """
+        try:
+            if self.failure.is_set():
+                self.log(f'Subsystem is in failure state. Ignoring message...')
+                return
+                # TODO add capability to recover component by performing some troubleshooting tasks being given to this component
+
+            if msg.dst_module != self.name:
+                # this module is NOT the intended receiver for this message. Forwarding to rightful destination
+                self.log(f'Received internal message intended for {msg.dst_module}. Rerouting message...')
+                await self.send_internal_message(msg)
+
+            elif isinstance(msg, SubsystemTaskMessage):
+                task = msg.get_task()
+                self.log(f'Received a task of type {type(task)}!')
+
+                if isinstance(task, SubsystemAbortTask):
+                    self.aborts.put(task)
+                else:
+                    self.tasks.put(task)
+
+            elif isinstance(msg.content, EnvironmentBroadcastMessage):
+                self.log(f'Received internal message containing an environment broadcast of type {type(msg)}. Reacting at the system-level...')
+                await self.environment_events.put(msg)
+
+                self.log(f'System-level reaction done. Reacting at the component-level...')
+                for component in self.submodules:
+                    component : ComponentModule
+                    msg_copy : InternalMessage = copy.copy(msg)
+                    msg_copy.dst_module = component.name
+
+                    await self.send_internal_message(msg_copy)
+                pass
+            
+            elif isinstance(msg, ComponentStateMessage):
+                
+                component_state : ComponentState = msg.get_state()
+                self.log(f'Received component state message from component type {component_state.component_type}. Updating subsystem state...')
+                
+                await self.state_lock.acquire()
+
+                self.component_states[component_state.component_name] = component_state
+                await self.updated.set()
+                self.updated.clear()
+
+                self.state_lock.release()
+                
+            else:
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+            
+        except asyncio.CancelledError:
+            return    
+
+    """
+    --------------------
+    CO-ROUTINES
+    --------------------
+    """
+    async def coroutines(self):
+        """
+        Each subsystem is in charge of the following routines:
+
+        1- Updating subsystem state using incoming component states
+
+        2- Detecting critical states
+
+        3- Triggering failure states
+
+        4- Perform tasks being given to this component
+
+        5- Processes events from the environment that may affect this component
+        
+        Subsystem failure leads to no actions being able to be performed by this 
+        subsystem. Agent-wide failure is to be handled by the platform simulator.
+        """
+
+        # create coroutine tasks
+        coroutines = []
+
+        ## Internal coroutines
+        update_component_state = asyncio.create_task(self.update_component_state())
+        update_component_state.set_name (f'{self.name}_update_component_state')
+        coroutines.append(update_component_state)
+
+        crit_monitor = asyncio.create_task(self.crit_monitor())
+        crit_monitor.set_name (f'{self.name}_crit_monitor')
+        coroutines.append(crit_monitor)
+
+        failure_monitor = asyncio.create_task(self.failure_monitor())
+        failure_monitor.set_name (f'{self.name}_failure_monitor')
+        coroutines.append(failure_monitor)
+
+        task_processor = asyncio.create_task(self.task_processor())
+        task_processor.set_name (f'{self.name}_task_processor')
+        coroutines.append(task_processor)
+
+        environment_event_processor = asyncio.create_task(self.environment_event_processor())
+        environment_event_processor.set_name (f'{self.name}_environment_event_processor')
+        coroutines.append(environment_event_processor)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                coroutine : asyncio.Task
+                done_name = coroutine.get_name()
+                break
+
+        # cancell all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine : asyncio.Task
+            subroutine.cancel()
+            await subroutine
+        return
+
+    async def crit_monitor(self) -> None:
+        """
+        Monitors subsystem state and triggers critical event if a critical state is detected
+        """
+        try:
+            while True:
+                if self.failure.is_set():
+                    # if comonent is in failure state, sleep until end of simulation
+                    await self.sim_wait(1e6)
+                
+                else:
+                    if self.is_subsystem_critical():
+                        # subsystem is in a critical state
+
+                        # set current status to critical
+                        if not self.failure.is_set():
+                            await self.state_lock.acquire()
+                            self.health = SubsystemHealth.CRITIAL
+                            self.state_lock.release()
+
+                        # trigger critical state event if it hasn't been triggered already
+                        if not self.critical.is_set():
+                            self.critical.set()
+
+                        # communicate critical state to command and data handling 
+                        state_msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, self.get_state())
+                        await self.send_internal_message(state_msg)
+
+                    else:
+                        # component is NOT in a critical state
+
+                        # reset critical event if it has been previously triggered
+                        if self.critical.is_set():
+                            self.critical.clear()
+
+                        # set internal state to nominal if not in a failure nor critical state
+                        if not self.failure.is_set():
+                            await self.state_lock.acquire()
+                            self.health = SubsystemHealth.NOMINAL
+                            self.state_lock.release()
+
+                    # wait for next state update 
+                    await self.updated
+
+        except asyncio.CancelledError:
+            return
+
+    def is_subsystem_critical(self) -> bool:
+        """
+        Detects subsystem-level critical state using latest component states received by this subsystem
+        """
+        return self.is_component_critical()
+
+    def is_component_critical(self) -> bool:
+        """
+        Detects component-level critical state using latest component states received by this subsystem
+        """
+        for component_state in self.component_states:
+            component_state : ComponentState
+            if component_state.health is ComponentHealth.CRITIAL:
+                return True
+        return False
+
+    async def failure_monitor(self):
+        """
+        Monitors subsystem state and triggers failure event if a failure state is detected
+        """
+        try:
+            while True: 
+                if self.health is SubsystemHealth.FAILURE:
+                    # if comonent is in failure state, sleep for the rest of the simulation
+                    await self.sim_wait(1e6)
+
+                else:
+                    # check if in failure state
+                    if self.is_subsystem_failure() or self.is_component_failure():
+                        # possible failure state detected
+
+                        # set current status to critical
+                        self.health = ComponentHealth.CRITIAL
+                            
+                        # communicate CRITICAL state to parent submodule
+                        state_msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, self.get_state())
+                        await self.send_internal_message(state_msg)
+
+                        # allow for component to react to possible failure state
+                        if self.is_subsystem_failure():
+                            await self.sim_wait(1)
+                        
+                            # check if component avoided failure state
+                            if self.is_subsystem_failure():
+                                # component is still in a possible failure state 
+                                
+                                # set current status to failure and turn off component
+                                await self.state_lock.acquire()
+                                self.health = SubsystemHealth.FAILURE
+                                self.status = SubsystemStatus.OFF
+                                self.state_lock.release()
+
+                                # communicate FAILURE state to parent submodule
+                                state_msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, self.get_state())
+                                await self.send_internal_message(state_msg)
+
+                                # trigger failure state event
+                                self.failure.set()
+
+                    else:
+                        # set internal state to nominal if not in a failure nor critical state
+                        if not self.critical.is_set():
+                            await self.state_lock.acquire()
+                            self.health = SubsystemHealth.NOMINAL
+                            self.state_lock.release()
+
+                        # wait for next component state update to reevaluate subsystem-level failure state
+
+
+        except asyncio.CancelledError:
+            return
+
+    def is_subsystem_failure(self) -> bool:
+        """
+        Detects subsystem-level failure state using latest component states received by this subsystem
+        """
+        return False
+
+    def is_component_failure(self) -> bool:
+        """
+        Detects component-level failure state using latest component states received by this subsystem
+        """
+        for component_state in self.component_states:
+            component_state : ComponentState
+            if component_state.health is ComponentHealth.FAILURE:
+                return True
+        return False
+
+    """
+    --------------------
+    TASKS AND EVENT HANDLER
+    --------------------
+    """
+
+
+    """
+    --------------------
+    HELPING FUNCTIONS
+    --------------------
+    """
+    async def get_state(self):
+        """
+        Returns a state class object capturing the state of this subsystem
+        """
+        try:
+            # process indicators
+            acquired = False
+
+            # wait for any possible update process to finish
+            acquired = await self.state_lock.acquire()
+
+            # get state object from component status
+            self.subsystem_state : SubsystemState
+            state = self.subsystem_state.from_subsystem(self)
+
+            # release update lock
+            self.state_lock.release()
+
+            return state
+        except asyncio.CancelledError:
+            if self.state_lock.locked() and acquired:
+                # if this process had acquired the update_lock and has not released it, then release
+                self.state_lock.release()
+            return None
+"""
+-------------------------------
+COMPONENT AND SUBSYSTEM STATES
 -------------------------------
 """
 class ComponentState:
@@ -603,18 +992,32 @@ class ComponentState:
         self.health = health
         self.status = status
 
+    @abstractmethod
     def from_component(component : ComponentModule):
         pass
 
-"""
--------------------------------
-SUBSYSTEM MODULES
--------------------------------
-"""
-class SubsystemModule(Module):
-    def __init__(self, name, parent_module) -> None:
-        super().__init__(name, parent_module, [], n_timed_coroutines=1)
-        self.submodules = []
+class SubsystemState:
+    def __init__(self, name: str, subsystem_type : type, component_states : dict, health : SubsystemHealth, status : SubsystemStatus):
+        """
+        Describes the state of a generic subsystem. Each subsystem type must have its own component state class if it contains any
+        extra metrics that describe its state besides health, operational status, and subcomponent states. 
+        """
+        # subsystem info
+        self.subsystem_name = name
+        self.subsystem_type = subsystem_type
+
+        # subsystem status
+        self.health = health
+        self.status = status
+
+        # component states
+        self.component_states = dict()
+        for component in component_states:
+            self.component_states[component] = component_states[component]
+
+    @abstractmethod
+    def from_subsystem(subsystem : SubsystemModule):
+        pass
 
 """
 COMMAND AND DATA HANDLING SUBSYSTEM
@@ -773,21 +1176,6 @@ class BatteryModule(ComponentModule):
         
         return (1 - self.energy_stored/self.energy_capacity) >= self.depth_of_discharge - self.crit_threshold
 
-    async def wait_for_critical(self) -> None:
-        """
-        Count downs to the next predicted critical state of this component given that the current configuration is maintained
-        """
-        try:
-            dp = self.charging_efficiency * self.power_supplied - self.power_output
-            if abs(dp) > 0.0:
-                dt = ((1 - (self.depth_of_discharge - self.crit_threshold)) * self.energy_capacity - self.energy_stored) / dp
-                await self.sim_wait(dt)
-            else:
-                while True:
-                    await self.sim_wait(1e6)
-        except asyncio.CancelledError:
-            return
-
     def is_failed(self) -> bool:
         """
         Returns true if the current state of the component is a failure state
@@ -909,7 +1297,7 @@ class InertialMeasurementUnitModule(ComponentModule):
                 parent_subsystem: Module, 
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
-                status: ComponentStatus = ComponentStatus.OFF, 
+                status: ComponentStatus = ComponentStatus.ON, 
                 f_update: float = 1) -> None:
         super().__init__(ComponentNames.IMU.value, parent_subsystem, InertialMeasurementUnitState, average_power_consumption, health, status, f_update)
         self.angular_pos = [None, None, None, None]
@@ -945,7 +1333,7 @@ class PositionDeterminationModule(ComponentModule):
                 parent_subsystem: Module, 
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
-                status: ComponentStatus = ComponentStatus.OFF, 
+                status: ComponentStatus = ComponentStatus.ON, 
                 f_update: float = 1) -> None:
         super().__init__(ComponentNames.POS.value, parent_subsystem, PositionDeterminationState, average_power_consumption, health, status, f_update)
         self.pos = [None, None, None]
@@ -996,7 +1384,7 @@ class SunSensorModule(ComponentModule):
                 parent_subsystem: Module, 
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
-                status: ComponentStatus = ComponentStatus.OFF, 
+                status: ComponentStatus = ComponentStatus.ON, 
                 f_update: float = 1) -> None:
         super().__init__(ComponentNames.SUN_SENSOR.value, parent_subsystem, SunSensorState, average_power_consumption, health, status, f_update)
         self.eclipse = None
