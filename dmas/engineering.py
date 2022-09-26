@@ -3,6 +3,7 @@ import asyncio
 import copy
 import logging
 import math
+from msilib.schema import Component
 from telnetlib import XASCII
 from messages import *
 from utils import *
@@ -213,15 +214,27 @@ class ComponentModule(Module):
         """
         try:
             while True:
+                # update component state
+                await self.update()
+
                 if self.status is ComponentStatus.OFF:
+                    # if component is turned off, wait until it is turned on
                     await self.updated
-                else:
-                    await self.update()
-                    dt = 1/self.UPDATE_FREQUENCY
-                    if self.failure.is_set():
-                        break
-                    await self.sim_wait(dt)
+
+                if self.health is ComponentHealth.FAILURE:
+                    # else if component is in failure state, stop periodic updates and sleep for the rest of the simulation
+                    break
+
+                # inform parent subsystem of current state
+                state : ComponentState = await self.get_state()
+                msg = ComponentStateMessage(self.name, self.parent_module.name, state)
+                await self.send_internal_message(msg)  
+
+                # wait for next periodic update
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
+
             while True:
+                # sleep for the rest of the simulation
                 await self.sim_wait(1e6)
 
         except asyncio.CancelledError:
@@ -229,54 +242,48 @@ class ComponentModule(Module):
 
     async def crit_monitor(self) -> None:
         """
-        Monitors component state and triggers critical event if a critical state is detected
+        Monitors component state after every component state update and communicates critical state 
+        to parent subsystem and other processes.
         """
         try:
             while True:
                 # check if failure event was triggered
-                if self.failure.is_set():
-                    # if comonent is in failure state, sleep
-                    await self.sim_wait(1e6)
+                if self.health is ComponentHealth.FAILURE:
+                    # if component is in failure state, sleep for the remainder of the simulation
+                    while True:
+                        await self.sim_wait(1e6)
                 
                 else:
-                    if self.is_critical():
-                        # component is in a critical state
+                    # wait for next state update 
+                    await self.updated
 
-                        # set current status to critical
-                        if not self.failure.is_set():
-                            await self.state_lock.acquire()
-                            self.health = ComponentHealth.CRITIAL
-                            self.state_lock.release()
+                    # get latest state and acquire state lock
+                    acquired = await self.state_lock.acquire()
+                    
+                    if self.health is ComponentHealth.CRITIAL:
+                        # component is in critical state
 
-                        # trigger critical state event if it hasn't been triggered already
                         if not self.critical.is_set():
-                            self.critical.set()
-
-                        # communicate critical state to parent submodule
-                        state_msg = ComponentStateMessage(self.name, self.parent_module.name, self.get_state())
-                        await self.send_internal_message(state_msg)
-                        
-                        # wait for component to be updated
-                        await self.updated  
-
-                    else:
-                        # component is NOT in a critical state
-
-                        # reset critical event if it has been previously triggered
-                        if self.critical.is_set():
-                            self.critical.clear()
-
-                        # set internal state to nominal if not in a failure nor critical state
-                        if not self.failure.is_set():
-                            await self.state_lock.acquire()
-                            self.health = ComponentHealth.NOMINAL
+                            # release state lock
                             self.state_lock.release()
+                            acquired = None
+                            
+                            # inform parent subsystem of component critical state
+                            state : ComponentState = await self.get_state()
+                            msg = ComponentStateMessage(self.name, self.parent_module.name, state)
+                            await self.send_internal_message(msg)                          
 
-                        # wait for next state update 
-                        await self.updated
+                            # trigger critical state event                             
+                            self.critical.set()
+                    
+                    # release state lock
+                    if acquired:
+                        self.state_lock.release()
+                        acquired = None
 
         except asyncio.CancelledError:
-            return
+            if acquired:
+                self.state_lock.release()
 
     def is_critical(self) -> bool:
         """
@@ -292,87 +299,82 @@ class ComponentModule(Module):
             while True: 
                 if self.health is ComponentHealth.FAILURE:
                     # if comonent is in failure state, sleep for the rest of the simulation
-                    await self.sim_wait(1e6)
+                    while True:
+                        await self.sim_wait(1e6)
 
                 else:
-                    # check if in failure state
-                    if self.is_failed():
-                        # possible failure state detected
+                    # initiate failure state timer
+                    failure_timer = asyncio.create_task(self.wait_for_failure())
+                    failure_timer.set_name(f'{self.name}_failure_timer')
+                    
+                    # wait for the failure timer to run out or for the component to update its state
+                    conditions = [self.updated, failure_timer]
+                    done, _ = await asyncio.wait(conditions, return_when=asyncio.FIRST_COMPLETED)
 
-                        # erease failure timer object
-                        failure_timer = None
+                    if self.updated in done:
+                        # component was updated before the component's failure timer ran out
 
-                        # set current status to critical
-                        self.health = ComponentHealth.CRITIAL
-                            
-                        # communicate CRITICAL state to parent submodule
-                        state_msg = ComponentStateMessage(self.name, self.parent_module.name, self.get_state())
-                        await self.send_internal_message(state_msg)
-
-                        # allow for component to react to possible failure state
-                        await self.sim_wait(1/self.UPDATE_FREQUENCY)
-                        
-                        # check if component avoided failure state
-                        if self.is_failed():
-                            # component is still in a possible failure state 
-                            
-                            # set current status to failure and turn off component
-                            await self.state_lock.acquire()
-                            self.health = ComponentHealth.FAILURE
-                            self.status = ComponentStatus.OFF
-                            self.state_lock.release()
-
-                            # update state
-                            await self.update()
-
-                            # communicate FAILURE state to parent submodule
-                            state_msg = ComponentStateMessage(self.name, self.parent_module.name, self.get_state())
-                            await self.send_internal_message(state_msg)
-
-                            # trigger failure state event
-                            self.failure.set()
-
+                        # cancel failure timer
+                        failure_timer.cancel()
+                        await failure_timer
                     else:
-                        # set internal state to nominal if not in a failure nor critical state
-                        if not self.critical.is_set():
-                            await self.state_lock.acquire()
-                            self.health = ComponentHealth.NOMINAL
+                        # component's failure timer ran out before the component had changed its state or configuration
+
+                        # update state
+                        await self.update()
+
+                    acquired = await self.state_lock.acquire()    
+                    if self.health is ComponentHealth.CRITIAL and self.is_failed():
+                        # component is in a potential failure state
+
+                        if not self.failure.is_set():                            
+                            # failure event has not been triggered yet
+
+                            # release state lock
                             self.state_lock.release()
+                            acquired = None
 
-                        # initiate failure state timer
-                        failure_timer = asyncio.create_task(self.wait_for_failure())
-                        failure_timer.set_name(f'{self.name}_failure_timer')
+                            # give parent subsystem or agent one update cycle to respond to potential failure
+                            await self.sim_wait(1/self.UPDATE_FREQUENCY)
+
+                            acquired = await self.state_lock.acquire()
+                            if self.is_failed():
+                                # component is still in failure state, triggering failure sequence
+
+                                # update component health to failure state and disable component
+                                self.health = ComponentHealth.FAILURE
+                                self.status = ComponentStatus.OFF
+
+                                # release state lock
+                                self.state_lock.release()      
+                                acquired = None                           
+
+                                # communicate parent subsystem of component failure state
+                                state = await self.get_state()
+                                msg = ComponentStateMessage(self.name, self.parent_module.name, state)
+                                await self.send_internal_message(msg)
+
+                                # trigger failure state
+                                self.failure.set()
                         
-                        # wait for the failure timer to run out or for the component to update its state
-                        conditions = [self.updated, failure_timer]
-                        done, _ = await asyncio.wait(conditions, return_when=asyncio.FIRST_COMPLETED)
-
-                        if failure_timer in done:                   
-                            # failure timer ran out before agent updated its state
-                            await self.update()
-                            while not self.is_failed():
-                                # if not failed yet, check periodically until failure state is detected
-                                await self.sim_wait(1/self.UPDATE_FREQUENCY)     
-                                await self.update()
-                        else:                                      
-                             # component updated its state before critical timer ran out
-                             
-                            # interrupt critical timer and check again
-                            failure_timer.cancel()
-                            await failure_timer
+                    # release state lock
+                    self.state_lock.release()
+                    acquired = None
 
         except asyncio.CancelledError:
-            return
+            if acquired:
+                self.state_lock.release()
 
     def is_failed(self) -> bool:
         """
-        Returns true if the current state of the component is a failure state
+        Returns true if the current state of the component is a failure state. 
+        By default it only considers power supply vs power consumption but can be extended to add more functionality
         """
         return abs( self.power_consumed - self.power_supplied ) >= 1e-6
 
     async def wait_for_failure(self) -> None:
         """
-        Count downs to the next predicted failure state of this component given that the current configuration is maintained
+        Counts down to the next predicted failure state of this component given that the current configuration is maintained
         """
         try:
             while True:
@@ -413,6 +415,10 @@ class ComponentModule(Module):
                 status = perform_task.result()
                 msg = ComponentTaskCompletionMessage(self.name, self.parent_module.name, task, status)
                 self.send_internal_message(msg)
+
+                # inform parent subsytem of the current component state
+                state = await self.get_state()
+                msg = ComponentStateMessage(self.name, self.parent_module.name, state)
 
         except asyncio.CancelledError:
             return
@@ -457,7 +463,7 @@ class ComponentModule(Module):
             aquired = await self.state_lock.acquire()
             await self.task_handler(task)
             self.state_lock.release()
-            aquired = False
+            aquired = None
 
             # update component state 
             self.log(f'Task of type {type(task)} successfully completed!')
@@ -468,7 +474,7 @@ class ComponentModule(Module):
 
         except asyncio.CancelledError:
             # release update lock if cancelled during task handling
-            if self.state_lock.locked() and aquired:
+            if aquired:
                 self.state_lock.release()
 
             # return task abort status
@@ -532,7 +538,7 @@ class ComponentModule(Module):
     """
     async def update(self):
         """
-        Updates the state of the component
+        Updates the state of the component. Checks if component is currently in a critical state.
         """
         try:
             # wait for any possible state accessing process to finish
@@ -545,8 +551,27 @@ class ComponentModule(Module):
             # update component properties
             await self.update_properties(dt)
 
-            # log state
-            self.log_state()
+            # check component health
+            if self.is_critical() or self.is_failed():
+                # component is in a critical or a potential failure state
+
+                # set current status to critical
+                self.health = ComponentHealth.CRITIAL                    
+
+                # trigger critical state event if it hasn't been triggered already
+                if self.is_critical() and not self.critical.is_set():
+                    self.critical.set()
+
+            else:
+                # component is NOT in a critical state
+                self.health = ComponentHealth.NOMINAL
+    
+                # reset critical and failure event if it has been previously triggered
+                if self.critical.is_set():
+                    self.critical.clear()
+
+                if self.failure.is_set():
+                    self.failure.clear()
 
             # update latest update time
             self.t_update = t_curr  
@@ -554,6 +579,8 @@ class ComponentModule(Module):
             # inform other processes that the update has finished
             self.updated.set()
             self.updated.clear()
+
+            # release state lock
             self.state_lock.release() 
 
         except asyncio.CancelledError:
@@ -579,9 +606,6 @@ class ComponentModule(Module):
         Returns a state class object capturing the current state of this component 
         """
         try:
-            # process indicators
-            acquired = False
-
             # wait for any possible update process to finish
             acquired = await self.state_lock.acquire()
 
@@ -591,19 +615,15 @@ class ComponentModule(Module):
 
             # release update lock
             self.state_lock.release()
+            acquired = None
 
             return state
         except asyncio.CancelledError:
-            if self.state_lock.locked() and acquired:
-                # if this process had acquired the update_lock and has not released it, then release
+            if acquired:
+                # release state lock
                 self.state_lock.release()
-            return None
 
-    def log_state(self) -> None:
-        """
-        Logs the current state of the subsystem 
-        """
-        return self.parent_module.log_state()
+            return None
 
 """
 -------------------------------
@@ -719,13 +739,7 @@ class SubsystemModule(Module):
                 component_state : ComponentState = msg.get_state()
                 self.log(f'Received component state message from component type {component_state.component_type}. Updating subsystem state...')
                 
-                await self.state_lock.acquire()
-
-                self.component_states[component_state.component_name] = component_state
-                await self.updated.set()
-                self.updated.clear()
-
-                self.state_lock.release()
+                await self.component_state_updates.put(component_state)
                 
             else:
                 self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
@@ -798,58 +812,89 @@ class SubsystemModule(Module):
             await subroutine
         return
 
+    async def update_component_state(self) -> None:
+        """
+        Receives and processes incoming component state updates. 
+        """
+        try:
+            while True:
+                # wait for next incoming component state updates
+                component_state : ComponentState = await self.component_state_updates.get()
+
+                # update component state list
+                acquired = await self.state_lock.acquire()
+                self.component_states[component_state.component_name] = component_state
+                
+                # check for subsystem and component-level critical or failure states
+                if (self.is_subsystem_critical() or self.is_component_critical()
+                    or self.is_subsystem_failure() or self.is_component_failure()):
+
+                    # set component health to critical
+                    self.health = SubsystemHealth.CRITIAL
+
+                    # trigger critical state event if it hasn't been triggered already
+                    if self.is_subsystem_critical() and not self.critical.is_set():
+                        self.critical.set()
+
+                # release update lock
+                self.state_lock.release()
+                acquired = None
+
+                # communicate to other processes that the subsystem's component states have been updated
+                await self.updated.set()
+                self.updated.clear()
+
+        except asyncio.CancelledError:
+            if acquired:
+                self.state_lock.release()
+
     async def crit_monitor(self) -> None:
         """
         Monitors subsystem state and triggers critical event if a critical state is detected
         """
         try:
             while True:
-                if self.failure.is_set():
-                    # if comonent is in failure state, sleep until end of simulation
-                    await self.sim_wait(1e6)
+                if self.health is SubsystemHealth.FAILURE:
+                    # if subsystem is in failure state, sleep for the remainder of the simulation
+                    while True:
+                        await self.sim_wait(1e6)
+                                
+                # wait for next state update 
+                await self.updated
+
+                # get latest state and acquire state lock
+                acquired = await self.state_lock.acquire()
                 
-                else:
-                    if self.is_subsystem_critical():
-                        # subsystem is in a critical state
+                if self.health is SubsystemHealth.CRITIAL:
+                    # subsystem is in critical state
 
-                        # set current status to critical
-                        if not self.failure.is_set():
-                            await self.state_lock.acquire()
-                            self.health = SubsystemHealth.CRITIAL
-                            self.state_lock.release()
+                    if not self.critical.is_set():
+                        # release state lock
+                        self.state_lock.release()
+                        acquired = None
+                        
+                        # inform Command and Data Handling subsystem of current subsystem critical state
+                        state : SubsystemState = await self.get_state()
+                        msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, state)
+                        await self.send_internal_message(msg)                          
 
-                        # trigger critical state event if it hasn't been triggered already
-                        if not self.critical.is_set():
-                            self.critical.set()
-
-                        # communicate critical state to command and data handling 
-                        state_msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, self.get_state())
-                        await self.send_internal_message(state_msg)
-
-                    else:
-                        # component is NOT in a critical state
-
-                        # reset critical event if it has been previously triggered
-                        if self.critical.is_set():
-                            self.critical.clear()
-
-                        # set internal state to nominal if not in a failure nor critical state
-                        if not self.failure.is_set():
-                            await self.state_lock.acquire()
-                            self.health = SubsystemHealth.NOMINAL
-                            self.state_lock.release()
-
-                    # wait for next state update 
-                    await self.updated
+                        # trigger critical state event                             
+                        self.critical.set()
+                
+                # release state lock
+                if acquired:
+                    self.state_lock.release()
+                    acquired = None
 
         except asyncio.CancelledError:
-            return
+            if acquired:
+                self.state_lock.release()
 
     def is_subsystem_critical(self) -> bool:
         """
         Detects subsystem-level critical state using latest component states received by this subsystem
         """
-        return self.is_component_critical()
+        return False
 
     def is_component_critical(self) -> bool:
         """
@@ -868,54 +913,61 @@ class SubsystemModule(Module):
         try:
             while True: 
                 if self.health is SubsystemHealth.FAILURE:
-                    # if comonent is in failure state, sleep for the rest of the simulation
-                    await self.sim_wait(1e6)
+                    # if subsystem is in failure state, sleep for the rest of the simulation
+                    while True:
+                        await self.sim_wait(1e6)
 
                 else:
-                    # check if in failure state
-                    if self.is_subsystem_failure() or self.is_component_failure():
-                        # possible failure state detected
+                    # wait for next component update
+                    await self.updated
 
-                        # set current status to critical
-                        self.health = ComponentHealth.CRITIAL
-                            
-                        # communicate CRITICAL state to parent submodule
-                        state_msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, self.get_state())
-                        await self.send_internal_message(state_msg)
+                    acquired = await self.state_lock.acquire()    
+                    if self.health is SubsystemHealth.CRITIAL and self.is_subsystem_failure():
+                        # subsystem is in a potential failure state
 
-                        # allow for component to react to possible failure state
-                        if self.is_subsystem_failure():
-                            await self.sim_wait(1)
-                        
-                            # check if component avoided failure state
+                        if not self.failure.is_set():                            
+                            # failure event has not been triggered yet
+
+                            # release state lock
+                            self.state_lock.release()
+                            acquired = None
+
+                            # give Command and Data Handling subsystem one update cycle to respond to potential failure
+                            f_min = 1
+                            for component in self.submodules:
+                                component : ComponentModule
+                                if component.UPDATE_FREQUENCY < f_min:
+                                    f_min = component.UPDATE_FREQUENCY
+
+                            await self.sim_wait(1/f_min)
+
+                            acquired = await self.state_lock.acquire()
                             if self.is_subsystem_failure():
-                                # component is still in a possible failure state 
-                                
-                                # set current status to failure and turn off component
-                                await self.state_lock.acquire()
+                                # subsystem is still in a failure state, triggering failure sequence
+
+                                # update subsystem's health to failure state and disable subsystem
                                 self.health = SubsystemHealth.FAILURE
                                 self.status = SubsystemStatus.OFF
-                                self.state_lock.release()
 
-                                # communicate FAILURE state to parent submodule
-                                state_msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, self.get_state())
-                                await self.send_internal_message(state_msg)
+                                # release state lock
+                                self.state_lock.release()      
+                                acquired = None                           
 
-                                # trigger failure state event
+                                # communicate parent subsystem of component failure state
+                                state : SubsystemState = await self.get_state()
+                                msg = SubsystemStateMessage(self.name, AgentSubsystemTypes.CNDH.value, state)
+                                await self.send_internal_message(msg)
+
+                                # trigger failure state
                                 self.failure.set()
-
-                    else:
-                        # set internal state to nominal if not in a failure nor critical state
-                        if not self.critical.is_set():
-                            await self.state_lock.acquire()
-                            self.health = SubsystemHealth.NOMINAL
-                            self.state_lock.release()
-
-                        # wait for next component state update to reevaluate subsystem-level failure state
-
+                        
+                    # release state lock
+                    self.state_lock.release()
+                    acquired = None
 
         except asyncio.CancelledError:
-            return
+            if acquired:
+                self.state_lock.release()
 
     def is_subsystem_failure(self) -> bool:
         """
