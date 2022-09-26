@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import asyncio
 import copy
+from ctypes import Union
 import logging
 import math
 from msilib.schema import Component
@@ -118,6 +119,11 @@ class ComponentModule(Module):
             if self.failure.is_set():
                 self.log(f'Component is in failure state. Ignoring message...')
                 return
+
+            self.parent_module : SubsystemModule
+            if self.parent_module.failure.is_set():
+                self.log(f'Subsystem is in failure state. Ignoring message...')
+                return
                 # TODO add capability to recover component by performing some troubleshooting tasks being given to this component
 
             if msg.dst_module != self.name:
@@ -134,6 +140,7 @@ class ComponentModule(Module):
                     self.tasks.put(task)
             
             elif isinstance(msg.content, EnvironmentBroadcastMessage):
+                self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
 
             else:
@@ -226,9 +233,10 @@ class ComponentModule(Module):
                     break
 
                 # inform parent subsystem of current state
-                state : ComponentState = await self.get_state()
-                msg = ComponentStateMessage(self.name, self.parent_module.name, state)
-                await self.send_internal_message(msg)  
+                if self.health is ComponentHealth.NOMINAL:
+                    state : ComponentState = await self.get_state()
+                    msg = ComponentStateMessage(self.name, self.parent_module.name, state)
+                    await self.send_internal_message(msg)  
 
                 # wait for next periodic update
                 await self.sim_wait(1/self.UPDATE_FREQUENCY)
@@ -397,7 +405,7 @@ class ComponentModule(Module):
                 task = await self.tasks.get()
 
                 perform_task = asyncio.create_task(self.perform_task(task))
-                listen_for_abort = asyncio.create_task(self.perform_task(task))
+                listen_for_abort = asyncio.create_task(self.listen_for_abort(task))
 
                 done, _ = await asyncio.wait([perform_task, listen_for_abort, self.failure], return_when=asyncio.FIRST_COMPLETED)
 
@@ -554,8 +562,6 @@ class ComponentModule(Module):
             # check component health
             if self.is_critical() or self.is_failed():
                 # component is in a critical or a potential failure state
-
-                # set current status to critical
                 self.health = ComponentHealth.CRITIAL                    
 
                 # trigger critical state event if it hasn't been triggered already
@@ -679,6 +685,9 @@ class SubsystemModule(Module):
         self.tasks = asyncio.Queue()                                    # stores task commands to be executed by this subsystem
         self.aborts = asyncio.Queue()                                   # stores task abort commnands to be executed by this subsystem
         self.component_state_updates = asyncio.Queue()                  # stores component state updates to be processed by this subsystem
+        self.subsystem_state_updates = asyncio.Queue()                  # stores subsystem state updates to be processed by this subsystem
+        self.component_task_status = asyncio.Queue()                    # stores component tasks' status after they've been submitted to components for completion
+        self.subsystem_task_status = asyncio.Queue()                    # stores subsystem tasks' status after they've been submitted to other subsystems for completion
         self.environment_events = asyncio.Queue()                       # stores environment events that may have an effect on this subsystem
 
         # subsystem update event
@@ -712,35 +721,51 @@ class SubsystemModule(Module):
                 self.log(f'Received internal message intended for {msg.dst_module}. Rerouting message...')
                 await self.send_internal_message(msg)
 
-            elif isinstance(msg, SubsystemTaskMessage):
+            elif isinstance(msg, SubsystemTaskMessage) or isinstance(msg, ComponentTaskMessage):
                 task = msg.get_task()
                 self.log(f'Received a task of type {type(task)}!')
 
-                if isinstance(task, SubsystemAbortTask):
+                if isinstance(task, SubsystemAbortTask) or isinstance(task, ComponentAbortTask):
                     self.aborts.put(task)
                 else:
                     self.tasks.put(task)
-
+                    
             elif isinstance(msg.content, EnvironmentBroadcastMessage):
-                self.log(f'Received internal message containing an environment broadcast of type {type(msg)}. Reacting at the system-level...')
+                self.log(f'Received internal message containing an environment broadcast of type {type(msg)}!')
                 await self.environment_events.put(msg)
 
-                self.log(f'System-level reaction done. Reacting at the component-level...')
+                self.log(f'Forwarding internal message containing an environment broadcast of type {type(msg)} to components...')
                 for component in self.submodules:
                     component : ComponentModule
                     msg_copy : InternalMessage = copy.copy(msg)
                     msg_copy.dst_module = component.name
 
                     await self.send_internal_message(msg_copy)
-                pass
             
             elif isinstance(msg, ComponentStateMessage):
+                subsystem_state : ComponentState = msg.get_state()
+                self.log(f'Received component state message from component type {subsystem_state.component_type}. Updating subsystem state...')
+                await self.component_state_updates.put(subsystem_state)
                 
-                component_state : ComponentState = msg.get_state()
-                self.log(f'Received component state message from component type {component_state.component_type}. Updating subsystem state...')
-                
-                await self.component_state_updates.put(component_state)
-                
+            elif isinstance(msg, SubsystemStateMessage):
+                subsystem_state : SubsystemState = msg.get_state()
+                self.log(f'Received component state message from subsystem type {subsystem_state.subsystem_type}!')
+                await self.component_state_updates.put(subsystem_state)
+
+            elif isinstance(msg, SubsystemStateRequestMessage):
+                self.log(f'Received a subsystem state request from subsystem \'{msg.src_module}\'. Sending latest subsystem state...')
+                state : SubsystemState = await self.get_state()
+                msg = SubsystemStateMessage(self.name, msg.src_module, state)
+                await self.send_internal_message(msg)
+
+            elif isinstance(msg, ComponentTaskCompletionMessage):
+                self.log(f'Received a component task completion message from component \'{msg.src_module}\'. Processing response...')
+                await self.component_task_status.put(msg.content)
+
+            elif isinstance(msg, SubsystemTaskCompletionMessage):
+                self.log(f'Received a subsystem task completion message from subsystem \'{msg.src_module}\'. Processing response...')
+                await self.subsystem_task_status.put(msg.content)
+
             else:
                 self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
             
@@ -758,13 +783,15 @@ class SubsystemModule(Module):
 
         1- Updating subsystem state using incoming component states
 
-        2- Detecting critical states
+        2- Updating knowledge of other subsystems' states
 
-        3- Triggering failure states
+        3- Detecting critical states
 
-        4- Perform tasks being given to this component
+        4- Triggering failure states
 
-        5- Processes events from the environment that may affect this component
+        5- Perform tasks being given to this component
+
+        6- Processes events from the environment that may affect this component
         
         Subsystem failure leads to no actions being able to be performed by this 
         subsystem. Agent-wide failure is to be handled by the platform simulator.
@@ -777,6 +804,10 @@ class SubsystemModule(Module):
         update_component_state = asyncio.create_task(self.update_component_state())
         update_component_state.set_name (f'{self.name}_update_component_state')
         coroutines.append(update_component_state)
+
+        update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
+        update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
+        coroutines.append(update_subsytem_state)
 
         crit_monitor = asyncio.create_task(self.crit_monitor())
         crit_monitor.set_name (f'{self.name}_crit_monitor')
@@ -847,6 +878,24 @@ class SubsystemModule(Module):
         except asyncio.CancelledError:
             if acquired:
                 self.state_lock.release()
+
+    async def update_subsytem_state(self) -> None:
+        """
+        Receives state updates from other subsystems and reacts accordingly
+        """
+        try:
+            while True:
+                subsystem_state : SubsystemState = await self.subsystem_state_updates.get()
+                await self.subsystem_state_update_handler(subsystem_state)
+
+        except asyncio.CancelledError:
+            return
+
+    async def subsystem_state_update_handler(self, subsystem_state):
+        """
+        Reacts to subsystem state updates.
+        """
+        pass
 
     async def crit_monitor(self) -> None:
         """
@@ -948,10 +997,28 @@ class SubsystemModule(Module):
                                 # update subsystem's health to failure state and disable subsystem
                                 self.health = SubsystemHealth.FAILURE
                                 self.status = SubsystemStatus.OFF
-
+                                
                                 # release state lock
                                 self.state_lock.release()      
-                                acquired = None                           
+                                acquired = None                
+
+                                # disable every component that comprises this subsystem
+                                for component in self.submodules:
+                                    component : ComponentModule
+                                    kill_task = ComponentActuationTask(component.name, ComponentStatus.OFF)
+                                    kill_msg = ComponentTaskMessage(self.name, component.name, kill_task)
+                                    await self.send_internal_message(kill_msg)
+
+                                # wait for every component to turn off
+                                while True:
+                                    fully_off = True
+                                    for component in self.submodules:
+                                        if component.status is ComponentStatus.ON:
+                                            fully_off = False
+                                            break
+                                    if fully_off:
+                                        break
+                                    await self.sim_wait(1/f_min)         
 
                                 # communicate parent subsystem of component failure state
                                 state : SubsystemState = await self.get_state()
@@ -990,7 +1057,193 @@ class SubsystemModule(Module):
     TASKS AND EVENT HANDLER
     --------------------
     """
+    async def task_processor(self) -> None:
+        """
+        Processes tasks in the order they are received. Listens for any abort commands that may be received during 
+        the performance of the task and processes them accordingly. 
+        """
+        try:
+            while True:
+                task = await self.tasks.get()
 
+                perform_task = asyncio.create_task(self.perform_task(task))
+                listen_for_abort = asyncio.create_task(self.listen_for_abort(task))
+
+                done, _ = await asyncio.wait([perform_task, listen_for_abort, self.failure], return_when=asyncio.FIRST_COMPLETED)
+
+                if self.failure in done or listen_for_abort in done:     
+                    # component failed or abort message received before task was completed, cancelling task 
+                    perform_task.cancel()
+                    await perform_task
+
+                if listen_for_abort not in done:                          
+                    # task was finished or component reached a failure state before abort command was received, cancelling abort listening task
+                    listen_for_abort.cancel()
+                    await listen_for_abort
+
+                # inform Command and Data Handling subsystem of the status of completion of the task at hand
+                status = perform_task.result()
+                msg = SubsystemTaskCompletionMessage(self.name, AgentSubsystemTypes.CNDH.value, task, status)
+                self.send_internal_message(msg)
+
+                # inform Command and Data Handling subsytem of the current component state
+                state = await self.get_state()
+                msg = ComponentStateMessage(self.name, AgentSubsystemTypes.CNDH.value, state)
+
+        except asyncio.CancelledError:
+            return
+
+    async def listen_for_abort(self, task: Union[SubsystemTask, ComponentTask]) -> None:
+        """
+        Listens for any abort command targetted towards the task being performed.
+        Any aborts targetted to other tasks are ignored but not discarted.
+        """
+        try:
+            other_aborts = []
+            while True:
+                abort_task = await self.aborts.get()
+                
+                if abort_task == task:
+                    for abort in other_aborts:
+                        self.aborts.put(abort)
+                    return
+                else:
+                    other_aborts.append(abort_task)
+
+        except asyncio.CancelledError:
+            for abort in other_aborts:
+                self.aborts.put(abort)
+
+    async def perform_task(self, task: Union[SubsystemTask, ComponentTask]) -> TaskStatus:
+        """
+        Performs a task given to this subsystem. If the task is a subsystem-level task, it decomposes the task into a list of component tasks to be performed.
+        Rejects any tasks if the subsystem is in a failure mode of if it is not intended for to be performed by this subsystem. 
+        """
+        try:
+            self.log(f'Starting task of type {type(task)}...')
+            
+            # Decompose subsytem task into component tasks
+            if isinstance(comp_task, SubsystemTask):
+                comp_tasks = self.decompose_subsystem_task(comp_task)
+            elif isinstance(comp_task, ComponentTask):
+                comp_tasks = [comp_task]
+            else:
+                self.log(f'Task of type {type(task)} not supported. Aborting task...')
+                return TaskStatus.ABORTED
+
+            # submit component tasks
+            task_status = dict()
+            for comp_task in comp_tasks:
+                comp_task : ComponentTask
+                task_handler = asyncio.create_task(self.task_handler(comp_task))
+
+                await asyncio.wait([task_handler, self.failure], return_when=asyncio.FIRST_COMPLETED)
+
+                if self.failure.is_set():
+                    self.log(f'Subsystem reached failure state. Aborting task of type {type(task)}...')
+                    task_handler.cancel()
+                    await task_handler
+
+                    return TaskStatus.ABORTED
+
+                task_status[comp_task] = task_handler.result()
+
+                if task_status[comp_task] is TaskStatus.ABORTED:
+                    self.log(f'Subsystem task of type {type(comp_task)} was aborted.')
+                    raise asyncio.CancelledError
+
+                elif task_status[comp_task] is TaskStatus.DONE:
+                    self.log(f'Subsystem task of type {type(comp_task)} successfully completed!')
+            
+            # return task completion status
+            self.log(f'Task of type {type(task)} successfully completed!')
+            return TaskStatus.DONE
+
+        except asyncio.CancelledError:
+            # return task abort status
+            self.log(f'Task of type {type(task)} aborted!')
+            return TaskStatus.ABORTED
+
+    @abstractmethod
+    def decompose_subsystem_task(self, task : SubsystemTask) -> list:
+        """
+        Decomposes a subsystem-level task and returns a list of component-level tasks to be performed by this subsystem.
+        """
+        pass
+
+    async def task_handler(self, task : ComponentTask) -> None:
+        """
+        Handles tasks to be performed by this subsystem's components.
+        """
+        try:
+            component_found = False
+            for component in self.submodules:
+                component : ComponentModule
+                if component.name == task.component:
+                    component_found = True
+                    break
+
+            if not component_found:
+                self.log(f'Component task intended for another subsystem. Initially intended for component \'{task.component}\'. Aborting task...')
+                return TaskStatus.ABORTED
+
+            # submist task to be performed by component
+            msg = ComponentTaskMessage(self.name, task.component, task)
+            await self.send_internal_message(msg)
+
+            # wait for response
+            status : TaskStatus = None
+            resp : list = []
+            while True:
+                resp_task, resp_status = await self.component_task_status.get()
+
+                if resp_task == task:
+                    status = resp_status              
+                    break
+                else:
+                    resp.append( (resp_task, resp_status) )
+
+            for resp_task, resp_status in resp:
+                self.component_task_status.put( (resp_task, resp_status) )
+
+            return status
+        except asyncio.CancelledError:
+            return TaskStatus.ABORTED
+
+    async def environment_event_processor(self):
+        """
+        Processes any incoming events from the environment
+        """
+        try:
+            while True:
+                # wait for an event to be received
+                event_broadcast : EventBroadcastMessage = await self.environment_events.get()
+
+                # handle according to event type
+                aquired = await self.state_lock.acquire()
+
+                # record subsystem-level effects
+                self.environment_event_handler(event_broadcast)
+
+                # release state lock
+                self.state_lock.release()
+                aquired = False
+
+                # record component-level effects by sending it to all subsystem components
+                for component in self.submodules:
+                    component : ComponentModule
+                    msg = InternalMessage(self.name, component.name, event_broadcast)
+                    await self.send_internal_message(msg)                
+
+        except asyncio.CancelledError:
+            if aquired:
+                self.state_lock.release()
+
+    async def environment_event_handler(self, event_msg) -> bool:
+        """ 
+        Affects the component depending on the type of event being received. Ignores all events by default.
+        """
+        pass
 
     """
     --------------------
@@ -1106,10 +1359,7 @@ class OnboardComputerModule(ComponentModule):
         """
 
         if isinstance(task, ComponentActuationTask):                
-            if task.component_status:
-                self.status = ComponentStatus.ON
-            else:
-                self.status = ComponentStatus.OFF
+            self.status = task.component_status
             self.log(f'Component status set to {self.status.name}!')
 
         elif isinstance(task, ComponentPowerSupplyTask):

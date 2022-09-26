@@ -3,7 +3,7 @@ from enum import Enum
 import json
 from re import T
 from unittest import result
-from dmas.utils import ComponentNames
+from dmas.utils import ComponentNames, ComponentStatus
 
 from utils import EnvironmentModuleTypes, TaskStatus
 
@@ -1425,18 +1425,17 @@ class ComponentAbortTask(ComponentTask):
 
 
 class ComponentActuationTask(ComponentTask):
-    def __init__(self, component: str, actuation_status: bool) -> None:
+    def __init__(self, component: str, actuation_status: ComponentStatus) -> None:
         """
         Tasks a specific component to actuate on or off
 
         component:
             Name of component to be actuated
         actuation_status:
-            Status of the component actuation to be set by this task. 
-            True for turning the component ON and False for turning the component OFF
+            Status of the component actuation to be set by this task
         """
         super().__init__(component)
-        self.component_status : bool = actuation_status
+        self.component_status : ComponentStatus = actuation_status
 
 class ComponentPowerSupplyRequestTask(ComponentTask):
     def __init__(self, component: str, power_to_supply : float, target : str) -> None:
@@ -1522,9 +1521,19 @@ class ComponentTaskCompletionMessage(InternalMessage):
         task, _ = self.content
         return task
 
-    def get_task_status(self) -> ComponentTask:
+    def get_task_status(self) -> TaskStatus:
         _, status = self.content
         return status
+
+class ComponentStateMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, state = None) -> None:
+        """
+        Inter module communicating the latest state of a component module
+        """
+        super().__init__(src_module, dst_module, state)
+
+    def get_state(self):
+        return self.content
 
 """
 SUBSYSTEM TASK
@@ -1574,22 +1583,34 @@ class SubsystemTaskMessage(InternalMessage):
     def get_task(self) -> SubsystemTask:
         return self.content
 
-class ComponentStateMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, state = None) -> None:
+class SubsystemTaskCompletionMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, task: SubsystemTask, status : TaskStatus) -> None:
         """
-        Inter module communicating the latest state of a component module
+        Internal message informing a module of the status of a subsystem task 
         """
-        super().__init__(src_module, dst_module, state)
+        super().__init__(src_module, dst_module, (task, status))
 
-    def get_state(self):
-        return self.content
+    def get_task(self) -> SubsystemTask:
+        task, _ = self.content
+        return task
+
+    def get_task_status(self) -> TaskStatus:
+        _, status = self.content
+        return status
 
 class SubsystemStateMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, state = None) -> None:
         """
-        Inter module communicating the latest state of a subsystem module
+        Inter module message communicating the latest state of a subsystem module
         """
         super().__init__(src_module, dst_module, state)
 
     def get_state(self):
         return self.content
+
+class SubsystemStateRequestMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str) -> None:
+        """
+        Inter module message requesting the latest state of a particular subsystem module
+        """
+        super().__init__(src_module, dst_module)
