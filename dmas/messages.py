@@ -1563,7 +1563,7 @@ class SubsystemAbortTask(SubsystemTask):
         Informs a subsystem that it must abort a task that is currently being performed or is scheduled to be performed
         
         subsystem:
-            Name of component to perform the abort command
+            Name of the subsystem to perform the abort command
         target_task:
             Task to be aborted
         """
@@ -1614,3 +1614,64 @@ class SubsystemStateRequestMessage(InternalMessage):
         Inter module message requesting the latest state of a particular subsystem module
         """
         super().__init__(src_module, dst_module)
+
+"""
+PLATOFRM TASK
+"""
+class PlatformTask:
+    def __init__(self, task_status : TaskStatus = TaskStatus.PENDING) -> None:
+        """
+        Abstract platform task class meant to communicate a task to be performed by the agent's platform
+
+        task_status:
+            Initial task status
+        """
+        self._task_status : TaskStatus = task_status
+    
+    def set_task_status(self, status: TaskStatus):
+        """
+        Sets the status of the task being performed
+        """
+        self._task_status = status
+
+class PlatformAbortTask(SubsystemTask):
+    def __init__(self, target_task : PlatformTask) -> None:
+        """
+        Informs a subsystem that it must abort a platform-level task that is currently being performed or is scheduled to be performed
+        
+        target_task:
+            Task to be aborted
+        """
+        super().__init__()
+        self.target_task = target_task
+
+class ObservationTask(PlatformTask):
+    def __init__(self, target, task_status: TaskStatus = TaskStatus.PENDING) -> None:
+        super().__init__(task_status)
+        self.target = target
+
+    def get_target(self):
+        return self.target
+
+"""
+SUBSYSTEM TASK MESSAGES
+"""
+class PlatformTaskMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, task: PlatformTask) -> None:
+        """
+        Intermodule message carrying an agent platform task
+        """
+        super().__init__(src_module, dst_module, task)
+
+    def get_task(self) -> SubsystemTask:
+        """
+        Returns the task to be performed by the agent platform
+        """
+        return self.content
+
+class PlatformTaskCompletionMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, task: PlatformTask, status : TaskStatus) -> None:
+        """
+        Internal message informing a module of the status of a platform task 
+        """
+        super().__init__(src_module, dst_module, (task, status))

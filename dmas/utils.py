@@ -80,7 +80,11 @@ class AgentModuleTypes(Enum):
     SCIENCE_MODULE = 'SCIENCE_MODULE'
     SCHEDULING_MODULE = 'SCHEDULING_MODULE'
 
-class AgentSubsystemTypes(Enum):
+class EngineeringModuleSubmoduleTypes(Enum):
+    PLATFORM_SIM = 'PLATFORM_SIM'
+    NETWORK_TRANSMISSION_EMULATOR = 'NETWORK_TRANSMISSION_EMULATOR'
+
+class SubsystemTypes(Enum):
     EPS = 'ELECTRIC_POWER_SUBSYSTEM'
     CNDH = 'COMMAND_AND_DATA_HANDLING'
     PAYLOAD = 'PAYLOAD'
