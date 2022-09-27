@@ -3,7 +3,7 @@ from enum import Enum
 import json
 from re import T
 from unittest import result
-from dmas.utils import ComponentNames, ComponentStatus
+from dmas.utils import ComponentNames, ComponentStatus, SubsystemTypes
 
 from utils import EnvironmentModuleTypes, TaskStatus
 
@@ -1385,29 +1385,14 @@ MODULE TASKS
 COMPONENT TASKS
 """
 class ComponentTask:
-    def __init__(self, component: str, task_status : TaskStatus = TaskStatus.PENDING) -> None:
+    def __init__(self, component: str) -> None:
         """
         Abstract component task class meant to communicate a task to be performed by a specific component
 
         component:
             Name of component to perform the task
-        task_status:
-            Initial task status
         """
         self.component : str = component
-        self._task_status : TaskStatus = task_status
-    
-    def set_status(self, status: TaskStatus):
-        """
-        Sets the status of the task being performed
-        """
-        self._task_status = status
-
-    def get_status(self):
-        """
-        returns the status of the task being performed
-        """
-        return self._task_status
 
 
 class ComponentAbortTask(ComponentTask):
@@ -1423,8 +1408,15 @@ class ComponentAbortTask(ComponentTask):
         super().__init__(component)
         self.target_task = target_task
 
+class ComponentMaintenanceTask(ComponentTask):
+    def __init__(self, component: str) -> None:
+        """
+        Abstract component task representing maintenance tasks to be performed to the component. 
+        Includes tasks that regulate a component's status, health, or power-supply.
+        """
+        super().__init__(component)
 
-class ComponentActuationTask(ComponentTask):
+class ComponentActuationTask(ComponentMaintenanceTask):
     def __init__(self, component: str, actuation_status: ComponentStatus) -> None:
         """
         Tasks a specific component to actuate on or off
@@ -1437,13 +1429,52 @@ class ComponentActuationTask(ComponentTask):
         super().__init__(component)
         self.component_status : ComponentStatus = actuation_status
 
-class ComponentPowerSupplyRequestTask(ComponentTask):
-    def __init__(self, component: str, power_to_supply : float, target : str) -> None:
+class ComponentDisableTask(ComponentActuationTask):
+    def __init__(self, component: str) -> None:
         """
-        Tasks a specific component to generate a finite amount of power for a given component defined by this task
+        Turns OFF a component
+        """
+        super().__init__(component, ComponentStatus.OFF)
+
+class ComponentEnableTask(ComponentActuationTask):
+    def __init__(self, component: str) -> None:
+        """
+        Turns ON a component
+        """
+        super().__init__(component, ComponentStatus.ON)
+
+class ReceivePowerTask(ComponentMaintenanceTask):
+    def __init__(self, component: str, power_to_supply : float) -> None:
+        """
+        Tasks a specific component to receive a given amount of power
 
         component:
             name of component to supply power
+        power_to_supply:
+            amout of power supplied in [W]
+        """
+        super().__init__(component)
+        self.power_to_supply = power_to_supply
+
+class StopReceivingPower(ReceivePowerTask):
+    def __init__(self, component: str, power_supplied: float) -> None:
+        """
+        Tells a specific component that it is no longer receiving a given amount of power
+
+        component:
+            name of component to supply power
+        power_supplied:
+            amout of power being taken away in [W]
+        """
+        super().__init__(component, -power_supplied)
+
+class ProvidePowerTask(ComponentTask):
+    def __init__(self, component: str, power_to_supply : float, target : str) -> None:
+        """
+        Tasks a component from the EPS subsystem to provide power to another component
+
+        component:
+            name of eps component to provide power
         power_to_supply:
             amout of power to be supplied in [W]
         target:
@@ -1452,19 +1483,6 @@ class ComponentPowerSupplyRequestTask(ComponentTask):
         super().__init__(component)
         self.power_to_supply = power_to_supply
         self.target = target
-
-class ComponentPowerSupplyTask(ComponentTask):
-    def __init__(self, component: str, power_to_supply : float) -> None:
-        """
-        Tasks a specific component to receive a finite amount of power defined by this task
-
-        component:
-            name of component to supply power
-        power_to_supply:
-            amout of power to be supplied in [W]
-        """
-        super().__init__(component)
-        self.power_to_supply = power_to_supply
 
 class SaveToMemoryTask(ComponentTask):
     def __init__(self, data : str) -> None:
@@ -1539,17 +1557,14 @@ class ComponentStateMessage(InternalMessage):
 SUBSYSTEM TASK
 """
 class SubsystemTask:
-    def __init__(self, subsystem: str, task_status : TaskStatus = TaskStatus.PENDING) -> None:
+    def __init__(self, subsystem: str) -> None:
         """
         Abstract subsystem task class meant to communicate a task to be performed by a particular subsystem
 
         subsystem:
             Name of subsystem to perform the task
-        task_status:
-            Initial task status
         """
         self.subsystem : str = subsystem
-        self._task_status : TaskStatus = task_status
     
     def set_task_status(self, status: TaskStatus):
         """
@@ -1569,6 +1584,33 @@ class SubsystemAbortTask(SubsystemTask):
         """
         super().__init__(subsystem)
         self.target_task = target_task
+
+class PowerSupplyRequestTask(SubsystemTask):
+    def __init__(self, target : str, power_requested : float) -> None:
+        """
+        Tasks the EPS to provide power to a specific component
+
+        target:
+            name of the component to be powered
+        power_requested:
+            amount of power being requested in [W]
+        """
+        super().__init__(SubsystemTypes.EPS.value)
+        self.target = target
+        self.power_requested = power_requested
+
+class StopPowerSupplyRequestTask(PowerSupplyRequestTask):
+    def __init__(self, target: str, power_supplied: float) -> None:
+        """
+        Tasks the EPS to stop providing power to a specific component
+
+        target:
+            name of the component to be powered
+        power_supplied:
+            amount of power being to no longer be provided to the component in [W]
+        """
+        super().__init__(target, -power_supplied)
+        
 
 """
 SUBSYSTEM TASK MESSAGES
