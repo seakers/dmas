@@ -64,14 +64,11 @@ class InstrumentCapabilityModule(Module):
     async def coroutines(self):
         self.log("Running instrument capability module coroutines")
         check_database = asyncio.create_task(self.check_database())
-        #broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
+        broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
         await check_database
-        self.log("1")
+        await broadcast_meas_req
         check_database.cancel()
-        self.log("2")
-        #await broadcast_meas_req
-        self.log("3")
-        #broadcast_meas_req.cancel()
+        broadcast_meas_req.cancel()
         self.log("Finished instrument capability module coroutines")
 
 
@@ -81,7 +78,7 @@ class InstrumentCapabilityModule(Module):
                 self.log(f'In broadcast meas req')
                 if self.to_be_sent:
                     self.log(f'In self to be sent')
-                    msg = InternalMessage(self.name, "MCCBA Module", self.msg_content)
+                    msg = InternalMessage(self.name, "Observation Planning Module", self.msg_content)
                     await self.parent_module.send_internal_message(msg)
                     self.to_be_sent = False
                 # msg_dict = dict()
@@ -127,3 +124,117 @@ class InstrumentCapabilityModule(Module):
 
         # Access the `p` value from each record
         return [ record["p"] for record in result ]
+
+class ObservationPlanningModule(Module):
+    def __init__(self, parent_module) -> None:
+        self.task_list = []
+        self.plan = []
+        super().__init__('Observation Planning Module', parent_module, submodules=[],
+                         n_timed_coroutines=1)
+
+    async def activate(self):
+        await super().activate()
+
+    async def internal_message_handler(self, msg):
+        """
+        Handles message intended for this module and performs actions accordingly.
+        """
+        try:
+            self.task_list.append(msg)
+        except asyncio.CancelledError:
+            return
+
+    async def coroutines(self):
+        self.log("Running observation planning module coroutines")
+        create_plan = asyncio.create_task(self.create_plan())
+        await create_plan
+        create_plan.cancel()
+        self.log("Finished instrument capability module coroutines")
+
+
+    async def create_plan(self):
+        try:
+            while True:
+                if(len(self.task_list) > 0):
+                    # replace this with an actual planner!
+                    for i in range(len(self.task_list)):
+                        self.plan.append(self.task_list[i])
+                    plan_msg = InternalMessage(self.name, "Planner Predictive Models Module", self.plan)
+                    await self.parent_module.send_internal_message(plan_msg)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return
+
+class PredictiveModelsModule(Module):
+    def __init__(self, parent_module) -> None:
+        self.agent_state = None
+        self.plan = None
+        super().__init__('Planner Predictive Models Module', parent_module, submodules=[],
+                         n_timed_coroutines=1)
+
+    async def activate(self):
+        await super().activate()
+
+    async def internal_message_handler(self, msg):
+        """
+        Handles message intended for this module and performs actions accordingly.
+        """
+        try:
+            self.plan.append(msg)
+        except asyncio.CancelledError:
+            return
+
+    async def coroutines(self):
+        self.log("Running Planner Predictive Models Module coroutines")
+        predict_state = asyncio.create_task(self.predict_state())
+        await predict_state
+        predict_state.cancel()
+        self.log("Finished Planner Predictive Models Module coroutines")
+
+
+    async def predict_state(self):
+        try:
+            while True:
+                if(self.plan is not None):
+                    plan_msg = InternalMessage(self.name, "Measurement Performance Module", self.plan)
+                    await self.parent_module.send_internal_message(plan_msg)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return
+
+class MeasurementPerformanceModule(Module):
+    def __init__(self, parent_module) -> None:
+        self.agent_state = None
+        self.plan = None
+        super().__init__('Measurement Performance Module', parent_module, submodules=[],
+                         n_timed_coroutines=1)
+
+    async def activate(self):
+        await super().activate()
+
+    async def internal_message_handler(self, msg):
+        """
+        Handles message intended for this module and performs actions accordingly.
+        """
+        try:
+            self.plan.append(msg)
+        except asyncio.CancelledError:
+            return
+
+    async def coroutines(self):
+        self.log("Running Measurement Performance Module coroutines")
+        predict_state = asyncio.create_task(self.predict_state())
+        await predict_state
+        predict_state.cancel()
+        self.log("Finished Measurement Performance Module coroutines")
+
+
+    async def predict_state(self):
+        try:
+            while True:
+                if(self.plan is not None):
+                    plan_msg = InternalMessage(self.name, "Observation Planning Module", self.plan)
+                    await self.parent_module.send_internal_message(plan_msg)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return

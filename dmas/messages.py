@@ -1342,6 +1342,13 @@ class ComponentStateMessage(InternalMessage):
         """
         super().__init__(src_module, dst_module, state)
 
+class ImgRequestMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, obs_sense_msg) -> None:
+        """
+        Inter module communicating the state of a module to another
+        """
+        super().__init__(src_module, dst_module, obs_sense_msg)
+
 """
 -------------------------------
 MODULE TASKS
