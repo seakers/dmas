@@ -1675,7 +1675,7 @@ class AccelerationUpdateTask(ComponentTask):
         
 
 class TransmitMessageTask(ComponentTask):
-    def __init__(self, target_agent: str, msg : NodeToEnvironmentMessage, timeout : float) -> None:
+    def __init__(self, target_agent: str, msg : InterNodeMessage, timeout : float) -> None:
         """
         Instructs the transmitter component to send a message to another agent
         
