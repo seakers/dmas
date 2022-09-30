@@ -665,7 +665,7 @@ class EnvironmentServer(Module):
                     self.reqservice.send_string('')
                     return
 
-                if NodeMessageTypes[msg_type] is NodeMessageTypes.TIC_REQUEST:
+                if NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.TIC_REQUEST:
                     # load tic request
                     request = TicRequestMessage.from_dict(d)
 
@@ -680,7 +680,7 @@ class EnvironmentServer(Module):
                     tic_req = InternalMessage(self.name, EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, request)
                     await self.send_internal_message(tic_req)
 
-                elif NodeMessageTypes[msg_type] is NodeMessageTypes.AGENT_ACCESS_SENSE:
+                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_ACCESS_SENSE:
                     # unpackage message
                     agent_access_msg = AgentAccessSenseMessage.from_dict(d)
                     
@@ -698,7 +698,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(agent_access_msg.to_json())
 
-                elif NodeMessageTypes[msg_type] is NodeMessageTypes.GS_ACCESS_SENSE:
+                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE:
                     # unpackage message
                     gs_access_msg = GndStnAccessSenseMessage.from_dict(d)
 
@@ -716,7 +716,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(gs_access_msg.to_json())
 
-                elif NodeMessageTypes[msg_type] is NodeMessageTypes.GP_ACCESS_SENSE:
+                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GP_ACCESS_SENSE:
                     # unpackage message
                     gp_access_msg = GndPntAccessSenseMessage.from_dict(d)
 
@@ -737,7 +737,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(gp_access_msg.to_json())
 
-                elif NodeMessageTypes[msg_type] is NodeMessageTypes.AGENT_INFO_SENSE:
+                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_INFO_SENSE:
                     # unpackage message
                     agent_sense_msg = AgentSenseMessage.from_dict(d)
 
@@ -755,7 +755,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(agent_sense_msg.to_json())
 
-                elif NodeMessageTypes[msg_type] is NodeMessageTypes.AGENT_END_CONFIRMATION:
+                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
                     # register that agent node has gone offline mid-simulation
                     # (this agent node won't be considered when broadcasting simulation end)
                     agent_end_conf_msg = AgentEndConfirmationMessage.from_dict(d)
@@ -766,7 +766,7 @@ class EnvironmentServer(Module):
                     # send blank response to agent
                     await self.send_blanc_response()
 
-                elif NodeMessageTypes[msg_type] is NodeMessageTypes.OBSERVATION_SENSE:
+                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.OBSERVATION_SENSE:
                     # unpackage message
                     observation_sense_msg = ObservationSenseMessage.from_dict(d)
 
@@ -941,7 +941,7 @@ class EnvironmentServer(Module):
             msg = json.loads(msg_str)
             msg_type = msg['@type']
 
-            if NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST or msg.get('port', None) is None:
+            if NodeToEnvironmentMessageTypes[msg_type] != NodeToEnvironmentMessageTypes.SYNC_REQUEST or msg.get('port', None) is None:
                 # ignore all messages that are not Sync Requests
                 continue
             
@@ -1031,7 +1031,7 @@ class EnvironmentServer(Module):
             msg_dict = json.loads(msg_str)
             msg_type = msg_dict['@type']
 
-            if NodeMessageTypes[msg_type] is not NodeMessageTypes.AGENT_END_CONFIRMATION:
+            if NodeToEnvironmentMessageTypes[msg_type] is not NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
                 self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
                 await self.send_blanc_response()

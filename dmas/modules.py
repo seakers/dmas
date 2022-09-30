@@ -330,13 +330,13 @@ class Module:
             await self.parent_module.sim_wait_to(t, module_name) 
 
     @abstractmethod
-    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
         """
         submitts a request of any type to the environment
         """
         pass
 
-    async def submit_environment_message(self, msg: NodeMessage, module_name: str=None):
+    async def submit_environment_message(self, msg: NodeToEnvironmentMessage, module_name: str=None):
         """
         submits environment request and returns response from environment server
         """
@@ -349,13 +349,13 @@ class Module:
             return await self.parent_module.submit_environment_message(msg, module_name)
 
     @abstractmethod
-    async def message_transmitter(self, msg : NodeMessage):
+    async def message_transmitter(self, msg : NodeToEnvironmentMessage):
         """
         transmits a message of any type to an agent
         """
         pass
 
-    async def transmit_message(self, msg : NodeMessage):
+    async def transmit_message(self, msg : NodeToEnvironmentMessage):
         """
         transmits a message to another agent and returns response from said agent
         """

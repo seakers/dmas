@@ -169,9 +169,9 @@ class AgentClient(Module):
             broadcast_handler.set_name (f'{self.name}_broadcast_handler')
             coroutines.append(broadcast_handler)
 
-            reception_handler = asyncio.create_task(self.reception_handler())
-            reception_handler.set_name (f'{self.name}_reception_handler')
-            coroutines.append(reception_handler)
+            # reception_handler = asyncio.create_task(self.reception_handler())
+            # reception_handler.set_name (f'{self.name}_reception_handler')
+            # coroutines.append(reception_handler)
 
             _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
 
@@ -268,7 +268,7 @@ class AgentClient(Module):
             Handles received message according to its type
             """
             try:            
-                msg_type = NodeMessageTypes[[msg_in['@type']]]
+                msg_type = NodeToEnvironmentMessageTypes[[msg_in['@type']]]
                 msg_src = msg_in['src']
                 msg_dst = msg_in['dst']
 
@@ -278,7 +278,7 @@ class AgentClient(Module):
                 self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
 
                 if self.name == msg_dst:
-                    if msg_type is NodeMessageTypes.PRINT_REQUEST:
+                    if msg_type is NodeToEnvironmentMessageTypes.PRINT_REQUEST:
                         msg = PrintRequestMessage.from_dict(msg_in)
                         self.log(f'Print instruction received with content: \'{msg.content}\'')
 
@@ -491,7 +491,7 @@ class AgentClient(Module):
             loggers.append(logger)
         return loggers
                 
-    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
         try:
             msg_type = msg.get_type()
             self.log(f'Submitting a request of type {msg_type}.')
@@ -559,7 +559,7 @@ class AgentClient(Module):
         except asyncio.CancelledError:
             pass
 
-    async def message_transmitter(self, msg: NodeMessage):
+    async def message_transmitter(self, msg: NodeToEnvironmentMessage):
         # reformat message
         msg.src = self.name
         msg_json = msg.to_json()
