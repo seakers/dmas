@@ -94,7 +94,7 @@ class ScienceValueModule(Module):
         self.to_be_valued = False
         self.request_msg = None
         super().__init__('Science Value Module', parent_module, submodules=[],
-                         n_timed_coroutines=0)
+                         n_timed_coroutines=2)
 
     prop_meas_obs_metrics = []
 
@@ -175,7 +175,7 @@ class ScienceValueModule(Module):
                 # msg_dict['result'] = result
                 # msg_json = json.dumps(msg_dict)
                 # await self.publisher.send_json(msg_json)
-                await self.sim_wait(1.0)
+                await self.sim_wait(0.1)
         except asyncio.CancelledError:
             return
 
@@ -183,6 +183,7 @@ class ScienceValueModule(Module):
         try:
             while True:
                 if self.to_be_valued:
+                    self.log(f'computing science value')
                     points = np.zeros(shape=(2000, 5))
                     content = self.request_msg.content
                     with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
@@ -198,7 +199,8 @@ class ScienceValueModule(Module):
                     content["value"] = pop
                     self.request_msg.content = content
                     self.to_be_valued = False
-                await self.sim_wait(1.0)
+                    self.log(f'computed science value')
+                await self.sim_wait(0.1)
         except asyncio.CancelledError:
             return
 
@@ -262,6 +264,7 @@ class OnboardProcessingModule(Module):
                     b4,b5,prefix,stored_data_filepath = self.store_measurement(meas_result.obs)
                     processed_data = self.compute_chlorophyll_obs_value(b4,b5)
                     self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
+                    self.meas_results.pop(i)
                     # if(self.meas_results[i]["level"] == 0):
                     #     data = self.meas_results[i]
                     #     processed_data = self.compute_chlorophyll_obs_value(data)

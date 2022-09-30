@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import csv
+import numpy as np
 from modules import Module
 from messages import *
 from neo4j import GraphDatabase
@@ -11,7 +12,10 @@ class PlanningModule(Module):
         self.scenario_dir = scenario_dir
         super().__init__(name, parent_module, submodules, n_timed_coroutines)
         self.submodules = [
-            InstrumentCapabilityModule(self)
+            InstrumentCapabilityModule(self),
+            ObservationPlanningModule(self),
+            PredictiveModelsModule(self),
+            MeasurementPerformanceModule(self)
         ]
 
     async def activate(self):
@@ -44,6 +48,7 @@ class InstrumentCapabilityModule(Module):
     def __init__(self, parent_module) -> None:
         self.to_be_sent = False
         self.msg_content = None
+        self.request_msg = None
         super().__init__('Instrument Capability Module', parent_module, submodules=[],
                          n_timed_coroutines=2)
 
@@ -56,8 +61,7 @@ class InstrumentCapabilityModule(Module):
         """
         try:
             self.log(f'Internal message handler in instrument capability module')
-            #self.to_be_sent = True
-            self.request_msg = msg
+            self.request_msg = msg.content
         except asyncio.CancelledError:
             return
 
@@ -75,7 +79,6 @@ class InstrumentCapabilityModule(Module):
     async def broadcast_meas_req(self):
         try:
             while True:
-                self.log(f'In broadcast meas req')
                 if self.to_be_sent:
                     self.log(f'In self to be sent')
                     msg = InternalMessage(self.name, "Observation Planning Module", self.msg_content)
@@ -96,7 +99,8 @@ class InstrumentCapabilityModule(Module):
     async def check_database(self):
         try:
             while True:
-                self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI")
+                if(self.request_msg is not None):
+                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "test", "OLI")
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
@@ -108,12 +112,18 @@ class InstrumentCapabilityModule(Module):
 
     def print_observers(self,driver,sc_name):
         with driver.session() as session:
-            observers = session.read_transaction(self.get_observers, title="Ocean chlorophyll concentration")
+            product = "None"
+            self.log(f'In print observers')
+            self.log(self.request_msg.content["product_type"])
+            if(self.request_msg.content["product_type"] == "chlorophyll-a"):
+                product = "Ocean chlorophyll concentration"
+            observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
                 if(observer.get("name") == sc_name):
                     self.log(f'Matching instrument!')
                     self.to_be_sent = True
-                    self.msg_content = "Able to be measured"
+                    self.request_msg.content["Measurable status"] = "Able to be measured"
+                    self.msg_content = self.request_msg.content
 
     @staticmethod
     def get_observers(tx, title): # (1)
@@ -140,7 +150,8 @@ class ObservationPlanningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.task_list.append(msg)
+            if(msg.src_module=="Instrument Capability Module"):
+                self.task_list.append(msg.content)
         except asyncio.CancelledError:
             return
 
@@ -149,7 +160,7 @@ class ObservationPlanningModule(Module):
         create_plan = asyncio.create_task(self.create_plan())
         await create_plan
         create_plan.cancel()
-        self.log("Finished instrument capability module coroutines")
+        self.log("Finished observation planning module coroutines")
 
 
     async def create_plan(self):
@@ -180,7 +191,7 @@ class PredictiveModelsModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.plan.append(msg)
+            self.plan = msg.content
         except asyncio.CancelledError:
             return
 
@@ -204,7 +215,6 @@ class PredictiveModelsModule(Module):
 
 class MeasurementPerformanceModule(Module):
     def __init__(self, parent_module) -> None:
-        self.agent_state = None
         self.plan = None
         super().__init__('Measurement Performance Module', parent_module, submodules=[],
                          n_timed_coroutines=1)
@@ -217,22 +227,30 @@ class MeasurementPerformanceModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.plan.append(msg)
+            self.plan = msg.content
         except asyncio.CancelledError:
             return
 
     async def coroutines(self):
         self.log("Running Measurement Performance Module coroutines")
-        predict_state = asyncio.create_task(self.predict_state())
-        await predict_state
-        predict_state.cancel()
+        evaluate_performance = asyncio.create_task(self.evaluate_performance())
+        await evaluate_performance
+        evaluate_performance.cancel()
         self.log("Finished Measurement Performance Module coroutines")
 
 
-    async def predict_state(self):
+    async def evaluate_performance(self):
         try:
             while True:
                 if(self.plan is not None):
+                    for i in range(len(self.plan)):
+                        event = self.plan[i]
+                        self.log(event)
+                        observation_time = 20.0
+                        delta = observation_time - float(event["time"])
+                        lagfunc = -0.08182 * np.log(delta)+0.63182
+                        event["meas_perf_value"] = lagfunc
+                        self.plan[i] = event
                     plan_msg = InternalMessage(self.name, "Observation Planning Module", self.plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)

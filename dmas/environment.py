@@ -250,115 +250,45 @@ class EclipseEventModule(ScheduledEventModule):
 
         return eclipse_data
 
-class ImageServerModule(Module):
-    """
-    Provides images corresponding to payload view
-    """
-    def __init__(self, parent_environment) -> None:
-        super().__init__(EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, parent_environment, submodules=[], n_timed_coroutines=1)
+# class ImageServerModule(Module):
+#     """
+#     Provides images corresponding to payload view
+#     """
+#     def __init__(self, parent_environment) -> None:
+#         super().__init__(EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, parent_environment, submodules=[], n_timed_coroutines=1)
 
-    async def activate(self):
-        await super().activate()
-        # self.img_request_queue = []
+#     async def activate(self):
+#         await super().activate()
+#         # self.img_request_queue = []
 
-    async def internal_message_handler(self, msg: InternalMessage):
-        """
-        Handles message intended for this module and performs actions accordingly.
-        """
-        try:
-            if msg.dst_module != self.name:
-                # this module is NOT the intended receiver for this message. Forwarding to rightful destination
-                await self.send_internal_message(msg)
-            else:
-                if isinstance(msg.content, ObservationSenseMessage):
-                    # if a img request is received, add to img_request_queue
-                    img_req = msg.content
-                    lat = img_req.lat
-                    lon = img_req.lon
-                    self.log(f'Received measurement result from ({lat}°, {lon}°)!')
-                    self.log(f'right before getLandsatFilePath')
-                    filepath = getLandsatFilePath(lat,lon)
-                    img_req.obs = filepath
-                    img_req.dst = img_req.src
-                    img_req.src = self.name
-                    await self.send_internal_message(img_req)
-                    #await self.reqservice.send_json(img_req.to_json())
-                    return
-                else:
-                    # if not a tic request, dump message
-                    return
-        except asyncio.CancelledError:
-            return
-
-    # async def internal_message_handler(self, msg):
-    #     """
-    #     Handles message intended for this module and performs actions accordingly.
-    #     """
-    #     try:
-    #         self.img_request_queue.append(msg)
-    #         # dst_name = msg['dst']
-    #         # if dst_name != self.name:
-    #         #     await self.put_message(msg)
-    #         # else:
-    #         #     if msg['@type'] == 'PRINT':
-    #         #         content = msg['content']
-    #         #         self.log(content)
-    #         #     if msg.type == 'MEAS_RESULT':
-    #         #         self.log(f'Received measurement result!')
-    #         #         self.meas_results.append(msg['content'])
-    #         #     if msg['@type'] == 'DATA_PROCESSING_REQUEST':
-    #         #         self.data_processing_requests.append(msg['content'])
-    #     except asyncio.CancelledError:
-    #         return
-
-    # async def coroutines(self):
-    #     self.log("Running image server module coroutines")
-    #     get_image = asyncio.create_task(self.get_image())
-    #     await get_image
-    #     get_image.cancel()
-    #     self.log("Completed image server module coroutines")
-    # async def coroutines(self):
-    #     try:
-    #         while True:
-    #             self.log(f'In coroutines')
-    #             if len(self.img_request_queue) > 0:
-    #                 self.log(f'inside if')
-    #                 img_req = self.img_request_queue[0]
-    #                 lat = img_req.lat
-    #                 lon = img_req.lon
-    #                 self.log(f'right before getLandsatFilePath')
-    #                 filepath = getLandsatFilePath(lat,lon)
-    #                 img_req.obs = filepath
-                    
-    #                 # change source and destination for response message
-    #                 img_req.dst = img_req.src
-    #                 img_req.src = self.name 
-
-    #                 # send response to agent
-    #                 await self.reqservice.send_json(img_req.to_json())
-    #                 self.img_request_queue.pop()
-    #             else:
-    #                 await self.sim_wait(2.0)
-
-    #     except asyncio.CancelledError:
-    #         return
-    # async def get_image(self):
-    #     try:
-    #         while True:
-    #             for i in range(len(self.img_request_queue)):
-    #                 img_req = self.img_request_queue[i]
-    #                 lat = img_req.lat
-    #                 lon = img_req.lon
-    #                 self.log(f'Received measurement result from ({lat}°, {lon}°)!')
-    #                 self.log(f'right before getLandsatFilePath')
-    #                 filepath = getLandsatFilePath(lat,lon)
-    #                 img_req.obs = filepath
-    #                 img_req.dst = img_req.src
-    #                 img_req.src = self.name 
-    #                 await self.reqservice.send_json(img_req.to_json())
-    #             await self.sim_wait(1.0)
-    #     except asyncio.CancelledError:
-    #         return
+#     async def internal_message_handler(self, msg: InternalMessage):
+#         """
+#         Handles message intended for this module and performs actions accordingly.
+#         """
+#         try:
+#             if msg.dst_module != self.name:
+#                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
+#                 await self.send_internal_message(msg)
+#             else:
+#                 if isinstance(msg.content, ObservationSenseMessage):
+#                     # if a img request is received, add to img_request_queue
+#                     img_req = msg.content
+#                     lat = img_req.lat
+#                     lon = img_req.lon
+#                     self.log(f'Received measurement result from ({lat}°, {lon}°)!')
+#                     self.log(f'right before getLandsatFilePath')
+#                     filepath = getLandsatFilePath(lat,lon)
+#                     img_req.obs = filepath
+#                     img_req.dst = img_req.src
+#                     img_req.src = self.name
+#                     await self.send_internal_message(img_req)
+#                     #await self.reqservice.send_json(img_req.to_json())
+#                     return
+#                 else:
+#                     # if not a tic request, dump message
+#                     return
+#         except asyncio.CancelledError:
+#             return
 
 class GndStatAccessEventModule(ScheduledEventModule):
     def __init__(self, parent_environment) -> None:
@@ -610,8 +540,8 @@ class EnvironmentServer(Module):
         # set up submodules
         self.submodules = [ 
                             TicRequestModule(self), 
-                            AgentExternalStatePropagator(self),
-                            ImageServerModule(self)
+                            AgentExternalStatePropagator(self)
+                            #ImageServerModule(self)
                           ]
         
         # set up results dir
@@ -894,18 +824,18 @@ class EnvironmentServer(Module):
                     self.log(f'Received observation sense message from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
                     
 
-                    # with open("./scenarios/sim_test/sample_landsat_image.png", "rb") as image_file:
-                    #     encoded_string = base64.b64encode(image_file.read())
-                    # observation_sense_msg.obs = encoded_string.decode('utf-8')
+                    with open("./scenarios/sim_test/sample_landsat_image.png", "rb") as image_file:
+                        encoded_string = base64.b64encode(image_file.read())
+                    observation_sense_msg.obs = encoded_string.decode('utf-8')
                     
                     # change source and destination for response message
-                    #observation_sense_msg.dst = observation_sense_msg.src
-                    #observation_sense_msg.src = self.name 
+                    observation_sense_msg.dst = observation_sense_msg.src
+                    observation_sense_msg.src = self.name 
 
                     # send response to agent
-                    #await self.reqservice.send_json(observation_sense_msg.to_json())
-                    img_req = ImgRequestMessage(self.name, EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, observation_sense_msg)
-                    await self.send_internal_message(img_req)
+                    await self.reqservice.send_json(observation_sense_msg.to_json())
+                    # img_req = ImgRequestMessage(self.name, EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, observation_sense_msg)
+                    # await self.send_internal_message(img_req)
 
                 else:
                     # if message type is not supported, dump and ignore message
