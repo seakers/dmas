@@ -52,6 +52,9 @@ class ComponentNames(Enum):
     IMU = 'IMU'
     POS = 'POS'
     SUN_SENSOR = 'SUN_SENSOR'
+    REACTION_WHEELS = 'REACTION_WHEELS'
+    MAGNETORQUER = 'MAGNETORQUER'
+    TRANSMITTER = 'TRANSMITTER'
 
 class BatteryChargeStatus(Enum):
     DISCHARGING = 'DISCHARGING'

@@ -1375,6 +1375,20 @@ class DataMessage(InternalMessage):
     def get_data(self):
         return self.content
 
+class DataDeleteMessage(DataMessage):
+    def __init__(self, src_module: str, dst_module: str, data: str) -> None:
+        super().__init__(src_module, dst_module, data)
+        """
+        Message informing that existing data is no longer available to this agent
+
+        src_module: 
+            name of the module sending the message
+        dst_module: 
+            name of the module to receive the message
+        data: 
+            data no longer available
+        """
+
 """
 -------------------------------
 MODULE TASKS
@@ -1456,7 +1470,7 @@ class ReceivePowerTask(ComponentMaintenanceTask):
         super().__init__(component)
         self.power_to_supply = power_to_supply
 
-class StopReceivingPower(ReceivePowerTask):
+class StopReceivingPowerTask(ReceivePowerTask):
     def __init__(self, component: str, power_supplied: float) -> None:
         """
         Tells a specific component that it is no longer receiving a given amount of power
@@ -1484,6 +1498,20 @@ class ProvidePowerTask(ComponentTask):
         self.power_to_supply = power_to_supply
         self.target = target
 
+class StopProvidingPowerTask(ProvidePowerTask):
+    def __init__(self, component: str, power_to_stop: float, target: str) -> None:
+        """
+        Tasks a component from the EPS subsystem to stop providing power to another component
+
+        component:
+            name of eps component to provide power
+        power_to_stop:
+            amout of power to no longer be supplied in [W]
+        target:
+            name of component to be deprived of power
+        """
+        super().__init__(component, -power_to_stop, target)
+
 class SaveToMemoryTask(ComponentTask):
     def __init__(self, data : str) -> None:
         """
@@ -1494,11 +1522,22 @@ class SaveToMemoryTask(ComponentTask):
 
     def get_data(self):
         return self._data
+
+class DeleteFromMemoryTask(SaveToMemoryTask):
+    def __init__(self, data : str) -> None:
+        """
+        Instructs component to delete data from internal memory 
+        """
+        super().__init__(ComponentNames.ONBOARD_COMPUTER.value)
+        self._data = data
+
+    def get_data(self):
+        return self._data
         
 class MeasurementTask(ComponentTask):
     def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, internal_state : dict) -> None:
         """
-        Instructs an isntrument to perform a measurement.
+        Instructs an instrument to perform a measurement.
 
         instrument_name:
             name of instrument to perform measurement
@@ -1515,6 +1554,56 @@ class MeasurementTask(ComponentTask):
         self.duration = duration
         self.target = [target_lat, target_lon]
         self.internal_state = internal_state
+
+class ControlSignalTask(ComponentTask):
+    def __init__(self, component, control_signal: float) -> None:
+        """
+        Gives a control signal to an atittude actuator to perform a maneuver.
+
+        component:
+            target component performing the maneuver
+        control_signal:
+            value of the step control signal being given to the actuator. Must be a value within [0, 1]
+        """
+        super().__init__(component)
+        self.control_signal = control_signal
+
+        if control_signal < 0 or 1 < control_signal:
+            raise Exception("Control signal must be a value between [0, 1]!")
+
+class AccelerationUpdateTask(ComponentTask):
+    def __init__(self, actuator_name : str, angular_acceleration : list) -> None:
+        """
+        Informs IMU that a component is excerting some angular acceleration vector onto the spacecraft
+
+        actuator_name:
+            name of component exerting the angular acceleration vector in question
+        angular_acceleration:
+            angular acceleration being excerted on the spacecraft in [rad/s^2] in the body-fixed frame
+        """
+        super().__init__(ComponentNames.IMU.value)
+        self.actuator_name = actuator_name
+        self.angular_acceleration = angular_acceleration
+        
+
+class TransmitMessageTask(ComponentTask):
+    def __init__(self, target_agent: str, msg : NodeMessage, timeout : float) -> None:
+        """
+        Instructs the transmitter component to send a message to another agent
+        
+        target_agent:
+            target agent to receive the message
+        msg:
+            message being transmitted
+        timeout:
+            transmission timeout in [s]
+        """
+        super().__init__(ComponentNames.TRANSMITTER.value)
+        self.target_agent = target_agent
+        self.msg = msg
+        self.timeout = timeout
+    
+
 """
 COMPONENT TASK MESSAGES
 """
