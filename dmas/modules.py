@@ -349,13 +349,13 @@ class Module:
             return await self.parent_module.submit_environment_message(msg, module_name)
 
     @abstractmethod
-    async def message_transmitter(self, msg):
+    async def message_transmitter(self, msg : NodeMessage):
         """
         transmits a message of any type to an agent
         """
         pass
 
-    async def transmit_message(self, msg):
+    async def transmit_message(self, msg : NodeMessage):
         """
         transmits a message to another agent and returns response from said agent
         """

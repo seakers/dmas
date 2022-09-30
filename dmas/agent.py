@@ -559,25 +559,22 @@ class AgentClient(Module):
         except asyncio.CancelledError:
             pass
 
-    async def message_transmitter(self, msg: dict):
+    async def message_transmitter(self, msg: NodeMessage):
         # reformat message
-        msg['src'] = self.name
-        msg_type = msg['@type']
-        dst = msg['dst']
-
-        req_json = json.dumps(msg)
+        msg.src = self.name
+        msg_json = msg.to_json()
 
         # connect socket to destination 
-        port = self.AGENT_TO_PORT_MAP[dst]
-        self.log(f'Connecting to agent {dst} through port number {port}...')
+        port = self.AGENT_TO_PORT_MAP[msg.dst]
+        self.log(f'Connecting to agent {msg.dst} through port number {port}...')
         self.agent_socket_out.connect(f"tcp://localhost:{port}")
-        self.log(f'Connected to agent {dst}!')
+        self.log(f'Connected to agent {msg.dst}!')
 
         # submit request
-        self.log(f'Transmitting a message of type {msg_type} (from {self.name} to {dst})...')
+        self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...')
         await self.agent_socket_out_lock.acquire()
-        await self.agent_socket_out.send_json(req_json)
-        self.log(f'{msg_type} message sent successfully. Awaiting response...')
+        await self.agent_socket_out.send_json(msg_json)
+        self.log(f'{type(msg)} message sent successfully. Awaiting response...')
         
         # wait for server reply
         await self.agent_socket_out.recv()
@@ -585,9 +582,9 @@ class AgentClient(Module):
         self.log(f'Received message reception confirmation!')      
 
         # disconnect socket from destination
-        self.log(f'Disconnecting from agent {dst}...')
+        self.log(f'Disconnecting from agent {msg.dst}...')
         self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
-        self.log(f'Disconnected from agent {dst}!')
+        self.log(f'Disconnected from agent {msg.dst}!')
 
     async def send_blanc_response(self):
         blanc = dict()
