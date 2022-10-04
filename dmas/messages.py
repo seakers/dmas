@@ -1474,8 +1474,6 @@ class DataDeleteMessage(DataMessage):
             data no longer available
         """
 
-
-
 """
 COMPONENT TASK MESSAGES
 """
@@ -1513,8 +1511,6 @@ class ComponentStateMessage(InternalMessage):
 
     def get_state(self):
         return self.content
-
-       
 
 """
 SUBSYSTEM TASK MESSAGES
@@ -1560,8 +1556,6 @@ class SubsystemStateRequestMessage(InternalMessage):
         Inter module message requesting the latest state of a particular subsystem module
         """
         super().__init__(src_module, dst_module)
-
-
 
 """
 PLATFORM TASK MESSAGES

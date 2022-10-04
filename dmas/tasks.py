@@ -22,7 +22,6 @@ class ComponentTask:
         """
         self.component : str = component
 
-
 class ComponentAbortTask(ComponentTask):
     def __init__(self, component: str, target_task : ComponentTask) -> None:
         """
@@ -149,7 +148,7 @@ class DeleteFromMemoryTask(SaveToMemoryTask):
         return self._data
         
 class MeasurementTask(ComponentTask):
-    def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, internal_state : dict) -> None:
+    def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, attitude_state : dict) -> None:
         """
         Instructs an instrument to perform a measurement.
 
@@ -161,13 +160,13 @@ class MeasurementTask(ComponentTask):
             latitude of target in [°]
         target_lon:
             longitude of target in [°]
-        internal_state:
-            compiled internal state of the agent
+        attitude_state:
+            attitude of the agent
         """
         super().__init__(instrument_name)
         self.duration = duration
         self.target = [target_lat, target_lon]
-        self.internal_state = internal_state
+        self.attitude_state = attitude_state
 
 class ControlSignalTask(ComponentTask):
     def __init__(self, component, control_signal: float) -> None:
@@ -198,7 +197,15 @@ class AccelerationUpdateTask(ComponentTask):
         super().__init__(ComponentNames.IMU.value)
         self.actuator_name = actuator_name
         self.angular_acceleration = angular_acceleration
-        
+
+class AttitudeUpdateMessage(ComponentTask):
+    def __init__(self, new_angular_pos, new_angular_vel) -> None:
+        """
+        Manually updates the attitude in an IMU
+        """
+        super().__init__(ComponentNames.IMU.value)
+        self.new_angular_pos = new_angular_pos
+        self.new_angular_vel = new_angular_vel        
 
 class TransmitMessageTask(ComponentTask):
     def __init__(self, target_agent: str, msg, timeout : float) -> None:
@@ -238,12 +245,6 @@ class SubsystemTask:
             Name of subsystem to perform the task
         """
         self.subsystem : str = subsystem
-    
-    def set_task_status(self, status: TaskStatus):
-        """
-        Sets the status of the task being performed
-        """
-        self._task_status = status
 
 class SubsystemAbortTask(SubsystemTask):
     def __init__(self, subsystem: str, target_task : SubsystemTask) -> None:
@@ -284,28 +285,56 @@ class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
         """
         super().__init__(target, -power_supplied)
 
+class PerformAttitudeManeuverTask(SubsystemTask):
+    def __init__(self, target_attitude : list) -> None:
+        """
+        Tasks the ADCS to perform an attitude maneouver
+
+        target_attitude:
+            quaternion vector describing the target attitude of the satellite
+        """
+        super().__init__(SubsystemNames.ADCS.value)
+        self.target_attitude = target_attitude
+
+class PerformMeasurement(SubsystemTask):
+    def __init__(self, target_lat : float, target_lon : float, instruments : list, durations : list) -> None:
+        """
+        Instructs the payload subsystem to perform a measurement of a target lat-lon with 
+        a given list of instruments for a given set of durations
+    
+        target_lat:
+            target latitude in [°]
+        target_lon:
+            target longitude in [°]
+        instruments:
+            list of instruments to perform the measurement at the same time
+        duration:
+            list of duration of each instrument measurement
+        """
+        super().__init__(SubsystemNames.PAYLOAD.value)
+        self.target = (target_lat, target_lon)
+
+        self.instruments = []
+        for instrument in instruments:
+            self.instruments.append(instrument)
+
+        self.durations = []
+        for duration in durations:
+            self.durations.append(duration)
+
 """
 -------------------------------
 PLATOFRM TASK
 -------------------------------
 """
 class PlatformTask:
-    def __init__(self, task_status : TaskStatus = TaskStatus.PENDING) -> None:
+    def __init__(self) -> None:
         """
         Abstract platform task class meant to communicate a task to be performed by the agent's platform
+        """
+        return
 
-        task_status:
-            Initial task status
-        """
-        self._task_status : TaskStatus = task_status
-    
-    def set_task_status(self, status: TaskStatus):
-        """
-        Sets the status of the task being performed
-        """
-        self._task_status = status
-
-class PlatformAbortTask(SubsystemTask):
+class PlatformAbortTask(PlatformTask):
     def __init__(self, target_task : PlatformTask) -> None:
         """
         Informs a subsystem that it must abort a platform-level task that is currently being performed or is scheduled to be performed

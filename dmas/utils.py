@@ -99,6 +99,7 @@ class SubsystemNames(Enum):
     CNDH = 'COMMAND_AND_DATA_HANDLING'
     PAYLOAD = 'PAYLOAD'
     GNC = 'GUIDANCE_AND_NAVIGATION'
+    ADCS = 'ATTITUDE_DETERMINATION_AND_CONTROL'
 
 class SimClocks(Enum):
     # asynchronized clocks

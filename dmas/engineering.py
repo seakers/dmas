@@ -1352,9 +1352,9 @@ class SubsystemModule(Module):
             task_handler = None
             tasks = []
             if isinstance(task, PlatformTask):
-                tasks = self.decompose_platform_task(task)
+                tasks = await self.decompose_platform_task(task)
             elif isinstance(task, SubsystemTask):
-                tasks = self.decompose_subsystem_task(task)
+                tasks = await self.decompose_subsystem_task(task)
             elif isinstance(task, ComponentTask):
                 tasks = [task]
             
@@ -1391,16 +1391,14 @@ class SubsystemModule(Module):
             self.log(f'Task of type {type(task)} aborted.')
             return TaskStatus.ABORTED
 
-    @abstractmethod
-    def decompose_platform_task(self, task : PlatformTask) -> list:
+    async def decompose_platform_task(self, task : PlatformTask) -> list:
         """
         Decomposes a platform-level task and returns a list of subsystem-level tasks to be performed by this or other subsystems.
         """
         self.log(f'Module does not support platform-level tasks.')
         return []
 
-    @abstractmethod
-    def decompose_subsystem_task(self, task : SubsystemTask) -> list:
+    async def decompose_subsystem_task(self, task : SubsystemTask) -> list:
         """
         Decomposes a subsystem-level task and returns a list of component-level tasks to be performed by this subsystem.
         """
@@ -1422,7 +1420,7 @@ class SubsystemModule(Module):
                         break
 
                 if not component_found:
-                    self.log(f'Component task intended for another subsystem. Initially intended for component \'{task.component}\'. Aborting task...')
+                    self.log(f'Component task intended for another subsystem. Initially intended for component \'{task.component}\'.')
                     raise asyncio.CancelledError
 
                 # submit task to be performed by component
@@ -1433,7 +1431,7 @@ class SubsystemModule(Module):
             elif isinstance(task, SubsystemTask):
                 if task.subsystem == self.name:
                     # Cannot submit a task to itself while performing other tasks. Will lead to blocking.
-                    self.log(f'Attempting to submit a subsystem task intended for self. Aborting task...')
+                    self.log(f'Attempting to submit a subsystem task intended for self.')
                     raise asyncio.CancelledError
 
                 # submit task to be performed by subsystem
@@ -1817,6 +1815,41 @@ class PayloadSubsystem(SubsystemModule):
     def __init__(self, parent_platform_sim: Module, health: ComponentHealth = ComponentHealth.NOMINAL, status: ComponentStatus = ComponentStatus.OFF) -> None:
         super().__init__(SubsystemNames.PAYLOAD.value, parent_platform_sim, PayloadState, health, status)
 
+    async def activate(self):
+        await super().activate()
+
+        self.attitude_state = asyncio.Queue()
+
+    async def subsystem_state_update_handler(self, subsystem_state):
+        """
+        Reacts to other subsystem state updates.
+        """
+        if isinstance(subsystem_state, AttitudeDeterminationAndControlState):
+            self.attitude_state.put(subsystem_state)
+
+    async def decompose_subsystem_task(self, task : SubsystemTask) -> list:
+        """
+        Decomposes a subsystem-level task and returns a list of component-level tasks to be performed by this subsystem.
+        """
+        if isinstance(task, PerformMeasurement):
+            comp_tasks = []
+
+            # ask for latest attitude state
+            msg = SubsystemStateRequestMessage(self.name, SubsystemNames.ADCS.value)
+            await self.send_internal_message(msg)
+
+            attitude_state = await self.attitude_state.get()
+            
+            # instruct each instrument in the observation task to perform the masurement 
+            for instrument in task.instruments:
+                i = task.instruments.index(instrument)
+                target_lat, target_lon = task.target
+                comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state) )
+
+            return comp_tasks
+        else:
+            return super().decompose_subsystem_task(task)
+
 class PayloadState(SubsystemState):
     def __init__(self, component_states: dict, health: SubsystemHealth, status: SubsystemStatus):
         super().__init__(SubsystemNames.PAYLOAD.value, PayloadSubsystem, component_states, health, status)
@@ -1891,7 +1924,7 @@ class InstrumentComponent(ComponentModule):
                 self.log(f'Performing measurement...')
                 src = self.get_top_module()
                 lat, lon = task.target
-                msg = ObservationSenseMessage(src.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, task.internal_state, lat, lon)
+                msg = ObservationSenseMessage(src.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, task.attitude_state, lat, lon)
                 response = await self.submit_environment_message(msg)
         
                 # wait for measurement duration
@@ -1968,41 +2001,91 @@ class InstrumentState(ComponentState):
 """
 ADCS 
 """
-# class InertialMeasurementUnitModule(ComponentModule):
-#     def __init__(self, 
-#                 parent_subsystem: Module, 
-#                 average_power_consumption: float, 
-#                 health: ComponentHealth = ComponentHealth.NOMINAL, 
-#                 status: ComponentStatus = ComponentStatus.ON, 
-#                 f_update: float = 1) -> None:
-#         super().__init__(ComponentNames.IMU.value, parent_subsystem, InertialMeasurementUnitState, average_power_consumption, health, status, f_update)
-#         self.angular_pos = [None, None, None, None]
-#         self.angular_vel = [None, None, None, None]
+class AttitudeDeterminationAndControlSubsystem(SubsystemModule):
+    def __init__(self, 
+                parent_platform_sim: Module, 
+                health: ComponentHealth = ComponentHealth.NOMINAL, 
+                status: ComponentStatus = ComponentStatus.ON) -> None:
+        super().__init__(SubsystemNames.ADCS.value, parent_platform_sim, AttitudeDeterminationAndControlState, health, status)
+        self.submodules = [
+                            InertialMeasurementUnitModule(self, 1)
+                          ]
 
-#     async def update_properties(self, dt):
-#         await super().update_properties(dt)
+class AttitudeDeterminationAndControlState(SubsystemState):
+    def __init__(self, 
+                component_states: dict,
+                health: SubsystemHealth, 
+                status: SubsystemStatus):
+        super().__init__(SubsystemNames.ADCS.value, AttitudeDeterminationAndControlSubsystem, component_states, health, status)
 
-#         # TODO sense angular position and velocity
+class InertialMeasurementUnitModule(ComponentModule):
+    def __init__(self, 
+                parent_subsystem: Module, 
+                average_power_consumption: float, 
+                health: ComponentHealth = ComponentHealth.NOMINAL, 
+                status: ComponentStatus = ComponentStatus.ON, 
+                f_update: float = 1) -> None:
+        super().__init__(ComponentNames.IMU.value, parent_subsystem, InertialMeasurementUnitState, average_power_consumption, health, status, f_update)
 
-# class InertialMeasurementUnitState(ComponentState):
-#     def __init__(self,                   
-#                 power_consumed: float,
-#                 power_supplied: float, 
-#                 angular_pos : list,
-#                 angular_vel : list,
-#                 health: ComponentHealth, 
-#                 status: ComponentStatus) -> None:
-#         super().__init__(ComponentNames.IMU.value, InertialMeasurementUnitModule, power_consumed, power_supplied, health, status)
-#         self.angular_pos = []
-#         for x_i in angular_pos:
-#             self.angular_pos.append(x_i)
+        self.angular_pos = [None, None, None, None]
+        self.angular_vel = [None, None, None, None]
 
-#         self.angular_vel = []
-#         for v_i in angular_vel:
-#             self.angular_pos.append(v_i)
+    async def update_properties(self, dt):
+        await super().update_properties(dt)
 
-#     def from_component(imu: InertialMeasurementUnitModule):
-#         return super().from_component()
+        # TODO sense angular position and velocity
+
+    async def perform_task(self, task: ComponentTask) -> TaskStatus:
+        """
+        Performs a task given to this component. 
+        Rejects any tasks that is not intended to be performed by this component. 
+        """
+        try:
+            # check if component was the intended performer of this task
+            if task.component != self.name:
+                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
+                raise asyncio.CancelledError
+            
+            acquire = None
+            if isinstance(task, AttitudeUpdateMessage):
+                acquire = await self.state_lock.acquire()
+                
+                self.angular_pos = task.new_angular_pos
+                self.angular_vel = task.new_angular_vel
+
+                self.state_lock.release()
+            else:
+                self.log(f'Task of type {type(task)} not yet supported.')
+                raise asyncio.CancelledError
+
+        except asyncio.CancelledError:
+            self.log(f'Aborting task of type {type(task)}.')
+
+            if acquire:
+                self.state_lock.release()
+
+            # return task abort status
+            return TaskStatus.ABORTED
+
+class InertialMeasurementUnitState(ComponentState):
+    def __init__(self,
+                power_consumed: float, 
+                power_supplied: float, 
+                angular_pos : list,
+                angular_vel : list,
+                health: ComponentHealth, 
+                status: ComponentStatus) -> None:
+        super().__init__(ComponentNames.IMU.value, InertialMeasurementUnitModule, power_consumed, power_supplied, health, status)
+        self.angular_pos = []
+        for x_i in angular_pos:
+            self.angular_pos.append(x_i)
+
+        self.angular_vel = []
+        for v_i in angular_vel:
+            self.angular_pos.append(v_i)
+
+    def from_component(imu: InertialMeasurementUnitModule):
+        return InertialMeasurementUnitState(imu.power_consumed, imu.power_supplied, imu.angular_pos, imu.angular_vel, imu.health, imu.status)
 
 """
 EPS
