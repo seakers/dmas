@@ -491,7 +491,7 @@ class AgentClient(Module):
             loggers.append(logger)
         return loggers
                 
-    async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
         try:
             msg_type = msg.get_type()
             self.log(f'Submitting a request of type {msg_type}.')
@@ -559,7 +559,7 @@ class AgentClient(Module):
         except asyncio.CancelledError:
             pass
 
-    async def message_transmitter(self, msg: NodeToEnvironmentMessage):
+    async def message_transmitter(self, msg: NodeMessage):
         # reformat message
         msg.src = self.name
         msg_json = msg.to_json()

@@ -3,7 +3,7 @@ from enum import Enum
 import json
 from re import T
 from unittest import result
-from dmas.utils import ComponentNames, ComponentStatus, SubsystemTypes
+from dmas.utils import ComponentNames, ComponentStatus, SubsystemNames
 
 from utils import EnvironmentModuleTypes, TaskStatus
 
@@ -1531,14 +1531,14 @@ class ComponentActuationTask(ComponentMaintenanceTask):
         super().__init__(component)
         self.component_status : ComponentStatus = actuation_status
 
-class ComponentDisableTask(ComponentActuationTask):
+class DisableComponentTask(ComponentActuationTask):
     def __init__(self, component: str) -> None:
         """
         Turns OFF a component
         """
         super().__init__(component, ComponentStatus.OFF)
 
-class ComponentEnableTask(ComponentActuationTask):
+class EnableComponentTask(ComponentActuationTask):
     def __init__(self, component: str) -> None:
         """
         Turns ON a component
@@ -1548,7 +1548,7 @@ class ComponentEnableTask(ComponentActuationTask):
 class ReceivePowerTask(ComponentMaintenanceTask):
     def __init__(self, component: str, power_to_supply : float) -> None:
         """
-        Tasks a specific component to receive a given amount of power
+        Tells a specific component that it is receiving some amount of power from the EPS
 
         component:
             name of component to supply power
@@ -1561,7 +1561,7 @@ class ReceivePowerTask(ComponentMaintenanceTask):
 class StopReceivingPowerTask(ReceivePowerTask):
     def __init__(self, component: str, power_supplied: float) -> None:
         """
-        Tells a specific component that it is no longer receiving a given amount of power
+        Tells a specific component that it is no longer receiving some amount of power from the EPS
 
         component:
             name of component to supply power
@@ -1778,11 +1778,11 @@ class PowerSupplyRequestTask(SubsystemTask):
         power_requested:
             amount of power being requested in [W]
         """
-        super().__init__(SubsystemTypes.EPS.value)
+        super().__init__(SubsystemNames.EPS.value)
         self.target = target
         self.power_requested = power_requested
 
-class StopPowerSupplyRequestTask(PowerSupplyRequestTask):
+class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
     def __init__(self, target: str, power_supplied: float) -> None:
         """
         Tasks the EPS to stop providing power to a specific component

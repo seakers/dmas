@@ -288,27 +288,55 @@ class Module:
         module_name:
             name of the module requesting the wait
         """
-        if module_name is None:
-            module_name = self.name
+        try:
+            wait_for_parent_module = None
+            message_submission = None
+            wait_for_clock = None
+    
+            if module_name is None:
+                module_name = self.name
 
-        if self.parent_module is None:
-            if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
-                await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
-            elif (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
-                        or self.CLOCK_TYPE == SimClocks.SERVER_TIME
-                        or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
+            if self.parent_module is None:
+                if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
+                    await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
+                elif (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
+                            or self.CLOCK_TYPE == SimClocks.SERVER_TIME
+                            or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
 
-                # if the clock is server-step, then submit a tic request to environment
-                t_req = self.sim_time.level + delay 
+                    # if the clock is server-step, then submit a tic request to environment
+                    t_req = self.sim_time.level + delay 
 
-                tic_msg = TicRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, t_req)
-                await self.submit_environment_message(tic_msg, module_name)
+                    tic_msg = TicRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, t_req)
+                    
+                    message_submission = asyncio.create_task(self.submit_environment_message(tic_msg, module_name))
+                    await message_submission
 
-                await self.sim_time.when_geq_than(t_req)
+                    wait_for_clock = asyncio.create_task(self.sim_time.when_geq_than(t_req))
+                    await wait_for_clock
+                else:
+                    raise Exception(f'clock type {self.CLOCK_TYPE} not yet supported by module.')
             else:
-                raise Exception(f'clock type {self.CLOCK_TYPE} not yet supported by module.')
-        else:
-            await self.parent_module.sim_wait(delay, module_name)       
+                wait_for_parent_module = asyncio.create_task(self.parent_module.sim_wait(delay, module_name))
+                await wait_for_parent_module
+        
+        except asyncio.CancelledError:
+            if wait_for_parent_module is not None and not wait_for_parent_module.done():
+                wait_for_parent_module : asyncio.Task
+                wait_for_parent_module.cancel()
+                await wait_for_parent_module
+
+            if message_submission is not None and not message_submission.done():
+                message_submission : asyncio.Task
+                message_submission.cancel()
+                await message_submission
+
+            if wait_for_clock is not None and not wait_for_clock.done():
+                wait_for_clock : asyncio.Task
+                wait_for_clock.cancel()
+                await wait_for_clock
+
+
+            return
 
     async def sim_wait_to(self, t, module_name=None):
         """
@@ -319,15 +347,23 @@ class Module:
         module_name:
             name of the module requesting the wait
         """
-        if module_name is None:
-            module_name = self.name
+        try:
+            sim_wait = None            
 
-        if self.parent_module is None:
+            if module_name is None:
+                module_name = self.name
+
             t_curr = self.get_current_time()
             delay = t - t_curr
-            await self.sim_wait(delay, module_name=module_name)
-        else:
-            await self.parent_module.sim_wait_to(t, module_name) 
+
+            sim_wait = asyncio.create_task(self.sim_wait(delay, module_name=module_name))
+            await sim_wait
+
+        except asyncio.CancelledError:
+            if sim_wait is not None and sim_wait.done():
+                sim_wait : asyncio.Task
+                sim_wait.cancel()
+                await sim_wait
 
     @abstractmethod
     async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):

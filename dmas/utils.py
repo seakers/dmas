@@ -23,10 +23,16 @@ class EventPair:
             self.end.set()
 
     async def wait_start(self):
-        return await self.start.wait()
+        try:
+            return await self.start.wait()
+        except asyncio.CancelledError:
+            return
 
     async def wait_end(self):
-        return await self.end.wait()
+        try:
+            return await self.end.wait()
+        except asyncio.CancelledError:
+            return
 
 class ComponentStatus(Enum):
     ON = 'ON'
@@ -55,6 +61,7 @@ class ComponentNames(Enum):
     REACTION_WHEELS = 'REACTION_WHEELS'
     MAGNETORQUER = 'MAGNETORQUER'
     TRANSMITTER = 'TRANSMITTER'
+    RECEIVER = 'RECEIVER'
 
 class BatteryChargeStatus(Enum):
     DISCHARGING = 'DISCHARGING'
@@ -87,7 +94,7 @@ class EngineeringModuleSubmoduleTypes(Enum):
     PLATFORM_SIM = 'PLATFORM_SIM'
     NETWORK_TRANSMISSION_EMULATOR = 'NETWORK_TRANSMISSION_EMULATOR'
 
-class SubsystemTypes(Enum):
+class SubsystemNames(Enum):
     EPS = 'ELECTRIC_POWER_SUBSYSTEM'
     CNDH = 'COMMAND_AND_DATA_HANDLING'
     PAYLOAD = 'PAYLOAD'
