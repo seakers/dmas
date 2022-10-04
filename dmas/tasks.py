@@ -9,6 +9,7 @@ MODULE TASKS
 COMPONENT TASKS
 -------------------------------
 """
+from this import s
 from utils import *
 
 
@@ -349,9 +350,17 @@ class PlatformAbortTask(PlatformTask):
         self.target_task = target_task
 
 class ObservationTask(PlatformTask):
-    def __init__(self, target, task_status: TaskStatus = TaskStatus.PENDING) -> None:
-        super().__init__(task_status)
-        self.target = target
+    def __init__(self, target_lan : float, target_lon : float, instrument_list : list, durations : list) -> None:
+        super().__init__()
+        self.target = (target_lan, target_lon)
+
+        self.instrument_list = []
+        for instrument in instrument_list:
+            self.instrument_list.append(instrument)
+
+        self.durations = []
+        for duration in durations:
+            self.durations.append(duration)
 
     def get_target(self):
         return self.target

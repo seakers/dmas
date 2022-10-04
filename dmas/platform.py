@@ -1577,9 +1577,37 @@ class SubsystemState:
 """
 COMMAND AND DATA HANDLING SUBSYSTEM
 """
-# class CommandAndDataHandlingSubsystem(SubsystemModule):
-#     def __init__(self, name: str, parent_platform_sim: Module, subsystem_state: type, health: ComponentHealth = ComponentHealth.NOMINAL, status: ComponentStatus = ComponentStatus.OFF, n_timed_coroutines: int = 2) -> None:
-#         super().__init__(name, parent_platform_sim, subsystem_state, health, status, n_timed_coroutines)
+class CommandAndDataHandlingSubsystem(SubsystemModule):
+    def __init__(self, 
+                parent_platform_sim: Module, 
+                health: ComponentHealth = ComponentHealth.NOMINAL, 
+                status: ComponentStatus = ComponentStatus.ON) -> None:
+        super().__init__(SubsystemNames.CNDH.value, parent_platform_sim, CommandAndDataHandlingState, health, status)
+        self.submodules = [ OnboardComputerModule(self, 1, 1e3) ]
+    
+    async def subsystem_state_update_handler(self, subsystem_state):
+        """
+        Reacts to other subsystem state updates.
+        """
+        pass
+
+    async def decompose_platform_task(self, task : PlatformTask) -> list:
+        """
+        Decomposes a platform-level task and returns a list of subsystem-level tasks to be performed by this or other subsystems.
+        """
+
+        if isinstance(task, ObservationTask):
+            lat, lon = task.target
+            return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations) ]
+        else:
+            return await super().decompose_platform_task(task)
+
+class CommandAndDataHandlingState(SubsystemState):
+    def __init__(self, 
+                component_states: dict, 
+                health: SubsystemHealth, 
+                status: SubsystemStatus):
+        super().__init__(SubsystemNames.CNDH.value, CommandAndDataHandlingSubsystem, component_states, health, status)
 
 class OnboardComputerModule(ComponentModule):
     def __init__(self, 
@@ -1702,7 +1730,7 @@ class GuidanceAndNavigationSubsystem(SubsystemModule):
     def __init__(self, 
                 parent_platform_sim: Module, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
-                status: ComponentStatus = ComponentStatus.OFF) -> None:
+                status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.GNC.name, parent_platform_sim, GuidanceAndNavigationSubsystemState, health, status)
         self.submodules = [
                             PositionDeterminationModule(self, 1.0),
@@ -2547,12 +2575,12 @@ class BatteryState(EPSComponentState):
 """
 COMMS
 """
-class CommsSubsystemModule(SubsystemModule):
+class CommsSubsystem(SubsystemModule):
     def __init__(self,
                 parent_platform_sim: Module, 
                 buffer_size: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL,
-                status: ComponentStatus = ComponentStatus.OFF) -> None:
+                status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.COMMS.value, parent_platform_sim, CommsSubsystemState, health, status)
         self.submodules = [
                             TransmitterComponent(self, 1, buffer_size),
@@ -2560,8 +2588,8 @@ class CommsSubsystemModule(SubsystemModule):
                             ]
 
 class CommsSubsystemState(SubsystemState):
-    def __init__(self, name: str, subsystem_type: type, component_states: dict, health: SubsystemHealth, status: SubsystemStatus):
-        super().__init__(name, subsystem_type, component_states, health, status)
+    def __init__(self, component_states: dict, health: SubsystemHealth, status: SubsystemStatus):
+        super().__init__(SubsystemNames.COMMS.value, CommsSubsystem, component_states, health, status)
 
 class TransmitterComponent(ComponentModule):
     def __init__(self, 
@@ -2965,5 +2993,4 @@ class ReceiverState(ComponentState):
         self.buffer_allocated = buffer_allocated
 
     def from_component(receiver: ReceiverComponent):
-        return 
-    
+        return

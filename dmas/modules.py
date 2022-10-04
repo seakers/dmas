@@ -176,19 +176,13 @@ class Module:
         of the type 'PrintInstruction'.
         """
         try:
-            # dst_name = msg['dst']
             dst_name = msg.dst_module
             if dst_name != self.name:
                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 await self.send_internal_message(msg)
             else:
                 # this module is the intended receiver for this message. Handling message
-                content = msg.content
-                if isinstance(content, PrintInstruction):
-                    text = content.text_to_print
-                    self.log(text)    
-                else:
-                    self.log(f'Internal messages with contents of type: {type(content)} not yet supported. Discarting message.')
+                self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
         except asyncio.CancelledError:
             return
 
@@ -207,7 +201,6 @@ class Module:
     """
     HELPING FUNCTIONS
     """
-    @abstractmethod
     async def send_internal_message(self, msg: InternalMessage):
         """
         Sends message to its intended destination within this agent's modules. 
@@ -455,14 +448,3 @@ class Module:
     #             self.actions_logger.critical(out)
     #     else:
     #         self.parent_module.log_state(content, level, module_name)
-
-class ModuleInstruction:
-    def __init__(self, target: Module, t_start: float, t_end: float) -> None:
-        self.target = target
-        self.t_start = t_start
-        self.t_end = t_end
-
-class PrintInstruction(ModuleInstruction):
-    def __init__(self, target: Module, t_start: float, text_to_print: str) -> None:
-        super().__init__(target, t_start, t_start + 1)
-        self.text_to_print = text_to_print
