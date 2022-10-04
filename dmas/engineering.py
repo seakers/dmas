@@ -1,15 +1,12 @@
 from abc import abstractmethod
 import asyncio
-import copy
 from ctypes import Union
 import logging
-import math
-from msilib.schema import Component
-from telnetlib import XASCII
 
 from numpy import Infinity
 from messages import *
 from utils import *
+from tasks import *
 from modules import Module
 
 """
@@ -1239,9 +1236,17 @@ class SubsystemModule(Module):
 
     def is_subsystem_failure(self) -> bool:
         """
-        Detects subsystem-level failure state using latest component states received by this subsystem
+        Detects subsystem-level failure state using latest component states received by this subsystem. 
+        By default it fails only if all components are in a failure state.
         """
-        return False
+        all_comp_failure = True
+        for component in self.submodules:
+            component : ComponentModule
+            if component.health is not ComponentHealth.FAILURE:
+                all_comp_failure = True
+                break
+
+        return all_comp_failure
 
     def is_component_failure(self) -> bool:
         """
