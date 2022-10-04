@@ -89,7 +89,7 @@ class EnvironmentModuleTypes(Enum):
 class AgentModuleTypes(Enum):
     ENGINEERING_MODULE = 'ENGINEERING_MODULE'
     SCIENCE_MODULE = 'SCIENCE_MODULE'
-    SCHEDULING_MODULE = 'SCHEDULING_MODULE'
+    PLANNING_MODULE = 'PLANNING_MODULE'
 
 class EngineeringModuleSubmoduleTypes(Enum):
     PLATFORM_SIM = 'PLATFORM_SIM'

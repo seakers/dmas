@@ -1306,7 +1306,7 @@ class SubsystemModule(Module):
                     msg = SubsystemTaskCompletionMessage(self.name, SubsystemNames.CNDH.value, task, status)
                 elif isinstance(task, PlatformTask):
                     # inform Scheduling Module of the status of completion of platform-level tasks
-                    msg = PlatformTaskCompletionMessage(self.name, AgentModuleTypes.SCHEDULING_MODULE.value, task, status)
+                    msg = PlatformTaskCompletionMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, task, status)
                 self.send_internal_message(msg)
 
                 # inform Command and Data Handling subsytem of the new subsystem state
@@ -1845,6 +1845,7 @@ PAYLOAD SUBSYSTEM
 class PayloadSubsystem(SubsystemModule):
     def __init__(self, parent_platform_sim: Module, health: ComponentHealth = ComponentHealth.NOMINAL, status: ComponentStatus = ComponentStatus.OFF) -> None:
         super().__init__(SubsystemNames.PAYLOAD.value, parent_platform_sim, PayloadState, health, status)
+        self.submodules = [ InstrumentComponent(InstrumentNames.TEST.value, self, 10, 1, 100) ]
 
     async def activate(self):
         await super().activate()

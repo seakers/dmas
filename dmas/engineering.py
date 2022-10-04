@@ -17,11 +17,12 @@
    \/_/ \/_/\/___/  \/__,_ /\/___/  \/____/\/____/                                                                                                                                                    
 --------------------------------------------------------
 """
-from messages import *
-from tasks import *
-from platform import *
-from modules import Module
-from utils import *
+from dmas.messages import *
+from dmas.tasks import *
+from dmas.platform import *
+from dmas.modules import Module
+from dmas.utils import *
+
 
 class EngineeringModule(Module):
     def __init__(self, parent_agent : Module) -> None:
