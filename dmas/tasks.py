@@ -96,34 +96,34 @@ class StopReceivingPowerTask(ReceivePowerTask):
         super().__init__(component, -power_supplied)
 
 class ProvidePowerTask(ComponentTask):
-    def __init__(self, component: str, power_to_supply : float, target : str) -> None:
+    def __init__(self, eps_component: str, power_to_supply : float, target : str) -> None:
         """
         Tasks a component from the EPS subsystem to provide power to another component
 
-        component:
+        eps_component:
             name of eps component to provide power
         power_to_supply:
             amout of power to be supplied in [W]
         target:
             name of component to be supplied with power
         """
-        super().__init__(component)
+        super().__init__(eps_component)
         self.power_to_supply = power_to_supply
         self.target = target
 
 class StopProvidingPowerTask(ProvidePowerTask):
-    def __init__(self, component: str, power_to_stop: float, target: str) -> None:
+    def __init__(self, eps_component: str, power_to_stop: float, target: str) -> None:
         """
         Tasks a component from the EPS subsystem to stop providing power to another component
 
-        component:
+        eps_component:
             name of eps component to provide power
         power_to_stop:
             amout of power to no longer be supplied in [W]
         target:
             name of component to be deprived of power
         """
-        super().__init__(component, -power_to_stop, target)
+        super().__init__(eps_component, -power_to_stop, target)
 
 class SaveToMemoryTask(ComponentTask):
     def __init__(self, data : str) -> None:
@@ -198,7 +198,7 @@ class AccelerationUpdateTask(ComponentTask):
         self.actuator_name = actuator_name
         self.angular_acceleration = angular_acceleration
 
-class AttitudeUpdateMessage(ComponentTask):
+class AttitudeUpdateTask(ComponentTask):
     def __init__(self, new_angular_pos, new_angular_vel) -> None:
         """
         Manually updates the attitude in an IMU
@@ -286,15 +286,18 @@ class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
         super().__init__(target, -power_supplied)
 
 class PerformAttitudeManeuverTask(SubsystemTask):
-    def __init__(self, target_attitude : list) -> None:
+    def __init__(self, target_angular_pos : list, target_angular_vel = list) -> None:
         """
         Tasks the ADCS to perform an attitude maneouver
 
-        target_attitude:
-            quaternion vector describing the target attitude of the satellite
+        target_angular_pos:
+            quaternion vector describing the target attitude of the agent
+        target_angular_pos:
+            quaternion vector describing the target angular velocity of the agent
         """
         super().__init__(SubsystemNames.ADCS.value)
-        self.target_attitude = target_attitude
+        self.target_angular_pos = target_angular_pos
+        self.target_angular_vel = target_angular_vel
 
 class PerformMeasurement(SubsystemTask):
     def __init__(self, target_lat : float, target_lon : float, instruments : list, durations : list) -> None:

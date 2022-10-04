@@ -55,6 +55,7 @@ class SubsystemHealth(Enum):
 class ComponentNames(Enum):
     ONBOARD_COMPUTER = 'ONBOARD_COMPUTER'
     BATTERY = 'BATTERY'
+    POWER_SUPPLY = 'POWER_SUPPLY'
     IMU = 'IMU'
     POS = 'POS'
     SUN_SENSOR = 'SUN_SENSOR'
@@ -100,6 +101,7 @@ class SubsystemNames(Enum):
     PAYLOAD = 'PAYLOAD'
     GNC = 'GUIDANCE_AND_NAVIGATION'
     ADCS = 'ATTITUDE_DETERMINATION_AND_CONTROL'
+    COMMS = 'COMMS'
 
 class SimClocks(Enum):
     # asynchronized clocks
