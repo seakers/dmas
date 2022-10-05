@@ -18,11 +18,13 @@ def get_data_product(sd,lat,lon,time,product_type):
                     return df
 
 class ScienceModule(Module):
-    def __init__(self, name, parent_module, scenario_dir, submodules=[], n_timed_coroutines=2) -> None:
+    def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
+        super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [])
+
         self.scenario_dir = scenario_dir
-        super().__init__(name, parent_module, submodules, n_timed_coroutines)
-        self.data_products = []
-        self.load_data_products()
+
+        self.data_products = self.load_data_products()        
+
         self.submodules = [
             ScienceValueModule(self,self.data_products),
             SciencePredictiveModelModule(self,self.data_products),
@@ -30,12 +32,16 @@ class ScienceModule(Module):
             ScienceReasoningModule(self,self.data_products)
         ]
 
-    def load_data_products(self):
+    def load_data_products(self) -> list:
+        data_products = []
+
         for file in os.listdir(self.scenario_dir):
             if(file.lower().endswith('.txt')):
                 with open(file) as headerfile:
                     data_product_dict = json.load(headerfile)
-                    self.data_products.append(data_product_dict)
+                    data_products.append(data_product_dict)
+
+        return data_products
 
     def get_data_product(self,lat,lon,time,product_type):
         for item in self.data_products:
@@ -61,47 +67,22 @@ class ScienceModule(Module):
         with open('./scenarios/sim_test/results/sd/dataprod'+lat+lon+time+product_type+'.txt') as datafile:
             datafile.write(json.dumps(data_product_dict))
 
-    async def activate(self):
-        await super().activate()
-
-    async def internal_message_handler(self, msg):
-        """
-        Handles message intended for this module and performs actions accordingly.
-        """
-        try:
-            dst_name = msg['dst']
-            if dst_name != self.name:
-                await self.put_message(msg)
-            else:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    self.log(content)                
-        except asyncio.CancelledError:
-            return
-
-    async def coroutines(self):
-        try:
-            while True:
-                await self.sim_wait(1.0, module_name=self.name)
-        except asyncio.CancelledError:
-            return
-
 
 class ScienceValueModule(Module):
-    def __init__(self, parent_module, sd) -> None:
+    def __init__(self, parent_module : Module, sd) -> None:
+        super().__init__(ScienceModuleSubmoduleTypes.SCIENCE_VALUE_MODEL.value, parent_module, submodules=[],
+                         n_timed_coroutines=2)
         self.sd = sd
         self.to_be_sent = False
         self.to_be_valued = False
         self.request_msg = None
-        super().__init__('Science Value Module', parent_module, submodules=[],
-                         n_timed_coroutines=2)
 
-    prop_meas_obs_metrics = []
+        self.prop_meas_obs_metrics = []
 
     async def activate(self):
         await super().activate()
 
-    async def internal_message_handler(self, msg):
+    async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly.
         """
@@ -146,13 +127,12 @@ class ScienceValueModule(Module):
         broadcast_meas_req.set_name('broadcast_meas_req')
         routines = [compute_science_value, broadcast_meas_req]
 
-        _, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
 
         done_name = None
-        for coroutine in routines:
-            if coroutine not in pending:
-                done_name = coroutine.get_name()
-        self.log(f"{done_name} completed!")
+        for coroutine in done:
+            done_name = coroutine.get_name()
+            self.log(f"{done_name} completed!")
 
         for p in pending:
             self.log(f"Terminating {p.get_name()}...")

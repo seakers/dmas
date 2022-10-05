@@ -8,41 +8,15 @@ from messages import *
 from neo4j import GraphDatabase
 
 class PlanningModule(Module):
-    def __init__(self, name, parent_module, scenario_dir, submodules=[], n_timed_coroutines=3) -> None:
+    def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
+        super().__init__(AgentModuleTypes.PLANNING_MODULE.value, parent_agent, [], 3)
         self.scenario_dir = scenario_dir
-        super().__init__(name, parent_module, submodules, n_timed_coroutines)
         self.submodules = [
             InstrumentCapabilityModule(self),
             ObservationPlanningModule(self),
             PredictiveModelsModule(self),
             MeasurementPerformanceModule(self)
         ]
-
-    async def activate(self):
-        await super().activate()
-
-    async def internal_message_handler(self, msg):
-        """
-        Handles message intended for this module and performs actions accordingly.
-        """
-        try:
-            dst_name = msg['dst']
-            if dst_name != self.name:
-                await self.put_message(msg)
-            else:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    self.log(content)                
-        except asyncio.CancelledError:
-            return
-
-    async def coroutines(self):
-        try:
-            while True:
-                await self.sim_wait(1.0, module_name=self.name)
-        except asyncio.CancelledError:
-            return
-
 
 class InstrumentCapabilityModule(Module):
     def __init__(self, parent_module) -> None:
