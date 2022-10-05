@@ -12,6 +12,7 @@ from modules import  Module
 from utils import Container, SimClocks, EnvironmentModuleTypes
 import pandas as pd
 import base64
+from scienceserver import *
 
 """
 --------------------------------------------------------
@@ -128,7 +129,7 @@ class ScheduledEventModule(Module):
         pass
 
     @abstractmethod
-    def row_to_broadcast_msg(self, row) -> EnvironmentBroadcastMessage:
+    def row_to_broadcast_msg(self, row) -> BroadcastMessage:
         """
         converts a row of from 'event_data' into a message to be broadcast to other agents
         """
@@ -248,6 +249,46 @@ class EclipseEventModule(ScheduledEventModule):
                 eclipse_data = pd.concat([eclipse_data, eclipse_merged])
 
         return eclipse_data
+
+# class ImageServerModule(Module):
+#     """
+#     Provides images corresponding to payload view
+#     """
+#     def __init__(self, parent_environment) -> None:
+#         super().__init__(EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, parent_environment, submodules=[], n_timed_coroutines=1)
+
+#     async def activate(self):
+#         await super().activate()
+#         # self.img_request_queue = []
+
+#     async def internal_message_handler(self, msg: InternalMessage):
+#         """
+#         Handles message intended for this module and performs actions accordingly.
+#         """
+#         try:
+#             if msg.dst_module != self.name:
+#                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
+#                 await self.send_internal_message(msg)
+#             else:
+#                 if isinstance(msg.content, ObservationSenseMessage):
+#                     # if a img request is received, add to img_request_queue
+#                     img_req = msg.content
+#                     lat = img_req.lat
+#                     lon = img_req.lon
+#                     self.log(f'Received measurement result from ({lat}°, {lon}°)!')
+#                     self.log(f'right before getLandsatFilePath')
+#                     filepath = getLandsatFilePath(lat,lon)
+#                     img_req.obs = filepath
+#                     img_req.dst = img_req.src
+#                     img_req.src = self.name
+#                     await self.send_internal_message(img_req)
+#                     #await self.reqservice.send_json(img_req.to_json())
+#                     return
+#                 else:
+#                     # if not a tic request, dump message
+#                     return
+#         except asyncio.CancelledError:
+#             return
 
 class GndStatAccessEventModule(ScheduledEventModule):
     def __init__(self, parent_environment) -> None:
@@ -500,6 +541,7 @@ class EnvironmentServer(Module):
         self.submodules = [ 
                             TicRequestModule(self), 
                             AgentExternalStatePropagator(self)
+                            #ImageServerModule(self)
                           ]
         
         # set up results dir
@@ -619,7 +661,7 @@ class EnvironmentServer(Module):
                 await self.send_internal_message(msg)
             else:
                 content = msg.content
-                if isinstance(content, EnvironmentBroadcastMessage):
+                if isinstance(content, BroadcastMessage):
                     # if the message is of type broadcast, send to broadcast handler
                     self.log(f'Submitting message of type {content.get_type()} for publishing...')
                     await self.publisher_queue.put(content)
@@ -628,6 +670,12 @@ class EnvironmentServer(Module):
                     # if an submodule sends a tic request, forward to tic request submodule
                     self.log(f'Forwarding Tic request to relevant submodule...')
                     msg.dst_module = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
+                    await self.send_internal_message(msg)
+
+                elif isinstance(content, ImgRequestMessage):
+                    # if an submodule sends a img request, forward to img request submodule
+                    self.log(f'Forwarding image request to relevant submodule...')
+                    msg.dst_module = EnvironmentModuleTypes.IMAGE_SERVER_MODULE.name
                     await self.send_internal_message(msg)
 
                 else:
@@ -665,7 +713,7 @@ class EnvironmentServer(Module):
                     self.reqservice.send_string('')
                     return
 
-                if NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.TIC_REQUEST:
+                if NodeMessageTypes[msg_type] is NodeMessageTypes.TIC_REQUEST:
                     # load tic request
                     request = TicRequestMessage.from_dict(d)
 
@@ -680,7 +728,7 @@ class EnvironmentServer(Module):
                     tic_req = InternalMessage(self.name, EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, request)
                     await self.send_internal_message(tic_req)
 
-                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_ACCESS_SENSE:
+                elif NodeMessageTypes[msg_type] is NodeMessageTypes.AGENT_ACCESS_SENSE:
                     # unpackage message
                     agent_access_msg = AgentAccessSenseMessage.from_dict(d)
                     
@@ -698,7 +746,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(agent_access_msg.to_json())
 
-                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE:
+                elif NodeMessageTypes[msg_type] is NodeMessageTypes.GS_ACCESS_SENSE:
                     # unpackage message
                     gs_access_msg = GndStnAccessSenseMessage.from_dict(d)
 
@@ -716,7 +764,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(gs_access_msg.to_json())
 
-                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GP_ACCESS_SENSE:
+                elif NodeMessageTypes[msg_type] is NodeMessageTypes.GP_ACCESS_SENSE:
                     # unpackage message
                     gp_access_msg = GndPntAccessSenseMessage.from_dict(d)
 
@@ -737,7 +785,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(gp_access_msg.to_json())
 
-                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_INFO_SENSE:
+                elif NodeMessageTypes[msg_type] is NodeMessageTypes.AGENT_INFO_SENSE:
                     # unpackage message
                     agent_sense_msg = AgentSenseMessage.from_dict(d)
 
@@ -755,7 +803,7 @@ class EnvironmentServer(Module):
                     # send response to agent
                     await self.reqservice.send_json(agent_sense_msg.to_json())
 
-                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
+                elif NodeMessageTypes[msg_type] is NodeMessageTypes.AGENT_END_CONFIRMATION:
                     # register that agent node has gone offline mid-simulation
                     # (this agent node won't be considered when broadcasting simulation end)
                     agent_end_conf_msg = AgentEndConfirmationMessage.from_dict(d)
@@ -766,18 +814,19 @@ class EnvironmentServer(Module):
                     # send blank response to agent
                     await self.send_blanc_response()
 
-                elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.OBSERVATION_SENSE:
+                elif NodeMessageTypes[msg_type] is NodeMessageTypes.OBSERVATION_SENSE:
                     # unpackage message
                     observation_sense_msg = ObservationSenseMessage.from_dict(d)
 
-                    lat, lon = observation_sense_msg.target
+                    lat = observation_sense_msg.lat
+                    lon = observation_sense_msg.lon
                     t_curr = self.get_current_time()
                     self.log(f'Received observation sense message from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
                     
-                    # query observation data and insert in message
-                    with open("sample_landsat_image.png", "rb") as image_file:
+
+                    with open("./scenarios/sim_test/sample_landsat_image.png", "rb") as image_file:
                         encoded_string = base64.b64encode(image_file.read())
-                    observation_sense_msg.set_result(encoded_string)
+                    observation_sense_msg.obs = encoded_string.decode('utf-8')
                     
                     # change source and destination for response message
                     observation_sense_msg.dst = observation_sense_msg.src
@@ -785,6 +834,8 @@ class EnvironmentServer(Module):
 
                     # send response to agent
                     await self.reqservice.send_json(observation_sense_msg.to_json())
+                    # img_req = ImgRequestMessage(self.name, EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, observation_sense_msg)
+                    # await self.send_internal_message(img_req)
 
                 else:
                     # if message type is not supported, dump and ignore message
@@ -854,7 +905,7 @@ class EnvironmentServer(Module):
             while True:
                 msg = await self.publisher_queue.get()
 
-                if not isinstance(msg, EnvironmentBroadcastMessage):
+                if not isinstance(msg, BroadcastMessage):
                     # if message to be broadcasted is not of any supported format, reject and dump
                     self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarting task...')
                     continue
@@ -941,7 +992,7 @@ class EnvironmentServer(Module):
             msg = json.loads(msg_str)
             msg_type = msg['@type']
 
-            if NodeToEnvironmentMessageTypes[msg_type] != NodeToEnvironmentMessageTypes.SYNC_REQUEST or msg.get('port', None) is None:
+            if NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST or msg.get('port', None) is None:
                 # ignore all messages that are not Sync Requests
                 continue
             
@@ -1031,7 +1082,7 @@ class EnvironmentServer(Module):
             msg_dict = json.loads(msg_str)
             msg_type = msg_dict['@type']
 
-            if NodeToEnvironmentMessageTypes[msg_type] is not NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
+            if NodeMessageTypes[msg_type] is not NodeMessageTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
                 self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
                 await self.send_blanc_response()
@@ -1129,7 +1180,7 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 10
+    duration = 20
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
