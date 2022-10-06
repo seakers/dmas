@@ -9,7 +9,6 @@ MODULE TASKS
 COMPONENT TASKS
 -------------------------------
 """
-from this import s
 from utils import *
 
 

@@ -724,7 +724,7 @@ class AgentEndConfirmationMessage(NodeToEnvironmentMessage):
         return AgentEndConfirmationMessage.from_dict(json.loads(d))
 
 class ObservationSenseMessage(NodeToEnvironmentMessage):
-    def __init__(self, src: str, dst: str, internal_state: dict, lat: float, lon: float, result: str = None) -> None:
+    def __init__(self, src: str, lat: float, lon: float, obs: str = None) -> None:
         """
         Message from an agent node to the environment asking to be informed about a GP's current state
 
@@ -741,47 +741,34 @@ class ObservationSenseMessage(NodeToEnvironmentMessage):
         result:
             result from sensing if the agent is accessing the target
         """
-        super().__init__(src, dst, NodeToEnvironmentMessageTypes.OBSERVATION_SENSE)
-        self.internal_state = internal_state
-        self.target = [lat, lon]
-        self.result = result
+        super().__init__(src, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, NodeToEnvironmentMessageTypes.OBSERVATION_SENSE)
+        self.lat = lat
+        self.lon = lon
+        self.obs = obs
 
-    def set_result(self, results: str):
-        """
-        Sets the observation results 
-        """
-        self.result = results
 
     def to_dict(self) -> dict:
         """
         Crates a dictionary containing all information contained in this message object
         """
         msg_dict = super().to_dict()
-        lat, lon = self.target
-        msg_dict['lat'] = lat
-        msg_dict['lon'] = lon 
-        msg_dict['internal state'] = self.internal_state
-        
-        if self.result is None:
-            msg_dict['result'] = "None"
-        else:
-            msg_dict['result'] = self.result        
+
+        msg_dict['obs'] = self.obs
+        msg_dict['lat'] = self.lat
+        msg_dict['lon'] = self.lon
 
         return msg_dict
 
     def from_dict(d):
         """
-        Creates an instance of a Access Sense Message class object from a dictionary
+        Creates an instance of a Observation Sense Message class object from a dictionary
         """
         src = d.get('src', None)
-        dst = d.get('dst', None)
         type_name = d.get('@type', None)
-        internal_state = d.get('internal state', None)
         lat = d.get('lat', None)
         lon = d.get('lon', None)
-        result = d.get('result', -1)
-
-        if src is None or dst is None or type_name is None or internal_state is None or lat is None or lon is None or result == -1:
+        obs = d.get('obs', None)
+        if src is None or type_name is None or lat is None or lon is None or obs is None:
             raise Exception('Dictionary does not contain necessary information to construct a message object.')
 
         _type = None
@@ -795,7 +782,7 @@ class ObservationSenseMessage(NodeToEnvironmentMessage):
             raise Exception(f'Cannot load a Observation Sense Message from a dictionary of type {type_name}.')
 
 
-        return ObservationSenseMessage(src, dst, internal_state, lat, lon, result)
+        return ObservationSenseMessage(src, lat, lon, obs)
 
     def from_json(d):
         """`

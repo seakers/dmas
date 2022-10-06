@@ -74,7 +74,7 @@ class InstrumentCapabilityModule(Module):
         try:
             while True:
                 if(self.request_msg is not None):
-                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "test", "OLI")
+                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI")
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return

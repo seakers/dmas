@@ -2,7 +2,6 @@ import asyncio
 from curses import def_prog_mode
 import json
 import os
-from modules import PrintInstruction
 
 from environment import EnvironmentServer
 
@@ -17,6 +16,9 @@ from messages import *
 from utils import SimClocks, Container, EnvironmentModuleTypes
 
 from modules import Module
+
+from science import ScienceModule
+from planning import PlanningModule
 
 """    
 --------------------------------------------------------
@@ -491,7 +493,7 @@ class AgentClient(Module):
             loggers.append(logger)
         return loggers
                 
-    async def environment_message_submitter(self, msg: NodeMessage, module_name: str=None):
+    async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
         try:
             msg_type = msg.get_type()
             self.log(f'Submitting a request of type {msg_type}.')
@@ -553,13 +555,34 @@ class AgentClient(Module):
                 
                 return resp
 
+            elif isinstance(msg, ObservationSenseMessage):
+                # submit request
+                self.log(f'Sending Observation Sense Message...')
+                await self.environment_request_lock.acquire()
+                self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
+                await self.environment_request_socket.send_json(msg.to_json())
+                self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
+                
+                # wait for server reply
+                resp_json = await self.environment_request_socket.recv_json()
+                self.environment_request_lock.release()
+
+                if resp_json == json.dumps(dict()):
+                    self.log(f'Received Response: \'None\'') 
+                    return None
+                    
+                resp = ObservationSenseMessage.from_json(resp_json)
+                self.log(f'Received Observation Sense Message')        
+                
+                return resp
+
             else:
                 raise Exception(f'Request of type {msg_type} not supported by request submitter.')
 
         except asyncio.CancelledError:
             pass
 
-    async def message_transmitter(self, msg: NodeMessage):
+    async def message_transmitter(self, msg: InterNodeMessage):
         # reformat message
         msg.src = self.name
         msg_json = msg.to_json()
@@ -603,7 +626,12 @@ class AgentState:
 class TestAgent(AgentClient):    
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
-        self.submodules = [TestModule(self)]  
+        self.submodules = [TestModule(self)]
+
+class ScienceTestAgent(AgentClient):
+    def __init__(self, name, scenario_dir) -> None:
+        super().__init__(name, scenario_dir)
+        self.submodules = [TestModule(self), ScienceModule(self,scenario_dir), PlanningModule(self,scenario_dir)]
 
 """
 --------------------
@@ -627,11 +655,11 @@ class SubModule(Module):
             while True:
                 if not sent_requests:
                     # test message to parent module
-                    instruction = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
-                    msg = InternalMessage(self.name, self.parent_module.name, instruction)
+                    # instruction = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
+                    # msg = InternalMessage(self.name, self.parent_module.name, instruction)
 
-                    self.log('Sending print instruction to parent module.')
-                    await self.send_internal_message(msg)
+                    # self.log('Sending print instruction to parent module.')
+                    # await self.send_internal_message(msg)
 
                     self.log('Waiting for 1 second')
                     await self.sim_wait_to(int(self.get_current_time()) + 1)
@@ -673,6 +701,22 @@ class SubModule(Module):
                         self.log(f'Current state: pos=[{response.pos}], vel=[{response.vel}], eclipse={response.eclipse}')
                         await self.sim_wait(1.1)
 
+                    lat, lon = 45.590934, 47.716708
+                    obs = "radiances"
+                    msg = ObservationSenseMessage(src.name, lat, lon, obs)
+                    self.log(f'Sending Observation Sense message to Environment.')
+                    response = await self.submit_environment_message(msg)
+
+                    if response is not None:
+                        #self.log(f'Current status: {response.obs}')
+                        self.log(f'Received response observation')
+                        await self.sim_wait(0.1)
+                    self.log('done waiting')
+                    msg = InternalMessage(self.name, "Onboard Processing Module", response)
+
+                    self.log('Sending measurement result to onboard processing module.')
+                    await self.send_internal_message(msg)
+
                 # else:
                 #     await self.sim_wait( 1e6 )
 
@@ -701,6 +745,7 @@ MAIN
 if __name__ == '__main__':
     print('Initializing agent...')
     
-    agent = TestAgent('Mars1', './scenarios/sim_test')
+    #agent = TestAgent('Mars1', './scenarios/sim_test')
+    agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
     
     asyncio.run(agent.live())

@@ -95,6 +95,9 @@ class EngineeringModuleSubmoduleTypes(Enum):
     PLATFORM_SIM = 'PLATFORM_SIM'
     NETWORK_TRANSMISSION_EMULATOR = 'NETWORK_TRANSMISSION_EMULATOR'
 
+class ScienceModuleSubmoduleTypes(Enum):
+    SCIENCE_VALUE = 'SCIENCE_VALUE'
+
 class SubsystemNames(Enum):
     EPS = 'ELECTRIC_POWER_SUBSYSTEM'
     CNDH = 'COMMAND_AND_DATA_HANDLING'

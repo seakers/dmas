@@ -172,8 +172,7 @@ class Module:
     @abstractmethod
     async def internal_message_handler(self, msg: InternalMessage):
         """
-        Handles message intended for this module and performs actions accordingly. By default it only handles messages
-        of the type 'PrintInstruction'.
+        Handles message intended for this module and performs actions accordingly.
         """
         try:
             dst_name = msg.dst_module

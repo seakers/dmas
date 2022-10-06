@@ -9,6 +9,7 @@ from PIL import Image
 from io import BytesIO
 from modules import Module
 from messages import *
+from utils import ScienceModuleSubmoduleTypes
 
 def get_data_product(sd,lat,lon,time,product_type):
         for item in sd:
@@ -70,7 +71,7 @@ class ScienceModule(Module):
 
 class ScienceValueModule(Module):
     def __init__(self, parent_module : Module, sd) -> None:
-        super().__init__(ScienceModuleSubmoduleTypes.SCIENCE_VALUE_MODEL.value, parent_module, submodules=[],
+        super().__init__(ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value, parent_module, submodules=[],
                          n_timed_coroutines=2)
         self.sd = sd
         self.to_be_sent = False
@@ -315,7 +316,7 @@ class SciencePredictiveModelModule(Module):
             else:
                 if msg['@type'] == 'PRINT':
                     content = msg['content']
-                    self.log(content)
+                    #self.log(content)
                 if msg['@type'] == 'MODEL_REQ':
                     self.model_reqs.append(msg['content'])
         except asyncio.CancelledError:
@@ -396,7 +397,7 @@ class ScienceReasoningModule(Module):
                         item["severity"] = (pixel_value-mean) / stddev
                         chlorophyll_outliers.append(item)
                 for outlier in chlorophyll_outliers:
-                    msg = InternalMessage(self.name, "Science Value Module", outlier)
+                    msg = InternalMessage(self.name, ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value, outlier)
                     await self.parent_module.send_internal_message(msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
