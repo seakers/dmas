@@ -712,7 +712,7 @@ class SubModule(Module):
                         self.log(f'Received response observation')
                         await self.sim_wait(0.1)
                     self.log('done waiting')
-                    msg = InternalMessage(self.name, "Onboard Processing Module", response)
+                    msg = InternalMessage(self.name, ScienceModuleSubmoduleTypes.ONBOARD_PROCESSING.value, response)
 
                     self.log('Sending measurement result to onboard processing module.')
                     await self.send_internal_message(msg)

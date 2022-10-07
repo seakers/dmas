@@ -145,7 +145,7 @@ class ScienceValueModule(Module):
         try:
             while True:
                 if self.to_be_sent and not self.to_be_valued:
-                    msg = InternalMessage(self.name, "Instrument Capability Module", self.request_msg)
+                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, self.request_msg)
                     await self.parent_module.send_internal_message(msg)
                     self.to_be_sent = False
                 # msg_dict = dict()
@@ -198,7 +198,7 @@ class ScienceValueModule(Module):
 class OnboardProcessingModule(Module):
     def __init__(self, parent_module, sd) -> None:
         self.sd = sd
-        super().__init__('Onboard Processing Module', parent_module, submodules=[],
+        super().__init__(ScienceModuleSubmoduleTypes.ONBOARD_PROCESSING.value, parent_module, submodules=[],
                          n_timed_coroutines=0)
 
     meas_results = []
@@ -298,7 +298,7 @@ class OnboardProcessingModule(Module):
 class SciencePredictiveModelModule(Module):
     def __init__(self, parent_module, sd) -> None:
         self.sd = sd
-        super().__init__('Science Predictive Model Module', parent_module, submodules=[],
+        super().__init__(ScienceModuleSubmoduleTypes.PREDICTIVE_MODELS.value, parent_module, submodules=[],
                          n_timed_coroutines=0)
 
     model_reqs = []
@@ -332,7 +332,7 @@ class SciencePredictiveModelModule(Module):
 class ScienceReasoningModule(Module):
     def __init__(self, parent_module, sd) -> None:
         self.sd = sd
-        super().__init__('Science Reasoning Module', parent_module, submodules=[],
+        super().__init__(ScienceModuleSubmoduleTypes.REASONING.value, parent_module, submodules=[],
                          n_timed_coroutines=0)
 
     model_results = []

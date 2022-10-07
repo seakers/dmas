@@ -6,6 +6,7 @@ import numpy as np
 from modules import Module
 from messages import *
 from neo4j import GraphDatabase
+from utils import PlanningModuleSubmoduleTypes
 
 class PlanningModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
@@ -23,7 +24,7 @@ class InstrumentCapabilityModule(Module):
         self.to_be_sent = False
         self.msg_content = None
         self.request_msg = None
-        super().__init__('Instrument Capability Module', parent_module, submodules=[],
+        super().__init__(PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, parent_module, submodules=[],
                          n_timed_coroutines=2)
 
     async def activate(self):
@@ -55,7 +56,7 @@ class InstrumentCapabilityModule(Module):
             while True:
                 if self.to_be_sent:
                     self.log(f'In self to be sent')
-                    msg = InternalMessage(self.name, "Observation Planning Module", self.msg_content)
+                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.msg_content)
                     await self.parent_module.send_internal_message(msg)
                     self.to_be_sent = False
                 # msg_dict = dict()
@@ -80,9 +81,13 @@ class InstrumentCapabilityModule(Module):
             return
 
     def queryGraphDatabase(self, uri, user, password, sc_name):
-        driver = GraphDatabase.driver(uri, auth=(user, password))
-        self.print_observers(driver,sc_name)
-        driver.close()
+        try:
+            driver = GraphDatabase.driver(uri, auth=(user, password))
+            self.print_observers(driver,sc_name)
+            driver.close()
+        except:
+            self.log(f'Connection to Neo4j is not working! Make sure it\'s running and check the password!')
+        
 
     def print_observers(self,driver,sc_name):
         with driver.session() as session:
@@ -113,7 +118,7 @@ class ObservationPlanningModule(Module):
     def __init__(self, parent_module) -> None:
         self.task_list = []
         self.plan = []
-        super().__init__('Observation Planning Module', parent_module, submodules=[],
+        super().__init__(PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
     async def activate(self):
@@ -124,7 +129,7 @@ class ObservationPlanningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module=="Instrument Capability Module"):
+            if(msg.src_module==PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
                 self.task_list.append(msg.content)
         except asyncio.CancelledError:
             return
@@ -144,7 +149,7 @@ class ObservationPlanningModule(Module):
                     # replace this with an actual planner!
                     for i in range(len(self.task_list)):
                         self.plan.append(self.task_list[i])
-                    plan_msg = InternalMessage(self.name, "Planner Predictive Models Module", self.plan)
+                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, self.plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
@@ -154,7 +159,7 @@ class PredictiveModelsModule(Module):
     def __init__(self, parent_module) -> None:
         self.agent_state = None
         self.plan = None
-        super().__init__('Planner Predictive Models Module', parent_module, submodules=[],
+        super().__init__(PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
     async def activate(self):
@@ -181,7 +186,7 @@ class PredictiveModelsModule(Module):
         try:
             while True:
                 if(self.plan is not None):
-                    plan_msg = InternalMessage(self.name, "Measurement Performance Module", self.plan)
+                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, self.plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
@@ -190,7 +195,7 @@ class PredictiveModelsModule(Module):
 class MeasurementPerformanceModule(Module):
     def __init__(self, parent_module) -> None:
         self.plan = None
-        super().__init__('Measurement Performance Module', parent_module, submodules=[],
+        super().__init__(PlanningModuleSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
     async def activate(self):
@@ -225,7 +230,7 @@ class MeasurementPerformanceModule(Module):
                         lagfunc = -0.08182 * np.log(delta)+0.63182
                         event["meas_perf_value"] = lagfunc
                         self.plan[i] = event
-                    plan_msg = InternalMessage(self.name, "Observation Planning Module", self.plan)
+                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
