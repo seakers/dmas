@@ -35,27 +35,42 @@ class InstrumentCapabilityModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.log(f'Internal message handler in instrument capability module')
             self.request_msg = msg.content
         except asyncio.CancelledError:
             return
 
     async def coroutines(self):
-        self.log("Running instrument capability module coroutines")
+        coroutines = []
+
+        ## Internal coroutines
         check_database = asyncio.create_task(self.check_database())
+        check_database.set_name (f'{self.name}_check_database')
+        coroutines.append(check_database)
+
         broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
-        await check_database
-        await broadcast_meas_req
-        check_database.cancel()
-        broadcast_meas_req.cancel()
-        self.log("Finished instrument capability module coroutines")
+        broadcast_meas_req.set_name (f'{self.name}_broadcast_meas_req')
+        coroutines.append(broadcast_meas_req)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
 
 
     async def broadcast_meas_req(self):
         try:
             while True:
                 if self.to_be_sent:
-                    self.log(f'In self to be sent')
                     msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.msg_content)
                     await self.parent_module.send_internal_message(msg)
                     self.to_be_sent = False
@@ -75,7 +90,7 @@ class InstrumentCapabilityModule(Module):
         try:
             while True:
                 if(self.request_msg is not None):
-                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI")
+                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "test", "OLI")
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
@@ -92,8 +107,6 @@ class InstrumentCapabilityModule(Module):
     def print_observers(self,driver,sc_name):
         with driver.session() as session:
             product = "None"
-            self.log(f'In print observers')
-            self.log(self.request_msg.content["product_type"])
             if(self.request_msg.content["product_type"] == "chlorophyll-a"):
                 product = "Ocean chlorophyll concentration"
             observers = session.read_transaction(self.get_observers, title=product)
@@ -135,11 +148,27 @@ class ObservationPlanningModule(Module):
             return
 
     async def coroutines(self):
-        self.log("Running observation planning module coroutines")
+        coroutines = []
+
+        ## Internal coroutines
         create_plan = asyncio.create_task(self.create_plan())
-        await create_plan
-        create_plan.cancel()
-        self.log("Finished observation planning module coroutines")
+        create_plan.set_name (f'{self.name}_create_plan')
+        coroutines.append(create_plan)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
 
 
     async def create_plan(self):
@@ -175,12 +204,27 @@ class PredictiveModelsModule(Module):
             return
 
     async def coroutines(self):
-        self.log("Running Planner Predictive Models Module coroutines")
-        predict_state = asyncio.create_task(self.predict_state())
-        await predict_state
-        predict_state.cancel()
-        self.log("Finished Planner Predictive Models Module coroutines")
+        coroutines = []
 
+        ## Internal coroutines
+        predict_state = asyncio.create_task(self.predict_state())
+        predict_state.set_name (f'{self.name}_predict_state')
+        coroutines.append(predict_state)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
 
     async def predict_state(self):
         try:
@@ -211,11 +255,27 @@ class MeasurementPerformanceModule(Module):
             return
 
     async def coroutines(self):
-        self.log("Running Measurement Performance Module coroutines")
+        coroutines = []
+
+        ## Internal coroutines
         evaluate_performance = asyncio.create_task(self.evaluate_performance())
-        await evaluate_performance
-        evaluate_performance.cancel()
-        self.log("Finished Measurement Performance Module coroutines")
+        evaluate_performance.set_name (f'{self.name}_evaluate_performance')
+        coroutines.append(evaluate_performance)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
 
 
     async def evaluate_performance(self):
@@ -227,7 +287,7 @@ class MeasurementPerformanceModule(Module):
                         self.log(event)
                         observation_time = 20.0
                         delta = observation_time - float(event["time"])
-                        lagfunc = -0.08182 * np.log(delta)+0.63182
+                        lagfunc = -0.08182 * np.log(delta)+0.63182 # from molly's ppt on google drive
                         event["meas_perf_value"] = lagfunc
                         self.plan[i] = event
                     plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.plan)

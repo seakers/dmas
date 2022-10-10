@@ -74,10 +74,8 @@ class ScienceValueModule(Module):
         super().__init__(ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value, parent_module, submodules=[],
                          n_timed_coroutines=2)
         self.sd = sd
-        self.to_be_sent = False
-        self.to_be_valued = False
-        self.request_msg = None
-
+        self.unvalued_queue = []
+        self.valued_queue = []
         self.prop_meas_obs_metrics = []
 
     async def activate(self):
@@ -89,9 +87,7 @@ class ScienceValueModule(Module):
         """
         try:
             self.log(f'Internal message handler in science value module')
-            self.to_be_sent = True
-            self.to_be_valued = True
-            self.request_msg = msg
+            self.unvalued_queue.append(msg)
             # dst_name = msg['dst']
             # if dst_name != self.name:
             #     await self.put_message(msg)
@@ -107,21 +103,10 @@ class ScienceValueModule(Module):
         except asyncio.CancelledError:
             return
 
-    # async def coroutines(self):
-    #     self.log("Running Science Value module coroutines")
-    #     compute_science_value = asyncio.create_task(self.compute_science_value())
-    #     await compute_science_value
-    #     compute_science_value.cancel()
-    #     broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
-    #     await broadcast_meas_req
-    #     broadcast_meas_req.cancel()
-    #     self.log("Completed science value module coroutines")
-
     async def coroutines(self):
         """
         Executes list of coroutine tasks to be executed by the science value module. These coroutine task incluide:
         """
-        self.log("Running Science Value module coroutines")
         compute_science_value = asyncio.create_task(self.compute_science_value())
         compute_science_value.set_name('compute_science_value')
         broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
@@ -144,10 +129,9 @@ class ScienceValueModule(Module):
     async def broadcast_meas_req(self):
         try:
             while True:
-                if self.to_be_sent and not self.to_be_valued:
-                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, self.request_msg)
+                for valued_msg in self.valued_queue:
+                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, valued_msg)
                     await self.parent_module.send_internal_message(msg)
-                    self.to_be_sent = False
                 # msg_dict = dict()
                 # msg_dict['src'] = self.name
                 # msg_dict['dst'] = 'Planner'
@@ -163,10 +147,9 @@ class ScienceValueModule(Module):
     async def compute_science_value(self):
         try:
             while True:
-                if self.to_be_valued:
-                    self.log(f'computing science value')
+                for unvalued in self.unvalued_queue:
                     points = np.zeros(shape=(2000, 5))
-                    content = self.request_msg.content
+                    content = unvalued.content
                     with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
                         reader = csv.reader(csvfile)
                         count = 0
@@ -178,8 +161,7 @@ class ScienceValueModule(Module):
                             count = count + 1
                     pop = self.get_pop(content["lat"], content["lon"], points)
                     content["value"] = pop
-                    self.request_msg.content = content
-                    self.to_be_valued = False
+                    self.valued_queue.append(self.unvalued_queue.pop())
                     self.log(f'computed science value')
                 await self.sim_wait(0.1)
         except asyncio.CancelledError:
@@ -228,11 +210,27 @@ class OnboardProcessingModule(Module):
             return
 
     async def coroutines(self):
-        self.log("Running Onboard Processing module coroutines")
+        coroutines = []
+
+        ## Internal coroutines
         process_meas_results = asyncio.create_task(self.process_meas_results())
-        await process_meas_results
-        process_meas_results.cancel()
-        self.log("Completed Onboard Processing module coroutines")
+        process_meas_results.set_name (f'{self.name}_process_meas_results')
+        coroutines.append(process_meas_results)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
 
     async def process_meas_results(self):
         try:
@@ -357,11 +355,27 @@ class ScienceReasoningModule(Module):
             return
 
     async def coroutines(self):
-        self.log("Running Science Reasoning module coroutines")
-        check_chlorophyll_outliers = asyncio.create_task(self.check_chlorophyll_outliers(self.sd))
-        await check_chlorophyll_outliers
-        check_chlorophyll_outliers.cancel()
-        self.log("Completed Science Reasoning module coroutines")
+        coroutines = []
+
+        ## Internal coroutines
+        check_chlorophyll_outliers = asyncio.create_task(self.check_chlorophyll_outliers())
+        check_chlorophyll_outliers.set_name (f'{self.name}_check_chlorophyll_outliers')
+        coroutines.append(check_chlorophyll_outliers)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
 
     def get_mean_sd(self, lat, lon, points):
         mean = 0.0
@@ -375,7 +389,7 @@ class ScienceReasoningModule(Module):
                 break
         return mean, sd, lat, lon
 
-    async def check_chlorophyll_outliers(self,sd):
+    async def check_chlorophyll_outliers(self):
         try:
             while True:
                 points = np.zeros(shape=(2000, 5))
@@ -389,7 +403,7 @@ class ScienceReasoningModule(Module):
                             continue
                         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
                         count = count + 1
-                for item in sd:
+                for item in self.sd:
                     mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
                     pixel_value = self.get_pixel_value_from_image(item,lat,lon,30)
                     pixel_value = 100000
