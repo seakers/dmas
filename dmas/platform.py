@@ -3,7 +3,6 @@ import asyncio
 from ctypes import Union
 import logging
 
-from numpy import Infinity
 from messages import *
 from utils import *
 from tasks import *
@@ -2262,7 +2261,7 @@ class PowerSupplyComponent(ComponentModule):
                 name : str, 
                 parent_subsystem : Module, 
                 state_type : type,
-                maximum_power_output : float = Infinity,
+                maximum_power_output : float = 1e10,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
                 f_update: float = 1) -> None:
@@ -2582,6 +2581,13 @@ class CommsSubsystem(SubsystemModule):
                 buffer_size: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL,
                 status: ComponentStatus = ComponentStatus.ON) -> None:
+        """
+        Represents the communications subsystem in an agent. Can receive and transmit messages between agents.
+        parent_platform_sim:
+            platform simulation that the subsystem exists in
+        buffer_size:
+            size of the buffer in bytes
+        """
         super().__init__(SubsystemNames.COMMS.value, parent_platform_sim, CommsSubsystemState, health, status)
         self.submodules = [
                             TransmitterComponent(self, 1, buffer_size),
@@ -2995,3 +3001,44 @@ class ReceiverState(ComponentState):
 
     def from_component(receiver: ReceiverComponent):
         return
+
+class PlatformSim(Module):
+    def __init__(self, parent_module : Module) -> None:
+        super().__init__(EngineeringModuleParts.PLATFORM_SIMULATION.value, parent_module)
+        """
+        Simulates the agent's platform including all components and subsystems that comprise the agent.
+        Can receive instructions via internal messages of type 'PlatformTaskMessage', 'SubsystemTaskMessage',
+        or 'ComponentTaskMessage'.
+        """
+        
+        # TODO create list of subsystems based on component list given to the platform
+        self.submodules = [
+            CommandAndDataHandlingSubsystem(self),
+            GuidanceAndNavigationSubsystem(self),
+            ElectricPowerSubsystem(self),
+            PayloadSubsystem(self),
+            CommsSubsystem(self, 1e6),
+            AttitudeDeterminationAndControlSubsystem(self)
+        ]
+
+    # TODO include internal state routing that kills the platform sim and the agent if a platform-level failure is detected    
+
+    async def internal_message_handler(self, msg: InternalMessage):
+        """
+        Forwards any task to the command and data handling subsystem
+        """
+        try:
+            dst_name = msg.dst_module
+            if dst_name != self.name:
+                # this module is NOT the intended receiver for this message. Forwarding to rightful destination
+                await self.send_internal_message(msg)
+            else:
+                if isinstance(msg, PlatformTaskMessage) or isinstance(msg, SubsystemTaskMessage) or isinstance(msg, ComponentTaskMessage):
+                    msg.dst_module = SubsystemNames.CNDH.value
+                    await self.send_internal_message(msg)
+                else:
+                    # this module is the intended receiver for this message. Handling message
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+
+        except asyncio.CancelledError:
+            return

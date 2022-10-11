@@ -3,8 +3,6 @@ from curses import def_prog_mode
 import json
 import os
 
-from environment import EnvironmentServer
-
 import random
 import sys
 import time

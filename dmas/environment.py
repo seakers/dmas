@@ -4,6 +4,7 @@ import json
 import logging
 import time
 import zmq.asyncio
+
 from utils import EnvironmentModuleTypes
 from orbitdata import OrbitData
 
@@ -1186,7 +1187,7 @@ if __name__ == '__main__':
     print(f'Simulation duration: {duration}[s]')
 
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
-    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
-    asyncio.run(environment.live())
+    # asyncio.run(environment.live())
