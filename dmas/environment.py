@@ -100,18 +100,11 @@ class TicRequestModule(Module):
                 else:
                     self.log(f'Server clock is of type {self.CLOCK_TYPE.value}. Sleeping for the rest of the simulation...')
                     while True:
-                        wait_task = asyncio.create_task(self.sim_wait(10))
+                        wait_task = asyncio.create_task(self.sim_wait(1e6))
                         await wait_task
 
         except asyncio.CancelledError:
             self.log(f'Received task cancel command!')
-
-            # if wait_task is not None and isinstance(wait_task, asyncio.Task) and not wait_task.done():
-            #     self.log(f'Task was waiting on time to pass. Aborting sim_wait...')
-            #     wait_task : asyncio.Task
-            #     wait_task.cancel()
-            #     await wait_task
-
             return
 
 
@@ -232,13 +225,6 @@ class ScheduledEventModule(Module):
 
         except asyncio.CancelledError:
             self.log(f'Scheduled event broadcast interrupted!')
-
-            if wait_task is not None and isinstance(wait_task, asyncio.Task):
-                self.log(f'Aborting sim_wait...')
-                wait_task : asyncio.Task
-                wait_task.cancel()
-                await wait_task
-
             return
 
 class EclipseEventModule(ScheduledEventModule):
@@ -574,8 +560,8 @@ class EnvironmentServer(Module):
 
         # set up submodules
         self.submodules = [ 
-                            TicRequestModule(self)
-                            # AgentExternalStatePropagator(self)
+                            TicRequestModule(self),
+                            AgentExternalStatePropagator(self)
                             #ImageServerModule(self)
                           ]
         
@@ -912,6 +898,7 @@ class EnvironmentServer(Module):
                 await self.send_blanc_response()
             elif worker_task is not None:
                 self.log('Cancelling response...')
+                worker_task : asyncio.Task
                 worker_task.cancel()
                 await worker_task
             else:

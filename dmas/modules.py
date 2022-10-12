@@ -144,6 +144,7 @@ class Module:
 
                     for submodule in self.submodules:
                         # first check if any submodule is its intended destination
+                        submodule : Module
                         if submodule.name == dst_name:
                             dst = submodule
                             break
@@ -171,7 +172,7 @@ class Module:
         Cleanup subroutine that should be used to terminate any thread-sensitive or envent-loop sensitive variables
         """
         self.log(f'Terminated.', level=logging.INFO)
-        pass
+        return
     
     @abstractmethod
     async def internal_message_handler(self, msg: InternalMessage):
@@ -243,12 +244,14 @@ class Module:
         Performs depth-first search to find a module in that corresponds to the name being searched
         """
         # self.log(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
+        module : Module
         if module.name == dst_name:
             return module
         elif len(module.submodules) == 0:
             return None
         else:
             for submodule in module.submodules:
+                submodule : Module
                 dst = self.dfs(submodule, dst_name)
                 if dst is not None:
                     return dst
@@ -302,16 +305,16 @@ class Module:
                 if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                     
                     async def cancel_me():
-                        self.log(f'sim_wait(): starting sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                        self.log(f'Starting sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
 
                         try:
                             # Wait for 1 hour
                             await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
                         except asyncio.CancelledError:
-                            self.log(f'sim_wait(): cancelled sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                            self.log(f'Cancelled sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
                             raise
                         finally:
-                            self.log(f'sim_wait(): after sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                            self.log(f'After sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
 
 
                     # wait_for_clock = asyncio.create_task(asyncio.sleep(delay / self.SIMULATION_FREQUENCY))
