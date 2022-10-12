@@ -21,9 +21,8 @@ class PlanningModule(Module):
 
 class InstrumentCapabilityModule(Module):
     def __init__(self, parent_module) -> None:
-        self.to_be_sent = False
-        self.msg_content = None
-        self.request_msg = None
+        self.event_msg_queue = []
+        self.capable_msg_queue = []
         super().__init__(PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, parent_module, submodules=[],
                          n_timed_coroutines=2)
 
@@ -35,7 +34,8 @@ class InstrumentCapabilityModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.request_msg = msg.content
+            if(msg.src_module == PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
+                self.event_msg_queue.append(msg)
         except asyncio.CancelledError:
             return
 
@@ -70,10 +70,9 @@ class InstrumentCapabilityModule(Module):
     async def broadcast_meas_req(self):
         try:
             while True:
-                if self.to_be_sent:
-                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.msg_content)
+                for capable_msg in self.capable_msg_queue:
+                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, capable_msg.content)
                     await self.parent_module.send_internal_message(msg)
-                    self.to_be_sent = False
                 # msg_dict = dict()
                 # msg_dict['src'] = self.name
                 # msg_dict['dst'] = 'Planner'
@@ -90,7 +89,7 @@ class InstrumentCapabilityModule(Module):
         try:
             while True:
                 if(self.request_msg is not None):
-                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "test", "OLI")
+                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI")
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
@@ -98,24 +97,25 @@ class InstrumentCapabilityModule(Module):
     def queryGraphDatabase(self, uri, user, password, sc_name):
         try:
             driver = GraphDatabase.driver(uri, auth=(user, password))
-            self.print_observers(driver,sc_name)
+            for event_msg in self.event_msg_queue:
+                self.print_observers(driver,sc_name,event_msg)
             driver.close()
         except:
             self.log(f'Connection to Neo4j is not working! Make sure it\'s running and check the password!')
         
 
-    def print_observers(self,driver,sc_name):
+    def print_observers(self,driver,sc_name,event_msg):
         with driver.session() as session:
             product = "None"
-            if(self.request_msg.content["product_type"] == "chlorophyll-a"):
+            if(event_msg.content["product_type"] == "chlorophyll-a"):
                 product = "Ocean chlorophyll concentration"
             observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
                 if(observer.get("name") == sc_name):
                     self.log(f'Matching instrument!')
-                    self.to_be_sent = True
-                    self.request_msg.content["Measurable status"] = "Able to be measured"
-                    self.msg_content = self.request_msg.content
+                    event_msg.content["Measurable status"] = "Able to be measured"
+                    self.capable_msg_queue.append(event_msg)
+                    self.event_msg_queue.remove(event_msg)
 
     @staticmethod
     def get_observers(tx, title): # (1)
@@ -184,10 +184,74 @@ class ObservationPlanningModule(Module):
         except asyncio.CancelledError:
             return
 
+class OperationsPlanningModule(Module):
+    def __init__(self, parent_module) -> None:
+        self.obs_plan = []
+        self.ops_plan = []
+        self.modeled_states = []
+        super().__init__(PlanningModuleSubmoduleTypes.OPERATIONS_PLANNING.value, parent_module, submodules=[],
+                         n_timed_coroutines=1)
+
+    async def activate(self):
+        await super().activate()
+
+    async def internal_message_handler(self, msg):
+        """
+        Handles message intended for this module and performs actions accordingly.
+        """
+        try:
+            if(msg.src_module==PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value):
+                self.obs_plan.append(msg.content)
+            elif(msg.src_module==PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value):
+                self.modeled_states.append(msg.content)
+            else:
+                self.log(f'Unsupported message type for this module.)')
+        except asyncio.CancelledError:
+            return
+
+    async def coroutines(self):
+        coroutines = []
+
+        ## Internal coroutines
+        create_plan = asyncio.create_task(self.create_plan())
+        create_plan.set_name (f'{self.name}_create_plan')
+        coroutines.append(create_plan)
+
+        # wait for the first coroutine to complete
+        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        
+        done_name = None
+        for coroutine in coroutines:
+            if coroutine not in pending:
+                done_name = coroutine.get_name()
+
+        # cancel all other coroutine tasks
+        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+        for subroutine in pending:
+            subroutine.cancel()
+            await subroutine
+        return
+
+
+    async def create_plan(self):
+        try:
+            while True:
+                # Replace with basic module that adds charging to plan
+                # if(len(self.task_list) > 0):
+                #     # replace this with an actual planner!
+                #     for i in range(len(self.task_list)):
+                #         self.plan.append(self.task_list[i])
+                #     plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, self.plan)
+                #     await self.parent_module.send_internal_message(plan_msg)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return
+
 class PredictiveModelsModule(Module):
     def __init__(self, parent_module) -> None:
         self.agent_state = None
-        self.plan = None
+        self.obs_plan = None
+        self.ops_plan = None
         super().__init__(PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
@@ -199,7 +263,12 @@ class PredictiveModelsModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.plan = msg.content
+            if(msg.src_module == PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value):
+                self.obs_plan = msg.content
+            elif(msg.src_module == PlanningModuleSubmoduleTypes.OPERATIONS_PLANNING.value):
+                self.ops_plan = msg.content
+            else:
+                self.log(f'Message from unsupported module.')
         except asyncio.CancelledError:
             return
 
@@ -229,8 +298,8 @@ class PredictiveModelsModule(Module):
     async def predict_state(self):
         try:
             while True:
-                if(self.plan is not None):
-                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, self.plan)
+                if(self.obs_plan is not None):
+                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, self.obs_plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
@@ -250,7 +319,10 @@ class MeasurementPerformanceModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.plan = msg.content
+            if(msg.src_module == PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value):
+                self.plan = msg.content
+            else:
+                self.log(f'Unsupported message type for this module.')
         except asyncio.CancelledError:
             return
 

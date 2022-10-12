@@ -11,13 +11,6 @@ from modules import Module
 from messages import *
 from utils import ScienceModuleSubmoduleTypes
 
-def get_data_product(sd,lat,lon,time,product_type):
-        for item in sd:
-            if item["lat"] == lat and item["lon"] == lon and item["time"] == time and item["product_type"]==product_type:
-                if(item["filepath"].lower().endswith('.csv')):
-                    df = pd.read_csv(item["filepath"])
-                    return df
-
 class ScienceModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
         super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [])
@@ -76,6 +69,8 @@ class ScienceValueModule(Module):
         self.sd = sd
         self.unvalued_queue = []
         self.valued_queue = []
+        self.model_requests_queue = []
+        self.model_results_queue = []
         self.prop_meas_obs_metrics = []
 
     async def activate(self):
@@ -86,8 +81,14 @@ class ScienceValueModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            self.log(f'Internal message handler in science value module')
-            self.unvalued_queue.append(msg)
+            if(msg.src_module == ScienceModuleSubmoduleTypes.REASONING.value):
+                # Event of interest sent from the science reasoning module
+                self.unvalued_queue.append(msg)
+            elif(msg.src_module == ScienceModuleSubmoduleTypes.PREDICTIVE_MODELS.value):
+                # receiving result from science predictive models module
+                self.model_results_queue.append(msg)
+            else:
+                self.log(f'Unsupported message type for this module.')
             # dst_name = msg['dst']
             # if dst_name != self.name:
             #     await self.put_message(msg)
@@ -131,6 +132,7 @@ class ScienceValueModule(Module):
             while True:
                 for valued_msg in self.valued_queue:
                     msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, valued_msg)
+                    self.valued_queue.pop()
                     await self.parent_module.send_internal_message(msg)
                 # msg_dict = dict()
                 # msg_dict['src'] = self.name
@@ -342,15 +344,10 @@ class ScienceReasoningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            dst_name = msg['dst']
-            if dst_name != self.name:
-                await self.put_message(msg)
+            if(msg.src_module == ScienceModuleSubmoduleTypes.PREDICTIVE_MODELS.value):
+                self.model_results.append(msg.content)
             else:
-                if msg['@type'] == 'PRINT':
-                    content = msg['content']
-                    self.log(content)
-                if msg['@type'] == 'MODEL_RES':
-                    self.model_results.append(msg['content'])
+                self.log(f'Unsupported message for this module.')
         except asyncio.CancelledError:
             return
 
