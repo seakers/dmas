@@ -29,7 +29,14 @@ class OrbitData:
 
     TODO: add support to load ground station agents' data
     """
-    def __init__(self, agent_name: str, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data, grid_data):
+    def __init__(self, agent_name : str, 
+                    time_data : pd.DataFrame, 
+                    eclipse_data : pd.DataFrame, 
+                    position_data : pd.DataFrame, 
+                    isl_data : pd.DataFrame,
+                    gs_access_data : pd.DataFrame, 
+                    gp_access_data : pd.DataFrame, 
+                    grid_data : pd.DataFrame):
         # name of agent being represented by this object
         self.agent_name = agent_name
 
@@ -68,7 +75,7 @@ class OrbitData:
             raise Exception(f'Access between {src} and {target} not supported.')
 
     def get_next_isl_access_interval(self, target, t) -> TimeInterval:
-        isl_data = self.isl_data[target]
+        isl_data : pd.DataFrame = self.isl_data[target]
         
         for _, row in isl_data.iterrows():
             t_start = row['start index'] * self.time_step
@@ -91,7 +98,6 @@ class OrbitData:
         grid_index, gp_index, _, _ = self.find_gp_index(lat, lon)
 
         # find next access
-
         interval = TimeInterval(-np.Infinity, np.Infinity)
         instruments = []
         modes = dict()
