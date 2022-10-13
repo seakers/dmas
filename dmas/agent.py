@@ -491,7 +491,7 @@ class AgentClient(Module):
             logger.addHandler(f_handler)
 
             loggers.append(logger)
-        logging.getLogger('neo4j').setLevel(logging.WARNING)
+        #logging.getLogger('neo4j').setLevel(logging.WARNING)
         return loggers
                 
     async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):

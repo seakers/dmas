@@ -34,8 +34,10 @@ class InstrumentCapabilityModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
+            if(msg.src_module == ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value):
                 self.event_msg_queue.append(msg)
+            else:
+                self.log(f'Unsupported message type for this module.')
         except asyncio.CancelledError:
             return
 
@@ -88,32 +90,35 @@ class InstrumentCapabilityModule(Module):
     async def check_database(self):
         try:
             while True:
-                if(self.request_msg is not None):
-                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI")
+                for event_msg in self.event_msg_queue:
+                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", event_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
-    def queryGraphDatabase(self, uri, user, password, sc_name):
+    def queryGraphDatabase(self, uri, user, password, sc_name,event_msg):
         try:
+            self.log(f'Querying graph database')
             driver = GraphDatabase.driver(uri, auth=(user, password))
-            for event_msg in self.event_msg_queue:
-                self.print_observers(driver,sc_name,event_msg)
+            self.print_observers(driver,sc_name,event_msg)
             driver.close()
-        except:
+        except Exception as e:
+            print(e)
             self.log(f'Connection to Neo4j is not working! Make sure it\'s running and check the password!')
         
 
     def print_observers(self,driver,sc_name,event_msg):
         with driver.session() as session:
             product = "None"
-            if(event_msg.content["product_type"] == "chlorophyll-a"):
+            self.log(f'In print observers')
+            if(event_msg.content.content["product_type"] == "chlorophyll-a"):
+                self.log(f'In if in print observers')
                 product = "Ocean chlorophyll concentration"
             observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
                 if(observer.get("name") == sc_name):
                     self.log(f'Matching instrument!')
-                    event_msg.content["Measurable status"] = "Able to be measured"
+                    event_msg.content.content["Measurable status"] = "Able to be measured"
                     self.capable_msg_queue.append(event_msg)
                     self.event_msg_queue.remove(event_msg)
 
