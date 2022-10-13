@@ -747,6 +747,6 @@ if __name__ == '__main__':
     print('Initializing agent...')
     
     #agent = TestAgent('Mars1', './scenarios/sim_test')
-    agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
+    agent = ScienceTestAgent('Mars1', './scenarios/sim_test/')
     
     asyncio.run(agent.live())

@@ -5,6 +5,7 @@ from modules import Module
 from messages import *
 from neo4j import GraphDatabase
 from utils import PlanningModuleSubmoduleTypes
+from orbitdata import OrbitData
 
 class PlanningModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
@@ -134,6 +135,9 @@ class ObservationPlanningModule(Module):
     def __init__(self, parent_module) -> None:
         self.task_list = []
         self.plan = []
+        self.orbit_data: dict = OrbitData.from_directory(parent_module.scenario_dir)
+        print(parent_module.parent_module)
+        self.orbit_data = self.orbit_data[parent_module.parent_module.name]
         super().__init__(PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
@@ -180,6 +184,10 @@ class ObservationPlanningModule(Module):
                 if(len(self.task_list) > 0):
                     # replace this with an actual planner!
                     for i in range(len(self.task_list)):
+                        task = self.task_list[i].content
+                        #gp_accesses = self.orbit_data.get_ground_point_accesses_future(task["lat"], task["lon"], self.get_current_time())
+                        gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
+                        print(gp_accesses)
                         self.plan.append(self.task_list[i])
                     plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, self.plan)
                     await self.parent_module.send_internal_message(plan_msg)
