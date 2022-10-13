@@ -71,7 +71,9 @@ class ScienceModule(Module):
 
 class ScienceValueModule(Module):
     def __init__(self, parent_module : Module, sd) -> None:
-        super().__init__(ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value, parent_module, submodules=[],
+        super().__init__(ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value, 
+                         parent_module, 
+                         submodules=[],
                          n_timed_coroutines=2)
         self.sd = sd
         self.to_be_sent = False
@@ -83,15 +85,25 @@ class ScienceValueModule(Module):
     async def activate(self):
         await super().activate()
 
+        self.to_be_sent_event = asyncio.Event()
+        self.to_be_valued_event = asyncio.Event()
+        self.request_msg_queue = asyncio.Queue()
+
     async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly.
         """
         try:
             self.log(f'Internal message handler in science value module')
+            
+            # flag-driven
             self.to_be_sent = True
             self.to_be_valued = True
             self.request_msg = msg
+
+            # event-driven
+            self.request_msg_queue.put(msg)
+
             # dst_name = msg['dst']
             # if dst_name != self.name:
             #     await self.put_message(msg)
@@ -122,6 +134,7 @@ class ScienceValueModule(Module):
         Executes list of coroutine tasks to be executed by the science value module. These coroutine task incluide:
         """
         self.log("Running Science Value module coroutines")
+
         compute_science_value = asyncio.create_task(self.compute_science_value())
         compute_science_value.set_name('compute_science_value')
         broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
@@ -140,6 +153,62 @@ class ScienceValueModule(Module):
             p.cancel()
             await p
 
+    async def request_handler(self):
+        try:
+            while True:
+                msg : InternalMessage = await self.request_msg_queue.get()
+
+                science_value = self.compute_science_value(msg)
+
+
+
+        except asyncio.CancelledError:
+            return
+
+    def compute_science_value(self, msg : InternalMessage):
+        self.log(f'Computing science value...')
+        
+        content = msg.content
+        points = np.zeros(shape=(2000, 5))
+
+        with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+            reader = csv.reader(csvfile)
+            count = 0
+            for row in reader:
+                if count == 0:
+                    count = 1
+                    continue
+                points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                count = count + 1
+
+        science_val = self.get_pop(content["lat"], content["lon"], points)
+        self.log(f'computed science value: {science_val}')
+        return science_val
+
+    # async def compute_science_value(self):
+    #     try:
+    #         while True:
+    #             if self.to_be_valued:
+    #                 self.log(f'computing science value')
+    #                 points = np.zeros(shape=(2000, 5))
+    #                 content = self.request_msg.content
+    #                 with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+    #                     reader = csv.reader(csvfile)
+    #                     count = 0
+    #                     for row in reader:
+    #                         if count == 0:
+    #                             count = 1
+    #                             continue
+    #                         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+    #                         count = count + 1
+    #                 pop = self.get_pop(content["lat"], content["lon"], points)
+    #                 content["value"] = pop
+    #                 self.request_msg.content = content
+    #                 self.to_be_valued = False
+    #                 self.log(f'computed science value')
+    #             await self.sim_wait(0.1)
+    #     except asyncio.CancelledError:
+    #         return
 
     async def broadcast_meas_req(self):
         try:
@@ -156,31 +225,6 @@ class ScienceValueModule(Module):
                 # msg_dict['result'] = result
                 # msg_json = json.dumps(msg_dict)
                 # await self.publisher.send_json(msg_json)
-                await self.sim_wait(0.1)
-        except asyncio.CancelledError:
-            return
-
-    async def compute_science_value(self):
-        try:
-            while True:
-                if self.to_be_valued:
-                    self.log(f'computing science value')
-                    points = np.zeros(shape=(2000, 5))
-                    content = self.request_msg.content
-                    with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
-                        reader = csv.reader(csvfile)
-                        count = 0
-                        for row in reader:
-                            if count == 0:
-                                count = 1
-                                continue
-                            points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
-                            count = count + 1
-                    pop = self.get_pop(content["lat"], content["lon"], points)
-                    content["value"] = pop
-                    self.request_msg.content = content
-                    self.to_be_valued = False
-                    self.log(f'computed science value')
                 await self.sim_wait(0.1)
         except asyncio.CancelledError:
             return

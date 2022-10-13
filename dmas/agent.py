@@ -653,11 +653,6 @@ class SubModule(Module):
             while True:
                 if not sent_requests:
                     # test message to parent module
-                    # instruction = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
-                    # msg = InternalMessage(self.name, self.parent_module.name, instruction)
-
-                    # self.log('Sending print instruction to parent module.')
-                    # await self.send_internal_message(msg)
 
                     self.log('Waiting for 1 second')
                     await self.sim_wait_to(int(self.get_current_time()) + 1)
@@ -717,19 +712,6 @@ class SubModule(Module):
 
                 else:
                     await self.sim_wait( 1e6 )
-
-                # if messages_sent < n_messages and '1' in self.parent_module.parent_module.name:
-                #     msg = dict()
-                #     msg['src'] = self.name
-                #     msg['dst'] = 'Mars2'
-                #     msg['content'] = 'Howdy'
-                #     msg['@type'] = 'HELLO_WORLD'
-
-                #     await self.transmit_message(msg)
-
-                #     messages_sent += 1
-
-                # await self.sim_wait(20)
                 
         except asyncio.CancelledError:
             self.log('Periodic print routine cancelled')
