@@ -489,7 +489,7 @@ class AgentClient(Module):
             logger.addHandler(f_handler)
 
             loggers.append(logger)
-        #logging.getLogger('neo4j').setLevel(logging.WARNING)
+        logging.getLogger('neo4j').setLevel(logging.WARNING)
         return loggers
                 
     async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
@@ -647,7 +647,7 @@ class SubModule(Module):
 
     async def coroutines(self):
         try:
-            sent_requests = True
+            sent_requests = False
             messages_sent = 0
             n_messages = 1
             self.log('Starting periodic print routine...')
@@ -716,6 +716,8 @@ class SubModule(Module):
                     self.log('Sending measurement result to onboard processing module.')
                     await self.send_internal_message(msg)
 
+                    sent_requests = True
+
                 else:
                     await self.sim_wait( 1e6 )
 
@@ -744,7 +746,7 @@ MAIN
 if __name__ == '__main__':
     print('Initializing agent...')
     
-    agent = TestAgent('Mars1', './scenarios/sim_test')
-    # agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
+    #agent = TestAgent('Mars1', './scenarios/sim_test')
+    agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
     
     asyncio.run(agent.live())

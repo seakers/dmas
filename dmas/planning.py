@@ -1,5 +1,6 @@
 import asyncio
 import numpy as np
+import logging
 from modules import Module
 from messages import *
 from neo4j import GraphDatabase
@@ -7,7 +8,7 @@ from utils import PlanningModuleSubmoduleTypes
 
 class PlanningModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
-        super().__init__(AgentModuleTypes.PLANNING_MODULE.value, parent_agent, [], 3)
+        super().__init__(AgentModuleTypes.PLANNING_MODULE.value, parent_agent, [], 0)
         self.scenario_dir = scenario_dir
         self.submodules = [
             InstrumentCapabilityModule(self),
@@ -358,11 +359,10 @@ class MeasurementPerformanceModule(Module):
                 if(self.plan is not None):
                     for i in range(len(self.plan)):
                         event = self.plan[i]
-                        self.log(event)
                         observation_time = 20.0
-                        delta = observation_time - float(event["time"])
+                        delta = observation_time - float(event.content["time"])
                         lagfunc = -0.08182 * np.log(delta)+0.63182 # from molly's ppt on google drive
-                        event["meas_perf_value"] = lagfunc
+                        event.content["meas_perf_value"] = lagfunc
                         self.plan[i] = event
                     plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.plan)
                     await self.parent_module.send_internal_message(plan_msg)

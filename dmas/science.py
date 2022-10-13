@@ -142,7 +142,7 @@ class ScienceValueModule(Module):
                 # msg_dict['result'] = result
                 # msg_json = json.dumps(msg_dict)
                 # await self.publisher.send_json(msg_json)
-                await self.sim_wait(0.1)
+                await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
@@ -165,7 +165,7 @@ class ScienceValueModule(Module):
                     content["value"] = pop
                     self.valued_queue.append(self.unvalued_queue.pop())
                     self.log(f'computed science value')
-                await self.sim_wait(0.1)
+                await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
 
@@ -183,7 +183,7 @@ class OnboardProcessingModule(Module):
     def __init__(self, parent_module, sd) -> None:
         self.sd = sd
         super().__init__(ScienceModuleSubmoduleTypes.ONBOARD_PROCESSING.value, parent_module, submodules=[],
-                         n_timed_coroutines=0)
+                         n_timed_coroutines=1)
 
     meas_results = []
     data_processing_requests = []
