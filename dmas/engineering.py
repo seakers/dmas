@@ -1647,6 +1647,7 @@ class OnboardComputerModule(ComponentModule):
                 await self.enabled.wait()
 
                 data = task.get_data()
+                lat, lon = task.get_target()
                 data_vol = len(data.encode('utf-8'))
 
                 if isinstance(task, DeleteFromMemoryTask):
@@ -1658,7 +1659,7 @@ class OnboardComputerModule(ComponentModule):
                     else:
                         # data successfully stored in internal memory, send to science module for processing
                         
-                        msg = DataDeleteMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, data)
+                        msg = DataDeletedMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, lat, lon, data)
                         self.log(f'Deleting data from {AgentModuleTypes.SCIENCE_MODULE}...')
 
                         self.memory_stored -= data_vol
@@ -1671,7 +1672,7 @@ class OnboardComputerModule(ComponentModule):
 
                     else:
                         # data successfully stored in internal memory, send to science module for processing
-                        msg = DataMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, data)
+                        msg = DataMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, lat, lon, data)
                         self.log(f'Sending data to {AgentModuleTypes.SCIENCE_MODULE} for processing...')
                         
                         self.memory_stored += data_vol
@@ -1964,9 +1965,7 @@ class InstrumentComponent(ComponentModule):
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage
-                    data = response.result
-
-                    data_save_task = SaveToMemoryTask(data)
+                    data_save_task = SaveToMemoryTask(lat, lon, response.obs)
                     data_msg = ComponentTaskMessage(self.name, ComponentNames.ONBOARD_COMPUTER.name, data_save_task)
 
                     await self.send_internal_message(data_msg)

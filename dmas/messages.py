@@ -3,6 +3,7 @@ from enum import Enum
 import json
 from typing import Union
 from tasks import *
+from requests import *
 from utils import *
 
 """
@@ -739,8 +740,8 @@ class ObservationSenseMessage(NodeToEnvironmentMessage):
             latitude of the target ground point to be accessed by the source node (in degrees)
         lon:
             lingitude of the target ground point to be accessed by the source node (in degrees)
-        result:
-            result from sensing if the agent is accessing the target
+        obs:
+            observation result from sensing if the agent is accessing the target
         """
         super().__init__(src, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, NodeToEnvironmentMessageTypes.OBSERVATION_SENSE)
         self.lat = lat
@@ -1433,8 +1434,18 @@ class InternalMessage:
     def generate_response(self):
         return InternalMessage(src_module=self.dst_module, dst_module=self.src_module, content=self.content)
 
+class RequestMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, request : Request) -> None:
+        """
+        Internal message comminicating a measurement request to be scheduled
+        """
+        super().__init__(src_module, dst_module, request)
+    
+    def get_request(self) -> Request:
+        return self.content
+
 class DataMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, data: str) -> None:
+    def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str) -> None:
         """
         Message carrying sensor data from one module to another
 
@@ -1442,17 +1453,32 @@ class DataMessage(InternalMessage):
             name of the module sending the message
         dst_module: 
             name of the module to receive the message
-        data: 
-            data being sent
+        target_lat:
+            lattitude of the target in [°]
+        target_lon:
+            longitude of the target in [°]
+        data:        
+            data to be sent
         """
         super().__init__(src_module, dst_module, data)
+        self._target = (target_lat, target_lon)
 
     def get_data(self):
         return self.content
 
-class DataDeleteMessage(DataMessage):
-    def __init__(self, src_module: str, dst_module: str, data: str) -> None:
-        super().__init__(src_module, dst_module, data)
+    def get_target(self):
+        return self._target
+
+    def get_target_lat(self):
+        lat, _ = self._target
+        return lat
+
+    def get_target_lon(self):
+        _, lon = self._target
+        return lon
+
+class DataDeletedMessage(DataMessage):
+    def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str) -> None:
         """
         Message informing that existing data is no longer available to this agent
 
@@ -1460,9 +1486,15 @@ class DataDeleteMessage(DataMessage):
             name of the module sending the message
         dst_module: 
             name of the module to receive the message
-        data: 
-            data no longer available
+        target_lat:
+            lattitude of the target in [°]
+        target_lon:
+            longitude of the target in [°]
+        data:        
+            data that is no longer available
         """
+        super().__init__(src_module, dst_module, target_lat, target_lon, data)
+        
 
 """
 COMPONENT TASK MESSAGES
