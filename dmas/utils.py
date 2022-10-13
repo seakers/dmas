@@ -34,6 +34,9 @@ class EventPair:
         except asyncio.CancelledError:
             return
 
+class EngineeringModuleParts(Enum):
+    PLATFORM_SIMULATION = 'PLATFORM_SIMULATION'
+
 class ComponentStatus(Enum):
     ON = 'ON'
     OFF = 'OFF'    
@@ -64,9 +67,8 @@ class ComponentNames(Enum):
     TRANSMITTER = 'TRANSMITTER'
     RECEIVER = 'RECEIVER'
 
-class BatteryChargeStatus(Enum):
-    DISCHARGING = 'DISCHARGING'
-    CHARGING = 'CHARGING'
+class InstrumentNames(Enum):
+    TEST = 'TEST'
 
 class TaskStatus(Enum):
     """

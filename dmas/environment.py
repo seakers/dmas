@@ -4,6 +4,7 @@ import json
 import logging
 import time
 import zmq.asyncio
+
 from utils import EnvironmentModuleTypes
 from orbitdata import OrbitData
 
@@ -33,8 +34,8 @@ from scienceserver import *
 --------------------------------------------------------
 """
 class TicRequestModule(Module):
-    def __init__(self, parent_environment) -> None:
-        super().__init__(EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, parent_environment, submodules=[], n_timed_coroutines=0)
+    def __init__(self, parent_environment : Module) -> None:
+        super().__init__(EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, parent_environment, submodules=[], n_timed_coroutines=1)
 
     async def activate(self):
         await super().activate()
@@ -64,8 +65,11 @@ class TicRequestModule(Module):
 
     async def coroutines(self):
         try:
-            n_routines = self.parent_module.NUMBER_OF_TIMED_COROUTINES_AGENTS + self.parent_module.NUMBER_OF_TIMED_COROUTINES
+            parent_server : EnvironmentServer = self.parent_module
+            n_routines = parent_server.NUMBER_OF_TIMED_COROUTINES_AGENTS + self.parent_module.NUMBER_OF_TIMED_COROUTINES
             while True:
+                wait_task = None
+
                 if self.CLOCK_TYPE is SimClocks.SERVER_EVENTS:
                     # append tic request to request list
                     self.log(f'Waiting for next tic request ({len(self.tic_request_queue_sorted)} / {n_routines})...')
@@ -88,14 +92,19 @@ class TicRequestModule(Module):
 
                         # send a broadcast request to parent environment              
                         self.log(f'Submitting broadcast request for tic with server clock at t={t_next}')
-                        parent_env = self.get_top_module()
-                        tic_broadcast = TicEventBroadcast(parent_env.name, t_next)
-                        msg_out = InternalMessage(self.name, parent_env.name, tic_broadcast)
+                        parent_server = self.get_top_module()
+                        tic_broadcast = TicEventBroadcast(parent_server.name, t_next)
+                        msg_out = InternalMessage(self.name, parent_server.name, tic_broadcast)
 
                         await self.send_internal_message(msg_out)
                 else:
-                    await self.sim_wait(1e6, module_name=self.name)
+                    self.log(f'Server clock is of type {self.CLOCK_TYPE.value}. Sleeping for the rest of the simulation...')
+                    while True:
+                        wait_task = asyncio.create_task(self.sim_wait(1e6))
+                        await wait_task
+
         except asyncio.CancelledError:
+            self.log(f'Received task cancel command!')
             return
 
 
@@ -116,8 +125,9 @@ class ScheduledEventModule(Module):
 
         # get scheduled event time-step
         self.time_step = -1
-        for agent_name in self.parent_module.parent_module.orbit_data:
-            orbit_data = self.parent_module.parent_module.orbit_data[agent_name]
+        parent_env : EnvironmentServer = self.parent_module.parent_module
+        for agent_name in parent_env.orbit_data:
+            orbit_data : OrbitData = parent_env.orbit_data[agent_name]
             self.time_step = orbit_data.time_step
             break
 
@@ -180,13 +190,16 @@ class ScheduledEventModule(Module):
         Parses through event data and sends broadcast requests to parent environment
         """
         try:
+            wait_task = None
+
             for _, row in self.event_data.iterrows():
                 # get next scheduled event message
-                event_broadcast = self.row_to_broadcast_msg(row)
+                event_broadcast : EventBroadcastMessage = self.row_to_broadcast_msg(row)
 
                 # wait for said event to start
                 t_next = event_broadcast.t
-                await self.sim_wait_to(t_next, module_name=self.name)
+                wait_task = asyncio.create_task( self.sim_wait(t_next, module_name=self.name) )
+                await wait_task
 
                 # log broadcast request
                 broadcast_type = event_broadcast.get_type()
@@ -199,13 +212,19 @@ class ScheduledEventModule(Module):
 
                 # send a broadcast request to parent environment      
                 dst =  self.get_top_module()
-                msg = InternalMessage(self.name, dst.name, event_broadcast)               
+                msg = InternalMessage(self.name, dst.name, event_broadcast)            
                 await self.send_internal_message(msg)
 
+                self.log(f'Broadcast request successfully submitted!')
+
             # once all events have occurred, go to sleep until the end of the simulation
+            self.log(f'All events have occurred! Sleeping until the end of the simulation...')
             while True:
-                await self.sim_wait(1e6, module_name=self.name)
+                wait_task = asyncio.create_task( self.sim_wait(1e6, module_name=self.name) )
+                await wait_task
+
         except asyncio.CancelledError:
+            self.log(f'Scheduled event broadcast interrupted!')
             return
 
 class EclipseEventModule(ScheduledEventModule):
@@ -463,10 +482,12 @@ class AgentExternalStatePropagator(Module):
                             parent_module, 
                             submodules=[], 
                             n_timed_coroutines=1)
-        self.submodules = [EclipseEventModule(self), 
+        self.submodules = [
+                            EclipseEventModule(self), 
                             GPAccessEventModule(self),
                             GndStatAccessEventModule(self),
-                            AgentAccessEventModule(self)]
+                            AgentAccessEventModule(self)
+                        ]
 
 """
 --------------------------------------------------------
@@ -539,7 +560,7 @@ class EnvironmentServer(Module):
 
         # set up submodules
         self.submodules = [ 
-                            TicRequestModule(self), 
+                            TicRequestModule(self),
                             AgentExternalStatePropagator(self)
                             #ImageServerModule(self)
                           ]
@@ -653,7 +674,7 @@ class EnvironmentServer(Module):
 
     async def internal_message_handler(self, msg: InternalMessage):
         """
-        Handles message intended for this module and performs actions accordingly.
+        Handles messages sent from other internal modules intended for this environment and performs actions accordingly.
         """
         try:
             if msg.dst_module != self.name:
@@ -672,11 +693,11 @@ class EnvironmentServer(Module):
                     msg.dst_module = EnvironmentModuleTypes.TIC_REQUEST_MODULE.name
                     await self.send_internal_message(msg)
 
-                elif isinstance(content, ImgRequestMessage):
-                    # if an submodule sends a img request, forward to img request submodule
-                    self.log(f'Forwarding image request to relevant submodule...')
-                    msg.dst_module = EnvironmentModuleTypes.IMAGE_SERVER_MODULE.name
-                    await self.send_internal_message(msg)
+                # elif isinstance(content, ImgRequestMessage):
+                #     # if an submodule sends a img request, forward to img request submodule
+                #     self.log(f'Forwarding image request to relevant submodule...')
+                #     msg.dst_module = EnvironmentModuleTypes.IMAGE_SERVER_MODULE.name
+                #     await self.send_internal_message(msg)
 
                 else:
                     # if content type is none of the above, then discard message
@@ -689,7 +710,8 @@ class EnvironmentServer(Module):
 
     async def request_handler(self):
         """
-        Listens to 'reqservice' socket and handles messages being sent by agents to the environment asking for information. List of supported messages:
+        Listens to 'reqservice' socket for any icoming messages being sent by agents to the environment asking for information.
+        List of supported messages:
             1- tic_request: agents ask to be notified when a certain time has passed in the environment's clock    
             2- agent_access_sense: agent asks the enviroment if the agent is capable of accessing another agent at the current simulation time
             3- gp_access_sense: agent asks the enviroment if the agent is capable of accessing a ground point at the current simulation time
@@ -745,6 +767,7 @@ class EnvironmentServer(Module):
                     
                     # send response to agent
                     await self.reqservice.send_json(agent_access_msg.to_json())
+                    self.log(f'Aagent access from {agent_access_msg.src} to {agent_access_msg.target} at simulation time t={t_curr}: {is_accessing}')
 
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE:
                     # unpackage message
@@ -875,6 +898,7 @@ class EnvironmentServer(Module):
                 await self.send_blanc_response()
             elif worker_task is not None:
                 self.log('Cancelling response...')
+                worker_task : asyncio.Task
                 worker_task.cancel()
                 await worker_task
             else:
@@ -1180,13 +1204,15 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 20
+    duration = 3
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
 
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
-    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME)
     # environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
+    print('DONE')

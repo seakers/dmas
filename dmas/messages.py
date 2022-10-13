@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from enum import Enum
 import json
+from typing import Union
 from tasks import *
 from utils import *
 
@@ -856,18 +857,29 @@ class EnvironmentBroadcastMessageTypes(Enum):
     SIM_END_EVENT = 'SIM_END_EVENT'
 
 class EnvironmentBroadcastMessage(SimulationMessage): 
-    def __init__(self, src: str, _type: EnvironmentBroadcastMessageTypes, dst: str='all') -> None:   
+    def __init__(self, src: str, _type: EnvironmentBroadcastMessageTypes, t : Union[int, float], dst: str='all') -> None:   
         """
         Abstract class for a message being sent from an environment server to all simulation node clients that are subscribed to it
         
         src:
             name of the simulation node sending the message
-        dst:
-            name of the simulation node receiving the message
         _type:
             type of broadcast being sent
+        t:
+            server simulation clock at the time of transmission in [s]
+        dst:
+            name of the simulation node receiving the message
         """
         super().__init__(src, dst, _type)
+        self.t = t
+
+    def to_dict(self) -> dict:
+        """
+        Crates a dictionary containing all information contained in this message object
+        """
+        msg_dict = super().to_dict()
+        msg_dict['t'] = self.t
+        return msg_dict
 
     def from_dict(d):
         """
@@ -876,8 +888,9 @@ class EnvironmentBroadcastMessage(SimulationMessage):
         src = d.get('src', None)
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
+        t = d.get('t', None)
 
-        if src is None or dst is None or type_name is None:
+        if src is None or dst is None or type_name is None or t is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         _type = None
@@ -888,7 +901,7 @@ class EnvironmentBroadcastMessage(SimulationMessage):
         if _type is None:
             raise Exception(f'Could not recognize message of type {type_name}.')
 
-        return EnvironmentBroadcastMessage(src, dst, _type)
+        return EnvironmentBroadcastMessage(src, _type, t, dst)
 
     def to_json(self):
         """
@@ -907,16 +920,7 @@ class TicEventBroadcast(EnvironmentBroadcastMessage):
         """
         Message from the environment to be broadcasted to all agents containig the latest simulation time 
         """
-        super().__init__(src, EnvironmentBroadcastMessageTypes.TIC_EVENT)
-        self.t = t
-
-    def to_dict(self) -> dict:
-        """
-        Crates a dictionary containing all information contained in this message object
-        """
-        msg_dict = super().to_dict()
-        msg_dict['server clock'] = self.t
-        return msg_dict
+        super().__init__(src, EnvironmentBroadcastMessageTypes.TIC_EVENT, t)
 
     def from_dict(d):
         """
@@ -925,7 +929,7 @@ class TicEventBroadcast(EnvironmentBroadcastMessage):
         src = d.get('src', None)
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
-        t = d.get('server clock', None)
+        t = d.get('t', None)
 
         if src is None or dst is None or type_name is None or t is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
@@ -968,8 +972,7 @@ class EventBroadcastMessage(EnvironmentBroadcastMessage):
         rise:
             indicates whether the event in question started or ended
         """
-        super().__init__(src, _type, dst)
-        self.t = t
+        super().__init__(src, _type, t, dst)
         self.rise = rise
 
     def to_dict(self) -> dict:
@@ -1298,7 +1301,7 @@ class SimulationStartBroadcastMessage(EnvironmentBroadcastMessage):
         clock_info:
             dictionary containing information about the clock being used in this simulation
         """
-        super().__init__(src, EnvironmentBroadcastMessageTypes.SIM_START_EVENT)
+        super().__init__(src, EnvironmentBroadcastMessageTypes.SIM_START_EVENT, t=-1)
         self.port_ledger = port_ledger
         self.clock_info = clock_info
 
@@ -1359,7 +1362,7 @@ class SimulationEndBroadcastMessage(EnvironmentBroadcastMessage):
         t_end:
             environment server clock time at the end of the simulation
         """
-        super().__init__(src, EnvironmentBroadcastMessageTypes.SIM_END_EVENT)
+        super().__init__(src, EnvironmentBroadcastMessageTypes.SIM_END_EVENT, -1)
         self.t_end = t_end
 
     def to_dict(self) -> dict:

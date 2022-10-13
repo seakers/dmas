@@ -66,14 +66,14 @@ class Module:
             # create coroutine tasks
             coroutines : list = []
 
-            ## Internal coroutines
-            routine_task = asyncio.create_task(self.coroutines())
-            routine_task.set_name (f'{self.name}_routine')
-            coroutines.append(routine_task)
-            
+            ## Internal coroutines            
             router_task = asyncio.create_task(self._internal_message_router())
             router_task.set_name (f'{self.name}_internal_message_router')
             coroutines.append(router_task)
+
+            routine_task = asyncio.create_task(self.coroutines())
+            routine_task.set_name (f'{self.name}_coroutines')
+            coroutines.append(routine_task)
 
             ## Submodule coroutines
             for submodule in self.submodules:
@@ -100,11 +100,15 @@ class Module:
             return
 
         except asyncio.CancelledError: 
-            self.log('Cancelling all coroutines...')
+            self.log('Cancelling all internal tasks...')
             for subroutine in coroutines:
                 subroutine : asyncio.Task
+                self.log(f'Cancelling task \'{subroutine.get_name()}\'...')
                 subroutine.cancel()
                 await subroutine
+                self.log(f'Successfully cancelled task \'{subroutine.get_name()}\'!')
+
+            self.log('Internal tasks successfully cancelled!')
             return
 
         finally:
@@ -140,6 +144,7 @@ class Module:
 
                     for submodule in self.submodules:
                         # first check if any submodule is its intended destination
+                        submodule : Module
                         if submodule.name == dst_name:
                             dst = submodule
                             break
@@ -167,7 +172,7 @@ class Module:
         Cleanup subroutine that should be used to terminate any thread-sensitive or envent-loop sensitive variables
         """
         self.log(f'Terminated.', level=logging.INFO)
-        pass
+        return
     
     @abstractmethod
     async def internal_message_handler(self, msg: InternalMessage):
@@ -193,9 +198,15 @@ class Module:
         """
         try:
             while True:
-                await self.sim_wait(1e6)     
+                wait_task = asyncio.create_task(self.sim_wait(1e6))
+                await wait_task
+
         except asyncio.CancelledError:
-            return
+            if wait_task is not None and isinstance(wait_task, asyncio.Task) and not wait_task.done():
+                self.log(f'Aborting sim_wait...')
+                wait_task : asyncio.Task
+                wait_task.cancel()
+                await wait_task
     
     """
     HELPING FUNCTIONS
@@ -233,12 +244,14 @@ class Module:
         Performs depth-first search to find a module in that corresponds to the name being searched
         """
         # self.log(f'Visiting module {module.name} with submodules [{module.submodules}] looking for {dst_name}')
+        module : Module
         if module.name == dst_name:
             return module
         elif len(module.submodules) == 0:
             return None
         else:
             for submodule in module.submodules:
+                submodule : Module
                 dst = self.dfs(submodule, dst_name)
                 if dst is not None:
                     return dst
@@ -290,12 +303,31 @@ class Module:
 
             if self.parent_module is None:
                 if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
-                    await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
+                    
+                    async def cancel_me():
+                        self.log(f'Starting sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+
+                        try:
+                            # Wait for 1 hour
+                            await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
+                        except asyncio.CancelledError:
+                            self.log(f'Cancelled sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                            raise
+                        finally:
+                            self.log(f'After sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+
+
+                    # wait_for_clock = asyncio.create_task(asyncio.sleep(delay / self.SIMULATION_FREQUENCY))
+
+                    wait_for_clock = asyncio.create_task(cancel_me())
+                    await wait_for_clock
+
                 elif (self.CLOCK_TYPE == SimClocks.SERVER_EVENTS 
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME
                             or self.CLOCK_TYPE == SimClocks.SERVER_TIME_FAST):
 
                     # if the clock is server-step, then submit a tic request to environment
+                    self.sim_time : Container
                     t_req = self.sim_time.level + delay 
 
                     tic_msg = TicRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, t_req)
@@ -327,8 +359,7 @@ class Module:
                 wait_for_clock.cancel()
                 await wait_for_clock
 
-
-            return
+            raise
 
     async def sim_wait_to(self, t, module_name=None):
         """

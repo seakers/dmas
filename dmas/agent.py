@@ -3,8 +3,6 @@ from curses import def_prog_mode
 import json
 import os
 
-from environment import EnvironmentServer
-
 import random
 import sys
 import time
@@ -649,7 +647,7 @@ class SubModule(Module):
 
     async def coroutines(self):
         try:
-            sent_requests = False
+            sent_requests = True
             messages_sent = 0
             n_messages = 1
             self.log('Starting periodic print routine...')
@@ -718,8 +716,8 @@ class SubModule(Module):
                     self.log('Sending measurement result to onboard processing module.')
                     await self.send_internal_message(msg)
 
-                # else:
-                #     await self.sim_wait( 1e6 )
+                else:
+                    await self.sim_wait( 1e6 )
 
                 # if messages_sent < n_messages and '1' in self.parent_module.parent_module.name:
                 #     msg = dict()
@@ -746,7 +744,7 @@ MAIN
 if __name__ == '__main__':
     print('Initializing agent...')
     
-    #agent = TestAgent('Mars1', './scenarios/sim_test')
-    agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
+    agent = TestAgent('Mars1', './scenarios/sim_test')
+    # agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
     
     asyncio.run(agent.live())
