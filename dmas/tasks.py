@@ -416,7 +416,7 @@ class ChargePlannerTask(PlannerTask):
 
 """
 
-MODULE TASKS
+MODULE REQUESTS
 
 """
 

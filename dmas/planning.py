@@ -6,7 +6,7 @@ from messages import *
 from neo4j import GraphDatabase
 from utils import PlanningSubmoduleTypes
 from orbitdata import OrbitData
-from requests_xd import MeasurementRequest
+from tasks import MeasurementRequest
 
 class PlanningModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:

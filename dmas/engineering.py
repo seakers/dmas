@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Union
 import logging
-#from agent import AgentClient
+from agent import AgentClient
 from messages import *
 from utils import *
 from modules import Module
@@ -721,7 +721,7 @@ class ComponentModule(Module):
     HELPING FUNCTIONS
     --------------------
     """
-    async def update(self, crit_flag=True):
+    async def update(self, crit_flag : bool=True):
         """
         Updates the state of the component. Checks if component is currently in a critical state.
 
@@ -1914,11 +1914,11 @@ class InstrumentComponent(ComponentModule):
         self.buffer_allocated = 0
         self.status = ComponentStatus.ON
 
-    async def is_critical(self) -> bool:
+    def is_critical(self) -> bool:
         buffer_capacity_threshold = 0.90
         return super().is_critical() or self.buffer_allocated / self.buffer_capacity >= buffer_capacity_threshold
 
-    async def is_failed(self) -> bool:
+    def is_failed(self) -> bool:
         return super().is_failed() or self.buffer_allocated / self.buffer_capacity >= 1.0
 
     async def wait_for_failure(self) -> None:
@@ -3124,7 +3124,7 @@ if __name__ == '__main__':
                     msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, task)
                     await self.send_internal_message(msg)
 
-                    await self.sim_wait(1)
+                    await self.sim_wait(100)
             except asyncio.CancelledError:
                 return
 

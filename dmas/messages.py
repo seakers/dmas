@@ -1325,6 +1325,8 @@ class SimulationStartBroadcastMessage(EnvironmentBroadcastMessage):
         port_ledger = d.get('port ledger', None)
         clock_info = d.get('clock info', None)
 
+        print(src, dst, type_name, port_ledger, clock_info)
+
         if src is None or dst is None or type_name is None or port_ledger is None or clock_info is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 

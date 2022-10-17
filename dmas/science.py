@@ -11,7 +11,7 @@ from io import BytesIO
 from modules import Module
 from messages import *
 from utils import ScienceSubmoduleTypes
-from requests_xd import InformationRequest, DataProcessingRequest, MeasurementRequest
+from tasks import InformationRequest, DataProcessingRequest, MeasurementRequest
 
 class ScienceModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
