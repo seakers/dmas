@@ -209,7 +209,7 @@ class AgentClient(Module):
                 broadcast_dst = broadcast_dict['dst']
 
                 self.message_logger.info(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
-                self.log(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
+                #self.log(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
 
                 if self.name == broadcast_dst or 'all' == broadcast_dst:                  
                     if broadcast_type is EnvironmentBroadcastMessageTypes.TIC_EVENT:
@@ -222,7 +222,7 @@ class AgentClient(Module):
 
                             self.message_logger.info(f'Updating internal clock to T={broadcast.t}[s].')
                             await self.sim_time.set_level(broadcast.t)
-                            self.log('Updated internal clock.')
+                            #self.log('Updated internal clock.')
 
                             continue
                         
@@ -490,25 +490,26 @@ class AgentClient(Module):
             logger.addHandler(f_handler)
 
             loggers.append(logger)
+        logging.getLogger('neo4j').setLevel(logging.WARNING)
         return loggers
                 
     async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
         try:
             msg_type = msg.get_type()
-            self.log(f'Submitting a request of type {msg_type}.')
+            #self.log(f'Submitting a request of type {msg_type}.')
 
             if isinstance(msg, TicRequestMessage):
                 # submit request
-                self.log(f'Sending {msg_type} for t_end={msg.t_req}. Awaiting access to environment request socket...')
+                #self.log(f'Sending {msg_type} for t_end={msg.t_req}. Awaiting access to environment request socket...')
                 await self.environment_request_lock.acquire()
-                self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
+                #self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
                 await self.environment_request_socket.send_json(msg.to_json())
-                self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
+                #self.log(f'{msg_type} sent successfully. Awaiting confirmation...')
 
                 # wait for sever reply
                 await self.environment_request_socket.recv()  
                 self.environment_request_lock.release()
-                self.log('Tic request reception confirmation received.')         
+                #self.log('Tic request reception confirmation received.')         
 
                 return
 
@@ -635,7 +636,8 @@ class ScienceTestAgent(AgentClient):
         self.submodules = [
                             ScienceModule(self,scenario_dir),
                             PlanningModule(self,scenario_dir),
-                            EngineeringModule(self)
+                            EngineeringModule(self),
+                            #TestModule(self)
                           ]
 
 """
@@ -646,7 +648,7 @@ MAIN
 if __name__ == '__main__':
     print('Initializing agent...')
     
-    agent = TestAgent('Mars1', './scenarios/sim_test')
-    # agent = ScienceTestAgent('Mars1', './scenarios/sim_test')
+    #agent = TestAgent('Mars1', './scenarios/sim_test')
+    agent = ScienceTestAgent('Mars1', './scenarios/sim_test/')
     
     asyncio.run(agent.live())

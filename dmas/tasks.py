@@ -378,3 +378,38 @@ class ObservationTask(PlatformTask):
 
     def get_target(self):
         return self.target
+
+"""
+-------------------------------
+PLANNER TASK
+-------------------------------
+"""
+class PlannerTask:
+    def __init__(self) -> None:
+        """
+        Abstract platform task class meant to communicate from obs planner to ops planner
+        """
+        return
+
+class ObservationPlannerTask(PlannerTask):
+    def __init__(self, target_lat : float, target_lon : float, science_val: float, instrument_list : list, start: float, end: float) -> None:
+        super().__init__()
+        self.target = (target_lat, target_lon)
+        self.science_val = science_val
+
+        self.instrument_list = []
+        for instrument in instrument_list:
+            self.instrument_list.append(instrument)
+
+        self.start = start
+        self.end = end
+
+    def get_target(self):
+        return self.target
+
+class ChargePlannerTask(PlannerTask):
+    def __init__(self, start: float, end: float) -> None:
+        super().__init__()
+
+        self.start = start
+        self.end = end

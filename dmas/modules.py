@@ -305,7 +305,7 @@ class Module:
                 if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                     
                     async def cancel_me():
-                        self.log(f'Starting sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                        #self.log(f'Starting sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
 
                         try:
                             # Wait for 1 hour
@@ -313,9 +313,9 @@ class Module:
                         except asyncio.CancelledError:
                             self.log(f'Cancelled sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
                             raise
-                        finally:
-                            self.log(f'After sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
-
+                        # finally:
+                        #     #self.log(f'After sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                            
 
                     # wait_for_clock = asyncio.create_task(asyncio.sleep(delay / self.SIMULATION_FREQUENCY))
 
@@ -496,7 +496,7 @@ class SubModule(Module):
 
     async def coroutines(self):
         try:
-            sent_requests = True
+            sent_requests = False
             messages_sent = 0
             n_messages = 1
             self.log('Starting periodic print routine...')
@@ -555,7 +555,7 @@ class SubModule(Module):
                         self.log(f'Received response observation')
                         await self.sim_wait(0.1)
                     self.log('done waiting')
-                    msg = InternalMessage(self.name, "Onboard Processing Module", response)
+                    msg = InternalMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, response)
 
                     self.log('Sending measurement result to onboard processing module.')
                     await self.send_internal_message(msg)
