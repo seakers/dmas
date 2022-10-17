@@ -4,8 +4,9 @@ import logging
 from modules import Module
 from messages import *
 from neo4j import GraphDatabase
-from utils import PlanningModuleSubmoduleTypes
+from utils import PlanningSubmoduleTypes
 from orbitdata import OrbitData
+from requests_xd import MeasurementRequest
 
 class PlanningModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
@@ -14,6 +15,7 @@ class PlanningModule(Module):
         self.submodules = [
             InstrumentCapabilityModule(self),
             ObservationPlanningModule(self),
+            OperationsPlanningModule(self),
             PredictiveModelsModule(self),
             MeasurementPerformanceModule(self)
         ]
@@ -22,7 +24,7 @@ class InstrumentCapabilityModule(Module):
     def __init__(self, parent_module) -> None:
         self.event_msg_queue = []
         self.capable_msg_queue = []
-        super().__init__(PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value, parent_module, submodules=[],
+        super().__init__(PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value, parent_module, submodules=[],
                          n_timed_coroutines=2)
 
     async def activate(self):
@@ -33,7 +35,7 @@ class InstrumentCapabilityModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == ScienceModuleSubmoduleTypes.SCIENCE_VALUE.value):
+            if(msg.src_module == ScienceSubmoduleTypes.SCIENCE_VALUE.value):
                 self.event_msg_queue.append(msg)
             else:
                 self.log(f'Unsupported message type for this module.')
@@ -72,7 +74,7 @@ class InstrumentCapabilityModule(Module):
         try:
             while True:
                 for capable_msg in self.capable_msg_queue:
-                    msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, capable_msg.content)
+                    msg = InternalMessage(self.name, PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, capable_msg.content)
                     await self.parent_module.send_internal_message(msg)
                 # msg_dict = dict()
                 # msg_dict['src'] = self.name
@@ -133,13 +135,17 @@ class InstrumentCapabilityModule(Module):
 
 class ObservationPlanningModule(Module):
     def __init__(self, parent_module) -> None:
-        self.task_list = []
-        self.plan = []
+        self.obs_list = []
+        self.obs_plan = []
         self.orbit_data: dict = OrbitData.from_directory(parent_module.scenario_dir)
         print(parent_module.parent_module)
         self.orbit_data = self.orbit_data[parent_module.parent_module.name]
-        super().__init__(PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, parent_module, submodules=[],
+        super().__init__(PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
+
+        # this is just for testing!
+        initial_obs = ObservationPlannerTask(0.0,-32.0,1.0,["OLI"],0.0,1.0)
+        self.obs_list.append(initial_obs)
 
     async def activate(self):
         await super().activate()
@@ -149,8 +155,8 @@ class ObservationPlanningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module==PlanningModuleSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
-                self.task_list.append(msg.content)
+            if(msg.src_module==PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
+                self.obs_list.append(msg.content)
         except asyncio.CancelledError:
             return
 
@@ -181,15 +187,22 @@ class ObservationPlanningModule(Module):
     async def create_plan(self):
         try:
             while True:
-                if(len(self.task_list) > 0):
+                if(len(self.obs_list) > 0):
                     # replace this with an actual planner!
-                    for i in range(len(self.task_list)):
-                        task = self.task_list[i].content
+                    for i in range(len(self.obs_list)):
+                        obs = self.obs_list[i]
                         #gp_accesses = self.orbit_data.get_ground_point_accesses_future(task["lat"], task["lon"], self.get_current_time())
                         gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
+                        gp_access_list = []
+                        for _, row in gp_accesses.iterrows():
+                            gp_access_list.append(row)
                         print(gp_accesses)
-                        self.plan.append(self.task_list[i])
-                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, self.plan)
+                        if(len(gp_accesses) != 0):
+                            obs.start = gp_access_list[0]['time index']
+                            obs.end = obs.start + 5
+                            self.obs_plan.append(obs)
+                    self.obs_list = []
+                    plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
@@ -200,8 +213,8 @@ class OperationsPlanningModule(Module):
         self.obs_plan = []
         self.ops_plan = []
         self.modeled_states = []
-        super().__init__(PlanningModuleSubmoduleTypes.OPERATIONS_PLANNING.value, parent_module, submodules=[],
-                         n_timed_coroutines=1)
+        super().__init__(PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, parent_module, submodules=[],
+                         n_timed_coroutines=2)
 
     async def activate(self):
         await super().activate()
@@ -211,9 +224,9 @@ class OperationsPlanningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module==PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value):
-                self.obs_plan.append(msg.content)
-            elif(msg.src_module==PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value):
+            if(msg.src_module==PlanningSubmoduleTypes.OBSERVATION_PLANNER.value):
+                self.obs_plan = msg.content
+            elif(msg.src_module==PlanningSubmoduleTypes.PREDICTIVE_MODEL.value):
                 self.modeled_states.append(msg.content)
             else:
                 self.log(f'Unsupported message type for this module.)')
@@ -224,9 +237,13 @@ class OperationsPlanningModule(Module):
         coroutines = []
 
         ## Internal coroutines
-        create_plan = asyncio.create_task(self.create_plan())
-        create_plan.set_name (f'{self.name}_create_plan')
-        coroutines.append(create_plan)
+        create_ops_plan = asyncio.create_task(self.create_ops_plan())
+        create_ops_plan.set_name (f'{self.name}_create_ops_plan')
+        coroutines.append(create_ops_plan)
+
+        execute_ops_plan = asyncio.create_task(self.execute_ops_plan())
+        execute_ops_plan.set_name (f'{self.name}_execute_ops_plan')
+        coroutines.append(execute_ops_plan)
 
         # wait for the first coroutine to complete
         _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
@@ -244,16 +261,50 @@ class OperationsPlanningModule(Module):
         return
 
 
-    async def create_plan(self):
+    async def create_ops_plan(self):
         try:
             while True:
                 # Replace with basic module that adds charging to plan
-                # if(len(self.task_list) > 0):
-                #     # replace this with an actual planner!
-                #     for i in range(len(self.task_list)):
-                #         self.plan.append(self.task_list[i])
-                #     plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, self.plan)
-                #     await self.parent_module.send_internal_message(plan_msg)
+                if(len(self.obs_plan) > 0 and len(self.ops_plan) == 0):
+                    plan_beginning = self.get_current_time()
+                    starts = []
+                    ends = []
+                    for obs in self.obs_plan:
+                        starts.append(obs.start)
+                        ends.append(obs.end)
+                    charge_task = ChargePlannerTask(plan_beginning,starts[0])
+                    self.ops_plan.append(charge_task)
+                    for i in range(len(starts)):
+                        if(i+1 < len(starts)):
+                            charge_task = ChargePlannerTask(ends[i],starts[i+1])
+                            self.ops_plan.append(charge_task)
+                        obs_task = self.obs_plan[i]
+                        self.ops_plan.append(obs_task)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return
+    
+    async def execute_ops_plan(self):
+        try:
+            while True:
+                # Replace with basic module that adds charging to plan
+                curr_time = self.get_current_time()
+                for task in self.ops_plan:
+                    print(task)
+                    if(isinstance(task,ChargePlannerTask)):
+                        self.log(f'Telling platform sim to charge!')
+                        # currently doing nothing when 'charging'
+                    elif(isinstance(task,ObservationPlannerTask)):
+                        print(task.target)
+                        print(task.start)
+                        print(task.end)
+                        if(5 < curr_time < 10): # TODO should be between task start and task end but this is for testing
+                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [task.end-curr_time])
+                            msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
+                            await self.send_internal_message(msg)
+                    else:
+                        self.log(f'Currently unsupported task type!')
+
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
@@ -263,7 +314,7 @@ class PredictiveModelsModule(Module):
         self.agent_state = None
         self.obs_plan = None
         self.ops_plan = None
-        super().__init__(PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value, parent_module, submodules=[],
+        super().__init__(PlanningSubmoduleTypes.PREDICTIVE_MODEL.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
     async def activate(self):
@@ -274,9 +325,9 @@ class PredictiveModelsModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value):
+            if(msg.src_module == PlanningSubmoduleTypes.OBSERVATION_PLANNER.value):
                 self.obs_plan = msg.content
-            elif(msg.src_module == PlanningModuleSubmoduleTypes.OPERATIONS_PLANNING.value):
+            elif(msg.src_module == PlanningSubmoduleTypes.OPERATIONS_PLANNER.value):
                 self.ops_plan = msg.content
             else:
                 self.log(f'Message from unsupported module.')
@@ -310,7 +361,7 @@ class PredictiveModelsModule(Module):
         try:
             while True:
                 if(self.obs_plan is not None):
-                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, self.obs_plan)
+                    plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, self.obs_plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
@@ -319,7 +370,7 @@ class PredictiveModelsModule(Module):
 class MeasurementPerformanceModule(Module):
     def __init__(self, parent_module) -> None:
         self.plan = None
-        super().__init__(PlanningModuleSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, parent_module, submodules=[],
+        super().__init__(PlanningSubmoduleTypes.MEASUREMENT_PERFORMANCE.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
 
     async def activate(self):
@@ -330,7 +381,7 @@ class MeasurementPerformanceModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == PlanningModuleSubmoduleTypes.PREDICTIVE_MODELS.value):
+            if(msg.src_module == PlanningSubmoduleTypes.PREDICTIVE_MODEL.value):
                 self.plan = msg.content
             else:
                 self.log(f'Unsupported message type for this module.')
@@ -372,7 +423,7 @@ class MeasurementPerformanceModule(Module):
                         lagfunc = -0.08182 * np.log(delta)+0.63182 # from molly's ppt on google drive
                         event.content["meas_perf_value"] = lagfunc
                         self.plan[i] = event
-                    plan_msg = InternalMessage(self.name, PlanningModuleSubmoduleTypes.OBSERVATION_PLANNING.value, self.plan)
+                    plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, self.plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:

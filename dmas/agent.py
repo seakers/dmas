@@ -13,10 +13,11 @@ import logging
 from messages import *
 from utils import SimClocks, Container, EnvironmentModuleTypes
 
-from modules import Module
+from modules import *
 
 from science import ScienceModule
 from planning import PlanningModule
+from engineering import EngineeringModule
 
 """    
 --------------------------------------------------------
@@ -625,118 +626,19 @@ class AgentState:
 class TestAgent(AgentClient):    
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
-        self.submodules = [TestModule(self)]
+        self.submodules = [
+                            TestModule(self)
+                          ]
 
 class ScienceTestAgent(AgentClient):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
-        self.submodules = [TestModule(self), ScienceModule(self,scenario_dir), PlanningModule(self,scenario_dir)]
-
-"""
---------------------
-  TESTING MODULES
---------------------
-"""
-class TestModule(Module):
-    def __init__(self, parent_agent) -> None:
-        super().__init__('test', parent_agent, [SubModule('sub_test', self)])
-
-class SubModule(Module):
-    def __init__(self, name, parent_module) -> None:
-        super().__init__(name, parent_module, submodules=[])
-
-    async def coroutines(self):
-        try:
-            sent_requests = False
-            messages_sent = 0
-            n_messages = 1
-            self.log('Starting periodic print routine...')
-            while True:
-                if not sent_requests:
-                    # test message to parent module
-                    # instruction = PrintInstruction(self.parent_module, self.get_current_time(), 'HELLO WORLD')
-                    # msg = InternalMessage(self.name, self.parent_module.name, instruction)
-
-                    # self.log('Sending print instruction to parent module.')
-                    # await self.send_internal_message(msg)
-
-                    self.log('Waiting for 1 second')
-                    await self.sim_wait_to(int(self.get_current_time()) + 1)
-                    self.log('Wait over!')
-
-                    # sense requests
-                    src = self.get_top_module()
-                    sense_msgs = []
-                    
-                    ## agent access req
-                    target = 'Mars2'
-                    msg = AgentAccessSenseMessage(src.name, target)
-                    sense_msgs.append(msg)
-
-                    # gs access req
-                    target = 'NEN2'
-                    msg = GndStnAccessSenseMessage(src.name, target)
-                    sense_msgs.append(msg)
-
-                    # gp access req
-                    lat, lon = 1.0, 158.0
-                    msg = GndPntAccessSenseMessage(src.name, lat, lon)
-                    sense_msgs.append(msg)
-
-                    for sense_msg in sense_msgs:
-                        self.log(f'Sending access sense message of type {msg.get_type()} for target {target}.')
-                        response = await self.submit_environment_message(sense_msg)
-
-                        if response is not None:
-                            self.log(f'Access to {response.target}: {response.result}')
-                            await self.sim_wait(1.1)
-
-                    # agent info req 
-                    msg = AgentSenseMessage(src.name, dict())
-                    self.log(f'Sending Agent Info sense message to Envirnment.')
-                    response = await self.submit_environment_message(msg)
-
-                    if response is not None:
-                        self.log(f'Current state: pos=[{response.pos}], vel=[{response.vel}], eclipse={response.eclipse}')
-                        await self.sim_wait(1.1)
-
-                    lat, lon = 45.590934, 47.716708
-                    obs = "radiances"
-                    msg = ObservationSenseMessage(src.name, lat, lon, obs)
-                    self.log(f'Sending Observation Sense message to Environment.')
-                    response = await self.submit_environment_message(msg)
-
-                    if response is not None:
-                        #self.log(f'Current status: {response.obs}')
-                        self.log(f'Received response observation')
-                        await self.sim_wait(0.1)
-                    self.log('done waiting')
-                    msg = InternalMessage(self.name, ScienceModuleSubmoduleTypes.ONBOARD_PROCESSING.value, response)
-
-                    self.log('Sending measurement result to onboard processing module.')
-                    await self.send_internal_message(msg)
-
-                    sent_requests = True
-
-                else:
-                    await self.sim_wait( 1e6 )
-
-                # if messages_sent < n_messages and '1' in self.parent_module.parent_module.name:
-                #     msg = dict()
-                #     msg['src'] = self.name
-                #     msg['dst'] = 'Mars2'
-                #     msg['content'] = 'Howdy'
-                #     msg['@type'] = 'HELLO_WORLD'
-
-                #     await self.transmit_message(msg)
-
-                #     messages_sent += 1
-
-                # await self.sim_wait(20)
-                
-        except asyncio.CancelledError:
-            self.log('Periodic print routine cancelled')
-            return
+        self.submodules = [
+                            ScienceModule(self,scenario_dir),
+                            PlanningModule(self,scenario_dir),
+                            EngineeringModule(self),
+                            TestModule(self)
+                          ]
 
 """
 --------------------

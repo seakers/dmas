@@ -126,26 +126,41 @@ class StopProvidingPowerTask(ProvidePowerTask):
         super().__init__(eps_component, -power_to_stop, target)
 
 class SaveToMemoryTask(ComponentTask):
-    def __init__(self, data : str) -> None:
+    def __init__(self, target_lat: float, target_lon: float, data : str) -> None:
         """
-        Instructs component to save data in internal memory 
+        Instructs component to save observation data in internal memory 
+
+        target_lat:
+            lattitude of the target in [°]
+        target_lon:
+            longitude of the target in [°]
+        data:        
+            data to be saved
         """
         super().__init__(ComponentNames.ONBOARD_COMPUTER.value)
+        self._target = (target_lat, target_lon)
         self._data = data
 
     def get_data(self):
         return self._data
 
+    def get_target(self):
+        return self._target
+
+    def get_target_lat(self):
+        lat, _ = self._target
+        return lat
+
+    def get_target_lon(self):
+        _, lon = self._target
+        return lon
+
 class DeleteFromMemoryTask(SaveToMemoryTask):
-    def __init__(self, data : str) -> None:
+    def __init__(self, target_lat: float, target_lon: float, data : str) -> None:
         """
         Instructs component to delete data from internal memory 
         """
-        super().__init__(ComponentNames.ONBOARD_COMPUTER.value)
-        self._data = data
-
-    def get_data(self):
-        return self._data
+        super().__init__(ComponentNames.ONBOARD_COMPUTER.value, target_lat, target_lon, data)
         
 class MeasurementTask(ComponentTask):
     def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, attitude_state : dict) -> None:
@@ -363,3 +378,38 @@ class ObservationTask(PlatformTask):
 
     def get_target(self):
         return self.target
+
+"""
+-------------------------------
+PLANNER TASK
+-------------------------------
+"""
+class PlannerTask:
+    def __init__(self) -> None:
+        """
+        Abstract platform task class meant to communicate from obs planner to ops planner
+        """
+        return
+
+class ObservationPlannerTask(PlannerTask):
+    def __init__(self, target_lat : float, target_lon : float, science_val: float, instrument_list : list, start: float, end: float) -> None:
+        super().__init__()
+        self.target = (target_lat, target_lon)
+        self.science_val = science_val
+
+        self.instrument_list = []
+        for instrument in instrument_list:
+            self.instrument_list.append(instrument)
+
+        self.start = start
+        self.end = end
+
+    def get_target(self):
+        return self.target
+
+class ChargePlannerTask(PlannerTask):
+    def __init__(self, start: float, end: float) -> None:
+        super().__init__()
+
+        self.start = start
+        self.end = end

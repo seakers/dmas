@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Union
 import logging
-from agent import AgentClient
+#from agent import AgentClient
 from messages import *
 from utils import *
 from modules import Module
@@ -631,13 +631,14 @@ class ComponentModule(Module):
                 self.send_internal_message(msg)
 
         except asyncio.CancelledError:
-            if not perform_task.done():
-                perform_task.cancel()
-                await perform_task
+            # if not perform_task.done():
+            #     perform_task.cancel()
+            #     await perform_task
             
-            if not listen_for_abort.done():
-                listen_for_abort.cancel()
-                await listen_for_abort            
+            # if not listen_for_abort.done():
+            #     listen_for_abort.cancel()
+            #     await listen_for_abort
+            await self.sim_wait(1e6) 
 
     async def listen_for_abort(self, task: ComponentTask) -> None:
         """
@@ -1122,8 +1123,9 @@ class SubsystemModule(Module):
                     acquired = None
 
         except asyncio.CancelledError:
-            if acquired:
-                self.state_lock.release()
+            await self.sim_wait(1e6)
+            # if acquired:
+            #     self.state_lock.release()
 
     def is_subsystem_critical(self) -> bool:
         """
@@ -1228,8 +1230,9 @@ class SubsystemModule(Module):
                     
 
         except asyncio.CancelledError:
-            if acquired:
-                self.state_lock.release()
+            await self.sim_wait(1e6)
+            # if acquired:
+            #     self.state_lock.release()
 
     def is_subsystem_failure(self) -> bool:
         """
@@ -1478,8 +1481,9 @@ class SubsystemModule(Module):
                 aquired = False       
 
         except asyncio.CancelledError:
-            if aquired:
-                self.state_lock.release()
+            await self.sim_wait(1e6)
+            # if aquired:
+            #     self.state_lock.release()
 
     async def environment_event_handler(self, event_broadcast : EnvironmentBroadcastMessage) -> bool:
         """ 
@@ -1595,6 +1599,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
 
         if isinstance(task, ObservationTask):
             lat, lon = task.target
+            self.log(f'In decompose platform task in CNDH')
             return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations) ]
         else:
             return await super().decompose_platform_task(task)
@@ -1647,6 +1652,7 @@ class OnboardComputerModule(ComponentModule):
                 await self.enabled.wait()
 
                 data = task.get_data()
+                lat, lon = task.get_target()
                 data_vol = len(data.encode('utf-8'))
 
                 if isinstance(task, DeleteFromMemoryTask):
@@ -1658,7 +1664,7 @@ class OnboardComputerModule(ComponentModule):
                     else:
                         # data successfully stored in internal memory, send to science module for processing
                         
-                        msg = DataDeleteMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, data)
+                        msg = DataDeletedMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, lat, lon, data)
                         self.log(f'Deleting data from {AgentModuleTypes.SCIENCE_MODULE}...')
 
                         self.memory_stored -= data_vol
@@ -1671,7 +1677,7 @@ class OnboardComputerModule(ComponentModule):
 
                     else:
                         # data successfully stored in internal memory, send to science module for processing
-                        msg = DataMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, data)
+                        msg = DataMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, lat, lon, data)
                         self.log(f'Sending data to {AgentModuleTypes.SCIENCE_MODULE} for processing...')
                         
                         self.memory_stored += data_vol
@@ -1690,8 +1696,9 @@ class OnboardComputerModule(ComponentModule):
             self.log(f'Aborting task of type {type(task)}.')
 
             # release update lock if cancelled during task handling
-            if acquired:
-                self.state_lock.release()
+            await self.sim_wait(1e6)
+            # if acquired:
+            #     self.state_lock.release()
 
             # return task abort status
             return TaskStatus.ABORTED
@@ -1964,9 +1971,7 @@ class InstrumentComponent(ComponentModule):
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage
-                    data = response.result
-
-                    data_save_task = SaveToMemoryTask(data)
+                    data_save_task = SaveToMemoryTask(lat, lon, response.obs)
                     data_msg = ComponentTaskMessage(self.name, ComponentNames.ONBOARD_COMPUTER.name, data_save_task)
 
                     await self.send_internal_message(data_msg)
@@ -3012,11 +3017,11 @@ class PlatformSim(Module):
         # TODO create list of subsystems based on component list given to the platform
         self.submodules = [
             CommandAndDataHandlingSubsystem(self),
-            GuidanceAndNavigationSubsystem(self),
-            ElectricPowerSubsystem(self),
+            #GuidanceAndNavigationSubsystem(self),
+            #ElectricPowerSubsystem(self),
             PayloadSubsystem(self),
-            CommsSubsystem(self, 1e6),
-            AttitudeDeterminationAndControlSubsystem(self)
+            #CommsSubsystem(self, 1e6),
+            #AttitudeDeterminationAndControlSubsystem(self)
         ]
 
     # TODO include internal state routing that kills the platform sim and the agent if a platform-level failure is detected    
@@ -3064,7 +3069,7 @@ class EngineeringModule(Module):
     def __init__(self, parent_agent : Module) -> None:
         super().__init__(AgentModuleTypes.ENGINEERING_MODULE.value, parent_agent, [], 1)
         self.submodules = [
-            # PlatformSim(self)
+            PlatformSim(self)
         ]
 
     async def internal_message_handler(self, msg: InternalMessage):
@@ -3077,15 +3082,15 @@ class EngineeringModule(Module):
                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 await self.send_internal_message(msg)
             else:
-                # if isinstance(msg, PlatformTaskMessage) or isinstance(msg, SubsystemTaskMessage) or isinstance(msg, ComponentTaskMessage):
-                #     msg.dst_module = EngineeringModuleParts.PLATFORM_SIMULATION.value
-                #     await self.send_internal_message(msg)
-                # else:
-                #     # this module is the intended receiver for this message. Handling message
-                #     self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                if isinstance(msg, PlatformTaskMessage) or isinstance(msg, SubsystemTaskMessage) or isinstance(msg, ComponentTaskMessage):
+                    msg.dst_module = EngineeringModuleParts.PLATFORM_SIMULATION.value
+                    await self.send_internal_message(msg)
+                else:
+                    # this module is the intended receiver for this message. Handling message
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
 
-                # this module is the intended receiver for this message. Handling message
-                self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                # # this module is the intended receiver for this message. Handling message
+                # self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
 
         except asyncio.CancelledError:
             return
