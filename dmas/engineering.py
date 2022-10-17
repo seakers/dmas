@@ -126,11 +126,11 @@ class ComponentModule(Module):
                 task = msg.get_task()
                 self.log(f'Received a task of type {type(task)}!')
                 if isinstance(task, ComponentAbortTask):
-                    self.aborts.put(task)
+                    await self.aborts.put(task)
                 elif isinstance(task, ComponentMaintenanceTask):
-                    self.maintenance_tasks.put(task)
+                    await self.maintenance_tasks.put(task)
                 else:
-                    self.tasks.put(task)
+                    await self.tasks.put(task)
             
             elif isinstance(msg.content, EnvironmentBroadcastMessage):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
@@ -176,15 +176,15 @@ class ComponentModule(Module):
        
         crit_monitor = asyncio.create_task(self.crit_monitor())
         crit_monitor.set_name (f'{self.name}_crit_monitor')
-        coroutines.append(crit_monitor)
+        #coroutines.append(crit_monitor)
 
         failure_monitor = asyncio.create_task(self.failure_monitor())
         failure_monitor.set_name (f'{self.name}_failure_monitor')
-        coroutines.append(failure_monitor)
+        #coroutines.append(failure_monitor)
 
-        maintenance_task_processor = asyncio.create_task(self.maintenance_task_processor())
-        maintenance_task_processor.set_name (f'{self.name}_maintenance_task_processor')
-        coroutines.append(maintenance_task_processor)
+        # maintenance_task_processor = asyncio.create_task(self.maintenance_task_processor())
+        # maintenance_task_processor.set_name (f'{self.name}_maintenance_task_processor')
+        # coroutines.append(maintenance_task_processor)
 
         task_processor = asyncio.create_task(self.task_processor())
         task_processor.set_name (f'{self.name}_task_processor')
@@ -436,7 +436,7 @@ class ComponentModule(Module):
 
                 # inform parent subsystem of the status of completion of the task at hand
                 msg = ComponentTaskCompletionMessage(self.name, self.parent_module.name, task, status)
-                self.send_internal_message(msg)
+                await self.send_internal_message(msg)
 
                 # inform parent subsytem of the current component state
                 state : ComponentState = await self.get_state()
@@ -493,7 +493,7 @@ class ComponentModule(Module):
 
                 elif task.component_status is ComponentStatus.OFF:
                     if self.status is not ComponentStatus.OFF:
-                        # turn component on
+                        # turn component off
                         self.status = ComponentStatus.OFF
                         self.enabled.clear()
                         self.disabled.set()
@@ -914,9 +914,9 @@ class SubsystemModule(Module):
                 self.log(f'Received a task of type {type(task)}!')
 
                 if isinstance(task, PlatformAbortTask) or isinstance(task, SubsystemAbortTask) or isinstance(task, ComponentAbortTask):
-                    self.aborts.put(task)
+                    await self.aborts.put(task)
                 else:
-                    self.tasks.put(task)
+                    await self.tasks.put(task)
                     
             elif isinstance(msg.content, EnvironmentBroadcastMessage):
                 self.log(f'Received internal message containing an environment broadcast of type {type(msg)}!')
@@ -936,8 +936,8 @@ class SubsystemModule(Module):
                 
             elif isinstance(msg, SubsystemStateMessage):
                 subsystem_state : SubsystemState = msg.get_state()
-                self.log(f'Received component state message from subsystem type {subsystem_state.subsystem_type}!')
-                await self.component_state_updates.put(subsystem_state)
+                self.log(f'Received subsystem state message from subsystem type {subsystem_state.subsystem_type}!')
+                await self.subsystem_state_updates.put(subsystem_state)
 
             elif isinstance(msg, SubsystemStateRequestMessage):
                 self.log(f'Received a subsystem state request from subsystem \'{msg.src_module}\'. Sending latest subsystem state...')
@@ -988,9 +988,9 @@ class SubsystemModule(Module):
         coroutines = []
 
         ## Internal coroutines
-        update_component_state = asyncio.create_task(self.update_component_state())
-        update_component_state.set_name (f'{self.name}_update_component_state')
-        coroutines.append(update_component_state)
+        #update_component_state = asyncio.create_task(self.update_component_state())
+        #update_component_state.set_name (f'{self.name}_update_component_state')
+        #coroutines.append(update_component_state)
 
         update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
         update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
@@ -998,11 +998,11 @@ class SubsystemModule(Module):
 
         crit_monitor = asyncio.create_task(self.crit_monitor())
         crit_monitor.set_name (f'{self.name}_crit_monitor')
-        coroutines.append(crit_monitor)
+        #coroutines.append(crit_monitor)
 
         failure_monitor = asyncio.create_task(self.failure_monitor())
         failure_monitor.set_name (f'{self.name}_failure_monitor')
-        coroutines.append(failure_monitor)
+        #coroutines.append(failure_monitor)
 
         task_processor = asyncio.create_task(self.task_processor())
         task_processor.set_name (f'{self.name}_task_processor')
@@ -1037,6 +1037,7 @@ class SubsystemModule(Module):
         try:
             while True:
                 # wait for next incoming component state updates
+                self.log(f'In update component state')
                 component_state : ComponentState = await self.component_state_updates.get()
 
                 # update component state list
@@ -1044,15 +1045,15 @@ class SubsystemModule(Module):
                 self.component_states[component_state.component_name] = component_state
                 
                 # check for subsystem and component-level critical or failure states
-                if (self.is_subsystem_critical() or self.is_component_critical()
-                    or self.is_subsystem_failure() or self.is_component_failure()):
+                # if (self.is_subsystem_critical() or self.is_component_critical()
+                #     or self.is_subsystem_failure() or self.is_component_failure()):
 
-                    # set component health to critical
-                    self.health = SubsystemHealth.CRITIAL
+                #     # set component health to critical
+                #     self.health = SubsystemHealth.CRITIAL
 
-                    # trigger critical state event if it hasn't been triggered already
-                    if self.is_subsystem_critical() and not self.critical.is_set():
-                        self.critical.set()
+                #     # trigger critical state event if it hasn't been triggered already
+                #     if self.is_subsystem_critical() and not self.critical.is_set():
+                #         self.critical.set()
 
                 # release update lock
                 self.state_lock.release()
@@ -1584,7 +1585,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.CNDH.value, parent_platform_sim, CommandAndDataHandlingState, health, status)
-        self.submodules = [ OnboardComputerModule(self, 1, 1e3) ]
+        self.submodules = [ OnboardComputerModule(self, 1, 1e9) ]
     
     async def subsystem_state_update_handler(self, subsystem_state):
         """
@@ -1649,8 +1650,9 @@ class OnboardComputerModule(ComponentModule):
                 raise asyncio.CancelledError
 
             if isinstance(task, SaveToMemoryTask):
-                await self.enabled.wait()
-
+                self.log(f'In save to memory task')
+                #await self.enabled.set() TODO fix this enable setting?
+                self.log(f'In save to memory task')
                 data = task.get_data()
                 lat, lon = task.get_target()
                 data_vol = len(data.encode('utf-8'))
@@ -1670,6 +1672,7 @@ class OnboardComputerModule(ComponentModule):
                         self.memory_stored -= data_vol
                         self.log(f'Data successfully deleted from internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).')
                 else:
+                    self.log(f'In else')
                     if self.memory_stored + data_vol > self.memory_capacity:
                         # insufficient memory storage for incoming data, discarding task.
                         self.log(f'Module does NOT contain enough memory space to store data. Data size: {data_vol}, memory state: ({self.memory_stored}/{self.memory_capacity}).')
@@ -1860,8 +1863,9 @@ class PayloadSubsystem(SubsystemModule):
         """
         Reacts to other subsystem state updates.
         """
+        self.log(f'payload subsystem state update handler')
         if isinstance(subsystem_state, AttitudeDeterminationAndControlState):
-            self.attitude_state.put(subsystem_state)
+            await self.attitude_state.put(subsystem_state)
 
     async def decompose_subsystem_task(self, task : SubsystemTask) -> list:
         """
@@ -1869,19 +1873,19 @@ class PayloadSubsystem(SubsystemModule):
         """
         if isinstance(task, PerformMeasurement):
             comp_tasks = []
-
+            self.log(f'In decompose subsystem task in Payload')
             # ask for latest attitude state
             msg = SubsystemStateRequestMessage(self.name, SubsystemNames.ADCS.value)
             await self.send_internal_message(msg)
 
             attitude_state = await self.attitude_state.get()
-            
+            self.log(f'Past attitude state')
             # instruct each instrument in the observation task to perform the masurement 
             for instrument in task.instruments:
                 i = task.instruments.index(instrument)
                 target_lat, target_lon = task.target
                 comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state) )
-
+            self.log(f'End of decompose subsystem task in Payload')
             return comp_tasks
         else:
             return await super().decompose_subsystem_task(task)
@@ -1901,13 +1905,14 @@ class InstrumentComponent(ComponentModule):
                 data_rate: float,
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
-                status: ComponentStatus = ComponentStatus.OFF, 
+                status: ComponentStatus = ComponentStatus.ON, 
                 f_update: float = 1, 
                 n_timed_coroutines: int = 3) -> None:
         super().__init__(name, parent_subsystem, InstrumentState, average_power_consumption, health, status, f_update, n_timed_coroutines)
         self.data_rate = data_rate
         self.buffer_capacity = buffer_capacity
         self.buffer_allocated = 0
+        self.status = ComponentStatus.ON
 
     async def is_critical(self) -> bool:
         buffer_capacity_threshold = 0.90
@@ -1952,6 +1957,7 @@ class InstrumentComponent(ComponentModule):
                 raise asyncio.CancelledError
 
             if isinstance(task, MeasurementTask):
+                self.status = ComponentStatus.ON # TODO remove this hardcode
                 if self.status is ComponentStatus.OFF:
                     self.log(f'Cannot perform measurement while component status is {self.status}.')
                     raise asyncio.CancelledError
@@ -1960,11 +1966,13 @@ class InstrumentComponent(ComponentModule):
                 self.log(f'Performing measurement...')
                 src = self.get_top_module()
                 lat, lon = task.target
-                msg = ObservationSenseMessage(src.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, task.attitude_state, lat, lon)
+                msg = ObservationSenseMessage(src.name, lat, lon, "radiances") # TODO replace hardcoded radiances with instrument specific measurements
                 response = await self.submit_environment_message(msg)
         
                 # wait for measurement duration
                 # TODO consider real-time delays from environment server querying for the data being sensed
+                self.log(f'sim_wait in payload')
+                print(task.duration)
                 await self.sim_wait(task.duration)
 
                 self.log(f'Measurement complete! Sending data to internal memory.')
@@ -3021,7 +3029,7 @@ class PlatformSim(Module):
             #ElectricPowerSubsystem(self),
             PayloadSubsystem(self),
             #CommsSubsystem(self, 1e6),
-            #AttitudeDeterminationAndControlSubsystem(self)
+            AttitudeDeterminationAndControlSubsystem(self)
         ]
 
     # TODO include internal state routing that kills the platform sim and the agent if a platform-level failure is detected    

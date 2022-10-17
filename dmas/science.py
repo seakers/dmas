@@ -11,6 +11,7 @@ from io import BytesIO
 from modules import Module
 from messages import *
 from utils import ScienceSubmoduleTypes
+from requests_xd import InformationRequest, DataProcessingRequest, MeasurementRequest
 
 class ScienceModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
@@ -324,7 +325,7 @@ class ScienceValueModule(Module):
                 self.log(f'Unsupported message type for this module.')
 
             # event-driven
-            self.request_msg_queue.put(msg)
+            await self.request_msg_queue.put(msg)
         except asyncio.CancelledError:
             return
 
@@ -336,35 +337,40 @@ class ScienceValueModule(Module):
         # compute_science_value.set_name('compute_science_value')
         # broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
         # broadcast_meas_req.set_name('broadcast_meas_req')
-        # routines = []
+        request_handler = asyncio.create_task(self.request_handler())
+        request_handler.set_name('request_handler')
+        routines = [request_handler]
 
-        # done, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
 
-        # done_name = None
-        # for coroutine in done:
-        #     coroutine : asyncio.Task
-        #     done_name = coroutine.get_name()
-        #     self.log(f"{done_name} completed!")
+        done_name = None
+        for coroutine in done:
+            coroutine : asyncio.Task
+            done_name = coroutine.get_name()
+            self.log(f"{done_name} completed!")
 
-        # for p in pending:
-        #     p : asyncio.Task
-        #     self.log(f"Terminating {p.get_name()}...")
-        #     p.cancel()
-        #     await p
+        for p in pending:
+            p : asyncio.Task
+            self.log(f"Terminating {p.get_name()}...")
+            p.cancel()
+            await p
         await self.sim_wait(1e6)
 
     async def request_handler(self):
         try:
             while True:
+                self.log(f'In science value request handler')
                 msg : DataMessage = await self.request_msg_queue.get()
-                lat, lon = msg.get_target()
-                obs = msg.get_data()
+                lat = msg.content["lat"]
+                lon = msg.content["lon"]
+                obs = msg.content["product_type"]
 
                 science_value = self.compute_science_value(lat, lon, obs)                
 
                 measurement_request = MeasurementRequest(lat, lon, science_value)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
+                await self.send_internal_message(req_msg)
 
         except asyncio.CancelledError:
             return
@@ -401,7 +407,7 @@ class ScienceValueModule(Module):
 class OnboardProcessingModule(Module):
     def __init__(self, parent_module : Module, sd : list) -> None:
         self.sd : list = sd
-        super().__init__(ScienceSubmoduleTypes.ONBOARD_PROCESSING, parent_module, submodules=[],
+        super().__init__(ScienceSubmoduleTypes.ONBOARD_PROCESSING.value, parent_module, submodules=[],
                          n_timed_coroutines=0)
 
         self.meas_results = []
@@ -510,6 +516,23 @@ class OnboardProcessingModule(Module):
         prefix = "./scenarios/sim_test/results/sd/"
         np.savetxt(prefix+"outputdata.csv", value, delimiter='\t', fmt='%4d')
         return b4, b5, prefix, "outputdata.csv"
+
+    def compute_chlorophyll_obs_value(self,b4,b5):
+        bda = b5 - b5/b4 + b4
+        return bda
+
+    def add_data_product(self,sd,lat,lon,time,product_type,filepath,data):
+        data_product_dict = dict()
+        data_product_dict["lat"] = lat
+        data_product_dict["lon"] = lon
+        data_product_dict["time"] = time
+        data_product_dict["product_type"] = product_type
+        data_product_dict["filepath"] = filepath
+        pd.DataFrame(data).to_csv(filepath,index=False,header=False)
+        sd.append(data_product_dict)
+        with open("./scenarios/sim_test/results/sd/dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
+            datafile.write(json.dumps(data_product_dict))
+        return sd
 
 
 
@@ -620,7 +643,7 @@ class ScienceReasoningModule(Module):
                         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
                         count = count + 1
                 for item in self.sd:
-                    mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
+                    mean, stddev, lat, lon = self.get_mean_sd(45.590934, 47.716708, points) # TODO fix hard coding
                     pixel_value = self.get_pixel_value_from_image(item,lat,lon,30)
                     pixel_value = 100000
                     if pixel_value > mean+stddev:
@@ -634,8 +657,10 @@ class ScienceReasoningModule(Module):
             return
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):
-        topleftlat = image["lat"]
-        topleftlon = image["lon"]
+        # topleftlat = image["lat"]
+        # topleftlon = image["lon"]
+        topleftlat = 45.590834
+        topleftlon = 47.716608 # TODO fix this hardcoding
         latdiff = lat-topleftlat
         londiff = lon-topleftlon
         row = (latdiff*111139)//resolution

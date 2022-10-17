@@ -1577,7 +1577,7 @@ class SubsystemStateRequestMessage(InternalMessage):
         """
         Inter module message requesting the latest state of a particular subsystem module
         """
-        super().__init__(src_module, dst_module)
+        super().__init__(src_module, dst_module, None)
 
 """
 PLATFORM TASK MESSAGES

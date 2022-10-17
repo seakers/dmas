@@ -299,7 +299,7 @@ class OperationsPlanningModule(Module):
                         print(task.start)
                         print(task.end)
                         if(5 < curr_time < 10): # TODO should be between task start and task end but this is for testing
-                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [task.end-curr_time])
+                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1])
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
                             await self.send_internal_message(msg)
                     else:

@@ -637,7 +637,7 @@ class ScienceTestAgent(AgentClient):
                             ScienceModule(self,scenario_dir),
                             PlanningModule(self,scenario_dir),
                             EngineeringModule(self),
-                            TestModule(self)
+                            #TestModule(self)
                           ]
 
 """
