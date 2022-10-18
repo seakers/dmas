@@ -333,28 +333,36 @@ class ScienceValueModule(Module):
         """
         Executes list of coroutine tasks to be executed by the science value module. These coroutine task incluide:
         """
-        # compute_science_value = asyncio.create_task(self.compute_science_value())
-        # compute_science_value.set_name('compute_science_value')
-        # broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
-        # broadcast_meas_req.set_name('broadcast_meas_req')
-        request_handler = asyncio.create_task(self.request_handler())
-        request_handler.set_name('request_handler')
-        routines = [request_handler]
+        try:
+            # compute_science_value = asyncio.create_task(self.compute_science_value())
+            # compute_science_value.set_name('compute_science_value')
+            # broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
+            # broadcast_meas_req.set_name('broadcast_meas_req')
+            request_handler = asyncio.create_task(self.request_handler())
+            request_handler.set_name('request_handler')
+            coroutines = [request_handler]
 
-        done, pending = await asyncio.wait(routines, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
 
-        done_name = None
-        for coroutine in done:
-            coroutine : asyncio.Task
-            done_name = coroutine.get_name()
-            self.log(f"{done_name} completed!")
+            done_name = None
+            for coroutine in done:
+                coroutine : asyncio.Task
+                done_name = coroutine.get_name()
+                self.log(f"{done_name} completed!")
 
-        for p in pending:
-            p : asyncio.Task
-            self.log(f"Terminating {p.get_name()}...")
-            p.cancel()
-            await p
-        await self.sim_wait(1e6)
+            for p in pending:
+                p : asyncio.Task
+                self.log(f"Terminating {p.get_name()}...")
+                p.cancel()
+                await p
+        
+        except asyncio.CancelledError:
+            if len(coroutines) > 0:
+                for coroutine in coroutines:
+                    coroutine : asyncio.Task
+                    if not coroutine.done():
+                        coroutine.cancel()
+                        await coroutine
 
     async def request_handler(self):
         try:
@@ -439,25 +447,34 @@ class OnboardProcessingModule(Module):
     async def coroutines(self):
         coroutines = []
 
-        ## Internal coroutines
-        process_meas_results = asyncio.create_task(self.process_meas_results())
-        process_meas_results.set_name (f'{self.name}_process_meas_results')
-        coroutines.append(process_meas_results)
+        try:
+            ## Internal coroutines
+            process_meas_results = asyncio.create_task(self.process_meas_results())
+            process_meas_results.set_name (f'{self.name}_process_meas_results')
+            coroutines.append(process_meas_results)
 
-        # wait for the first coroutine to complete
-        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
-        
-        done_name = None
-        for coroutine in coroutines:
-            if coroutine not in pending:
-                done_name = coroutine.get_name()
+            # wait for the first coroutine to complete
+            _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+            
+            done_name = None
+            for coroutine in coroutines:
+                if coroutine not in pending:
+                    done_name = coroutine.get_name()
 
-        # cancel all other coroutine tasks
-        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
-        for subroutine in pending:
-            subroutine.cancel()
-            await subroutine
-        return
+            # cancel all other coroutine tasks
+            self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+            for subroutine in pending:
+                subroutine : asyncio.Task
+                subroutine.cancel()
+                await subroutine
+            
+        except asyncio.CancelledError:
+            if len(coroutines) > 0:
+                for coroutine in coroutines:
+                    coroutine : asyncio.Task
+                    if not coroutine.done():
+                        coroutine.cancel()
+                        await coroutine
 
     async def process_meas_results(self):
         try:
@@ -567,7 +584,7 @@ class SciencePredictiveModelModule(Module):
     async def coroutines(self):
         try:
             while True:
-                await self.sim_wait(1.0, module_name=self.name)
+                await self.sim_wait(1e6)
         except asyncio.CancelledError:
             return
 
@@ -596,25 +613,33 @@ class ScienceReasoningModule(Module):
     async def coroutines(self):
         coroutines = []
 
-        ## Internal coroutines
-        check_chlorophyll_outliers = asyncio.create_task(self.check_chlorophyll_outliers())
-        check_chlorophyll_outliers.set_name (f'{self.name}_check_chlorophyll_outliers')
-        coroutines.append(check_chlorophyll_outliers)
+        try:
+            ## Internal coroutines
+            check_chlorophyll_outliers = asyncio.create_task(self.check_chlorophyll_outliers())
+            check_chlorophyll_outliers.set_name (f'{self.name}_check_chlorophyll_outliers')
+            coroutines.append(check_chlorophyll_outliers)
 
-        # wait for the first coroutine to complete
-        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+            # wait for the first coroutine to complete
+            _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+            
+            done_name = None
+            for coroutine in coroutines:
+                if coroutine not in pending:
+                    done_name = coroutine.get_name()
+
+            # cancel all other coroutine tasks
+            self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+            for subroutine in pending:
+                subroutine.cancel()
+                await subroutine
         
-        done_name = None
-        for coroutine in coroutines:
-            if coroutine not in pending:
-                done_name = coroutine.get_name()
-
-        # cancel all other coroutine tasks
-        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
-        for subroutine in pending:
-            subroutine.cancel()
-            await subroutine
-        return
+        except asyncio.CancelledError:
+            if len(coroutines) > 0:
+                for coroutine in coroutines:
+                    coroutine : asyncio.Task
+                    if not coroutine.done():
+                        coroutine.cancel()
+                        await coroutine
 
     def get_mean_sd(self, lat, lon, points):
         mean = 0.0

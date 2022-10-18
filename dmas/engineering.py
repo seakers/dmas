@@ -2239,10 +2239,11 @@ class ElectricPowerSubsystem(SubsystemModule):
             status of the component
         """
         super().__init__(SubsystemNames.EPS.value, parent_platform_sim, ElectricPowerSubsystemState, health, status)
-
+        
+        # TODO add support for list of components/designer inputs 
         self.submodules = [
                             # BatteryModule(self, 100, 1000),
-                            # PowerSupplyComponent(ComponentNames.POWER_SUPPLY.value, self, EPSComponentState, 100)
+                            PowerSupplyComponent(ComponentNames.POWER_SUPPLY.value, self, EPSComponentState, 100)
                           ]
 
     def is_subsystem_critical(self) -> bool:
@@ -3123,12 +3124,12 @@ class PlatformSim(Module):
         
         # TODO create list of subsystems based on component list given to the platform
         self.submodules = [
-            # CommandAndDataHandlingSubsystem(self)
-            # GuidanceAndNavigationSubsystem(self),
-            ElectricPowerSubsystem(self)
-            # PayloadSubsystem(self),
-            # CommsSubsystem(self, 1e6),
-            # AttitudeDeterminationAndControlSubsystem(self)
+            CommandAndDataHandlingSubsystem(self),
+            GuidanceAndNavigationSubsystem(self),
+            ElectricPowerSubsystem(self),
+            PayloadSubsystem(self),
+            CommsSubsystem(self, 1e6),
+            AttitudeDeterminationAndControlSubsystem(self)
         ]
 
     # TODO include internal state routing that kills the platform sim and the agent if a platform-level failure is detected    
