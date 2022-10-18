@@ -560,8 +560,8 @@ class EnvironmentServer(Module):
 
         # set up submodules
         self.submodules = [ 
-                            TicRequestModule(self),
-                            AgentExternalStatePropagator(self)
+                            # TicRequestModule(self),
+                            # AgentExternalStatePropagator(self)
                             #ImageServerModule(self)
                           ]
         

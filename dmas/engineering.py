@@ -174,17 +174,17 @@ class ComponentModule(Module):
         periodic_update.set_name (f'{self.name}_periodic_update')
         coroutines.append(periodic_update)
        
-        crit_monitor = asyncio.create_task(self.crit_monitor())
-        crit_monitor.set_name (f'{self.name}_crit_monitor')
-        #coroutines.append(crit_monitor)
+        # crit_monitor = asyncio.create_task(self.crit_monitor())
+        # crit_monitor.set_name (f'{self.name}_crit_monitor')
+        # #coroutines.append(crit_monitor)
 
-        failure_monitor = asyncio.create_task(self.failure_monitor())
-        failure_monitor.set_name (f'{self.name}_failure_monitor')
-        #coroutines.append(failure_monitor)
+        # failure_monitor = asyncio.create_task(self.failure_monitor())
+        # failure_monitor.set_name (f'{self.name}_failure_monitor')
+        # #coroutines.append(failure_monitor)
 
-        # maintenance_task_processor = asyncio.create_task(self.maintenance_task_processor())
-        # maintenance_task_processor.set_name (f'{self.name}_maintenance_task_processor')
-        # coroutines.append(maintenance_task_processor)
+        maintenance_task_processor = asyncio.create_task(self.maintenance_task_processor())
+        maintenance_task_processor.set_name (f'{self.name}_maintenance_task_processor')
+        coroutines.append(maintenance_task_processor)
 
         task_processor = asyncio.create_task(self.task_processor())
         task_processor.set_name (f'{self.name}_task_processor')
@@ -987,17 +987,17 @@ class SubsystemModule(Module):
         # create coroutine tasks
         coroutines = []
 
-        ## Internal coroutines
-        #update_component_state = asyncio.create_task(self.update_component_state())
-        #update_component_state.set_name (f'{self.name}_update_component_state')
-        #coroutines.append(update_component_state)
+        # Internal coroutines
+        update_component_state = asyncio.create_task(self.update_component_state())
+        update_component_state.set_name (f'{self.name}_update_component_state')
+        coroutines.append(update_component_state)
 
-        update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
-        update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
-        coroutines.append(update_subsytem_state)
+        # update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
+        # update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
+        # coroutines.append(update_subsytem_state)
 
-        crit_monitor = asyncio.create_task(self.crit_monitor())
-        crit_monitor.set_name (f'{self.name}_crit_monitor')
+        # crit_monitor = asyncio.create_task(self.crit_monitor())
+        # crit_monitor.set_name (f'{self.name}_crit_monitor')
         #coroutines.append(crit_monitor)
 
         failure_monitor = asyncio.create_task(self.failure_monitor())
@@ -1425,7 +1425,7 @@ class SubsystemModule(Module):
                     raise asyncio.CancelledError
 
                 # submit task to be performed by component
-                self.log(f'Submitting component task to {task.component}...')
+                self.log(f'Submitting component task to \'{task.component}\'...')
                 msg = ComponentTaskMessage(self.name, task.component, task)
                 await self.send_internal_message(msg)
 
@@ -1436,7 +1436,7 @@ class SubsystemModule(Module):
                     raise asyncio.CancelledError
 
                 # submit task to be performed by subsystem
-                self.log(f'Submitting subsystem task to {task.subsystem}...')
+                self.log(f'Submitting subsystem task to \'{task.subsystem}\'...')
                 msg = SubsystemTaskMessage(self.name, task.subsystem, task)
                 await self.send_internal_message(msg)
 
@@ -1600,7 +1600,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
 
         if isinstance(task, ObservationTask):
             lat, lon = task.target
-            self.log(f'In decompose platform task in CNDH')
+            self.log(f'Decompose observation platform-level task into subsystem-level tasks')
             return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations) ]
         else:
             return await super().decompose_platform_task(task)
@@ -3045,6 +3045,7 @@ class PlatformSim(Module):
                 await self.send_internal_message(msg)
             else:
                 if isinstance(msg, PlatformTaskMessage) or isinstance(msg, SubsystemTaskMessage) or isinstance(msg, ComponentTaskMessage):
+                    self.log(f'Received a tasks message. Forwarding to \'{SubsystemNames.CNDH.value}\' for handling.')
                     msg.dst_module = SubsystemNames.CNDH.value
                     await self.send_internal_message(msg)
                 else:
@@ -3091,6 +3092,7 @@ class EngineeringModule(Module):
                 await self.send_internal_message(msg)
             else:
                 if isinstance(msg, PlatformTaskMessage) or isinstance(msg, SubsystemTaskMessage) or isinstance(msg, ComponentTaskMessage):
+                    self.log(f'Received a tasks message. Forwarding to \'{EngineeringModuleParts.PLATFORM_SIMULATION.value}\' for handling.')
                     msg.dst_module = EngineeringModuleParts.PLATFORM_SIMULATION.value
                     await self.send_internal_message(msg)
                 else:
@@ -3128,11 +3130,16 @@ if __name__ == '__main__':
             except asyncio.CancelledError:
                 return
 
+    class ScienceModule(Module):
+        def __init__(self, parent_module : Module) -> None:
+            super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_module)
+
     class TestAgent(AgentClient):    
         def __init__(self, name, scenario_dir) -> None:
             super().__init__(name, scenario_dir)
             self.submodules = [
                 EngineeringModule(self),
+                ScienceModule(self),
                 PlanningModule(self)
                 ]  
 

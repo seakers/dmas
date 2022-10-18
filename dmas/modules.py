@@ -160,7 +160,7 @@ class Module:
                             if dst is None:
                                 self.log(f'Couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
-                    self.log(f'forwarding message to {dst.name}...')
+                    self.log(f'forwarding message to \'{dst.name}\'...')
                     await dst.put_in_inbox(msg)
 
         except asyncio.CancelledError:
@@ -454,6 +454,9 @@ class Module:
             elif level == logging.CRITICAL:
                 self.actions_logger.critical(out)
         else:
+            if self.name not in module_name:
+                module_name = self.name + '/' + module_name
+
             self.parent_module.log(content, level, module_name)
 
     # def log_state(self, content, level=logging.DEBUG, module_name=None):
