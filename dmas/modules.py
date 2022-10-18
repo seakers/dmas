@@ -146,7 +146,7 @@ class Module:
                     # if this module is the intended receiver, handle message
                     self.log(f'Handling message of type {type(msg)}...')
                     await self.internal_message_handler(msg)
-                    self.log(f'Message handled!')
+                    self.log(f'Message handled!',level=logging.DEBUG)
                 else:
                     # else, search if any of this module's submodule is the intended destination
                     dst = None
@@ -169,7 +169,7 @@ class Module:
                             if dst is None:
                                 self.log(f'Couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
-                    self.log(f'Forwarding message to \'{dst.name}\'...')
+                    self.log(f'Forwarding message to \'{dst.name}\'...', level=logging.INFO)
                     await dst.put_in_inbox(msg)
 
         except asyncio.CancelledError:

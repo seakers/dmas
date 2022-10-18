@@ -2,6 +2,7 @@ import asyncio
 from curses import def_prog_mode
 import json
 import os
+import shutil
 
 import random
 import sys
@@ -441,10 +442,19 @@ class AgentClient(Module):
         if os.path.exists(agent_results_path):
             # if directory already exists, clear contents
             for f in os.listdir(agent_results_path):
-                os.remove(os.path.join(agent_results_path, f)) 
+                path = os.path.join(agent_results_path, f)
+                try:
+                    shutil.rmtree(path)
+                except:
+                    os.remove(path)
         else:
             # if directory does not exist, create a new onw
             os.mkdir(agent_results_path)
+        
+        if(os.path.exists(agent_results_path+'/sd')):
+            pass
+        else:
+            os.mkdir(agent_results_path+'/sd')
 
         return scenario_results_path, agent_results_path
 
@@ -453,8 +463,8 @@ class AgentClient(Module):
         set root logger to default settings
         """
 
-        logging.root.setLevel(logging.NOTSET)
-        logging.basicConfig(level=logging.NOTSET)
+        logging.root.setLevel(logging.INFO)
+        logging.basicConfig(level=logging.INFO)
         
         logger_names = ['agent_messages', 'env_requests', 'measurements', 'state', 'actions']
 

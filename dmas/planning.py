@@ -33,7 +33,7 @@ class PlanningModule(Module):
                 # This module is the intended receiver for this message. Handling message
                 if isinstance(msg.content, MeasurementRequest):
                     # if a measurement request is received, forward to instrument capability submodule
-                    self.log(f'Received measurement request from \'{msg.src_module}\'!')
+                    self.log(f'Received measurement request from \'{msg.src_module}\'!', level=logging.INFO)
                     msg.dst_module = PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value
 
                     await self.send_internal_message(msg)
@@ -127,14 +127,14 @@ class InstrumentCapabilityModule(Module):
     def queryGraphDatabase(self, uri, user, password, sc_name,event_msg):
         try:
             capable = False
-            self.log(f'Querying knowledge graph...')
+            self.log(f'Querying knowledge graph...', level=logging.INFO)
             driver = GraphDatabase.driver(uri, auth=(user, password))
             capable = self.print_observers(driver,sc_name,event_msg)
             driver.close()
             return capable
         except Exception as e:
             print(e)
-            self.log(f'Connection to Neo4j is not working! Make sure it\'s running and check the password!')
+            self.log(f'Connection to Neo4j is not working! Make sure it\'s running and check the password!', level=logging.ERROR)
             return False
         
 
@@ -147,7 +147,7 @@ class InstrumentCapabilityModule(Module):
             observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
                 if(observer.get("name") == sc_name):
-                    self.log(f'Matching instrument in knowledge graph!')
+                    self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
                     capable = True
         return capable
 
@@ -167,7 +167,6 @@ class ObservationPlanningModule(Module):
         self.obs_list = []
         self.obs_plan = []
         self.orbit_data: dict = OrbitData.from_directory(parent_module.scenario_dir)
-        print(parent_module.parent_module)
         self.orbit_data = self.orbit_data[parent_module.parent_module.name]
         super().__init__(PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, parent_module, submodules=[],
                          n_timed_coroutines=1)
@@ -227,12 +226,13 @@ class ObservationPlanningModule(Module):
                         gp_access_list = []
                         for _, row in gp_accesses.iterrows():
                             gp_access_list.append(row)
-                        print(gp_accesses)
+                        self.log(f'Ground point accesses: {gp_accesses}',level=logging.INFO)
                         if(len(gp_accesses) != 0):
                             obs.start = gp_access_list[0]['time index']
                             obs.end = obs.start + 5
                             self.obs_plan.append(obs)
                     self.obs_list = []
+                    self.log(f'Observation plan: {self.obs_plan}', level=logging.INFO)
                     plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
                     await self.parent_module.send_internal_message(plan_msg)
                 await self.sim_wait(1.0)

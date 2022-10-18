@@ -375,7 +375,7 @@ class ScienceValueModule(Module):
             return
 
     def compute_science_value(self, lat, lon, obs):
-        self.log(f'Computing science value...')
+        self.log(f'Computing science value...', level=logging.INFO)
         
         points = np.zeros(shape=(2000, 5))
 
@@ -390,7 +390,7 @@ class ScienceValueModule(Module):
                 count = count + 1
 
         science_val = self.get_pop(lat, lon, points)
-        self.log(f'Computed science value: {science_val}')
+        self.log(f'Computed science value: {science_val}', level=logging.INFO)
         return science_val
 
     def get_pop(self, lat, lon, points):
@@ -430,7 +430,7 @@ class OnboardProcessingModule(Module):
         try:
             if isinstance(msg, DataMessage):
                 # event-driven
-                self.log(f'Received new observation data! Processing...')            
+                self.log(f'Received new observation data! Processing...', level=logging.INFO)            
                 await self.incoming_results.put(msg)
         except asyncio.CancelledError:
             return
@@ -482,7 +482,7 @@ class OnboardProcessingModule(Module):
                 obs_str = msg.get_data()
                 lat, lon = msg.get_target()
 
-                self.log(f'Received measurement result from ({lat}°, {lon}°)!')
+                self.log(f'Received measurement result from ({lat}°, {lon}°)!', level=logging.INFO)
 
                 # process result
                 b4,b5,prefix,stored_data_filepath = self.store_measurement(obs_str)
@@ -490,7 +490,7 @@ class OnboardProcessingModule(Module):
                 self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
 
                 # release database lock and inform other processes that the database has been updated
-                self.log(f'Measurement data successfully saved in on-board data-base.')
+                self.log(f'Measurement data successfully saved in on-board data-base.', level=logging.INFO)
                 self.database_lock.release()
                 self.updated.set()
         except asyncio.CancelledError:
@@ -512,7 +512,7 @@ class OnboardProcessingModule(Module):
         value = np.hstack([pixel_numbers, xy_coords, rgb])
 
         # Properly save as CSV
-        prefix = "./scenarios/sim_test/results/sd/"
+        prefix = "./scenarios/sim_test/results/"+str(self.parent_module.parent_module.name)+"/sd/"
         np.savetxt(prefix+"outputdata.csv", value, delimiter='\t', fmt='%4d')
         return b4, b5, prefix, "outputdata.csv"
 
@@ -529,7 +529,8 @@ class OnboardProcessingModule(Module):
         data_product_dict["filepath"] = filepath
         pd.DataFrame(data).to_csv(filepath,index=False,header=False)
         sd.append(data_product_dict)
-        with open("./scenarios/sim_test/results/sd/dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
+        prefix = "./scenarios/sim_test/results/"+str(self.parent_module.parent_module.name)+"/sd/"
+        with open(prefix+"dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
             datafile.write(json.dumps(data_product_dict))
         return sd
 
@@ -649,8 +650,9 @@ class ScienceReasoningModule(Module):
                         item["severity"] = (pixel_value-mean) / stddev
                         chlorophyll_outliers.append(item)
                 for outlier in chlorophyll_outliers:
+                    self.log(f'Outliers: {outlier}',level=logging.INFO)
                     msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, outlier)
-                    await self.parent_module.send_internal_message(msg)
+                    await self.send_internal_message(msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return

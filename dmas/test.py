@@ -1,11 +1,11 @@
 import asyncio
 from multiprocessing import Process
 
-from agent import TestAgent
+from agent import ScienceTestAgent
 
 def run(i):
         print(f'Mars{i+1} run')
-        agent = TestAgent(f'Mars{i+1}', './scenarios/sim_test')
+        agent = ScienceTestAgent(f'Mars{i+1}', './scenarios/sim_test/')
         asyncio.run(agent.live())
 
 if __name__ == '__main__':

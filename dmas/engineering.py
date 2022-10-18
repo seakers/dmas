@@ -2381,7 +2381,7 @@ class PowerSupplyComponent(ComponentModule):
         """
         Updates the current state of the component given a time-step dt
         """
-        super().update_properties(dt)
+        await super().update_properties(dt)
 
         # update power output
         self.power_output = 0
@@ -2427,7 +2427,7 @@ class PowerSupplyComponent(ComponentModule):
                     # inform target component of its new power supply
                     power_supply_task = ReceivePowerTask(task.target, task.power_to_supply)
                     msg = ComponentTaskMessage(self.name, task.target, power_supply_task)
-                    self.send_internal_message(msg)
+                    await self.send_internal_message(msg)
                     self.log(f'Now providing { task.power_to_supply} [W] of power to \'{task.target}\'! (Current power output: {self.power_output}[W]/{self.maximum_power_output}[W])')
 
                     return TaskStatus.DONE
@@ -3087,7 +3087,12 @@ class ReceiverState(ComponentState):
         self.buffer_allocated = buffer_allocated
 
     def from_component(receiver: ReceiverComponent):
-        return
+        return ReceiverState(receiver.power_consumed, 
+                                    receiver.power_supplied, 
+                                    receiver.buffer_capacity, 
+                                    receiver.buffer_allocated, 
+                                    receiver.health, 
+                                    receiver.status)
 
 class PlatformSim(Module):
     def __init__(self, parent_module : Module) -> None:
