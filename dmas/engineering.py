@@ -992,17 +992,17 @@ class SubsystemModule(Module):
         update_component_state.set_name (f'{self.name}_update_component_state')
         coroutines.append(update_component_state)
 
-        # update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
-        # update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
-        # coroutines.append(update_subsytem_state)
+        update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
+        update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
+        coroutines.append(update_subsytem_state)
 
         # crit_monitor = asyncio.create_task(self.crit_monitor())
         # crit_monitor.set_name (f'{self.name}_crit_monitor')
         #coroutines.append(crit_monitor)
 
-        failure_monitor = asyncio.create_task(self.failure_monitor())
-        failure_monitor.set_name (f'{self.name}_failure_monitor')
-        #coroutines.append(failure_monitor)
+        # failure_monitor = asyncio.create_task(self.failure_monitor())
+        # failure_monitor.set_name (f'{self.name}_failure_monitor')
+        # coroutines.append(failure_monitor)
 
         task_processor = asyncio.create_task(self.task_processor())
         task_processor.set_name (f'{self.name}_task_processor')
