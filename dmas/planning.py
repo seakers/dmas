@@ -78,6 +78,14 @@ class InstrumentCapabilityModule(Module):
                         coroutine.cancel()
                         await coroutine
 
+    async def check_database(self):
+        try:
+            while True:
+                for event_msg in self.event_msg_queue:
+                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", event_msg)
+                await self.sim_wait(1.0)
+        except asyncio.CancelledError:
+            return
 
     async def broadcast_meas_req(self):
         try:
@@ -95,16 +103,7 @@ class InstrumentCapabilityModule(Module):
                 # await self.publisher.send_json(msg_json)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
-            return
-
-    async def check_database(self):
-        try:
-            while True:
-                for event_msg in self.event_msg_queue:
-                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", event_msg)
-                await self.sim_wait(1.0)
-        except asyncio.CancelledError:
-            return
+            return    
 
     def queryGraphDatabase(self, uri, user, password, sc_name,event_msg):
         try:
@@ -144,18 +143,27 @@ class InstrumentCapabilityModule(Module):
 
 class ObservationPlanningModule(Module):
     def __init__(self, parent_module : Module) -> None:
-        self.obs_list = []
         self.obs_plan = []
         self.orbit_data: dict = OrbitData.from_directory(parent_module.scenario_dir)
         self.orbit_data = self.orbit_data[parent_module.parent_module.name]
         super().__init__(PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, parent_module)
 
+        # # this is just for testing!
+        # initial_obs = ObservationPlannerTask(0.0,-32.0,1.0,["OLI"],0.0,1.0)
+        # self.obs_list.append(initial_obs)
+
+    async def activate(self):
+        await super().activate()
+        
+        # Initialize observation list and plan
+        self.obs_list = asyncio.Queue()
+
+        await self.initialize_plan()
+
+    async def initialize_plan(self):
         # this is just for testing!
         initial_obs = ObservationPlannerTask(0.0,-32.0,1.0,["OLI"],0.0,1.0)
-        self.obs_list.append(initial_obs)
-
-    # async def activate(self):
-    #     await super().activate()
+        self.obs_list.put(initial_obs)
 
     async def internal_message_handler(self, msg):
         """
@@ -163,7 +171,7 @@ class ObservationPlanningModule(Module):
         """
         try:
             if(msg.src_module==PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
-                self.obs_list.append(msg.content)
+                self.obs_list.put(msg.content)
         except asyncio.CancelledError:
             return
 
@@ -202,33 +210,48 @@ class ObservationPlanningModule(Module):
     async def create_plan(self):
         try:
             while True:
-                sim_wait = None
-                if(len(self.obs_list) > 0):
-                    # replace this with an actual planner!
-                    for i in range(len(self.obs_list)):
-                        obs = self.obs_list[i]
-                        #gp_accesses = self.orbit_data.get_ground_point_accesses_future(task["lat"], task["lon"], self.get_current_time())
-                        gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
-                        gp_access_list = []
-                        for _, row in gp_accesses.iterrows():
-                            gp_access_list.append(row)
-                        print(gp_accesses)
-                        if(len(gp_accesses) != 0):
-                            obs.start = gp_access_list[0]['time index']
-                            obs.end = obs.start + 5
-                            self.obs_plan.append(obs)
-                    self.obs_list = []
-                    plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
-                    await self.parent_module.send_internal_message(plan_msg)
+                # sim_wait = None
+                # if(len(self.obs_list) > 0):
+                #     # replace this with an actual planner!
+                #     for i in range(len(self.obs_list)):
+                #         obs = self.obs_list[i]
+                #         #gp_accesses = self.orbit_data.get_ground_point_accesses_future(task["lat"], task["lon"], self.get_current_time())
+                #         gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
+                #         gp_access_list = []
+                #         for _, row in gp_accesses.iterrows():
+                #             gp_access_list.append(row)
+                #         print(gp_accesses)
+                #         if(len(gp_accesses) != 0):
+                #             obs.start = gp_access_list[0]['time index']
+                #             obs.end = obs.start + 5
+                #             self.obs_plan.append(obs)
+                #     self.obs_list = []
+                    # plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
+                    # await self.parent_module.send_internal_message(plan_msg)
                 
-                sim_wait = asyncio.create_task(self.sim_wait(1.0))
-                await sim_wait
-                
+                # sim_wait = asyncio.create_task(self.sim_wait(1.0))
+                # await sim_wait
+
+                # wait for observation request 
+                obs = await self.obs_list.get()
+
+                # estimate next observation opportunities
+                gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
+                gp_access_list = []
+                for _, row in gp_accesses.iterrows():
+                    gp_access_list.append(row)
+                print(gp_accesses)
+                if(len(gp_accesses) != 0):
+                    obs.start = gp_access_list[0]['time index']
+                    obs.end = obs.start + 5
+                    self.obs_plan.append(obs)
+
+                # schedule observation plan and send to operations planner for further development
+                plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
+                await self.parent_module.send_internal_message(plan_msg)
+
         except asyncio.CancelledError:
-            if sim_wait is not None and not sim_wait.done():
-                sim_wait : asyncio.Task
-                sim_wait.cancel()
-                await sim_wait
+            return
 
 class OperationsPlanningModule(Module):
     def __init__(self, parent_module) -> None:
