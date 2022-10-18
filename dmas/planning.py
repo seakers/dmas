@@ -20,12 +20,36 @@ class PlanningModule(Module):
             MeasurementPerformanceModule(self)
         ]
 
+    async def internal_message_handler(self, msg: InternalMessage):
+        """
+        Handles message intended for this module and performs actions accordingly.
+        """
+        try:
+            dst_name = msg.dst_module
+            if dst_name != self.name:
+                # This module is NOT the intended receiver for this message. Forwarding to rightful destination
+                await self.send_internal_message(msg)
+            else:
+                # This module is the intended receiver for this message. Handling message
+                if isinstance(msg.content, MeasurementRequest):
+                    # if a measurement request is received, forward to instrument capability submodule
+                    self.log(f'Received measurement request from \'{msg.src_module}\'!')
+                    msg.dst_module = PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value
+
+                    await self.send_internal_message(msg)
+
+                else:
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
+
+        except asyncio.CancelledError:
+            return
+
 class InstrumentCapabilityModule(Module):
     def __init__(self, parent_module) -> None:
         self.event_msg_queue = []
         self.capable_msg_queue = []
         super().__init__(PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value, parent_module, submodules=[],
-                         n_timed_coroutines=2)
+                         n_timed_coroutines=0)
 
     async def activate(self):
         await super().activate()
@@ -35,93 +59,98 @@ class InstrumentCapabilityModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == ScienceSubmoduleTypes.SCIENCE_VALUE.value):
-                self.event_msg_queue.append(msg)
+            if(isinstance(msg.content, MeasurementRequest)):
+                if self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", msg):
+                    msg.dst_module = PlanningSubmoduleTypes.OBSERVATION_PLANNER.value
+                    await self.send_internal_message(msg)
             else:
                 self.log(f'Unsupported message type for this module.')
         except asyncio.CancelledError:
             return
 
-    async def coroutines(self):
-        coroutines = []
+    # async def coroutines(self):
+    #     coroutines = []
 
-        ## Internal coroutines
-        check_database = asyncio.create_task(self.check_database())
-        check_database.set_name (f'{self.name}_check_database')
-        coroutines.append(check_database)
+    #     ## Internal coroutines
+    #     check_database = asyncio.create_task(self.check_database())
+    #     check_database.set_name (f'{self.name}_check_database')
+    #     coroutines.append(check_database)
 
-        broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
-        broadcast_meas_req.set_name (f'{self.name}_broadcast_meas_req')
-        coroutines.append(broadcast_meas_req)
+    #     broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())
+    #     broadcast_meas_req.set_name (f'{self.name}_broadcast_meas_req')
+    #     coroutines.append(broadcast_meas_req)
 
-        # wait for the first coroutine to complete
-        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+    #     # wait for the first coroutine to complete
+    #     _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
         
-        done_name = None
-        for coroutine in coroutines:
-            if coroutine not in pending:
-                done_name = coroutine.get_name()
+    #     done_name = None
+    #     for coroutine in coroutines:
+    #         if coroutine not in pending:
+    #             done_name = coroutine.get_name()
 
-        # cancel all other coroutine tasks
-        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
-        for subroutine in pending:
-            subroutine.cancel()
-            await subroutine
-        return
+    #     # cancel all other coroutine tasks
+    #     self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+    #     for subroutine in pending:
+    #         subroutine.cancel()
+    #         await subroutine
+    #     return
 
 
-    async def broadcast_meas_req(self):
-        try:
-            while True:
-                for capable_msg in self.capable_msg_queue:
-                    msg = InternalMessage(self.name, PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, capable_msg.content)
-                    await self.parent_module.send_internal_message(msg)
-                # msg_dict = dict()
-                # msg_dict['src'] = self.name
-                # msg_dict['dst'] = 'Planner'
-                # msg_dict['@type'] = 'MEAS_REQ'
-                # msg_dict['content'] = param_msg
-                # msg_dict['result'] = result
-                # msg_json = json.dumps(msg_dict)
-                # await self.publisher.send_json(msg_json)
-                await self.sim_wait(1.0)
-        except asyncio.CancelledError:
-            return
+    # async def broadcast_meas_req(self):
+    #     try:
+    #         while True:
+    #             for capable_msg in self.capable_msg_queue:
+    #                 initial_obs = ObservationPlannerTask(0.0,-32.0,1.0,["OLI"],0.0,1.0)
+    #                 msg = InternalMessage(self.name, PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, capable_msg.content)
+    #                 await self.parent_module.send_internal_message(msg)
+    #             # msg_dict = dict()
+    #             # msg_dict['src'] = self.name
+    #             # msg_dict['dst'] = 'Planner'
+    #             # msg_dict['@type'] = 'MEAS_REQ'
+    #             # msg_dict['content'] = param_msg
+    #             # msg_dict['result'] = result
+    #             # msg_json = json.dumps(msg_dict)
+    #             # await self.publisher.send_json(msg_json)
+    #             await self.sim_wait(1.0)
+    #     except asyncio.CancelledError:
+    #         return
 
-    async def check_database(self):
-        try:
-            while True:
-                for event_msg in self.event_msg_queue:
-                    self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", event_msg)
-                await self.sim_wait(1.0)
-        except asyncio.CancelledError:
-            return
+    # async def check_database(self):
+    #     try:
+    #         while True:
+    #             for event_msg in self.event_msg_queue:
+    #                 self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", event_msg)
+    #             await self.sim_wait(1.0)
+    #     except asyncio.CancelledError:
+    #         return
 
     def queryGraphDatabase(self, uri, user, password, sc_name,event_msg):
         try:
-            self.log(f'Querying graph database')
+            capable = False
+            self.log(f'Querying knowledge graph...')
             driver = GraphDatabase.driver(uri, auth=(user, password))
-            self.print_observers(driver,sc_name,event_msg)
+            capable = self.print_observers(driver,sc_name,event_msg)
             driver.close()
+            return capable
         except Exception as e:
             print(e)
             self.log(f'Connection to Neo4j is not working! Make sure it\'s running and check the password!')
+            return False
         
 
     def print_observers(self,driver,sc_name,event_msg):
+        capable = False
         with driver.session() as session:
             product = "None"
-            self.log(f'In print observers')
-            if(event_msg.content.content["product_type"] == "chlorophyll-a"):
-                self.log(f'In if in print observers')
+            if(event_msg.content._type == "chlorophyll-a"):
                 product = "Ocean chlorophyll concentration"
             observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
                 if(observer.get("name") == sc_name):
-                    self.log(f'Matching instrument!')
-                    event_msg.content.content["Measurable status"] = "Able to be measured"
-                    self.capable_msg_queue.append(event_msg)
-                    self.event_msg_queue.remove(event_msg)
+                    self.log(f'Matching instrument in knowledge graph!')
+                    capable = True
+        return capable
+
 
     @staticmethod
     def get_observers(tx, title): # (1)
@@ -155,8 +184,10 @@ class ObservationPlanningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module==PlanningSubmoduleTypes.INSTRUMENT_CAPABILITY.value):
-                self.obs_list.append(msg.content)
+            if(isinstance(msg.content, MeasurementRequest)):
+                meas_req = msg.content
+                new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,["OLI"],0.0,1.0)
+                self.obs_list.append(new_obs)
         except asyncio.CancelledError:
             return
 
@@ -191,7 +222,7 @@ class ObservationPlanningModule(Module):
                     # replace this with an actual planner!
                     for i in range(len(self.obs_list)):
                         obs = self.obs_list[i]
-                        #gp_accesses = self.orbit_data.get_ground_point_accesses_future(task["lat"], task["lon"], self.get_current_time())
+                        #gp_accesses = self.orbit_data.get_ground_point_accesses_future(task["lat"], task["lon"], self.get_current_time()) TODO fix hardcode
                         gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
                         gp_access_list = []
                         for _, row in gp_accesses.iterrows():
@@ -290,14 +321,7 @@ class OperationsPlanningModule(Module):
                 # Replace with basic module that adds charging to plan
                 curr_time = self.get_current_time()
                 for task in self.ops_plan:
-                    print(task)
-                    if(isinstance(task,ChargePlannerTask)):
-                        self.log(f'Telling platform sim to charge!')
-                        # currently doing nothing when 'charging'
-                    elif(isinstance(task,ObservationPlannerTask)):
-                        print(task.target)
-                        print(task.start)
-                        print(task.end)
+                    if(isinstance(task,ObservationPlannerTask)):
                         if(5 < curr_time < 10): # TODO should be between task start and task end but this is for testing
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1])
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)

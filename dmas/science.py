@@ -73,7 +73,7 @@ class ScienceModule(Module):
                     await self.send_internal_message(msg)
 
                 else:
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
         except asyncio.CancelledError:
             return
@@ -151,14 +151,14 @@ class ScienceModule(Module):
 
 #             elif isinstance(msg, RequestMessage) and isinstance(msg.get_request(), InformationRequest):
 #                 # TODO add support for information requests 
-#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')            
+#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')            
 
 #             elif isinstance(msg, RequestMessage) and isinstance(msg.get_request(), DataProcessingRequest):
 #                 # TODO add support for data processing requests 
-#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')            
+#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')            
 
 #             else:
-#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')            
+#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')            
             
 #         except asyncio.CancelledError:
 #             return
@@ -359,7 +359,6 @@ class ScienceValueModule(Module):
     async def request_handler(self):
         try:
             while True:
-                self.log(f'In science value request handler')
                 msg : DataMessage = await self.request_msg_queue.get()
                 lat = msg.content["lat"]
                 lon = msg.content["lon"]
@@ -367,7 +366,7 @@ class ScienceValueModule(Module):
 
                 science_value = self.compute_science_value(lat, lon, obs)                
 
-                measurement_request = MeasurementRequest(lat, lon, science_value)
+                measurement_request = MeasurementRequest("chlorophyll-a", lat, lon, science_value)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 await self.send_internal_message(req_msg)
@@ -391,7 +390,7 @@ class ScienceValueModule(Module):
                 count = count + 1
 
         science_val = self.get_pop(lat, lon, points)
-        self.log(f'computed science value: {science_val}')
+        self.log(f'Computed science value: {science_val}')
         return science_val
 
     def get_pop(self, lat, lon, points):

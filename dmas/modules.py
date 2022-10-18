@@ -126,7 +126,7 @@ class Module:
 
                 # if dst_name is None or src_name is None:
                 if not isinstance(msg, InternalMessage):
-                    self.log(f'Received invalid internal message. Discarting message: {msg}')
+                    self.log(f'Received invalid internal message. Discarding message: {msg}')
                     continue
                 
                 src_name = msg.src_module
@@ -160,7 +160,7 @@ class Module:
                             if dst is None:
                                 self.log(f'Couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
-                    self.log(f'forwarding message to \'{dst.name}\'...')
+                    self.log(f'Forwarding message to \'{dst.name}\'...')
                     await dst.put_in_inbox(msg)
 
         except asyncio.CancelledError:
@@ -186,7 +186,7 @@ class Module:
                 await self.send_internal_message(msg)
             else:
                 # this module is the intended receiver for this message. Handling message
-                self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
         except asyncio.CancelledError:
             return
 

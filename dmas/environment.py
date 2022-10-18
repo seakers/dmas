@@ -478,10 +478,10 @@ class AgentExternalStatePropagator(Module):
     Module in charge of propagating the external state of the agents present in this simulated scenario
     """
     def __init__(self, parent_module) -> None:
-        super().__init__(EnvironmentModuleTypes.AGENT_EXTERNAL_PROPAGATOR_MODULE, 
+        super().__init__(EnvironmentModuleTypes.AGENT_EXTERNAL_PROPAGATOR_MODULE.value, 
                             parent_module, 
                             submodules=[], 
-                            n_timed_coroutines=1)
+                            n_timed_coroutines=0)
         self.submodules = [
                             EclipseEventModule(self), 
                             GPAccessEventModule(self),
@@ -560,8 +560,8 @@ class EnvironmentServer(Module):
 
         # set up submodules
         self.submodules = [ 
-                            # TicRequestModule(self),
-                            # AgentExternalStatePropagator(self)
+                            TicRequestModule(self),
+                            AgentExternalStatePropagator(self)
                             #ImageServerModule(self)
                           ]
         
@@ -931,14 +931,14 @@ class EnvironmentServer(Module):
 
                 if not isinstance(msg, EnvironmentBroadcastMessage):
                     # if message to be broadcasted is not of any supported format, reject and dump
-                    self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarting task...')
+                    self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarding task...')
                     continue
                 else:
                     if msg.src != self.name:
                         msg.src = self.name
                     
                     if msg.dst == self.name:
-                        self.log(f'Broadcast task of type {msg.get_type()} received! Destination originally set to this environment server. Discarting task...')
+                        self.log(f'Broadcast task of type {msg.get_type()} received! Destination originally set to this environment server. Discarding task...')
                         continue
 
                     self.log(f'Broadcast task of type {msg.get_type()} received! Publishing to all agents...')
@@ -1108,7 +1108,7 @@ class EnvironmentServer(Module):
 
             if NodeToEnvironmentMessageTypes[msg_type] is not NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
-                self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
+                self.log(f'Request of type {msg_type} received at the end of simulation. Discarding request and sending a blank response...', level=logging.INFO)
                 await self.send_blanc_response()
                 continue
             
@@ -1204,14 +1204,14 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 3
+    duration = 20
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
 
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
-    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
-    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME)
+    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME)
     # environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())

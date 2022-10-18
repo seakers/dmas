@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import Union
 import logging
-from agent import AgentClient
+#from agent import AgentClient
 from messages import *
 from utils import *
 from modules import Module
@@ -41,7 +41,7 @@ class ComponentModule(Module):
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
                 f_update: float = 1.0,
-                n_timed_coroutines: int = 2) -> None:
+                n_timed_coroutines: int = 0) -> None:
         """
         Describes a generic component of an agent's platform.
 
@@ -137,7 +137,7 @@ class ComponentModule(Module):
                 self.environment_events.put(msg.content)
 
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
         except asyncio.CancelledError:
             return    
@@ -643,7 +643,7 @@ class ComponentModule(Module):
     async def listen_for_abort(self, task: ComponentTask) -> None:
         """
         Listens for any abort command targetted towards the task being performed.
-        Any aborts targetted to other tasks are ignored but not discarted.
+        Any aborts targetted to other tasks are ignored but not discarded.
         """
         try:
             other_aborts = []
@@ -825,7 +825,7 @@ class SubsystemModule(Module):
                 subsystem_state : type, 
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
-                n_timed_coroutines: int = 2) -> None:
+                n_timed_coroutines: int = 0) -> None:
         """
         Describes a generic subsyem of an agent's platform.
 
@@ -954,7 +954,7 @@ class SubsystemModule(Module):
                 await self.recevied_task_status.put(msg.content)
 
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
         except asyncio.CancelledError:
             return    
@@ -1037,7 +1037,6 @@ class SubsystemModule(Module):
         try:
             while True:
                 # wait for next incoming component state updates
-                self.log(f'In update component state')
                 component_state : ComponentState = await self.component_state_updates.get()
 
                 # update component state list
@@ -1323,7 +1322,7 @@ class SubsystemModule(Module):
     async def listen_for_abort(self, task: Union[PlatformTask, SubsystemTask, ComponentTask]) -> None:
         """
         Listens for any abort command targetted towards the task being performed.
-        Any aborts targetted to other tasks are ignored but not discarted.
+        Any aborts targetted to other tasks are ignored but not discarded.
         """
         try:
             other_aborts = []
@@ -1650,9 +1649,7 @@ class OnboardComputerModule(ComponentModule):
                 raise asyncio.CancelledError
 
             if isinstance(task, SaveToMemoryTask):
-                self.log(f'In save to memory task')
                 #await self.enabled.set() TODO fix this enable setting?
-                self.log(f'In save to memory task')
                 data = task.get_data()
                 lat, lon = task.get_target()
                 data_vol = len(data.encode('utf-8'))
@@ -1672,7 +1669,6 @@ class OnboardComputerModule(ComponentModule):
                         self.memory_stored -= data_vol
                         self.log(f'Data successfully deleted from internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).')
                 else:
-                    self.log(f'In else')
                     if self.memory_stored + data_vol > self.memory_capacity:
                         # insufficient memory storage for incoming data, discarding task.
                         self.log(f'Module does NOT contain enough memory space to store data. Data size: {data_vol}, memory state: ({self.memory_stored}/{self.memory_capacity}).')
@@ -1863,7 +1859,6 @@ class PayloadSubsystem(SubsystemModule):
         """
         Reacts to other subsystem state updates.
         """
-        self.log(f'payload subsystem state update handler')
         if isinstance(subsystem_state, AttitudeDeterminationAndControlState):
             await self.attitude_state.put(subsystem_state)
 
@@ -1873,19 +1868,16 @@ class PayloadSubsystem(SubsystemModule):
         """
         if isinstance(task, PerformMeasurement):
             comp_tasks = []
-            self.log(f'In decompose subsystem task in Payload')
             # ask for latest attitude state
             msg = SubsystemStateRequestMessage(self.name, SubsystemNames.ADCS.value)
             await self.send_internal_message(msg)
 
             attitude_state = await self.attitude_state.get()
-            self.log(f'Past attitude state')
             # instruct each instrument in the observation task to perform the masurement 
             for instrument in task.instruments:
                 i = task.instruments.index(instrument)
                 target_lat, target_lon = task.target
                 comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state) )
-            self.log(f'End of decompose subsystem task in Payload')
             return comp_tasks
         else:
             return await super().decompose_subsystem_task(task)
@@ -2673,7 +2665,7 @@ class TransmitterComponent(ComponentModule):
                         self.log(f'Out-going message of length {t_msg_length} now stored in out-going buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                     else:
                         self.log(f'Rejected out-going transmission into buffer.')
-                        self.log(f'Out-going buffer cannot store out-going message of length {t_msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarting message...')
+                        self.log(f'Out-going buffer cannot store out-going message of length {t_msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarding message...')
 
                     self.state_lock.release()                   
             
@@ -2682,7 +2674,7 @@ class TransmitterComponent(ComponentModule):
                 self.environment_events.put(msg.content)
 
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
         except asyncio.CancelledError:
             return  
@@ -2967,7 +2959,7 @@ class ReceiverComponent(ComponentModule):
                         self.state_lock.release()
 
                     else:
-                        self.log(f'Incoming buffer cannot store incoming message of length {msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarting message...')
+                        self.log(f'Incoming buffer cannot store incoming message of length {msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarding message...')
                     
             else:
                 self.log(f'Task of type {type(task)} not yet supported.')
@@ -3050,7 +3042,7 @@ class PlatformSim(Module):
                     await self.send_internal_message(msg)
                 else:
                     # this module is the intended receiver for this message. Handling message
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
         except asyncio.CancelledError:
             return
@@ -3097,10 +3089,10 @@ class EngineeringModule(Module):
                     await self.send_internal_message(msg)
                 else:
                     # this module is the intended receiver for this message. Handling message
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
                 # # this module is the intended receiver for this message. Handling message
-                # self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                # self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
         except asyncio.CancelledError:
             return
