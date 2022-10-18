@@ -15,9 +15,9 @@ from utils import SimClocks, Container, EnvironmentModuleTypes
 
 from modules import *
 
-# from science import ScienceModule
-# from planning import PlanningModule
-# from engineering import EngineeringModule
+from science import ScienceModule
+from planning import PlanningModule
+from engineering import EngineeringModule
 
 """    
 --------------------------------------------------------
@@ -636,8 +636,7 @@ class ScienceTestAgent(AgentClient):
         self.submodules = [
                             # ScienceModule(self,scenario_dir),
                             # PlanningModule(self,scenario_dir),
-                            # EngineeringModule(self),
-                            #TestModule(self)
+                            EngineeringModule(self)
                           ]
 
 """

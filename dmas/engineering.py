@@ -1,7 +1,8 @@
 from abc import abstractmethod
+from asyncio import CancelledError
 from typing import Union
 import logging
-from agent import AgentClient
+# from agent import AgentClient
 from messages import *
 from utils import *
 from modules import Module
@@ -183,48 +184,56 @@ class ComponentModule(Module):
         # create coroutine tasks
         coroutines = []
 
-        ## Internal coroutines
-        periodic_update = asyncio.create_task(self.periodic_update())
-        periodic_update.set_name (f'{self.name}_periodic_update')
-        coroutines.append(periodic_update)
-       
-        # crit_monitor = asyncio.create_task(self.crit_monitor())
-        # crit_monitor.set_name (f'{self.name}_crit_monitor')
-        # #coroutines.append(crit_monitor)
-
-        # failure_monitor = asyncio.create_task(self.failure_monitor())
-        # failure_monitor.set_name (f'{self.name}_failure_monitor')
-        # #coroutines.append(failure_monitor)
-
-        maintenance_task_processor = asyncio.create_task(self.maintenance_task_processor())
-        maintenance_task_processor.set_name (f'{self.name}_maintenance_task_processor')
-        coroutines.append(maintenance_task_processor)
-
-        task_processor = asyncio.create_task(self.task_processor())
-        task_processor.set_name (f'{self.name}_task_processor')
-        coroutines.append(task_processor)
-
-        environment_event_processor = asyncio.create_task(self.environment_event_processor())
-        environment_event_processor.set_name (f'{self.name}_environment_event_processor')
-        coroutines.append(environment_event_processor)
-
-        # wait for the first coroutine to complete
-        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+        try:
+            ## Internal coroutines
+            periodic_update = asyncio.create_task(self.periodic_update())
+            periodic_update.set_name (f'{self.name}_periodic_update')
+            coroutines.append(periodic_update)
         
-        done_name = None
-        for coroutine in coroutines:
-            if coroutine not in pending:
-                coroutine : asyncio.Task
-                done_name = coroutine.get_name()
-                break
+            # crit_monitor = asyncio.create_task(self.crit_monitor())
+            # crit_monitor.set_name (f'{self.name}_crit_monitor')
+            # #coroutines.append(crit_monitor)
 
-        # cancell all other coroutine tasks
-        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
-        for subroutine in pending:
-            subroutine : asyncio.Task
-            subroutine.cancel()
-            await subroutine
-        return
+            # failure_monitor = asyncio.create_task(self.failure_monitor())
+            # failure_monitor.set_name (f'{self.name}_failure_monitor')
+            # #coroutines.append(failure_monitor)
+
+            maintenance_task_processor = asyncio.create_task(self.maintenance_task_processor())
+            maintenance_task_processor.set_name (f'{self.name}_maintenance_task_processor')
+            coroutines.append(maintenance_task_processor)
+
+            task_processor = asyncio.create_task(self.task_processor())
+            task_processor.set_name (f'{self.name}_task_processor')
+            coroutines.append(task_processor)
+
+            environment_event_processor = asyncio.create_task(self.environment_event_processor())
+            environment_event_processor.set_name (f'{self.name}_environment_event_processor')
+            coroutines.append(environment_event_processor)
+
+            # wait for the first coroutine to complete
+            _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+            
+            done_name = None
+            for coroutine in coroutines:
+                if coroutine not in pending:
+                    coroutine : asyncio.Task
+                    done_name = coroutine.get_name()
+                    break
+
+            # cancell all other coroutine tasks
+            self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+            for subroutine in pending:
+                subroutine : asyncio.Task
+                subroutine.cancel()
+                await subroutine
+            
+        except asyncio.CancelledError:
+            if len(coroutines) > 0:
+                for coroutine in coroutines:
+                    coroutine : asyncio.Task
+                    if not coroutine.done():
+                        coroutine.cancel()
+                        await coroutine
 
     async def periodic_update(self):
         """
@@ -1023,52 +1032,58 @@ class SubsystemModule(Module):
         Subsystem failure leads to no actions being able to be performed by this 
         subsystem. Agent-wide failure is to be handled by the platform simulator.
         """
-
         # create coroutine tasks
         coroutines = []
+        try:
+            # Internal coroutines
+            update_component_state = asyncio.create_task(self.update_component_state())
+            update_component_state.set_name (f'{self.name}_update_component_state')
+            coroutines.append(update_component_state)
 
-        # Internal coroutines
-        update_component_state = asyncio.create_task(self.update_component_state())
-        update_component_state.set_name (f'{self.name}_update_component_state')
-        coroutines.append(update_component_state)
+            update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
+            update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
+            coroutines.append(update_subsytem_state)
 
-        update_subsytem_state = asyncio.create_task(self.update_subsytem_state())
-        update_subsytem_state.set_name (f'{self.name}_update_subsytem_state')
-        coroutines.append(update_subsytem_state)
+            # crit_monitor = asyncio.create_task(self.crit_monitor())
+            # crit_monitor.set_name (f'{self.name}_crit_monitor')
+            #coroutines.append(crit_monitor)
 
-        # crit_monitor = asyncio.create_task(self.crit_monitor())
-        # crit_monitor.set_name (f'{self.name}_crit_monitor')
-        #coroutines.append(crit_monitor)
+            # failure_monitor = asyncio.create_task(self.failure_monitor())
+            # failure_monitor.set_name (f'{self.name}_failure_monitor')
+            # coroutines.append(failure_monitor)
 
-        # failure_monitor = asyncio.create_task(self.failure_monitor())
-        # failure_monitor.set_name (f'{self.name}_failure_monitor')
-        # coroutines.append(failure_monitor)
+            task_processor = asyncio.create_task(self.task_processor())
+            task_processor.set_name (f'{self.name}_task_processor')
+            coroutines.append(task_processor)
 
-        task_processor = asyncio.create_task(self.task_processor())
-        task_processor.set_name (f'{self.name}_task_processor')
-        coroutines.append(task_processor)
+            environment_event_processor = asyncio.create_task(self.environment_event_processor())
+            environment_event_processor.set_name (f'{self.name}_environment_event_processor')
+            coroutines.append(environment_event_processor)
 
-        environment_event_processor = asyncio.create_task(self.environment_event_processor())
-        environment_event_processor.set_name (f'{self.name}_environment_event_processor')
-        coroutines.append(environment_event_processor)
+            # wait for the first coroutine to complete
+            _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+            
+            done_name = None
+            for coroutine in coroutines:
+                if coroutine not in pending:
+                    coroutine : asyncio.Task
+                    done_name = coroutine.get_name()
+                    break
 
-        # wait for the first coroutine to complete
-        _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
-        
-        done_name = None
-        for coroutine in coroutines:
-            if coroutine not in pending:
-                coroutine : asyncio.Task
-                done_name = coroutine.get_name()
-                break
+            # cancell all other coroutine tasks
+            self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+            for subroutine in pending:
+                subroutine : asyncio.Task
+                subroutine.cancel()
+                await subroutine
 
-        # cancell all other coroutine tasks
-        self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
-        for subroutine in pending:
-            subroutine : asyncio.Task
-            subroutine.cancel()
-            await subroutine
-        return
+        except asyncio.CancelledError:
+            if len(coroutines) > 0:
+                for coroutine in coroutines:
+                    coroutine : asyncio.Task
+                    if not coroutine.done():
+                        coroutine.cancel()
+                        await coroutine
 
     async def update_component_state(self) -> None:
         """
@@ -2227,7 +2242,7 @@ class ElectricPowerSubsystem(SubsystemModule):
 
         self.submodules = [
                             # BatteryModule(self, 100, 1000),
-                            PowerSupplyComponent(ComponentNames.POWER_SUPPLY.value, self, EPSComponentState, 100)
+                            # PowerSupplyComponent(ComponentNames.POWER_SUPPLY.value, self, EPSComponentState, 100)
                           ]
 
     def is_subsystem_critical(self) -> bool:
@@ -2258,75 +2273,78 @@ class ElectricPowerSubsystem(SubsystemModule):
         """
         Decomposes a subsystem-level task and returns a list of component-level tasks to be performed by this subsystem.
         """
-        if isinstance(task, PowerSupplyRequestTask):
-            # from all available components, it instructs an available power supply to provide power to a component requesting it
-            
-            # unpackage task 
-            remaining_power_to_supply = task.power_requested
-            power_to_supply = dict()
-
-            # check if power is to be provided or stopped
-            if remaining_power_to_supply > 0:
-                self.log(f'\'{task.target}\' is requesting {task.power_requested} [W] to be provided.')
-
-                # check which components are available to provide power to target
-                for component in self.submodules:
-                    component : PowerSupplyComponent
-                    power_available = component.maximum_power_output - component.power_output
-
-                    if power_available > 0.0:
-                        if remaining_power_to_supply <= power_available:
-                            power_to_supply[component.name] = remaining_power_to_supply
-                            remaining_power_to_supply -= remaining_power_to_supply
-                        else:
-                            power_to_supply[component.name] = power_available
-                            remaining_power_to_supply -= power_available
-                    
-                    if remaining_power_to_supply < 1e-6:
-                        break
+        try:
+            if isinstance(task, PowerSupplyRequestTask):
+                # from all available components, it instructs an available power supply to provide power to a component requesting it
                 
-                if remaining_power_to_supply < 1e-6:
-                    # if enough power can be provided, send tasks to eps components
-                    comp_tasks = []
-                    for eps_component_name in power_to_supply:
-                        self.log(f'Instructing \'{eps_component_name}\' to provide \'{task.target}\' with {power_to_supply[eps_component_name]} [W] of power...')
-                        comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
-                    return comp_tasks
-                else:
-                    # else abort task
-                    self.log(f'{self.name} cannot meet power request of {task.power_requested} [W].')
-                    return []
-            else:
-                self.log(f'\'{task.target}\' is requesting {-task.power_requested} [W] to no longer be provided.')
+                # unpackage task 
+                remaining_power_to_supply = task.power_requested
+                power_to_supply = dict()
 
-                for component in self.submodules:
-                    component : PowerSupplyComponent
-                    
-                    state : EPSComponentState = await self.get_state()
+                # check if power is to be provided or stopped
+                if remaining_power_to_supply > 0:
+                    self.log(f'\'{task.target}\' is requesting {task.power_requested} [W] to be provided.')
 
-                    for component_name in state.components_powered:
-                        if component_name == task.target:
-                            remaining_power_to_supply -= state.components_powered[component_name]
-                            power_to_supply[component_name] = state.components_powered[component_name]
+                    # check which components are available to provide power to target
+                    for component in self.submodules:
+                        component : PowerSupplyComponent
+                        power_available = component.maximum_power_output - component.power_output
 
+                        if power_available > 0.0:
+                            if remaining_power_to_supply <= power_available:
+                                power_to_supply[component.name] = remaining_power_to_supply
+                                remaining_power_to_supply -= remaining_power_to_supply
+                            else:
+                                power_to_supply[component.name] = power_available
+                                remaining_power_to_supply -= power_available
+                        
                         if remaining_power_to_supply < 1e-6:
                             break
-                
-                if remaining_power_to_supply < 1e-6:
-                    # if enough power can be provided, send tasks to eps components
-                    comp_tasks = []
-                    for eps_component_name in power_to_supply:
-                        self.log(f'Instructing \'{eps_component_name}\' to stop providing \'{task.target}\' with {power_to_supply[eps_component_name]}[W] of power...')
-                        comp_tasks.append( StopProvidingPowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
-                    return comp_tasks
+                    
+                    if remaining_power_to_supply < 1e-6:
+                        # if enough power can be provided, send tasks to eps components
+                        comp_tasks = []
+                        for eps_component_name in power_to_supply:
+                            self.log(f'Instructing \'{eps_component_name}\' to provide \'{task.target}\' with {power_to_supply[eps_component_name]} [W] of power...')
+                            comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
+                        return comp_tasks
+                    else:
+                        # else abort task
+                        self.log(f'{self.name} cannot meet power request of {task.power_requested} [W].')
+                        return []
                 else:
-                    # else abort task
-                    self.log(f'{self.name} cannot meet power stop request of {task.power_requested} [W].')
-                    return []
-                pass
+                    self.log(f'\'{task.target}\' is requesting {-task.power_requested} [W] to no longer be provided.')
 
-        else:
-            return await super().decompose_subsystem_task(task)
+                    for component in self.submodules:
+                        component : PowerSupplyComponent
+                        
+                        state : EPSComponentState = await self.get_state()
+
+                        for component_name in state.components_powered:
+                            if component_name == task.target:
+                                remaining_power_to_supply -= state.components_powered[component_name]
+                                power_to_supply[component_name] = state.components_powered[component_name]
+
+                            if remaining_power_to_supply < 1e-6:
+                                break
+                    
+                    if remaining_power_to_supply < 1e-6:
+                        # if enough power can be provided, send tasks to eps components
+                        comp_tasks = []
+                        for eps_component_name in power_to_supply:
+                            self.log(f'Instructing \'{eps_component_name}\' to stop providing \'{task.target}\' with {power_to_supply[eps_component_name]}[W] of power...')
+                            comp_tasks.append( StopProvidingPowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
+                        return comp_tasks
+                    else:
+                        # else abort task
+                        self.log(f'{self.name} cannot meet power stop request of {task.power_requested} [W].')
+                        return []
+
+            else:
+                return await super().decompose_subsystem_task(task)
+        
+        except asyncio.CancelledError:
+            return
 
 class ElectricPowerSubsystemState(SubsystemState):
     def __init__(self, 
@@ -3105,12 +3123,12 @@ class PlatformSim(Module):
         
         # TODO create list of subsystems based on component list given to the platform
         self.submodules = [
-            CommandAndDataHandlingSubsystem(self),
-            GuidanceAndNavigationSubsystem(self),
-            ElectricPowerSubsystem(self),
-            PayloadSubsystem(self),
-            CommsSubsystem(self, 1e6),
-            AttitudeDeterminationAndControlSubsystem(self)
+            # CommandAndDataHandlingSubsystem(self)
+            # GuidanceAndNavigationSubsystem(self),
+            ElectricPowerSubsystem(self)
+            # PayloadSubsystem(self),
+            # CommsSubsystem(self, 1e6),
+            # AttitudeDeterminationAndControlSubsystem(self)
         ]
 
     # TODO include internal state routing that kills the platform sim and the agent if a platform-level failure is detected    
@@ -3188,42 +3206,42 @@ class EngineeringModule(Module):
 DEBUGGING MAIN
 --------------------    
 """
-if __name__ == '__main__':
-    # print('Initializing agent...')
-    class PlanningModule(Module):
-        def __init__(self, parent_module : Module) -> None:
-            super().__init__(AgentModuleTypes.PLANNING_MODULE.value, parent_module)
+# if __name__ == '__main__':
+#     # print('Initializing agent...')
+#     class PlanningModule(Module):
+#         def __init__(self, parent_module : Module) -> None:
+#             super().__init__(AgentModuleTypes.PLANNING_MODULE.value, parent_module)
 
-        # async def coroutines(self):
-        #     """
-        #     Routinely sends out a measurement task to the agent to perform every minute
-        #     """
-        #     try:
-        #         while True:
-        #             task = ObservationTask(0, 0, [InstrumentNames.TEST.value], [1])
-        #             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, task)
-        #             await self.send_internal_message(msg)
+#         # async def coroutines(self):
+#         #     """
+#         #     Routinely sends out a measurement task to the agent to perform every minute
+#         #     """
+#         #     try:
+#         #         while True:
+#         #             task = ObservationTask(0, 0, [InstrumentNames.TEST.value], [1])
+#         #             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, task)
+#         #             await self.send_internal_message(msg)
 
-        #             await self.sim_wait(100)
-        #     except asyncio.CancelledError:
-        #         return
+#         #             await self.sim_wait(100)
+#         #     except asyncio.CancelledError:
+#         #         return
 
-    class ScienceModule(Module):
-        def __init__(self, parent_module : Module) -> None:
-            super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_module)
+#     class ScienceModule(Module):
+#         def __init__(self, parent_module : Module) -> None:
+#             super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_module)
 
-    class TestAgent(AgentClient):    
-        def __init__(self, name, scenario_dir) -> None:
-            super().__init__(name, scenario_dir)
-            self.submodules = [
-                EngineeringModule(self),
-                ScienceModule(self),
-                PlanningModule(self)
-                ]  
+#     class TestAgent(AgentClient):    
+#         def __init__(self, name, scenario_dir) -> None:
+#             super().__init__(name, scenario_dir)
+#             self.submodules = [
+#                 EngineeringModule(self),
+#                 ScienceModule(self),
+#                 PlanningModule(self)
+#                 ]  
 
-    print('Initializing agent...')
+#     print('Initializing agent...')
     
-    agent = TestAgent('Mars1', './scenarios/sim_test')
+#     agent = TestAgent('Mars1', './scenarios/sim_test')
     
-    asyncio.run(agent.live())
+#     asyncio.run(agent.live())
     
