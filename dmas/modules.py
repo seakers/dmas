@@ -79,7 +79,7 @@ class Module:
             for submodule in self.submodules:
                 submodule : Module
                 task = asyncio.create_task(submodule.run())
-                task.set_name (f'{self.name}_run')
+                task.set_name (f'{submodule.name}_run')
                 coroutines.append(task)
 
             # wait for the first coroutine to complete
@@ -103,10 +103,18 @@ class Module:
             self.log('Cancelling all internal tasks...')
             for subroutine in coroutines:
                 subroutine : asyncio.Task
-                self.log(f'Cancelling task \'{subroutine.get_name()}\'...')
+                if 'router' in subroutine.get_name() or 'coroutines' in subroutine.get_name():
+                    self.log(f'Cancelling task \'{subroutine.get_name()}\'...')
+                else:
+                    self.log(f'Cancelling submodule \'{subroutine.get_name()}\'...')
+                
                 subroutine.cancel()
                 await subroutine
-                self.log(f'Successfully cancelled task \'{subroutine.get_name()}\'!')
+
+                if 'router' in subroutine.get_name() or 'coroutines' in subroutine.get_name():
+                    self.log(f'Successfully cancelled task \'{subroutine.get_name()}\'!')
+                else:
+                    self.log(f'Successfully cancelled submodule \'{subroutine.get_name()}\'!')
 
             self.log('Internal tasks successfully cancelled!')
             return
@@ -131,13 +139,14 @@ class Module:
                 
                 src_name = msg.src_module
                 dst_name = msg.dst_module
-                self.log(f'Received internal message from \'{src_name}\' intended for \'{dst_name}\'')
+                self.log(f'Received internal message of type {type(msg)} from \'{src_name}\' intended for \'{dst_name}\'')
 
                 # check destination
                 if dst_name == self.name:
                     # if this module is the intended receiver, handle message
-                    self.log(f'Handling message...')
+                    self.log(f'Handling message of type {type(msg)}...')
                     await self.internal_message_handler(msg)
+                    self.log(f'Message handled!')
                 else:
                     # else, search if any of this module's submodule is the intended destination
                     dst = None
@@ -222,6 +231,7 @@ class Module:
         if not isinstance(msg, InternalMessage):
             raise TypeError('Attepmting to send a message of an unknown type')
 
+        self.log(f'Sending internal message of type {type(msg)} to module \'{msg.dst_module}\'...')
         await self.inbox.put(msg)
 
     async def put_in_inbox(self, msg: InternalMessage):
@@ -305,19 +315,11 @@ class Module:
                 if self.CLOCK_TYPE == SimClocks.REAL_TIME or self.CLOCK_TYPE == SimClocks.REAL_TIME_FAST:
                     
                     async def cancel_me():
-                        #self.log(f'Starting sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
-
                         try:
-                            # Wait for 1 hour
                             await asyncio.sleep(delay / self.SIMULATION_FREQUENCY)
                         except asyncio.CancelledError:
-                            self.log(f'Cancelled sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
+                            self.log(f'Cancelled sleep of delay {delay / self.SIMULATION_FREQUENCY} [s]', module_name=module_name)
                             raise
-                        # finally:
-                        #     #self.log(f'After sleep of delay {delay / self.SIMULATION_FREQUENCY}', module_name=module_name)
-                            
-
-                    # wait_for_clock = asyncio.create_task(asyncio.sleep(delay / self.SIMULATION_FREQUENCY))
 
                     wait_for_clock = asyncio.create_task(cancel_me())
                     await wait_for_clock

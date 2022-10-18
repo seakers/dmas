@@ -515,7 +515,7 @@ class AgentClient(Module):
 
             elif isinstance(msg, AccessSenseMessage): 
                 # submit request
-                self.log(f'Sending Agent Access Message (from {self.name} to {msg.target})...')
+                self.log(f'Sending \'Agent Access\' Message (from {self.name} to {msg.target}) to Environment...')
                 await self.environment_request_lock.acquire()
                 self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
                 await self.environment_request_socket.send_json(msg.to_json())
@@ -536,7 +536,7 @@ class AgentClient(Module):
 
             elif isinstance(msg, AgentSenseMessage):
                 # submit request
-                self.log(f'Sending Agent Info Message...')
+                self.log(f'Sending \'Agent Info Sense\' Message to Environment...')
                 await self.environment_request_lock.acquire()
                 self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
                 await self.environment_request_socket.send_json(msg.to_json())
@@ -557,7 +557,7 @@ class AgentClient(Module):
 
             elif isinstance(msg, ObservationSenseMessage):
                 # submit request
-                self.log(f'Sending Observation Sense Message...')
+                self.log(f'Sending \'Observation Sense\' Message to Environment...')
                 await self.environment_request_lock.acquire()
                 self.log(f'Access to environment request socket confirmed. Sending {msg_type}...')
                 await self.environment_request_socket.send_json(msg.to_json())
