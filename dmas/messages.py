@@ -1516,7 +1516,8 @@ class ComponentTaskCompletionMessage(InternalMessage):
         """
         Internal message informing a module of the status of a component task 
         """
-        super().__init__(src_module, dst_module, (task, status))
+        tupple = (task, status)
+        super().__init__(src_module, dst_module, tupple)
 
     def get_task(self) -> ComponentTask:
         task, _ = self.content
@@ -1527,14 +1528,19 @@ class ComponentTaskCompletionMessage(InternalMessage):
         return status
 
 class ComponentStateMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, state = None) -> None:
+    def __init__(self, src_module: str, dst_module: str, state) -> None:
         """
         Inter module communicating the latest state of a component module
         """
         super().__init__(src_module, dst_module, state)
 
+        if state is None:
+            raise Exception('State of NoneType not supported')
+
+        self.state = state
+
     def get_state(self):
-        return self.content
+        return self.state
 
 """
 SUBSYSTEM TASK MESSAGES
