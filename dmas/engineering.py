@@ -2028,6 +2028,7 @@ class InstrumentComponent(ComponentModule):
         """
         Handles tasks to be performed by this battery component. 
         """
+        acquired = None
         try:
             # check if component was the intended performer of this task
             if task.component != self.name:
