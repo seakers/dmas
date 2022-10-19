@@ -646,8 +646,7 @@ class ScienceTestAgent(AgentClient):
         self.submodules = [
                             ScienceModule(self,scenario_dir),
                             PlanningModule(self,scenario_dir),
-                            EngineeringModule(self),
-                            #TestModule(self)
+                            EngineeringModule(self)
                           ]
 
 """
