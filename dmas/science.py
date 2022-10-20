@@ -377,7 +377,9 @@ class ScienceValueModule(Module):
                 measurement_request = MeasurementRequest("chlorophyll-a", lat, lon, science_value)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
+                ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
                 await self.send_internal_message(req_msg)
+                await self.send_internal_message(ext_msg)
 
         except asyncio.CancelledError:
             return

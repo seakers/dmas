@@ -2780,7 +2780,7 @@ class TransmitterComponent(ComponentModule):
                 elif isinstance(task, TransmitMessageTask):
                     await self.state_lock.acquire()
 
-                    t_msg : NodeToEnvironmentMessage = task.msg
+                    t_msg = task.msg
                     t_msg_str = t_msg.to_json()
                     t_msg_length = len(t_msg_str.encode('utf-8'))
 
@@ -2798,6 +2798,11 @@ class TransmitterComponent(ComponentModule):
             elif isinstance(msg.content, EnvironmentBroadcastMessage):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
+
+            elif isinstance(msg.content, InterNodeMessage):
+                self.log(f'Received an internode message!',level=logging.INFO)
+                task_msg = TransmitMessageTask("wtf",msg,1.0)
+                await self.tasks.put(msg)
 
             else:
                 self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
@@ -3068,8 +3073,9 @@ class ReceiverComponent(ComponentModule):
 
                         # elif msg_type is InterNodeMessageTypes.PLANNER_MESSAGE:
                         #     pass
-                        # elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
-                        #     pass
+                        elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
+                            msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
+                            await self.send_internal_message(AgentModuleTypes.SCIENCE_MODULE.value,msg.content) # send measurement request to science module
                         # elif msg_type is InterNodeMessageTypes.MEASUREMENT_MESSAGE:
                         #     pass
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_REQUEST:
