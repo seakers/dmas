@@ -380,6 +380,7 @@ class ScienceValueModule(Module):
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
                 await self.send_internal_message(req_msg)
                 await self.send_internal_message(ext_msg)
+                self.log(f'Sent message to transmitter!',level=logging.INFO)
 
         except asyncio.CancelledError:
             return

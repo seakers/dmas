@@ -13,7 +13,6 @@ from modules import  Module
 from utils import Container, SimClocks, EnvironmentModuleTypes
 import pandas as pd
 import base64
-from scienceserver import *
 
 """
 --------------------------------------------------------
@@ -760,6 +759,8 @@ class EnvironmentServer(Module):
                     # query agent access database
                     is_accessing: bool = self.orbit_data[agent_access_msg.src].is_accessing_agent(agent_access_msg.target, t_curr)
                     agent_access_msg.set_result(is_accessing)
+                    if(agent_access_msg.src == "Iridium" or agent_access_msg.target == "Iridium"):
+                        agent_access_msg.set_result(True)
                     
                     # change source and destination for response message
                     agent_access_msg.dst = agent_access_msg.src
@@ -1212,7 +1213,7 @@ if __name__ == '__main__':
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
+    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2', 'Mars3', 'Iridium'], duration, clock_type=SimClocks.REAL_TIME)
     
     asyncio.run(environment.live())
     print('DONE')

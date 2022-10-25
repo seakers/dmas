@@ -2765,6 +2765,7 @@ class TransmitterComponent(ComponentModule):
         Processes messages being sent to this component. Only accepts task messages.
         """
         try:
+            self.log(f'Received a message for the transmittercomponent!!!')
             if msg.dst_module != self.name:
                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 self.log(f'Received internal message intended for {msg.dst_module}. Rerouting message...')
@@ -2801,9 +2802,14 @@ class TransmitterComponent(ComponentModule):
 
             elif isinstance(msg.content, InterNodeMessage):
                 self.log(f'Received an internode message!',level=logging.INFO)
-                task_msg = TransmitMessageTask("wtf",msg,1.0)
-                await self.tasks.put(msg)
-
+                task_msg = TransmitMessageTask(AgentModuleTypes.IRIDIUM_ENGINEERING_MODULE,msg,1.0)
+                await self.tasks.put(task_msg)
+            
+            elif isinstance(msg.content, MeasurementRequest):
+                self.log(f'Received a measurement request!',level=logging.INFO)
+                inter_node_msg = MeasurementRequestMessage(self,"Iridium",msg.content)
+                task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
+                await self.tasks.put(task_msg)
             else:
                 self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
@@ -2840,17 +2846,17 @@ class TransmitterComponent(ComponentModule):
 
                 # unpackage message
                 msg : InterNodeMessage = task.msg
-
+                self.log(f'Right before wait_for_access_start in perform_task',level=logging.DEBUG)
                 # wait for access to target node
-                wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
-                await wait_for_access_start
-
+                #wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
+                #await wait_for_access_start
+                self.log(f'Right before create_tasks in perform_task',level=logging.DEBUG)
                 # wait for msg to be transmitted successfully or interrupted due to access end or message timeout
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
-                wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
-                wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
+                #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
+                #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
                 wait_for_message_timeout = asyncio.create_task( self.sim_wait(task.timeout) )
-                processes = [transmit_msg, wait_for_access_end, wait_for_access_end_event, wait_for_message_timeout]
+                processes = [transmit_msg, wait_for_message_timeout] # TODO replace wait_for_access_end
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
                 
@@ -2862,37 +2868,37 @@ class TransmitterComponent(ComponentModule):
 
                 # remove message from out-going buffer
                 await self.remove_msg_from_buffer(msg)
-                self.access_events.pop(msg.dst)
+                #self.access_events.pop(msg.dst)
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!')                    
+                    self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
                     return TaskStatus.DONE
 
-                elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
-                    self.log(f'Access to target \'{msg.dst}\' lost during transmission of message of type {type(msg)}!')
-                    raise asyncio.CancelledError
+                # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
+                #     self.log(f'Access to target \'{msg.dst}\' lost during transmission of message of type {type(msg)}!',level=logging.DEBUG)
+                #     raise asyncio.CancelledError
 
                 else:
-                    self.log(f'Message of type {type(msg)} timed out!')
+                    self.log(f'Message of type {type(msg)} timed out!',level=logging.DEBUG)
                     raise asyncio.CancelledError
 
             else:
-                self.log(f'Task of type {type(task)} not yet supported.')
+                self.log(f'Task of type {type(task)} not yet supported.',level=logging.DEBUG)
                 acquired = None 
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.')
+            self.log(f'Aborting task of type {type(task)}.',level=logging.DEBUG)
 
             # release update lock if cancelled during task handling
             if acquired:
                 self.state_lock.release()
 
             # cancel any task that's not yet completed
-            if not wait_for_access_start.done():
-                wait_for_access_start.cancel()
-                await wait_for_access_start
+            # if not wait_for_access_start.done():
+            #     wait_for_access_start.cancel()
+            #     await wait_for_access_start
 
             for process in processes:
                 if process is not None and isinstance(process, asyncio.Task) and not process.done():
@@ -2902,9 +2908,44 @@ class TransmitterComponent(ComponentModule):
             # return task abort status
             return TaskStatus.ABORTED
 
-    async def remove_msg_from_buffer(self, msg : NodeToEnvironmentMessage):
+    async def transmit_message(self, msg: InterNodeMessage):
         try:
-            self.log(f'Removing message from out-going buffer...')
+            self.log(f'Sending to agent-level message transmitter',level=logging.DEBUG)
+            await self.get_top_module().message_transmitter(msg)
+        except asyncio.CancelledError:
+            self.log(f'transmit_message cancelled!',level=logging.DEBUG)
+
+
+    # async def transmit_message(self, msg: InterNodeMessage):
+    #     # reformat message
+    #     msg.src = self.name
+    #     msg_json = msg.to_json()
+
+    #     # connect socket to destination 
+    #     port = self.AGENT_TO_PORT_MAP[msg.dst]
+    #     self.log(f'Connecting to agent {msg.dst} through port number {port}...')
+    #     self.agent_socket_out.connect(f"tcp://localhost:{port}")
+    #     self.log(f'Connected to agent {msg.dst}!')
+
+    #     # submit request
+    #     self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...')
+    #     await self.agent_socket_out_lock.acquire()
+    #     await self.agent_socket_out.send_json(msg_json)
+    #     self.log(f'{type(msg)} message sent successfully. Awaiting response...')
+        
+    #     # wait for server reply
+    #     await self.agent_socket_out.recv()
+    #     self.agent_socket_out_lock.release()
+    #     self.log(f'Received message reception confirmation!')      
+
+    #     # disconnect socket from destination
+    #     self.log(f'Disconnecting from agent {msg.dst}...')
+    #     self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
+    #     self.log(f'Disconnected from agent {msg.dst}!')
+
+    async def remove_msg_from_buffer(self, msg : InterNodeMessage):
+        try:
+            self.log(f'Removing message from out-going buffer...',level=logging.DEBUG)
             acquired = await self.state_lock.acquire()
 
             msg_str = msg.to_json()
@@ -2913,7 +2954,7 @@ class TransmitterComponent(ComponentModule):
                 self.buffer_allocated -= msg_length
             else:
                 self.buffer_allocated = 0
-            self.log(f'Message sucessfully removed from buffer!')
+            self.log(f'Message sucessfully removed from buffer!',level=logging.DEBUG)
 
             self.state_lock.release()
 
@@ -2923,13 +2964,17 @@ class TransmitterComponent(ComponentModule):
     
     async def wait_for_access_start(self, target : str):
         try:
-            msg = AgentAccessSenseMessage(self.name, target)
+            msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
+            # if response is None:
+            #     raise asyncio.CancelledError
+            if response is None:
+                await self.sim_wait(1e6)
             while not response.result:
                 self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
-
+            self.log(f'Response {response} in wait_for_access_start in perform_task',level=logging.DEBUG)
             if target not in self.access_events:
                 self.access_events[target] = EventPair()        
 
@@ -2939,7 +2984,7 @@ class TransmitterComponent(ComponentModule):
 
     async def wait_for_access_end(self, target : str):
         try:
-            msg = AgentAccessSenseMessage(self.name, target)
+            msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
             while response.result:
@@ -3015,6 +3060,8 @@ class ReceiverComponent(ComponentModule):
         await super().activate()
 
         self.access_events = dict()
+        task = ReceiveMessageTransmission()
+        await self.tasks.put(task)
 
     def is_critical(self) -> bool:
         threshold = 0.05
@@ -3041,15 +3088,19 @@ class ReceiverComponent(ComponentModule):
                 # gain access to incoming agent message port from parent agent
                 parent_agent = self.get_top_module()
 
-                await parent_agent.agent_socket_lock.acquire()
+                await parent_agent.agent_socket_in_lock.acquire()
 
                 while True:
                     msg_dict = None
 
                     # listen for messages from other agents
-                    self.log('Waiting for agent messages...')
-                    msg_dict = await parent_agent.agent_socket_in.recv_json()
-                    self.log(f'Agent message received!')
+                    self.log('Waiting for agent messages...',level=logging.DEBUG)
+                    msg_json = await parent_agent.agent_socket_in.recv_json()
+                    await parent_agent.agent_socket_in.send_json(None)
+                    #await parent_agent.agent_socket_in_lock.release()
+                    msg = InterNodeMessage.from_json(msg_json)
+                    msg_dict = InterNodeMessage.to_dict(msg)
+                    self.log(f'Agent message received!',level=logging.DEBUG)
 
                     # check if message can fit in incoming buffer
                     msg_str = json.dumps(msg_dict)
@@ -3060,6 +3111,7 @@ class ReceiverComponent(ComponentModule):
                         self.buffer_allocated += msg_length
                         self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                         self.state_lock.release()
+                        acquired = None
                 
                         # handle request
                         msg_type : InterNodeMessageTypes = InterNodeMessageTypes[msg_dict['@type']]
@@ -3075,7 +3127,13 @@ class ReceiverComponent(ComponentModule):
                         #     pass
                         elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
                             msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
-                            await self.send_internal_message(AgentModuleTypes.SCIENCE_MODULE.value,msg.content) # send measurement request to science module
+                            msg_contents = json.loads(msg.content)["content"]
+                            msg_contents = json.loads(msg_contents)
+                            self.log(f'Msg contents: {msg_contents}',level=logging.DEBUG)
+                            measurement_request = MeasurementRequest(msg_contents["_type"],msg_contents["_target"][0],msg_contents["_target"][1],msg_contents["_science_val"])
+                            req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
+                            self.log(f'Sending measurement request to science module (hopefully)!',level=logging.DEBUG)
+                            await self.send_internal_message(req_msg) # send measurement request to plannign module
                         # elif msg_type is InterNodeMessageTypes.MEASUREMENT_MESSAGE:
                         #     pass
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_REQUEST:
@@ -3089,16 +3147,18 @@ class ReceiverComponent(ComponentModule):
                         self.buffer_allocated -= msg_length
                         self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                         self.state_lock.release()
+                        acquired = None
 
                     else:
                         self.log(f'Incoming buffer cannot store incoming message of length {msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarding message...')
-                    
+
             else:
                 self.log(f'Task of type {type(task)} not yet supported.')
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.')
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
+            parent_agent.agent_socket_in_lock.release()
 
             # release update lock if cancelled during task handling
             if acquired:

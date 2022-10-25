@@ -173,24 +173,43 @@ class ObservationPlanningModule(Module):
             while True:
                 # wait for observation request 
                 obs = await self.obs_list.get()
-
+                obs_candidates = []
                 # estimate next observation opportunities
                 gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
                 gp_access_list = []
                 for _, row in gp_accesses.iterrows():
                     gp_access_list.append(row)
-                print(gp_accesses)
+                #print(gp_accesses)
                 if(len(gp_accesses) != 0):
                     obs.start = gp_access_list[0]['time index']
                     obs.end = obs.start + 5
-                    self.obs_plan.append(obs)
-
+                    obs_candidates.append(obs)
+                self.obs_plan = self.rule_based_planner(obs_candidates)
                 # schedule observation plan and send to operations planner for further development
                 plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
                 await self.parent_module.send_internal_message(plan_msg)
 
         except asyncio.CancelledError:
             return
+
+    def rule_based_planner(self,obs_list):
+        rule_based_plan = []
+        estimated_reward = 100000.0
+        while len(obs_list) > 0:
+            best_obs = None
+            maximum = 0.0
+            for obs in obs_list:
+                rho = (86400.0 - obs.end)/86400.0
+                e = pow(rho,0.99) * estimated_reward
+                adjusted_reward = obs.science_val + e
+                if(adjusted_reward > maximum):
+                    maximum = adjusted_reward
+                    best_obs = obs
+            rule_based_plan.append(best_obs)
+            obs_list.remove(best_obs)
+        return rule_based_plan
+
+            
 
 class OperationsPlanningModule(Module):
     def __init__(self, parent_module) -> None:

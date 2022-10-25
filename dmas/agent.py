@@ -19,6 +19,14 @@ from modules import *
 from science import ScienceModule
 from planning import PlanningModule
 from engineering import EngineeringModule
+from iridium_engineering import IridiumEngineeringModule
+from json import JSONEncoder
+
+def _default(self, obj):
+    return getattr(obj.__class__, "to_json", _default.default)(obj)
+
+_default.default = JSONEncoder().default
+JSONEncoder.default = _default
 
 """    
 --------------------------------------------------------
@@ -122,21 +130,21 @@ class AgentClient(Module):
         self.log(f"Shutting down agent...", level=logging.INFO)
         end_msg = AgentEndConfirmationMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value)
 
-        self.log('Awaiting access to environment request socket...')
+        self.log('Awaiting access to environment request socket...', level=logging.INFO)
         await self.environment_request_lock.acquire()
-        self.log('Access to environment request socket obtained! Sending agent termination confirmation...')
+        self.log('Access to environment request socket obtained! Sending agent termination confirmation...', level=logging.INFO)
         await self.environment_request_socket.send_json(end_msg.to_json())
 
         self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
-        self.log('Agent termination aknowledgement sent. Awaiting environment response...')
+        self.log('Agent termination aknowledgement sent. Awaiting environment response...', level=logging.INFO)
 
         # wait for server reply
         await self.environment_request_socket.recv() 
         self.environment_request_lock.release()
         self.env_request_logger.info('Response received! terminating agent.')
-        self.log('Response received! terminating agent.')
+        self.log('Response received! terminating agent.', level=logging.INFO)
 
-        self.log(f"Closing all network sockets...")
+        self.log(f"Closing all network sockets...", level=logging.INFO)
         self.agent_socket_in.close()
         self.context.destroy()
         self.log(f"Network sockets closed.", level=logging.INFO)
@@ -463,8 +471,8 @@ class AgentClient(Module):
         set root logger to default settings
         """
 
-        logging.root.setLevel(logging.INFO)
-        logging.basicConfig(level=logging.INFO)
+        logging.root.setLevel(logging.DEBUG)
+        logging.basicConfig(level=logging.DEBUG)
         
         logger_names = ['agent_messages', 'env_requests', 'measurements', 'state', 'actions']
 
@@ -593,31 +601,32 @@ class AgentClient(Module):
             pass
 
     async def message_transmitter(self, msg: InterNodeMessage):
+        self.log(f'In message transmitter',level=logging.DEBUG)
         # reformat message
         msg.src = self.name
         msg_json = msg.to_json()
 
         # connect socket to destination 
         port = self.AGENT_TO_PORT_MAP[msg.dst]
-        self.log(f'Connecting to agent {msg.dst} through port number {port}...')
+        self.log(f'Connecting to agent {msg.dst} through port number {port}...',level=logging.DEBUG)
         self.agent_socket_out.connect(f"tcp://localhost:{port}")
-        self.log(f'Connected to agent {msg.dst}!')
+        self.log(f'Connected to agent {msg.dst}!',level=logging.DEBUG)
 
         # submit request
-        self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...')
+        self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.INFO)
         await self.agent_socket_out_lock.acquire()
         await self.agent_socket_out.send_json(msg_json)
-        self.log(f'{type(msg)} message sent successfully. Awaiting response...')
+        self.log(f'{type(msg)} message sent successfully. Awaiting response...',level=logging.DEBUG)
         
         # wait for server reply
         await self.agent_socket_out.recv()
         self.agent_socket_out_lock.release()
-        self.log(f'Received message reception confirmation!')      
+        self.log(f'Received message reception confirmation!',level=logging.DEBUG)      
 
         # disconnect socket from destination
-        self.log(f'Disconnecting from agent {msg.dst}...')
+        self.log(f'Disconnecting from agent {msg.dst}...',level=logging.DEBUG)
         self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
-        self.log(f'Disconnected from agent {msg.dst}!')
+        self.log(f'Disconnected from agent {msg.dst}!',level=logging.DEBUG)
 
     async def send_blanc_response(self):
         blanc = dict()
@@ -649,13 +658,11 @@ class ScienceTestAgent(AgentClient):
                             EngineeringModule(self)
                           ]
 
-class CommsTestAgent(AgentClient):
+class IridiumTestAgent(AgentClient):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
         self.submodules = [
-                            ScienceModule(self,scenario_dir),
-                            PlanningModule(self,scenario_dir),
-                            EngineeringModule(self)
+                            IridiumEngineeringModule(self)
                           ]
 
 """

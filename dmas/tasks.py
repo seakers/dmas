@@ -9,6 +9,7 @@ MODULE TASKS
 COMPONENT TASKS
 -------------------------------
 """
+import json
 from utils import *
 
 
@@ -441,6 +442,9 @@ class MeasurementRequest(Request):
 
     def get_science_val(self):
         return self._science_val
+    
+    def to_json(self):
+        return json.dumps(self, default=lambda o:o.__dict__, sort_keys=True, indent=4)
 
 class InformationRequest(Request):
     def __init__(self, data_type : type, target_lat : float, target_lon: float) -> None:

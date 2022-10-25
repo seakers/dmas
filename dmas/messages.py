@@ -78,7 +78,9 @@ class InterNodeMessage(SimulationMessage):
         self.content = content
 
     def to_dict(self) -> dict:
-        return super().to_dict()
+        d = super().to_dict()
+        d['content'] = self.content
+        return d
 
     def from_dict(d : dict):
         """
@@ -87,6 +89,7 @@ class InterNodeMessage(SimulationMessage):
         src = d.get('src', None)
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
+        content = d.get('content', None)
 
         if src is None or dst is None or type_name is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
@@ -99,7 +102,7 @@ class InterNodeMessage(SimulationMessage):
         if _type is None:
             raise Exception(f'Could not recognize message of type {type_name}.')
 
-        return InterNodeMessage(src, dst, _type)
+        return InterNodeMessage(src, dst, _type, content)
 
     def to_json(self):
         """
@@ -151,6 +154,45 @@ class PrintMessage(InterNodeMessage):
         Creates an instance of a message class object from a json object 
         """
         return PrintMessage.from_dict(json.loads(j))
+
+class MeasurementRequestMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, content : str) -> None:
+        super().__init__(src, dst, InterNodeMessageTypes.MEASUREMENT_REQUEST, content)
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        d['content'] = self.content
+        return d
+
+    def from_dict(d : dict):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        content = d.get('content', None)
+
+        if src is None or dst is None or type_name is None or content is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not InterNodeMessageTypes.MEASUREMENT_REQUEST:
+            raise Exception(f'Cannot load a measurement request Message from a dictionary of type {type_name}.')
+
+        return MeasurementRequestMessage(src, dst, _type, content)
+    
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return MeasurementRequestMessage.from_dict(json.loads(j))
 
 class NodeToEnvironmentMessageTypes(Enum):
     """
