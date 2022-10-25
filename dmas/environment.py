@@ -9,7 +9,7 @@ from utils import EnvironmentModuleTypes
 from orbitdata import OrbitData
 
 from messages import *
-from modules import  Module
+from modules import  *
 from utils import Container, SimClocks, EnvironmentModuleTypes
 import pandas as pd
 import base64
@@ -478,7 +478,7 @@ class AgentExternalStatePropagator(Module):
     Module in charge of propagating the external state of the agents present in this simulated scenario
     """
     def __init__(self, parent_module) -> None:
-        super().__init__(EnvironmentModuleTypes.AGENT_EXTERNAL_PROPAGATOR_MODULE, 
+        super().__init__(EnvironmentModuleTypes.AGENT_EXTERNAL_PROPAGATOR_MODULE.value, 
                             parent_module, 
                             submodules=[], 
                             n_timed_coroutines=1)
@@ -519,7 +519,7 @@ def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
-class EnvironmentServer(Module):
+class EnvironmentServer(NodeModule):
     """
     Server encompasing all environment processes. Main module regulates simulation start and end as well as managing network ledgers for all agents to communicate with eachother.
     Submodules manage the environment clock and the scenario simulation. The latter concerns propagating the state of the environment as a function of time as well as propagating
@@ -527,7 +527,9 @@ class EnvironmentServer(Module):
     """
 
     def __init__(self, scenario_dir, agent_name_list: list, duration, clock_type: SimClocks = SimClocks.REAL_TIME, simulation_frequency: float = -1) -> None:
-        super().__init__(EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, n_timed_coroutines=1)
+        # super().__init__(EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, n_timed_coroutines=1)
+        super().__init__(EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, scenario_dir, n_timed_coroutines=1)
+
         # Constants
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
@@ -556,20 +558,20 @@ class EnvironmentServer(Module):
             raise Exception('Simulation frequency needed to initiate simulation with a REAL_TIME_FAST clock.')
 
         # propagate orbit and coverage information
-        self.orbit_data: dict = OrbitData.from_directory(scenario_dir)
+        self.orbit_data : dict = OrbitData.from_directory(scenario_dir)
 
         # set up submodules
         self.submodules = [ 
-                            # TicRequestModule(self),
-                            # AgentExternalStatePropagator(self)
-                            #ImageServerModule(self)
+                            TicRequestModule(self),
+                            AgentExternalStatePropagator(self),
+                            # ImageServerModule(self)
                           ]
         
-        # set up results dir
-        self.SCENARIO_RESULTS_DIR, self.ENVIRONMENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
+        # # set up results dir
+        # self.SCENARIO_RESULTS_DIR, self.ENVIRONMENT_RESULTS_DIR = self.EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value(scenario_dir)
 
-        # set up loggers
-        [self.message_logger, self.request_logger, self.state_logger, self.actions_logger] = self.set_up_loggers()
+        # # set up loggers
+        # [self.message_logger, self.request_logger, self.state_logger, self.actions_logger] = self.set_up_loggers()
 
         print('Environment Initialized!')
 
@@ -1090,14 +1092,14 @@ class EnvironmentServer(Module):
         t_end = time.perf_counter() - self.START_TIME
         kill_msg = SimulationEndBroadcastMessage(self.name, t_end)
         
-        self.message_logger.debug(f'Broadcasting simulation end at t={t_end}[s]')
+        # self.message_logger.debug(f'Broadcasting simulation end at t={t_end}[s]')
         self.log(f'Broadcasting simulation end at t={t_end}[s]')
         
         # await self.publisher.send_json(kill_msg)
         await self.publisher.send_json(kill_msg.to_json())
         
         # wait for all agents to send their confirmation
-        self.request_logger.info(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...')
+        # self.request_logger.info(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...')
         self.log(f'Waiting for simulation end confirmation from {len(self.AGENT_NAME_LIST)} agents...', level=logging.INFO)
         
         while len(self.offline_subscribers) < self.NUMBER_AGENTS:
@@ -1114,7 +1116,7 @@ class EnvironmentServer(Module):
             
             confirmation_msg = AgentEndConfirmationMessage.from_dict(msg_dict)
 
-            self.request_logger.info(f'Received simulation end confirmation from {confirmation_msg.src}!')
+            # self.request_logger.info(f'Received simulation end confirmation from {confirmation_msg.src}!')
             self.log(f'Received simulation end confirmation from {confirmation_msg.src}!', level=logging.INFO)
             
             # log subscriber confirmation
@@ -1147,41 +1149,41 @@ class EnvironmentServer(Module):
         return scenario_results_path, enviroment_results_path
 
 
-    def set_up_loggers(self):
-        # set root logger to default settings
-        logging.root.setLevel(logging.NOTSET)
-        logging.basicConfig(level=logging.NOTSET)
+    # def set_up_loggers(self):
+    #     # set root logger to default settings
+    #     logging.root.setLevel(logging.NOTSET)
+    #     logging.basicConfig(level=logging.NOTSET)
 
-        logger_names = ['messages', 'requests', 'state', 'actions']
+    #     logger_names = ['messages', 'requests', 'state', 'actions']
 
-        loggers = []
-        for logger_name in logger_names:
-            path = self.ENVIRONMENT_RESULTS_DIR + f'/{logger_name}.log'
+    #     loggers = []
+    #     for logger_name in logger_names:
+    #         path = self.ENVIRONMENT_RESULTS_DIR + f'/{logger_name}.log'
 
-            if os.path.isdir(path):
-                # if file already exists, delete
-                os.remove(path)
+    #         if os.path.isdir(path):
+    #             # if file already exists, delete
+    #             os.remove(path)
 
-            # create logger
-            logger = logging.getLogger(f'{self.name}_{logger_name}')
-            logger.propagate = False
+    #         # create logger
+    #         logger = logging.getLogger(f'{self.name}_{logger_name}')
+    #         logger.propagate = False
 
-            # create handlers
-            c_handler = logging.StreamHandler()
-            if logger_name == 'actions':
-                c_handler.setLevel(logging.DEBUG)
-            else:
-                c_handler.setLevel(logging.WARNING)
+    #         # create handlers
+    #         c_handler = logging.StreamHandler()
+    #         if logger_name == 'actions':
+    #             c_handler.setLevel(logging.DEBUG)
+    #         else:
+    #             c_handler.setLevel(logging.WARNING)
 
-            f_handler = logging.FileHandler(path)
-            f_handler.setLevel(logging.DEBUG)
+    #         f_handler = logging.FileHandler(path)
+    #         f_handler.setLevel(logging.DEBUG)
 
-            # add handlers to logger
-            logger.addHandler(c_handler)
-            logger.addHandler(f_handler)
+    #         # add handlers to logger
+    #         logger.addHandler(c_handler)
+    #         logger.addHandler(f_handler)
 
-            loggers.append(logger)
-        return loggers
+    #         loggers.append(logger)
+    #     return loggers
 
     async def environment_message_submitter(self, msg, module_name):
         """

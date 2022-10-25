@@ -34,6 +34,13 @@ class EventPair:
         except asyncio.CancelledError:
             return
 
+class LoggerTypes(Enum):
+    DEBUG = 'DEBUG'
+    ACTIONS = 'ACTIONS'
+    ENV_MESSAGE = 'ENV_MESSAGE'
+    AGENT_MESSAGE = 'AGENT_MESSAGE'
+    INTERNAL_MESSAGE = 'INTERNAL_MESSAGE'
+
 class EngineeringModuleParts(Enum):
     PLATFORM_SIMULATION = 'PLATFORM_SIMULATION'
 
@@ -268,6 +275,13 @@ async def main():
     print(f'Initial container level: {container.level}')
     await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
     print(f'Final container level: {container.level}')
+
+class SequenceDiagram:
+    def __init__(self) -> None:
+        pass
+
+    def from_dir(self, dir):
+        pass
 
 if __name__ == '__main__':
     asyncio.run(main())
