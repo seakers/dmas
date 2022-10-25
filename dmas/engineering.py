@@ -2879,6 +2879,7 @@ class TransmitterComponent(ComponentModule):
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
                     self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!')                    
+                    self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
                     return TaskStatus.DONE
 
                 elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
@@ -3094,12 +3095,16 @@ class ReceiverComponent(ComponentModule):
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_MESSAGE:
                         #     pass
                         else:
+                            msg = None
                             self.log(content=f'Internode message of type {msg_type.name} not yet supported. Discarding message...')
 
                         acquired = await self.state_lock.acquire()
                         self.buffer_allocated -= msg_length
                         self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                         self.state_lock.release()
+
+                        if msg is not None:
+                            self.log(f'RECEIVED, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
 
                     else:
                         self.log(f'Incoming buffer cannot store incoming message of length {msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarting message...')
