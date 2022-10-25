@@ -1650,6 +1650,9 @@ class ComponentState:
     def from_component(component : ComponentModule):
         pass
 
+    def __str__(self) -> str:
+        return f'ComponentState, {self.component_name}, {self.power_consumed}, {self.power_supplied}, {self.health.name}, {self.status.name}'
+
 class SubsystemState:
     def __init__(self, name: str, subsystem_type : type, component_states : dict, health : SubsystemHealth, status : SubsystemStatus):
         """
@@ -2728,6 +2731,14 @@ class CommsSubsystem(SubsystemModule):
                             TransmitterComponent(self, 1, buffer_size),
                             ReceiverComponent(self, 1, buffer_size)
                             ]
+
+    async def activate(self):
+        await super().activate()
+
+        # instruct receiver to listen for transmissions
+        task = ReceiveMessageTransmission()
+        msg = ComponentTaskMessage(self.name, ComponentNames.RECEIVER.value, task)
+        await self.send_internal_message(msg)
 
 class CommsSubsystemState(SubsystemState):
     def __init__(self, component_states: dict, health: SubsystemHealth, status: SubsystemStatus):

@@ -740,6 +740,7 @@ class EnvironmentServer(NodeModule):
                 if NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.TIC_REQUEST:
                     # load tic request
                     request = TicRequestMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(request)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
 
                     # send reception confirmation to agent
                     await self.send_blanc_response()
@@ -752,9 +753,12 @@ class EnvironmentServer(NodeModule):
                     tic_req = InternalMessage(self.name, EnvironmentModuleTypes.TIC_REQUEST_MODULE.value, request)
                     await self.send_internal_message(tic_req)
 
+                    resp_msg = None
+
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_ACCESS_SENSE:
                     # unpackage message
                     agent_access_msg = AgentAccessSenseMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(agent_access_msg)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
                     
                     t_curr = self.get_current_time()
                     self.log(f'Received agent access sense message from {agent_access_msg.src} to {agent_access_msg.target} at simulation time t={t_curr}!')
@@ -771,9 +775,12 @@ class EnvironmentServer(NodeModule):
                     await self.reqservice.send_json(agent_access_msg.to_json())
                     self.log(f'Aagent access from {agent_access_msg.src} to {agent_access_msg.target} at simulation time t={t_curr}: {is_accessing}')
 
+                    resp_msg = agent_access_msg
+
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE:
                     # unpackage message
                     gs_access_msg = GndStnAccessSenseMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(gs_access_msg)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
 
                     t_curr = self.get_current_time()
                     self.log(f'Received ground station access sense message from {gs_access_msg.src} to {gs_access_msg.target} at simulation time t={t_curr}!')
@@ -788,10 +795,13 @@ class EnvironmentServer(NodeModule):
                     
                     # send response to agent
                     await self.reqservice.send_json(gs_access_msg.to_json())
+                    
+                    resp_msg = gs_access_msg
 
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.GP_ACCESS_SENSE:
                     # unpackage message
                     gp_access_msg = GndPntAccessSenseMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(gp_access_msg)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
 
                     lat, lon = gp_access_msg.target
                     t_curr = self.get_current_time()
@@ -810,9 +820,12 @@ class EnvironmentServer(NodeModule):
                     # send response to agent
                     await self.reqservice.send_json(gp_access_msg.to_json())
 
+                    resp_msg = gp_access_msg
+
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_INFO_SENSE:
                     # unpackage message
                     agent_sense_msg = AgentSenseMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(agent_sense_msg)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
 
                     t_curr = self.get_current_time()
                     self.log(f'Received agent information sense message from {agent_sense_msg.src} at simulation time t={t_curr}!')
@@ -828,10 +841,13 @@ class EnvironmentServer(NodeModule):
                     # send response to agent
                     await self.reqservice.send_json(agent_sense_msg.to_json())
 
+                    resp_msg = agent_sense_msg
+
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
                     # register that agent node has gone offline mid-simulation
                     # (this agent node won't be considered when broadcasting simulation end)
                     agent_end_conf_msg = AgentEndConfirmationMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(agent_end_conf_msg)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
                     
                     if agent_end_conf_msg.src not in self.offline_subscribers:
                         self.offline_subscribers.append(agent_end_conf_msg.src)
@@ -839,9 +855,12 @@ class EnvironmentServer(NodeModule):
                     # send blank response to agent
                     await self.send_blanc_response()
 
+                    resp_msg = None
+
                 elif NodeToEnvironmentMessageTypes[msg_type] is NodeToEnvironmentMessageTypes.OBSERVATION_SENSE:
                     # unpackage message
-                    observation_sense_msg = ObservationSenseMessage.from_dict(d)
+                    observation_sense_msg : ObservationSenseMessage = ObservationSenseMessage.from_dict(d)
+                    self.log(F'RECEIVED, {str(observation_sense_msg)}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
 
                     lat = observation_sense_msg.lat
                     lon = observation_sense_msg.lon
@@ -862,16 +881,23 @@ class EnvironmentServer(NodeModule):
                     # img_req = ImgRequestMessage(self.name, EnvironmentModuleTypes.IMAGE_SERVER_MODULE.value, observation_sense_msg)
                     # await self.send_internal_message(img_req)
 
+                    resp_msg = observation_sense_msg
+
                 else:
                     # if message type is not supported, dump and ignore message
+                    self.log(F'RECEIVED, UNKNOWN, UNKNOWN, {self.name}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
+
+                    msg_type : NodeToEnvironmentMessageTypes
                     self.log(f'Message of type {msg_type.value} not yet supported. Ignoring message...')
-                    await self.send_blanc_response()
+                    await self.send_blanc_response(dst=d.get('src', 'N/A'))
                     return
+
+                if resp_msg is not None:
+                    self.log(F'SENT, {str(resp_msg)}', logger_type=LoggerTypes.ENV_TO_AGENT_MESSAGE, level=logging.INFO)
 
             except asyncio.CancelledError:
                 self.log('Node message handling cancelled. Sending blank response...')
-                await self.send_blanc_response()
-
+                await self.send_blanc_response(d.get('src', 'N/A'))
         
         try:            
             self.log('Acquiring access to request service port...')
@@ -897,7 +923,7 @@ class EnvironmentServer(NodeModule):
         except asyncio.CancelledError:
             if msg_str is not None:
                 self.log('Sending blank response...')
-                await self.send_blanc_response()
+                await self.send_blanc_response(msg_dict.get('src', 'N/A'))
             elif worker_task is not None:
                 self.log('Cancelling response...')
                 worker_task : asyncio.Task
@@ -911,7 +937,7 @@ class EnvironmentServer(NodeModule):
                 evnt = await poller.poll(1000)
                 if len(evnt) > 0:
                     self.log('Agent message received during shutdown process. Sending blank response..')
-                    await self.send_blanc_response()
+                    await self.send_blanc_response(msg_dict.get('src', 'N/A'))
 
             self.log('Releasing request service port...')
             self.reqservice_lock.release()
@@ -1191,10 +1217,11 @@ class EnvironmentServer(NodeModule):
         """        
         await self.send_internal_message(InternalMessage(module_name, self.name, msg))
 
-    async def send_blanc_response(self):
+    async def send_blanc_response(self, dst : str = 'N/A'):
         blanc = dict()
         blanc_json = json.dumps(blanc)
         await self.reqservice.send_json(blanc_json)
+        self.log(f'SENT, BLANK_RESPONSE, {self.name}, {dst}', logger_type=LoggerTypes.ENV_TO_AGENT_MESSAGE, level=logging.INFO)
         
 """
 --------------------

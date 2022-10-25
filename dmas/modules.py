@@ -145,6 +145,8 @@ class Module:
                 # check destination
                 if dst_name == self.name:
                     # if this module is the intended receiver, handle message
+                    self.log(f'{str(msg)}', logger_type=LoggerTypes.INTERNAL_MESSAGE, level=logging.INFO)
+
                     self.log(f'Handling message of type {type(msg)}...')
                     await self.internal_message_handler(msg)
                     self.log(f'Message handled!')
@@ -436,16 +438,29 @@ class Module:
 
         return top
 
-    def log(self, content, module_name=None, logger_type = LoggerTypes.DEBUG, level : logging = logging.DEBUG):
+    def log(self, content : str, module_name : str = None, logger_type : LoggerTypes = LoggerTypes.DEBUG, level : logging = logging.DEBUG):
+        """
+        Logs a message to a specific logger defined by the user. 
+        All loggers are defined at the `setup_loggers()` method. 
+        Each logger has a file on which the content is written into. 
+        Only the logger of type `LoggerTypes.DEBUG` has a stream handler that prints the content to the terminal.
+
+        content:
+            String containing text to be logged
+        module_name:
+            Name of the module to log the message. By default, the function will detect which module is pefroming
+            the log and create a trasable path of said module. Can be overritten by the user if desired.
+        logger_type:
+            Type of logger to be used to write the content into. Must be of type LoggerTypes. 
+            By default all messages are logged into the `LoggerTypes.DEBUG` logger and onto the terminal
+        level:
+            Logger level (see logging.Logger python documentation for more information) 
+        """
         if module_name is None:
             module_name = self.name
 
         if self.parent_module is None:
-            if self.name == module_name:
-                out = f'{module_name} @ T{self.get_current_time():.{3}f}: {content}'
-            else:
-                out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
-
+            out = self.format_content(content, module_name, logger_type)
             logger : logging.Logger = self.get_logger(logger_type)
 
             if level is logging.DEBUG:
@@ -459,12 +474,21 @@ class Module:
             elif level is logging.CRITICAL:
                 logger.critical(out)
         else:
-            print(self.name)
-            print(module_name)
             if self.name not in module_name:
                 module_name = self.name + '/' + module_name
 
             self.parent_module.log(content, module_name, logger_type, level)
+
+    def format_content(self, content : str, module_name : str, logger_type : LoggerTypes) -> str:
+        if logger_type is LoggerTypes.DEBUG:
+            if self.name == module_name:
+                out = f'{self.name} @ T{self.get_current_time():.{3}f}: {content}'
+            else:
+                out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
+        else:
+            out = f'{self.name}, {module_name}, {self.get_current_time():.{3}f}, {content}'
+
+        return out
 
     def get_logger(self, logger_type : LoggerTypes) -> logging.Logger:
         if self.parent_module is None:
@@ -547,9 +571,6 @@ class NodeModule(Module):
             logger.addHandler(f_handler)
 
             loggers[logger_type] = logger
-
-        print("Number of loggers:" + str(len(loggers)))
-        print(loggers)
 
         logging.getLogger('neo4j').setLevel(logging.WARNING)
         return loggers

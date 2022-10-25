@@ -437,8 +437,8 @@ class AgentClient(NodeModule):
                 await self.environment_request_socket.recv()  
                 self.environment_request_lock.release()
                 #self.log('Tic request reception confirmation received.')         
-
-                return
+                                
+                resp = None
 
             elif isinstance(msg, AccessSenseMessage): 
                 # submit request
@@ -458,8 +458,8 @@ class AgentClient(NodeModule):
                     
                 resp = AccessSenseMessage.from_json(resp_json)
                 self.log(f'Received Request Response: \'{resp.result}\'')        
-                
-                return resp
+            
+                # return resp
 
             elif isinstance(msg, AgentSenseMessage):
                 # submit request
@@ -480,7 +480,7 @@ class AgentClient(NodeModule):
                 resp = AgentSenseMessage.from_json(resp_json)
                 self.log(f'Received Response: \'{[resp.pos, resp.vel, resp.eclipse]}\'')        
                 
-                return resp
+                # return resp
 
             elif isinstance(msg, ObservationSenseMessage):
                 # submit request
@@ -501,13 +501,18 @@ class AgentClient(NodeModule):
                 resp = ObservationSenseMessage.from_json(resp_json)
                 self.log(f'Received Observation Sense Message')        
                 
-                return resp
+                # return resp
 
             else:
                 raise Exception(f'Request of type {msg_type} not supported by request submitter.')
 
+            self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
+            if resp is not None:
+                self.log(f'RECEIVED, {resp}', logger_type=LoggerTypes.ENV_TO_AGENT_MESSAGE, level=logging.INFO)
+                return resp
+
         except asyncio.CancelledError:
-            pass
+            return
 
     async def message_transmitter(self, msg: InterNodeMessage):
         # reformat message
