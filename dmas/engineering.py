@@ -2854,17 +2854,18 @@ class TransmitterComponent(ComponentModule):
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
                 #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
                 #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
-                wait_for_message_timeout = asyncio.create_task( self.sim_wait(task.timeout) )
-                processes = [transmit_msg, wait_for_message_timeout] # TODO add waits back: wait_for_access_start, wait_for_access_end, wait_for_access_end_event, 
+                #wait_for_message_timeout = asyncio.create_task( self.sim_wait(1.0) )
+                processes = [transmit_msg] # TODO add waits back: wait_for_access_start, wait_for_access_end, wait_for_access_end_event, wait_for_message_timeout
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
                 
                 # cancel all pending processes
                 for pending_task in pending:
+                    self.log(f'Cancelling pending processes!',level=logging.DEBUG)
                     pending_task : asyncio.Task
                     pending_task.cancel()
                     await pending_task
-
+                self.log(f'Cancelled pending processes!',level=logging.DEBUG)
                 # remove message from out-going buffer
                 # await self.remove_msg_from_buffer(msg)
                 # self.access_events.pop(msg.dst)
@@ -2909,10 +2910,38 @@ class TransmitterComponent(ComponentModule):
 
     async def transmit_message(self, msg: InterNodeMessage):
         try:
-            self.log(f'Sending to agent-level message transmitter',level=logging.DEBUG)
-            await self.get_top_module().message_transmitter(msg)
+            self.log(f'In transmit_message',level=logging.DEBUG)
+            # reformat message
+            msg.src = self.name
+            msg_json = msg.to_json()
+            parent_agent = self.get_top_module()
+            # connect socket to destination 
+            port = parent_agent.AGENT_TO_PORT_MAP[msg.dst]
+            self.log(f'Connecting to agent {msg.dst} through port number {port}...',level=logging.DEBUG)
+            parent_agent.agent_socket_out.connect(f"tcp://localhost:{port}")
+            self.log(f'Connected to agent {msg.dst}!',level=logging.DEBUG)
+
+            # submit request
+            self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.INFO)
+            await parent_agent.agent_socket_out_lock.acquire()
+            self.log(f'Acquired lock.',level=logging.DEBUG)
+            await parent_agent.agent_socket_out.send_json(msg_json)
+            self.log(f'{type(msg)} message sent successfully. Awaiting response...',level=logging.DEBUG)
+                        
+            # wait for server reply
+            await parent_agent.agent_socket_out.recv_json()
+            parent_agent.agent_socket_out_lock.release()
+            self.log(f'Received message reception confirmation!',level=logging.DEBUG)      
+
+            # disconnect socket from destination
+            self.log(f'Disconnecting from agent {msg.dst}...',level=logging.DEBUG)
+            parent_agent.agent_socket_out.disconnect(f"tcp://localhost:{port}")
+            self.log(f'Disconnected from agent {msg.dst}!',level=logging.DEBUG)
         except asyncio.CancelledError:
-            self.log(f'transmit_message cancelled!',level=logging.DEBUG)
+            self.log(f'asyncio CancelledError in transmit_message',level=logging.DEBUG)
+            parent_agent.agent_socket_out_lock.release()
+            self.log(f'Released agent_socket_out lock.',level=logging.DEBUG)
+            return
 
 
     # async def transmit_message(self, msg: InterNodeMessage):
@@ -3163,7 +3192,7 @@ class ReceiverComponent(ComponentModule):
         except asyncio.CancelledError:
             self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
             parent_agent.agent_socket_in_lock.release()
-
+            self.log(f'Released agent_socket_in lock.',level=logging.DEBUG)
             # release update lock if cancelled during task handling
             if acquired:
                 self.state_lock.release()

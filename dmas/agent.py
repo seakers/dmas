@@ -146,7 +146,14 @@ class AgentClient(Module):
 
         self.log(f"Closing all network sockets...", level=logging.INFO)
         self.agent_socket_in.close()
-        self.context.destroy()
+        self.log(f"Closed agent_socket_in", level=logging.INFO)
+        self.agent_socket_out.close()
+        self.log(f"Closed agent_socket_out", level=logging.INFO)
+        self.environment_broadcast_socket.close()
+        self.log(f"Closed environment_broadcast_socket", level=logging.INFO)
+        self.environment_request_socket.close()
+        self.log(f"Closed environment_request_socket", level=logging.INFO)
+        self.context.term()
         self.log(f"Network sockets closed.", level=logging.INFO)
 
         self.log(f'...Good Night!', level=logging.INFO)
@@ -372,6 +379,7 @@ class AgentClient(Module):
         self.environment_broadcast_socket = self.context.socket(zmq.SUB)
         self.environment_broadcast_socket.connect(f"tcp://localhost:{self.ENVIRONMENT_PORT_NUMBER}")
         self.environment_broadcast_socket.setsockopt(zmq.SUBSCRIBE, b'')
+        self.environment_broadcast_socket.setsockopt(zmq.LINGER, 0)
         
         # give environment time to set up
         time.sleep(random.random())
@@ -379,15 +387,18 @@ class AgentClient(Module):
         # connect to environment request port
         self.environment_request_socket = self.context.socket(zmq.REQ)
         self.environment_request_socket.connect(f"tcp://localhost:{self.REQUEST_PORT_NUMBER}")
+        self.environment_request_socket.setsockopt(zmq.LINGER, 0)
         self.environment_request_lock = asyncio.Lock()
 
         # create agent communication sockets
         self.agent_socket_in = self.context.socket(zmq.REP)
         self.agent_port_in = get_next_available_port()
         self.agent_socket_in.bind(f"tcp://*:{self.agent_port_in}")
+        self.agent_socket_in.setsockopt(zmq.LINGER, 0)
         self.agent_socket_in_lock = asyncio.Lock()
 
         self.agent_socket_out = self.context.socket(zmq.REQ)
+        self.agent_socket_out.setsockopt(zmq.LINGER, 0)
         self.agent_socket_out_lock = asyncio.Lock()
 
     async def sync_environment(self):
