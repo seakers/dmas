@@ -2765,7 +2765,6 @@ class TransmitterComponent(ComponentModule):
         Processes messages being sent to this component. Only accepts task messages.
         """
         try:
-            self.log(f'Received a message for the transmittercomponent!!!')
             if msg.dst_module != self.name:
                 # this module is NOT the intended receiver for this message. Forwarding to rightful destination
                 self.log(f'Received internal message intended for {msg.dst_module}. Rerouting message...')
@@ -2856,7 +2855,7 @@ class TransmitterComponent(ComponentModule):
                 #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
                 #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
                 wait_for_message_timeout = asyncio.create_task( self.sim_wait(task.timeout) )
-                processes = [transmit_msg, wait_for_message_timeout] # TODO replace wait_for_access_end
+                processes = [transmit_msg, wait_for_message_timeout] # TODO add waits back: wait_for_access_start, wait_for_access_end, wait_for_access_end_event, 
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
                 
@@ -2867,12 +2866,12 @@ class TransmitterComponent(ComponentModule):
                     await pending_task
 
                 # remove message from out-going buffer
-                await self.remove_msg_from_buffer(msg)
-                #self.access_events.pop(msg.dst)
+                # await self.remove_msg_from_buffer(msg)
+                # self.access_events.pop(msg.dst)
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
                     return TaskStatus.DONE
 
                 # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
@@ -2967,12 +2966,10 @@ class TransmitterComponent(ComponentModule):
             msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
-            # if response is None:
-            #     raise asyncio.CancelledError
             if response is None:
-                await self.sim_wait(1e6)
+                raise asyncio.CancelledError
             while not response.result:
-                self.sim_wait(1/self.UPDATE_FREQUENCY)
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
             self.log(f'Response {response} in wait_for_access_start in perform_task',level=logging.DEBUG)
             if target not in self.access_events:
@@ -2987,8 +2984,14 @@ class TransmitterComponent(ComponentModule):
             msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
+            self.log(f'Response: {response}',level=logging.DEBUG)
+            if response is None:
+                self.log(f'Raising asyncio cancelled error',level=logging.DEBUG)
+                raise asyncio.CancelledError
+            self.log(f'After response is none if',level=logging.DEBUG)
+
             while response.result:
-                self.sim_wait(1/self.UPDATE_FREQUENCY)
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
 
             if target not in self.access_events:
@@ -2996,6 +2999,7 @@ class TransmitterComponent(ComponentModule):
             self.access_events[target].trigger_end()
 
         except asyncio.CancelledError:
+            self.log(f'In except handler in wait_for_access_end',level=logging.DEBUG)
             return
 
     async def environment_event_handler(self, event_msg : EnvironmentBroadcastMessage) -> bool:
@@ -3096,12 +3100,12 @@ class ReceiverComponent(ComponentModule):
                     # listen for messages from other agents
                     self.log('Waiting for agent messages...',level=logging.DEBUG)
                     msg_json = await parent_agent.agent_socket_in.recv_json()
-                    await parent_agent.agent_socket_in.send_json(None)
-                    #await parent_agent.agent_socket_in_lock.release()
+                    self.log(f'Agent message received!',level=logging.DEBUG)
+                    blank = dict()
+                    blank_json = json.dumps(blank)
+                    await parent_agent.agent_socket_in.send_json(blank_json)
                     msg = InterNodeMessage.from_json(msg_json)
                     msg_dict = InterNodeMessage.to_dict(msg)
-                    self.log(f'Agent message received!',level=logging.DEBUG)
-
                     # check if message can fit in incoming buffer
                     msg_str = json.dumps(msg_dict)
                     msg_length = len(msg_str.encode('utf-8'))
@@ -3132,8 +3136,8 @@ class ReceiverComponent(ComponentModule):
                             self.log(f'Msg contents: {msg_contents}',level=logging.DEBUG)
                             measurement_request = MeasurementRequest(msg_contents["_type"],msg_contents["_target"][0],msg_contents["_target"][1],msg_contents["_science_val"])
                             req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
-                            self.log(f'Sending measurement request to science module (hopefully)!',level=logging.DEBUG)
-                            await self.send_internal_message(req_msg) # send measurement request to plannign module
+                            self.log(f'Sending measurement request to planning module (hopefully)!',level=logging.DEBUG)
+                            await self.send_internal_message(req_msg) # send measurement request to planning module
                         # elif msg_type is InterNodeMessageTypes.MEASUREMENT_MESSAGE:
                         #     pass
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_REQUEST:

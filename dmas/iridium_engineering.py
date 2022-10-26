@@ -133,6 +133,8 @@ class IridiumTransmitterComponent(ComponentModule):
                 for agent_port in agent_port_dict:
                     agent = agent_port_dict[agent_port]
                     self.log(f'Sending to agent: {agent_port}',level=logging.INFO)
+                    if(agent_port == "Iridium"):
+                        continue
                     inter_node_msg = MeasurementRequestMessage("Iridium",agent_port,msg.content)
                     task_msg = TransmitMessageTask(agent,inter_node_msg,1.0)
                     await self.tasks.put(task_msg)
@@ -164,7 +166,6 @@ class IridiumTransmitterComponent(ComponentModule):
         """
         try:
             # check if component was the intended performer of this task
-
             if task.component != self.name:
                 self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
                 raise asyncio.CancelledError
@@ -181,19 +182,17 @@ class IridiumTransmitterComponent(ComponentModule):
 
                 # unpackage message
                 msg : InterNodeMessage = task.msg
-                if msg.dst == "Iridium":
-                    return TaskStatus.DONE
                 self.log(f'Right before wait_for_access_start in perform_task',level=logging.DEBUG)
                 # wait for access to target node
-                # wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
-                # await wait_for_access_start
+                #wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
+                #await wait_for_access_start
                 self.log(f'Right before create_tasks in perform_task',level=logging.DEBUG)
                 # wait for msg to be transmitted successfully or interrupted due to access end or message timeout
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
                 #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
                 #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
                 wait_for_message_timeout = asyncio.create_task( self.sim_wait(task.timeout) )
-                processes = [transmit_msg, wait_for_message_timeout] # TODO replace wait_for_access_end
+                processes = [transmit_msg, wait_for_message_timeout] # TODO add waits back: wait_for_access_start, wait_for_access_end, wait_for_access_end_event, 
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
                 
@@ -204,12 +203,12 @@ class IridiumTransmitterComponent(ComponentModule):
                     await pending_task
 
                 # remove message from out-going buffer
-                await self.remove_msg_from_buffer(msg)
-                #self.access_events.pop(msg.dst)
+                # await self.remove_msg_from_buffer(msg)
+                # self.access_events.pop(msg.dst)
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
                     return TaskStatus.DONE
 
                 # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
@@ -305,8 +304,10 @@ class IridiumTransmitterComponent(ComponentModule):
             msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
+            if response is None:
+                raise asyncio.CancelledError            
             while not response.result:
-                self.sim_wait(1/self.UPDATE_FREQUENCY)
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
             self.log(f'Response {response} in perform_task',level=logging.DEBUG)
             if target not in self.access_events:
@@ -321,8 +322,10 @@ class IridiumTransmitterComponent(ComponentModule):
             msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
+            if response is None:
+                raise asyncio.CancelledError
             while response.result:
-                self.sim_wait(1/self.UPDATE_FREQUENCY)
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
 
             if target not in self.access_events:
@@ -430,10 +433,12 @@ class IridiumReceiverComponent(ComponentModule):
                     # listen for messages from other agents
                     self.log('Waiting for agent messages...',level=logging.DEBUG)
                     msg_json = await parent_agent.agent_socket_in.recv_json()
-                    await parent_agent.agent_socket_in.send_json(None)
+                    self.log(f'Agent message received!',level=logging.DEBUG)
+                    blank = dict()
+                    blank_json = json.dumps(blank)
+                    await parent_agent.agent_socket_in.send_json(blank_json)
                     msg = InterNodeMessage.from_json(msg_json)
                     msg_dict = InterNodeMessage.to_dict(msg)
-                    self.log(f'Agent message received!',level=logging.DEBUG)
 
                     # check if message can fit in incoming buffer
                     msg_str = json.dumps(msg_dict)

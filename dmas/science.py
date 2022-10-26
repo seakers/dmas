@@ -15,7 +15,7 @@ from tasks import InformationRequest, DataProcessingRequest, MeasurementRequest
 
 class ScienceModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
-        super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [])
+        super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [], 0)
 
         self.scenario_dir = scenario_dir
 
