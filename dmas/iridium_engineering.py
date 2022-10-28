@@ -191,7 +191,7 @@ class IridiumTransmitterComponent(ComponentModule):
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
                 #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
                 #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
-                #wait_for_message_timeout = asyncio.create_task( self.sim_wait(1.0) )
+                #wait_for_message_timeout = asyncio.create_task( self.sim_wait(100.0) )
                 processes = [transmit_msg] # TODO add waits back: wait_for_access_start, wait_for_access_end, wait_for_access_end_event, wait_for_message_timeout
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
@@ -201,7 +201,6 @@ class IridiumTransmitterComponent(ComponentModule):
                     self.log(f'Cancelling pending processes!',level=logging.DEBUG)
                     pending_task : asyncio.Task
                     pending_task.cancel()
-                    await pending_task
                 self.log(f'Cancelled pending processes!',level=logging.DEBUG)
 
                 # remove message from out-going buffer
@@ -209,7 +208,7 @@ class IridiumTransmitterComponent(ComponentModule):
                 # self.access_events.pop(msg.dst)
 
                 # return task completion status                
-                if transmit_msg.done() and transmit_msg not in pending:
+                if transmit_msg.done():
                     self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
                     return TaskStatus.DONE
 

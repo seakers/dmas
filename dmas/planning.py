@@ -1,6 +1,7 @@
 import asyncio
 import numpy as np
 import logging
+import csv
 from modules import Module
 from messages import *
 from neo4j import GraphDatabase
@@ -121,8 +122,23 @@ class ObservationPlanningModule(Module):
 
     async def initialize_plan(self):
         # this is just for testing!
-        initial_obs = ObservationPlannerTask(0.0,-32.0,1.0,["OLI"],0.0,1.0)
-        await self.obs_list.put(initial_obs)
+        points = np.zeros(shape=(2000, 5))
+        with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+            reader = csv.reader(csvfile)
+            count = 0
+            for row in reader:
+                if count == 0:
+                    count = 1
+                    continue
+                points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                count = count + 1
+        obs_list = []
+        for i in range(len(points[:, 0])):
+            lat = points[i, 0]
+            lon = points[i, 1]
+            obs = ObservationPlannerTask(lat,lon,1.0,["OLI"],0.0,1.0)
+            obs_list.append(obs)
+        await self.obs_list.put(obs_list)
 
     async def internal_message_handler(self, msg):
         """
@@ -171,19 +187,21 @@ class ObservationPlanningModule(Module):
     async def create_plan(self):
         try:
             while True:
-                # wait for observation request 
-                obs = await self.obs_list.get()
+                # wait for observation request
+                obs_list = await self.obs_list.get()
                 obs_candidates = []
-                # estimate next observation opportunities
-                gp_accesses = self.orbit_data.get_ground_point_accesses_future(0.0, -32.0, self.get_current_time())
-                gp_access_list = []
-                for _, row in gp_accesses.iterrows():
-                    gp_access_list.append(row)
-                #print(gp_accesses)
-                if(len(gp_accesses) != 0):
-                    obs.start = gp_access_list[0]['time index']
-                    obs.end = obs.start + 5
-                    obs_candidates.append(obs)
+                for obs in obs_list:
+                    # estimate next observation opportunities
+                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
+                    gp_access_list = []
+                    for _, row in gp_accesses.iterrows():
+                        gp_access_list.append(row)
+                    #print(gp_accesses)
+                    if(len(gp_accesses) != 0):
+                        self.log(f'Adding observation candidate!',level=logging.INFO)
+                        obs.start = gp_access_list[0]['time index']
+                        obs.end = obs.start + 5
+                        obs_candidates.append(obs)
                 self.obs_plan = self.rule_based_planner(obs_candidates)
                 # schedule observation plan and send to operations planner for further development
                 plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
@@ -275,6 +293,7 @@ class OperationsPlanningModule(Module):
         try:
             while True:
                 # Replace with basic module that adds charging to plan
+                self.log(f'Creating operations plan!',level=logging.INFO)
                 plan = await self.obs_plan.get()
                 plan_beginning = self.get_current_time()
                 starts = []
@@ -289,6 +308,7 @@ class OperationsPlanningModule(Module):
                         charge_task = ChargePlannerTask(ends[i],starts[i+1])
                         self.ops_plan.append(charge_task)
                     obs_task = plan[i]
+                    self.log(f'Adding observation task {obs_task} to operations plan!',level=logging.INFO)
                     self.ops_plan.append(obs_task)
         except asyncio.CancelledError:
             return
@@ -300,7 +320,8 @@ class OperationsPlanningModule(Module):
                 curr_time = self.get_current_time()
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
-                        if(5 < curr_time < 10): # TODO should be between task start and task end but this is for testing
+                        if(task.start < curr_time < task.end):
+                            self.log(f'Sending observation task to engineering module!',level=logging.INFO)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1])
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
                             await self.send_internal_message(msg)

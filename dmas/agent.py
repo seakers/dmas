@@ -485,8 +485,8 @@ class AgentClient(Module):
         set root logger to default settings
         """
 
-        logging.root.setLevel(logging.DEBUG)
-        logging.basicConfig(level=logging.DEBUG)
+        logging.root.setLevel(logging.INFO)
+        logging.basicConfig(level=logging.INFO)
         
         logger_names = ['agent_messages', 'env_requests', 'measurements', 'state', 'actions']
 

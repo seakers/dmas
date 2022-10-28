@@ -1205,7 +1205,7 @@ if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 20
+    duration = 86400
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
@@ -1213,7 +1213,7 @@ if __name__ == '__main__':
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2', 'Mars3', 'Iridium'], duration, clock_type=SimClocks.REAL_TIME)
+    environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2', 'Mars3', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
     print('DONE')

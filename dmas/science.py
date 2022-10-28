@@ -513,6 +513,8 @@ class OnboardProcessingModule(Module):
                 self.log(f'Measurement data successfully saved in on-board data-base.', level=logging.INFO)
                 self.database_lock.release()
                 self.updated.set()
+                updated_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_REASONING.value, self.updated)
+                await self.send_internal_message(updated_msg)
         except asyncio.CancelledError:
             return
 
@@ -547,6 +549,7 @@ class OnboardProcessingModule(Module):
         data_product_dict["time"] = time
         data_product_dict["product_type"] = product_type
         data_product_dict["filepath"] = filepath
+        data_product_dict["chlorophyll checked"] = False
         pd.DataFrame(data).to_csv(filepath,index=False,header=False)
         sd.append(data_product_dict)
         prefix = "./scenarios/sim_test/results/"+str(self.parent_module.parent_module.name)+"/sd/"
@@ -600,14 +603,17 @@ class ScienceReasoningModule(Module):
     model_results = []
     async def activate(self):
         await super().activate()
+        self.updated_queue = asyncio.Queue()
 
     async def internal_message_handler(self, msg):
         """
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == ScienceSubmoduleTypes.PREDICTIVE_MODELS.value):
+            if(msg.src_module == ScienceSubmoduleTypes.SCIENCE_PREDICTIVE_MODEL.value):
                 self.model_results.append(msg.content)
+            elif(msg.src_module == ScienceSubmoduleTypes.ONBOARD_PROCESSING.value):
+                await self.updated_queue.put(msg)
             else:
                 self.log(f'Unsupported message for this module.')
         except asyncio.CancelledError:
@@ -645,10 +651,10 @@ class ScienceReasoningModule(Module):
                         await coroutine
 
     def get_mean_sd(self, lat, lon, points):
-        mean = 0.0
-        sd = 0.0
+        mean = None
+        sd = None
         for i in range(len(points[:, 0])):
-            if (float(lat)-points[i, 0] < 0.01) and (float(lon) - points[i, 1] < 0.01):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
                 mean = points[i, 2]
                 sd = points[i, 3]
                 lat = points[i, 0]
@@ -659,6 +665,7 @@ class ScienceReasoningModule(Module):
     async def check_chlorophyll_outliers(self):
         try:
             while True:
+                msg = await self.updated_queue.get()
                 points = np.zeros(shape=(2000, 5))
                 chlorophyll_outliers = []
                 with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
@@ -671,12 +678,16 @@ class ScienceReasoningModule(Module):
                         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
                         count = count + 1
                 for item in self.sd:
-                    mean, stddev, lat, lon = self.get_mean_sd(45.590934, 47.716708, points) # TODO fix hard coding
-                    pixel_value = self.get_pixel_value_from_image(item,lat,lon,30)
-                    pixel_value = 100000
-                    if pixel_value > mean+stddev:
-                        item["severity"] = (pixel_value-mean) / stddev
-                        chlorophyll_outliers.append(item)
+                    if(item["chlorophyll checked"] is False):
+                        mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
+                        pixel_value = self.get_pixel_value_from_image(item,lat,lon,30) # 30 meters is landsat resolution
+                        if pixel_value > mean+stddev:
+                            item["severity"] = (pixel_value-mean) / stddev
+                            chlorophyll_outliers.append(item)
+                            self.log(f'Chlorophyll outlier detected at {lat}, {lon}!',level=logging.INFO)
+                        else:
+                            self.log(f'No chlorophyll outlier detected at {lat}, {lon}',level=logging.INFO)
+                        item["chlorophyll checked"] = True
                 for outlier in chlorophyll_outliers:
                     self.log(f'Outliers: {outlier}',level=logging.INFO)
                     msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, outlier)
@@ -686,13 +697,11 @@ class ScienceReasoningModule(Module):
             return
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):
-        # topleftlat = image["lat"]
-        # topleftlon = image["lon"]
-        topleftlat = 45.590834
-        topleftlon = 47.716608 # TODO fix this hardcoding
+        topleftlat = image["lat"]
+        topleftlon = image["lon"]
         latdiff = lat-topleftlat
         londiff = lon-topleftlon
-        row = (latdiff*111139)//resolution
+        row = (latdiff*111139)//resolution # latitude to meters
         col = (londiff*111139)//resolution
         data = pd.read_csv(image["filepath"])
         pixel_values = data.values

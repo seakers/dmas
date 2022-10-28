@@ -2066,8 +2066,6 @@ class InstrumentComponent(ComponentModule):
         
                 # wait for measurement duration
                 # TODO consider real-time delays from environment server querying for the data being sensed
-                self.log(f'sim_wait in payload')
-                print(task.duration)
                 await self.sim_wait(task.duration)
 
                 self.log(f'Measurement complete! Sending data to internal memory.')
@@ -2854,8 +2852,8 @@ class TransmitterComponent(ComponentModule):
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
                 #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
                 #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
-                #wait_for_message_timeout = asyncio.create_task( self.sim_wait(1.0) )
-                processes = [transmit_msg] # TODO add waits back: wait_for_access_start, wait_for_access_end, wait_for_access_end_event, wait_for_message_timeout
+                #wait_for_message_timeout = asyncio.create_task( self.sim_wait(100.0) )
+                processes = [transmit_msg] # TODO add waits back:  wait_for_access_end, wait_for_access_end_event
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
                 
@@ -2864,14 +2862,13 @@ class TransmitterComponent(ComponentModule):
                     self.log(f'Cancelling pending processes!',level=logging.DEBUG)
                     pending_task : asyncio.Task
                     pending_task.cancel()
-                    await pending_task
                 self.log(f'Cancelled pending processes!',level=logging.DEBUG)
                 # remove message from out-going buffer
                 # await self.remove_msg_from_buffer(msg)
                 # self.access_events.pop(msg.dst)
 
                 # return task completion status                
-                if transmit_msg.done() and transmit_msg not in pending:
+                if transmit_msg.done():
                     self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
                     return TaskStatus.DONE
 
@@ -2930,8 +2927,9 @@ class TransmitterComponent(ComponentModule):
                         
             # wait for server reply
             await parent_agent.agent_socket_out.recv_json()
+            self.log(f'Received message reception confirmation!',level=logging.DEBUG)  
             parent_agent.agent_socket_out_lock.release()
-            self.log(f'Received message reception confirmation!',level=logging.DEBUG)      
+            self.log(f'Released agent_socket_out',level=logging.DEBUG)      
 
             # disconnect socket from destination
             self.log(f'Disconnecting from agent {msg.dst}...',level=logging.DEBUG)
