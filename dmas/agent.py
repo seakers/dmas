@@ -59,6 +59,21 @@ def count_number_of_subroutines(module: Module):
             count += count_number_of_subroutines(submodule)
         return count
 
+def load_mission_data(scenario_dir):
+    with open(scenario_dir +'MissionSpecs.json', 'r') as scenario_specs:
+        # load json file as dictionary
+        mission_dict = json.load(scenario_specs)
+
+        data = dict()
+        spacecraft_list = mission_dict.get('spacecraft')
+
+        for spacecraft in spacecraft_list:
+            name = spacecraft.get('name')
+            # land coverage data metrics data
+            payload = spacecraft.get('instrument', None)
+            data[name] = payload
+    return data
+
 class AgentClient(Module):
     def __init__(self, name, scenario_dir, modules=[], env_port_number = '5561', env_request_port_number = '5562') -> None:
         super().__init__(name, submodules=modules, n_timed_coroutines=0)
@@ -73,7 +88,7 @@ class AgentClient(Module):
         self.ENVIRONMENT_PORT_NUMBER =  env_port_number
         self.REQUEST_PORT_NUMBER = env_request_port_number
         self.AGENT_TO_PORT_MAP = None
-        
+        self.payload = load_mission_data(scenario_dir)
         self.log('Agent Initialized!', level=logging.INFO)
 
     async def live(self):

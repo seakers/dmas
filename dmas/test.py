@@ -4,10 +4,20 @@ from multiprocessing import Process
 from agent import ScienceTestAgent
 from agent import IridiumTestAgent
 
-def run(i):
-        print(f'Mars{i+1} run')
-        agent = ScienceTestAgent(f'Mars{i+1}', './scenarios/sim_test/')
-        asyncio.run(agent.live())
+def suominpp_run():
+    print(f'SuomiNPP run')
+    agent = ScienceTestAgent(f'SuomiNPP', './scenarios/sim_test/')
+    asyncio.run(agent.live())
+
+def jason_run():
+    print(f'Jason-3 run')
+    agent = ScienceTestAgent(f'Jason-3', './scenarios/sim_test/')
+    asyncio.run(agent.live())
+
+def customsat_run():
+    print(f'CustomSat run')
+    agent = ScienceTestAgent(f'CustomSat', './scenarios/sim_test/')
+    asyncio.run(agent.live())
 
 def iridium_run():
     print(f'Iridium run')
@@ -19,9 +29,11 @@ if __name__ == '__main__':
 
     n_agents = 3
     processes = []
-    print('Creating agent run process...')
-    for i in range(n_agents):
-        processes.append(Process(target=run, args=(i,)))
+    print('Creating agent run processes...')
+
+    processes.append(Process(target=suominpp_run, args=()))
+    processes.append(Process(target=jason_run, args=()))
+    processes.append(Process(target=customsat_run, args=()))
     processes.append(Process(target=iridium_run, args=()))
     print('Starting agent run process...')
     for process in processes:

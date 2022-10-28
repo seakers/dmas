@@ -506,11 +506,20 @@ class OnboardProcessingModule(Module):
 
                 # process result
                 b4,b5,prefix,stored_data_filepath = self.store_measurement(obs_str)
-                processed_data = self.compute_chlorophyll_obs_value(b4,b5)
-                self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
-
+                parent_agent = self.get_top_module()
+                instrument = parent_agent.payload[parent_agent.name]["name"]
+                self.log(f'Instrument: {instrument}',level=logging.INFO)
+                if(instrument == "VIIRS"):
+                    processed_data = self.compute_chlorophyll_obs_value(b4,b5)
+                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
+                    self.log(f'Chlorophyll measurement data successfully saved in on-board data-base.', level=logging.INFO)
+                elif(instrument == "Jason3"):
+                    processed_data = self.compute_altimetry()
+                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"altimetry",prefix+"alt_"+stored_data_filepath,processed_data)
+                    self.log(f'Altimetry measurement data successfully saved in on-board data-base.', level=logging.INFO)
+                else:
+                    self.log(f'Instrument not yet supported by science module!',level=logging.INFO)
                 # release database lock and inform other processes that the database has been updated
-                self.log(f'Measurement data successfully saved in on-board data-base.', level=logging.INFO)
                 self.database_lock.release()
                 self.updated.set()
                 updated_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_REASONING.value, self.updated)
@@ -541,6 +550,9 @@ class OnboardProcessingModule(Module):
     def compute_chlorophyll_obs_value(self,b4,b5):
         bda = b5 - b5/b4 + b4
         return bda
+
+    def compute_altimetry(self):
+        return np.random.rand(100,100)
 
     def add_data_product(self,sd,lat,lon,time,product_type,filepath,data):
         data_product_dict = dict()
@@ -681,6 +693,7 @@ class ScienceReasoningModule(Module):
                     if(item["chlorophyll checked"] is False):
                         mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
                         pixel_value = self.get_pixel_value_from_image(item,lat,lon,30) # 30 meters is landsat resolution
+                        pixel_value = 100000 # TODO remove this hardcode
                         if pixel_value > mean+stddev:
                             item["severity"] = (pixel_value-mean) / stddev
                             chlorophyll_outliers.append(item)
