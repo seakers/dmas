@@ -251,17 +251,27 @@ class ComponentModule(Module):
 
                 if self.status is ComponentStatus.OFF:
                     # if component is turned off, wait until it is turned on
+                    self.log(f'Component is off. Waiting until it is turned on again to restart periodic updates...')
                     await self.updated.wait()
 
                 if self.health is ComponentHealth.FAILURE:
-                    # else if component is in failure state, stop periodic updates and sleep for the rest of the simulation
+                    # else if component is in failure state, stop periodic updates and sleep for the rest of the simu
+                    self.log(f'Component is in a failure state. Stopping periodic updates until the end of the simulation...')
                     break
 
                 # inform parent subsystem of current state
-                if self.health is ComponentHealth.NOMINAL:
-                    state : ComponentState = await self.get_state()
-                    msg = ComponentStateMessage(self.name, self.parent_module.name, state)
-                    await self.send_internal_message(msg)                  
+                # if self.health is ComponentHealth.NOMINAL:
+                #     self.log(f'Component state is nominal. Sharing state with parent subsystem.')
+                #     state : ComponentState = await self.get_state()
+                #     msg = ComponentStateMessage(self.name, self.parent_module.name, state)
+                #     await self.send_internal_message(msg)                  
+                # TODO: uncomment previous 5 lines and comment out the next 4 lines whenever crit and failure monitures are activated
+                self.log(f'Sharing state with parent subsystem.')
+                state : ComponentState = await self.get_state()
+                self.log(f'state of type: {type(state)}')
+                msg = ComponentStateMessage(self.name, self.parent_module.name, state)
+                await self.send_internal_message(msg) 
+
 
             while True:
                 # sleep for the rest of the simulation
@@ -456,13 +466,14 @@ class ComponentModule(Module):
                 # perform task 
                 self.log(f'Component state updated! Performing task...')
                 status = await self.perform_maintenance_task(task)
+                self.log(f'{task}, {status}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
                 # update component state 
                 self.log(f'Updating comopnent state...')
                 await self.update()
 
                 # inform parent subsystem of the status of completion of the task at hand
-                self.log(f'Component state updated! Informing parent subsystem of task completion status...')
+                self.log(f'Component state updated! Informing parent subsystem of task completion status: \'{status.name}\'...')
                 msg = ComponentTaskCompletionMessage(self.name, self.parent_module.name, task, status)
                 await self.send_internal_message(msg)
 
@@ -510,7 +521,7 @@ class ComponentModule(Module):
                 acquired = await self.state_lock.acquire()
 
                 # actuate component
-                if task.component_status is ComponentStatus.ON:
+                if task.actuation_status is ComponentStatus.ON:
                     self.log(f'State lock acquired! Turning on component...')
                     if self.status is not ComponentStatus.ON:
                         # turn component on
@@ -532,7 +543,7 @@ class ComponentModule(Module):
                         self.log(f'Component is already on. Aborting task...')
                         raise asyncio.CancelledError  
 
-                elif task.component_status is ComponentStatus.OFF:
+                elif task.actuation_status is ComponentStatus.OFF:
                     self.log(f'State lock acquired! Turning off component...')
                     if self.status is not ComponentStatus.OFF:
                         # turn component off
@@ -559,7 +570,7 @@ class ComponentModule(Module):
                     self.state_lock.release()
                     acquired = None
 
-                    self.log(f'Component Status {task.component_status} not supported for component actuation.')
+                    self.log(f'Component Status {task.actuation_status} not supported for component actuation.')
                     raise asyncio.CancelledError
 
                 # release state lock
@@ -577,7 +588,7 @@ class ComponentModule(Module):
 
                 # provide change in power supply
                 self.log(f'State lock acquired! Changing power received by this component...')
-                self.power_supplied += task.power_to_supply
+                self.power_supplied += task.power_to_receive
 
                 if self.power_supplied < 0:
                     self.power_supplied = 0
@@ -660,6 +671,10 @@ class ComponentModule(Module):
                     for done_process in done:
                         done_process : asyncio.Task
                         self.log(f'{done_process.get_name()} completed before the task of type {type(task)} was successfully completed')
+                
+                # log task completion
+                status : TaskStatus = perform_task.result()
+                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
                 # cancell all pending processes
                 for pending_process in pending:
@@ -863,7 +878,9 @@ class ComponentModule(Module):
         try:
             # wait for any possible update process to finish
             self.log(f'Awaiting state lock...')
-            acquired = await self.state_lock.acquire()
+            acquired = await self.state_lock.acquire()  
+            self.log(f'State lock acquired! Getting current state...')
+
 
             # get state object from component status
             self.component_state : ComponentState
@@ -873,7 +890,7 @@ class ComponentModule(Module):
             self.state_lock.release()
             acquired = None
 
-            self.log(f'State lock acquired! Getting current state...')
+            self.log(f'State obtained. State lock released.')
             return state
         except asyncio.CancelledError:
             if acquired:
@@ -1005,8 +1022,11 @@ class SubsystemModule(Module):
                 
             elif isinstance(msg, SubsystemStateMessage):
                 subsystem_state : SubsystemState = msg.get_state()
-                self.log(f'Received subsystem state message from subsystem type {subsystem_state.subsystem_type}!')
-                await self.subsystem_state_updates.put(subsystem_state)
+                if subsystem_state is None:
+                    self.log(f'Received subsystem state message from subsystem type \'NONE\'!')
+                else:
+                    self.log(f'Received subsystem state message from subsystem type {subsystem_state.subsystem_type}!')
+                    await self.subsystem_state_updates.put(subsystem_state)
 
             elif isinstance(msg, SubsystemStateRequestMessage):
                 self.log(f'Received a subsystem state request from subsystem \'{msg.src_module}\'. Sending latest subsystem state...')
@@ -1139,6 +1159,15 @@ class SubsystemModule(Module):
                 self.updated.set()
                 self.updated.clear()
                 self.log(f'Sybsystem state updated!')
+
+                # communicate to Command and data handling that the subsystem's state has been updated
+                state = await self.get_state()
+                self.log(f'state of type: {type(state)}')
+                msg = SubsystemStateMessage(self.name, SubsystemNames.CNDH.value, state)
+                await self.send_internal_message(msg)
+
+                # log state
+                # self.log(f'{state}', logger_type=LoggerTypes.STATE, level=logging.INFO)
 
         except asyncio.CancelledError:
             self.log(f'Update interrupted!')
@@ -1386,9 +1415,10 @@ class SubsystemModule(Module):
                         await pending_process
                         self.log(f'{pending_process.get_name()} successfully aborted!')
 
-                # get task completion status
+                # log task completion status
                 status = perform_task.result()
                 self.log(f'Task status: \'{status.name}\'')
+                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
                 
                 self.log(f'Informing Command and Data Handling Subsystem of task status...')
                 # inform Command and Data Handling subsystem of the status of completion of component tasks
@@ -1651,7 +1681,7 @@ class ComponentState:
         pass
 
     def __str__(self) -> str:
-        return f'ComponentState, {self.component_name}, {self.power_consumed}, {self.power_supplied}, {self.health.name}, {self.status.name}'
+        return f'\"@type\" : \"ComponentState\", \"name\" : \"{self.component_name}\", \"power_consumed\" : {self.power_consumed}, \"power_supplied\" : {self.power_supplied}, \"health\" : \"{self.health.name}\", \"status\" : \"{self.status.name}\"'
 
 class SubsystemState:
     def __init__(self, name: str, subsystem_type : type, component_states : dict, health : SubsystemHealth, status : SubsystemStatus):
@@ -1676,6 +1706,22 @@ class SubsystemState:
     def from_subsystem(subsystem : SubsystemModule):
         pass
 
+    def __str__(self) -> str:
+        out = f'\"@type\" : \"SubsystemState\", \"name\" : \"{self.subsystem_name}\", \"health\" : \"{self.health.name}\", \"status\" : \"{self.status.name}\", \"component_states\" : ['
+        components = []
+        for component in self.component_states:
+            components.append(component)
+
+        for component in components:
+            component_state = self.component_states[component]
+            out += '{' + str(component_state) + '}'
+
+            if component != components[-1]:
+                out += ', '
+
+        out += ']'
+        return out
+
 """
 COMMAND AND DATA HANDLING SUBSYSTEM
 """
@@ -1686,12 +1732,34 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
                 status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.CNDH.value, parent_platform_sim, CommandAndDataHandlingState, health, status)
         self.submodules = [ OnboardComputerModule(self, 1, 1e9) ]
+
+        self.subsystem_states = dict()
     
-    async def subsystem_state_update_handler(self, subsystem_state):
+    async def subsystem_state_update_handler(self, subsystem_state : SubsystemState):
         """
         Reacts to other subsystem state updates.
         """
-        return
+        # update subsystem state tracking dictionary
+        self.subsystem_states[subsystem_state.subsystem_name] = subsystem_state
+        
+        # log system state
+        parent_agent = self.get_top_module()
+        out = '{' + f' \"@type\" : \"SystemState\", \"name\" : \"{parent_agent.name}\", \"subsystem_states\" : ['
+        
+        subsystems = []
+        for subsystem in self.subsystem_states:
+            subsystems.append(subsystem)
+
+        for subsystem in subsystems:
+            subsystem_state = self.subsystem_states[subsystem]
+            out += '{' + str(subsystem_state) + '}'
+
+            if subsystem != subsystems[-1]:
+                out += ', '
+
+        out += ']}'
+        self.log(f'{out}', logger_type=LoggerTypes.STATE, level=logging.INFO)
+
 
     async def decompose_platform_task(self, task : PlatformTask) -> list:
         """
@@ -2552,6 +2620,9 @@ class EPSComponentState(ComponentState):
                             component.health,
                             component.status)
 
+    def __str__(self) -> str:
+        return super().__str__() + f', \"power_output\" : {self.power_output}, \"maximum_power_output\" : {self.maximum_power_output}, \"components_powered\" : {json.dumps(self.components_powered)}'
+
 class BatteryModule(PowerSupplyComponent):
     def __init__(self, 
                 parent_subsystem: Module, 
@@ -2743,6 +2814,9 @@ class CommsSubsystem(SubsystemModule):
 class CommsSubsystemState(SubsystemState):
     def __init__(self, component_states: dict, health: SubsystemHealth, status: SubsystemStatus):
         super().__init__(SubsystemNames.COMMS.value, CommsSubsystem, component_states, health, status)
+
+    def from_subsystem(comms : CommsSubsystem):
+        return CommsSubsystemState(comms.component_states, comms.health, comms.status)
 
 class TransmitterComponent(ComponentModule):
     def __init__(self, 
@@ -3042,19 +3116,22 @@ class ReceiverComponent(ComponentModule):
         task from its parent subsystem or CNDH subsystem at the beginning of the simulation otherwise
         all messages will not be received
         """
-        try:
+        try:        
+            acquired = None
+            agent_lock = None
+
             # check if component was the intended performer of this task
             if task.component != self.name:
                 self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
                 raise asyncio.CancelledError
 
             if isinstance(task, ReceiveMessageTransmission):
-                acquired = None
+                self.log('Starting transmission reception task.')
 
                 # gain access to incoming agent message port from parent agent
                 parent_agent = self.get_top_module()
-
-                await parent_agent.agent_socket_lock.acquire()
+                agent_lock = await parent_agent.agent_socket_in_lock.acquire()
+                self.log('Communication port acquired.')
 
                 while True:
                     msg_dict = None
@@ -3115,6 +3192,10 @@ class ReceiverComponent(ComponentModule):
 
         except asyncio.CancelledError:
             self.log(f'Aborting task of type {type(task)}.')
+
+            # release 
+            if agent_lock:
+                parent_agent.agent_socket_in_lock.release()
 
             # release update lock if cancelled during task handling
             if acquired:

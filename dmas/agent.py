@@ -135,6 +135,10 @@ class AgentClient(NodeModule):
         self.context.destroy()
         self.log(f"Network sockets closed.", level=logging.INFO)
 
+        self.log('Processing results...')
+        self.process_results()
+        self.log('Results processed!')
+
         self.log(f'...Good Night!', level=logging.INFO)
 
     """
@@ -252,86 +256,6 @@ class AgentClient(NodeModule):
 
         except asyncio.CancelledError:
             return
-
-    # async def reception_handler(self):
-    #     """
-    #     Listens for messages from other agents. Stops processes when simulation end-command is received.
-    #     """
-    #     async def reception_worker(self, msg_in: dict):
-    #         """
-    #         Handles received message according to its type
-    #         """
-    #         try:            
-    #             msg_type = NodeToEnvironmentMessageTypes[[msg_in['@type']]]
-    #             msg_src = msg_in['src']
-    #             msg_dst = msg_in['dst']
-
-    #             #TODO check for format of message being sent?
-
-    #             self.message_logger.info(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
-    #             self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
-
-    #             if self.name == msg_dst:
-    #                 if msg_type is NodeToEnvironmentMessageTypes.PRINT_REQUEST:
-    #                     msg = PrintRequestMessage.from_dict(msg_in)
-    #                     self.log(f'Print instruction received with content: \'{msg.content}\'')
-
-    #                     # send reception confirmation to sender agent
-    #                     await self.send_blanc_response()
-    #                 else:
-    #                     # if request does not match any of the standard request format, dump and continue
-    #                     self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
-
-    #                     # send reception confirmation to sender agent
-    #                     await self.send_blanc_response()
-
-    #             else:
-    #                 # message was intended for someone else, discard message
-    #                 self.log('Inter agent message not intended for this agent. Discarding message...')
-    #         except asyncio.CancelledError:
-    #             await self.send_blanc_response()
-
-    #     try:            
-    #         self.log('Acquiring access to agent-in port...')
-    #         await self.agent_socket_in_lock.acquire()
-    #         self.log('Access to agent-in port acquired.')
-
-    #         while True:
-    #             msg_in = None
-    #             worker_task = None
-
-    #             # listen for messages from other agents
-    #             self.log('Waiting for agent messages...')
-    #             msg_in = await self.agent_socket_in.recv_json()
-    #             self.log(f'Agent message received!')
-                
-    #             # handle request
-    #             self.log(f'Handling agent message...')
-    #             worker_task = asyncio.create_task(reception_worker(msg_in))
-    #             await worker_task
-    #             self.log(f'Agent message handled.')
-
-    #     except asyncio.CancelledError:
-    #         if msg_in is not None:
-    #             self.log('Sending blank response...')
-    #             await self.send_blanc_response()
-    #         elif worker_task is not None:
-    #             self.log('Cancelling response...')
-    #             worker_task.cancel()
-    #             await worker_task
-    #         else:
-    #             poller = zmq.asyncio.Poller()
-    #             poller.register(self.agent_socket_in, zmq.POLLIN)
-    #             poller.register(self.agent_socket_in, zmq.POLLOUT)
-
-    #             evnt = await poller.poll(1000)
-    #             if len(evnt) > 0:
-    #                 self.log('Agent message received during shutdown process. Sending blank response..')
-    #                 await self.send_blanc_response()
-
-    #         self.log('Releasing agent-in port...')
-    #         self.agent_socket_in_lock.release()
-    #         return
 
     """
     --------------------
@@ -545,10 +469,12 @@ class AgentClient(NodeModule):
         blanc = dict()
         blanc_json = json.dumps(blanc)
         await self.agent_socket_out.send_json(blanc_json)
-  
 
-class AgentState:
-    def __init__(self, agent: AgentClient, component_list) -> None:
+    def process_results(self):
+        # sequence diagrams
+        self.generate_internal_sequence_diagram()
+  
+    def generate_internal_sequence_diagram(self):
         pass
 
 """
