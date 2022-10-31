@@ -3,13 +3,15 @@ import asyncio
 from curses.panel import top_panel
 from enum import Enum
 import logging
+import os
 import random
+import shutil
+import sys
 import time
 from messages import *
-from utils import EnvironmentModuleTypes
+from utils import *
 from messages import InternalMessage
 
-from utils import Container, SimClocks
 """
 MODULE
 """
@@ -144,7 +146,9 @@ class Module:
                 # check destination
                 if dst_name == self.name:
                     # if this module is the intended receiver, handle message
-                    self.log(f'Handling message of type {type(msg)}...',level=logging.DEBUG)
+                    self.log(f'{str(msg)}', logger_type=LoggerTypes.INTERNAL_MESSAGE, level=logging.INFO)
+
+                    self.log(f'Handling message of type {type(msg)}...')
                     await self.internal_message_handler(msg)
                     self.log(f'Message handled!',level=logging.DEBUG)
                 else:
@@ -435,57 +439,153 @@ class Module:
 
         return top
 
-    def log(self, content, level=logging.DEBUG, module_name=None):
+    def log(self, content : str, module_name : str = None, logger_type : LoggerTypes = LoggerTypes.DEBUG, level : logging = logging.DEBUG):
+        """
+        Logs a message to a specific logger defined by the user. 
+        All loggers are defined at the `setup_loggers()` method. 
+        Each logger has a file on which the content is written into. 
+        Only the logger of type `LoggerTypes.DEBUG` has a stream handler that prints the content to the terminal.
+
+        content:
+            String containing text to be logged
+        module_name:
+            Name of the module to log the message. By default, the function will detect which module is pefroming
+            the log and create a trasable path of said module. Can be overritten by the user if desired.
+        logger_type:
+            Type of logger to be used to write the content into. Must be of type LoggerTypes. 
+            By default all messages are logged into the `LoggerTypes.DEBUG` logger and onto the terminal
+        level:
+            Logger level (see logging.Logger python documentation for more information) 
+        """
         if module_name is None:
             module_name = self.name
 
         if self.parent_module is None:
-            if self.name == module_name:
-                out = f'{module_name} @ T{self.get_current_time():.{3}f}: {content}'
-            else:
-                out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
+            out = self.format_content(content, module_name, logger_type)
+            logger : logging.Logger = self.get_logger(logger_type)
 
-            if level == logging.DEBUG:
-                self.actions_logger.debug(out)
-            elif level == logging.INFO:
-                self.actions_logger.info(out)
-            elif level == logging.WARNING:
-                self.actions_logger.warning(out)
-            elif level == logging.ERROR:
-                self.actions_logger.error(out)
-            elif level == logging.CRITICAL:
-                self.actions_logger.critical(out)
+            if level is logging.DEBUG:
+                logger.debug(out)
+            elif level is logging.INFO:
+                logger.info(out)
+            elif level is logging.WARNING:
+                logger.warning(out)
+            elif level is logging.ERROR:
+                logger.error(out)
+            elif level is logging.CRITICAL:
+                logger.critical(out)
         else:
             if self.name not in module_name:
                 module_name = self.name + '/' + module_name
 
-            self.parent_module.log(content, level, module_name)
+            self.parent_module.log(content, module_name, logger_type, level)
 
-    # def log_state(self, content, level=logging.DEBUG, module_name=None):
-    #     if module_name is None:
-    #         module_name = self.name
+    def format_content(self, content : str, module_name : str, logger_type : LoggerTypes) -> str:
+        if logger_type is LoggerTypes.DEBUG:
+            if self.name == module_name:
+                out = f'{self.name} @ T{self.get_current_time():.{3}f}: {content}'
+            else:
+                out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
+        else:
+            out = f'{self.name}, {module_name}, {self.get_current_time():.{3}f}, {content}'
 
-    #     if self.parent_module is None:
-    #         if self.name == module_name:
-    #             out = f'{module_name} @ T{self.get_current_time():.{3}f}: {content}'
-    #         else:
-    #             out = f'{self.name} ({module_name}) @ T{self.get_current_time():.{3}f}: {content}'
+        return out
 
-    #         if level == logging.DEBUG:
-    #             self.actions_logger.debug(out)
-    #         elif level == logging.INFO:
-    #             self.actions_logger.info(out)
-    #         elif level == logging.WARNING:
-    #             self.actions_logger.warning(out)
-    #         elif level == logging.ERROR:
-    #             self.actions_logger.error(out)
-    #         elif level == logging.CRITICAL:
-    #             self.actions_logger.critical(out)
-    #     else:
-    #         self.parent_module.log_state(content, level, module_name)
+    def get_logger(self, logger_type : LoggerTypes) -> logging.Logger:
+        if self.parent_module is None:
+            return self.get_logger_from_type(logger_type)
+        else:
+            return self.parent_module.get_logger(logger_type)
 
+    @abstractmethod
+    def get_logger_from_type(self, logger_type : LoggerTypes) -> logging.Logger:
+        pass
 
+class NodeModule(Module):
+    def __init__(self, name, scenario_dir, n_timed_coroutines) -> None:
+        """
+        Represents the top-most module in an agent or environment class. 
+        Sets up results folders and loggers to be used throughout the 
+        """
+        super().__init__(name, None, submodules=[], n_timed_coroutines=n_timed_coroutines)
 
+        # set up results dir
+        self.SCENARIO_RESULTS_DIR, self.NODE_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
+
+        # set up loggers
+        self.logger_map = self.set_up_loggers()
+
+    def set_up_results_directory(self, scenario_dir):
+        """
+        Creates directories for agent results and clears them if they already exist
+        """
+        scenario_results_path = scenario_dir + '/results'
+        if not os.path.exists(scenario_results_path):
+            # if directory does not exists, create it
+            os.mkdir(scenario_results_path)
+
+        agent_results_path = scenario_results_path + f'/{self.name}'
+        if os.path.exists(agent_results_path):
+            # if directory already exists, clear contents
+            for f in os.listdir(agent_results_path):
+                path = os.path.join(agent_results_path, f)
+                try:
+                    shutil.rmtree(path)
+                except:
+                    os.remove(path)
+        else:
+            # if directory does not exist, create a new onw
+            os.mkdir(agent_results_path)
+
+        if(os.path.exists(agent_results_path+'/sd')):
+            pass
+        else:
+            os.mkdir(agent_results_path+'/sd')
+
+        return scenario_results_path, agent_results_path
+
+    def set_up_loggers(self) -> None:
+        """
+        set root logger to default settings
+        """
+
+        logging.root.setLevel(logging.INFO)
+        logging.basicConfig(level=logging.INFO)
+        
+        loggers = dict()
+        for logger_type in (LoggerTypes):
+            path = self.NODE_RESULTS_DIR + f'/{logger_type.value}.log'
+
+            if os.path.exists(path):
+                # if file already exists, delete
+                os.remove(path)
+
+            # create logger
+            logger = logging.getLogger(f'{self.name}_{logger_type.value}')
+            logger.propagate = False
+
+            # create stream handler for debug logger
+            if logger_type is LoggerTypes.DEBUG:
+                c_handler = logging.StreamHandler(sys.stderr)
+                c_handler.setLevel(logging.DEBUG)
+                logger.addHandler(c_handler)
+
+            # create file handler 
+            f_handler = logging.FileHandler(path)
+            f_handler.setLevel(logging.DEBUG)
+            f_format = logging.Formatter('%(message)s')
+            f_handler.setFormatter(f_format)
+
+            # add handlers to logger
+            logger.addHandler(f_handler)
+
+            loggers[logger_type] = logger
+
+        logging.getLogger('neo4j').setLevel(logging.WARNING)
+        return loggers
+        
+    def get_logger_from_type(self, logger_type: LoggerTypes) -> logging.Logger:
+        return self.logger_map[logger_type]   
 """
 --------------------
   TESTING MODULES

@@ -73,17 +73,12 @@ def load_mission_data(scenario_dir):
             payload = spacecraft.get('instrument', None)
             data[name] = payload
     return data
-
-class AgentClient(Module):
-    def __init__(self, name, scenario_dir, modules=[], env_port_number = '5561', env_request_port_number = '5562') -> None:
-        super().__init__(name, submodules=modules, n_timed_coroutines=0)
         
-        # set up results dir
-        self.SCENARIO_RESULTS_DIR, self.AGENT_RESULTS_DIR = self.set_up_results_directory(scenario_dir)
-
-        # set up loggers
-        self.message_logger, self.env_request_logger, self.measurement_logger, self.state_logger, self.actions_logger = self.set_up_loggers()
-        
+class AgentClient(NodeModule):
+    def __init__(self, name, scenario_dir, env_port_number = '5561', env_request_port_number = '5562') -> None:
+        # super().__init__(name, submodules=modules, n_timed_coroutines=0)
+        super().__init__(name, scenario_dir, n_timed_coroutines=0)
+                
         # Network information
         self.ENVIRONMENT_PORT_NUMBER =  env_port_number
         self.REQUEST_PORT_NUMBER = env_request_port_number
@@ -150,14 +145,14 @@ class AgentClient(Module):
         self.log('Access to environment request socket obtained! Sending agent termination confirmation...', level=logging.INFO)
         await self.environment_request_socket.send_json(end_msg.to_json())
 
-        self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
-        self.log('Agent termination aknowledgement sent. Awaiting environment response...', level=logging.INFO)
+        # self.env_request_logger.info('Agent termination aknowledgement sent. Awaiting environment response...')
+        self.log('Agent termination aknowledgement sent. Awaiting environment response...')
 
         # wait for server reply
         await self.environment_request_socket.recv() 
         self.environment_request_lock.release()
-        self.env_request_logger.info('Response received! terminating agent.')
-        self.log('Response received! terminating agent.', level=logging.INFO)
+        # self.env_request_logger.info('Response received! terminating agent.')
+        self.log('Response received! terminating agent.')
 
         self.log(f"Closing all network sockets...", level=logging.INFO)
         self.agent_socket_in.close()
@@ -201,10 +196,6 @@ class AgentClient(Module):
             broadcast_handler.set_name (f'{self.name}_broadcast_handler')
             coroutines.append(broadcast_handler)
 
-            # reception_handler = asyncio.create_task(self.reception_handler())
-            # reception_handler.set_name (f'{self.name}_reception_handler')
-            # coroutines.append(reception_handler)
-
             _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
 
             done_name = None
@@ -215,6 +206,7 @@ class AgentClient(Module):
             # cancell all other coroutine tasks
             self.log(f'{done_name} ended. Terminating all other coroutines...', level=logging.INFO)
             for coroutine in pending:
+                coroutine : asyncio.Task
                 coroutine.cancel()
                 await coroutine
             return
@@ -222,6 +214,7 @@ class AgentClient(Module):
         except asyncio.CancelledError: 
             self.log('Cancelling all coroutines...')
             for coroutine in coroutines:
+                coroutine : asyncio.Task
                 coroutine.cancel()
                 await coroutine
             return
@@ -239,7 +232,7 @@ class AgentClient(Module):
                 broadcast_src = broadcast_dict['src']
                 broadcast_dst = broadcast_dict['dst']
 
-                self.message_logger.info(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
+                # self.message_logger.info(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
                 #self.log(f'Received broadcast message of type {broadcast_type.name} from {broadcast_src} intended for {broadcast_dst}!')
 
                 if self.name == broadcast_dst or 'all' == broadcast_dst:                  
@@ -251,7 +244,7 @@ class AgentClient(Module):
                             # use server clock broadcasts to update internal clock
                             broadcast = TicEventBroadcast.from_dict(broadcast_dict)
 
-                            self.message_logger.info(f'Updating internal clock to T={broadcast.t}[s].')
+                            # self.message_logger.info(f'Updating internal clock to T={broadcast.t}[s].')
                             await self.sim_time.set_level(broadcast.t)
                             #self.log('Updated internal clock.')
 
@@ -291,88 +284,85 @@ class AgentClient(Module):
         except asyncio.CancelledError:
             return
 
-    async def reception_handler(self):
-        """
-        Listens for messages from other agents. Stops processes when simulation end-command is received.
-        """
-        try:            
-            self.log('Acquiring access to agent-in port...',level=logging.DEBUG)
-            await self.agent_socket_in_lock.acquire()
-            self.log('Access to agent-in port acquired.',level=logging.DEBUG)
+    # async def reception_handler(self):
+    #     """
+    #     Listens for messages from other agents. Stops processes when simulation end-command is received.
+    #     """
+    #     async def reception_worker(self, msg_in: dict):
+    #         """
+    #         Handles received message according to its type
+    #         """
+    #         try:            
+    #             msg_type = NodeToEnvironmentMessageTypes[[msg_in['@type']]]
+    #             msg_src = msg_in['src']
+    #             msg_dst = msg_in['dst']
 
-            while True:
-                msg_in = None
-                worker_task = None
+    #             #TODO check for format of message being sent?
 
-                # listen for messages from other agents
-                self.log('Waiting for agent messages...',level=logging.DEBUG)
-                msg_in = await self.agent_socket_in.recv_json()
-                self.log(f'Agent message received!',level=logging.DEBUG)
+    #             self.message_logger.info(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
+    #             self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
+
+    #             if self.name == msg_dst:
+    #                 if msg_type is NodeToEnvironmentMessageTypes.PRINT_REQUEST:
+    #                     msg = PrintRequestMessage.from_dict(msg_in)
+    #                     self.log(f'Print instruction received with content: \'{msg.content}\'')
+
+    #                     # send reception confirmation to sender agent
+    #                     await self.send_blanc_response()
+    #                 else:
+    #                     # if request does not match any of the standard request format, dump and continue
+    #                     self.log(f'Agent messages not yet supported. Sending blank response and dumping message...')
+
+    #                     # send reception confirmation to sender agent
+    #                     await self.send_blanc_response()
+
+    #             else:
+    #                 # message was intended for someone else, discard message
+    #                 self.log('Inter agent message not intended for this agent. Discarding message...')
+    #         except asyncio.CancelledError:
+    #             await self.send_blanc_response()
+
+    #     try:            
+    #         self.log('Acquiring access to agent-in port...')
+    #         await self.agent_socket_in_lock.acquire()
+    #         self.log('Access to agent-in port acquired.')
+
+    #         while True:
+    #             msg_in = None
+    #             worker_task = None
+
+    #             # listen for messages from other agents
+    #             self.log('Waiting for agent messages...')
+    #             msg_in = await self.agent_socket_in.recv_json()
+    #             self.log(f'Agent message received!')
                 
-                # handle request
-                self.log(f'Handling agent message...',level=logging.DEBUG)
-                # msg = InterNodeMessage.from_json(msg_in)
-                # msg_dict = InterNodeMessage.to_dict(msg)
-                # worker_task = asyncio.create_task(self.reception_worker(msg_dict))
-                # await worker_task
-                #await self.send_blanc_response()
-                self.log(f'Agent message handled.',level=logging.DEBUG)
+    #             # handle request
+    #             self.log(f'Handling agent message...')
+    #             worker_task = asyncio.create_task(reception_worker(msg_in))
+    #             await worker_task
+    #             self.log(f'Agent message handled.')
 
-        except asyncio.CancelledError:
-            if msg_in is not None:
-                self.log('Sending blank response...',level=logging.DEBUG)
-                await self.send_blanc_response()
-            elif worker_task is not None:
-                self.log('Cancelling response...',level=logging.DEBUG)
-                worker_task.cancel()
-                await worker_task
-            else:
-                poller = zmq.asyncio.Poller()
-                poller.register(self.agent_socket_in, zmq.POLLIN)
-                poller.register(self.agent_socket_in, zmq.POLLOUT)
+    #     except asyncio.CancelledError:
+    #         if msg_in is not None:
+    #             self.log('Sending blank response...')
+    #             await self.send_blanc_response()
+    #         elif worker_task is not None:
+    #             self.log('Cancelling response...')
+    #             worker_task.cancel()
+    #             await worker_task
+    #         else:
+    #             poller = zmq.asyncio.Poller()
+    #             poller.register(self.agent_socket_in, zmq.POLLIN)
+    #             poller.register(self.agent_socket_in, zmq.POLLOUT)
 
-                evnt = await poller.poll(1000)
-                if len(evnt) > 0:
-                    self.log('Agent message received during shutdown process. Sending blank response..',level=logging.DEBUG)
-                    await self.send_blanc_response()
+    #             evnt = await poller.poll(1000)
+    #             if len(evnt) > 0:
+    #                 self.log('Agent message received during shutdown process. Sending blank response..')
+    #                 await self.send_blanc_response()
 
-            self.log('Releasing agent-in port...',level=logging.DEBUG)
-            self.agent_socket_in_lock.release()
-            return
-    
-    async def reception_worker(self, msg_in: dict):
-        """
-        Handles received message according to its type
-        """
-        try:            
-            msg_type = NodeToEnvironmentMessageTypes[[msg_in['@type']]]
-            msg_src = msg_in['src']
-            msg_dst = msg_in['dst']
-
-            #TODO check for format of message being sent?
-
-            self.message_logger.info(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!')
-            self.log(f'Received a message of type {msg_type} from {msg_src} intended for {msg_dst}!',level=logging.DEBUG)
-
-            if self.name == msg_dst:
-                if msg_type is NodeToEnvironmentMessageTypes.PRINT_REQUEST:
-                    msg = PrintRequestMessage.from_dict(msg_in)
-                    self.log(f'Print instruction received with content: \'{msg.content}\'')
-
-                    # send reception confirmation to sender agent
-                    await self.send_blanc_response()
-                else:
-                    # if request does not match any of the standard request format, dump and continue
-                    self.log(f'Agent messages not yet supported. Sending blank response and dumping message...',level=logging.DEBUG)
-
-                    # send reception confirmation to sender agent
-                    await self.send_blanc_response()
-
-            else:
-                # message was intended for someone else, discard message
-                self.log('Inter agent message not intended for this agent. Discarding message...',level=logging.DEBUG)
-        except asyncio.CancelledError:
-            await self.send_blanc_response()
+    #         self.log('Releasing agent-in port...')
+    #         self.agent_socket_in_lock.release()
+    #         return
 
     """
     --------------------
@@ -464,81 +454,6 @@ class AgentClient(Module):
         else:
             self.SIMULATION_FREQUENCY = None
             self.sim_time = Container()
-
-    def set_up_results_directory(self, scenario_dir):
-        """
-        Creates directories for agent results and clears them if they already exist
-        """
-
-        scenario_results_path = scenario_dir + '/results'
-        if not os.path.exists(scenario_results_path):
-            # if directory does not exists, create it
-            os.mkdir(scenario_results_path)
-
-        agent_results_path = scenario_results_path + f'/{self.name}'
-        if os.path.exists(agent_results_path):
-            # if directory already exists, clear contents
-            for f in os.listdir(agent_results_path):
-                path = os.path.join(agent_results_path, f)
-                try:
-                    shutil.rmtree(path)
-                except:
-                    os.remove(path)
-        else:
-            # if directory does not exist, create a new onw
-            os.mkdir(agent_results_path)
-        
-        if(os.path.exists(agent_results_path+'/sd')):
-            pass
-        else:
-            os.mkdir(agent_results_path+'/sd')
-
-        return scenario_results_path, agent_results_path
-
-    def set_up_loggers(self):
-        """
-        set root logger to default settings
-        """
-
-        logging.root.setLevel(logging.INFO)
-        logging.basicConfig(level=logging.INFO)
-        
-        logger_names = ['agent_messages', 'env_requests', 'measurements', 'state', 'actions']
-
-        loggers = []
-        for logger_name in logger_names:
-            path = self.AGENT_RESULTS_DIR + f'/{logger_name}.log'
-
-            if os.path.exists(path):
-                # if file already exists, delete
-                os.remove(path)
-
-            # create logger
-            logger = logging.getLogger(f'{self.name}_{logger_name}')
-            logger.propagate = False
-
-            # create handlers
-            c_handler = logging.StreamHandler(sys.stderr)
-
-            if logger_name == 'actions':
-                c_handler.setLevel(logging.DEBUG)
-            else:
-                c_handler.setLevel(logging.WARNING)
-
-            f_handler = logging.FileHandler(path)
-            f_handler.setLevel(logging.DEBUG)
-
-            # create formatters
-            f_format = logging.Formatter('%(message)s')
-            f_handler.setFormatter(f_format)
-
-            # add handlers to logger
-            logger.addHandler(c_handler)
-            logger.addHandler(f_handler)
-
-            loggers.append(logger)
-        logging.getLogger('neo4j').setLevel(logging.WARNING)
-        return loggers
                 
     async def environment_message_submitter(self, msg: NodeToEnvironmentMessage, module_name: str=None):
         try:
@@ -560,8 +475,8 @@ class AgentClient(Module):
                     self.environment_request_lock.release()
                     acquired = None
                 #self.log('Tic request reception confirmation received.')         
-
-                return
+                                
+                resp = None
 
             elif isinstance(msg, AccessSenseMessage): 
                 # submit request
@@ -582,9 +497,9 @@ class AgentClient(Module):
                     return None
                     
                 resp = AccessSenseMessage.from_json(resp_json)
-                self.log(f'Received Request Response: \'{resp.result}\'',level=logging.DEBUG)        
-                
-                return resp
+                self.log(f'Received Request Response: \'{resp.result}\'')        
+            
+                # return resp
 
             elif isinstance(msg, AgentSenseMessage):
                 # submit request
@@ -607,7 +522,7 @@ class AgentClient(Module):
                 resp = AgentSenseMessage.from_json(resp_json)
                 self.log(f'Received Response: \'{[resp.pos, resp.vel, resp.eclipse]}\'',level=logging.DEBUG)        
                 
-                return resp
+                # return resp
 
             elif isinstance(msg, ObservationSenseMessage):
                 # submit request
@@ -630,15 +545,18 @@ class AgentClient(Module):
                 resp = ObservationSenseMessage.from_json(resp_json)
                 self.log(f'Received Observation Sense Message',level=logging.DEBUG)        
                 
-                return resp
+                # return resp
 
             else:
                 raise Exception(f'Request of type {msg_type} not supported by request submitter.')
 
+            self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
+            if resp is not None:
+                self.log(f'RECEIVED, {resp}', logger_type=LoggerTypes.ENV_TO_AGENT_MESSAGE, level=logging.INFO)
+                return resp
+
         except asyncio.CancelledError:
-            self.log(f'Environment_message_submitted has been cancelled!',level=logging.DEBUG)
-            if acquired:
-                self.environment_request_lock.release()
+            return
 
     async def message_transmitter(self, msg: InterNodeMessage):
         try:
@@ -677,6 +595,7 @@ class AgentClient(Module):
         blanc = dict()
         blanc_json = json.dumps(blanc)
         await self.agent_socket_out.send_json(blanc_json)
+  
 
 class AgentState:
     def __init__(self, agent: AgentClient, component_list) -> None:

@@ -58,14 +58,14 @@ class ScienceModule(Module):
 
                     await self.send_internal_message(msg)
 
-                elif isinstance(msg, RequestMessage) and isinstance(msg.get_request(), InformationRequest):
+                elif isinstance(msg, MeasurementRequestMessage) and isinstance(msg.get_request(), InformationRequest):
                     # if a request message is received, forward to on-board processing submodule
                     self.log(f'Received Information Request message from \'{msg.src_module}\'!')
                     msg.dst_module = ScienceSubmoduleTypes.ONBOARD_PROCESSING.value
 
                     await self.send_internal_message(msg)
 
-                elif isinstance(msg, RequestMessage) and isinstance(msg.get_request(), DataProcessingRequest):
+                elif isinstance(msg, MeasurementRequestMessage) and isinstance(msg.get_request(), DataProcessingRequest):
                     # if a request message is received, forward to on-board processing submodule
                     self.log(f'Received Data Processing Request message from \'{msg.src_module}\'!')
                     msg.dst_module = ScienceSubmoduleTypes.ONBOARD_PROCESSING.value

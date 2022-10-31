@@ -240,7 +240,7 @@ class NodeToEnvironmentMessage(SimulationMessage):
         """
         return super().to_dict()
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a message class object from a dictionary 
         """
@@ -273,6 +273,9 @@ class NodeToEnvironmentMessage(SimulationMessage):
         """
         return NodeToEnvironmentMessage.from_dict(json.loads(j))
 
+    def __str__(self) -> str:
+        return f'{self._type.name}, {self.src}, {self.dst}'
+
 class SyncRequestMessage(NodeToEnvironmentMessage):
     def __init__(self, src: str, dst: str, port: str, n_coroutines: int) -> None:
         """
@@ -300,7 +303,7 @@ class SyncRequestMessage(NodeToEnvironmentMessage):
         msg_dict['n_coroutines'] = self.n_coroutines
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a message class object from a dictionary
         """
@@ -428,7 +431,7 @@ class AccessSenseMessage(NodeToEnvironmentMessage):
 
         return msg_dict
     
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Access Sense Message class object from a dictionary
         """
@@ -456,7 +459,9 @@ class AccessSenseMessage(NodeToEnvironmentMessage):
         if result == 'None':
             result = None
 
-        return AccessSenseMessage(src, _type, target, result)
+        msg = AccessSenseMessage(src, _type, target, result)
+        msg.dst = d.get('dst', None)
+        return msg
 
     def to_json(self):
         """
@@ -484,7 +489,7 @@ class AgentAccessSenseMessage(AccessSenseMessage):
         """
         super().__init__(src, NodeToEnvironmentMessageTypes.AGENT_ACCESS_SENSE, target, result)
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Agent Access Sense Message class object from a dictionary
         """
@@ -510,7 +515,9 @@ class AgentAccessSenseMessage(AccessSenseMessage):
         if result == 'None':
             result = None
 
-        return AgentAccessSenseMessage(src, target, result)
+        msg = AgentAccessSenseMessage(src, target, result)
+        msg.dst = d.get('dst', None)
+        return msg
 
     def from_json(d):
         """
@@ -532,7 +539,7 @@ class GndStnAccessSenseMessage(AccessSenseMessage):
         """
         super().__init__(src, NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE, target, result)
     
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Ground Station Access Sense Message class object from a dictionary
         """
@@ -558,7 +565,9 @@ class GndStnAccessSenseMessage(AccessSenseMessage):
         if result == 'None':
             result = None
 
-        return GndStnAccessSenseMessage(src, target, result)
+        msg = GndStnAccessSenseMessage(src, target, result)
+        msg.dst = d.get('dst', None)
+        return msg
 
     def from_json(d):
         """
@@ -583,7 +592,7 @@ class GndPntAccessSenseMessage(AccessSenseMessage):
         super().__init__(src, NodeToEnvironmentMessageTypes.GP_ACCESS_SENSE, [lat, lon], result)
         self.target = (lat, lon)
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Ground Point Access Sense Message class object from a dictionary
         """
@@ -610,7 +619,9 @@ class GndPntAccessSenseMessage(AccessSenseMessage):
             result = None
         lat, lon = target
 
-        return GndPntAccessSenseMessage(src, lat, lon, result)
+        msg = GndPntAccessSenseMessage(src, lat, lon, result)
+        msg.dst = d.get('dst', None)
+        return msg
 
     def from_json(d):
         """
@@ -683,7 +694,7 @@ class AgentSenseMessage(NodeToEnvironmentMessage):
 
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Access Sense Message class object from a dictionary
         """
@@ -717,7 +728,9 @@ class AgentSenseMessage(NodeToEnvironmentMessage):
         if eclipse == 'None':
             eclipse = None
 
-        return AgentSenseMessage(src, internal_state, pos, vel, eclipse)
+        msg = AgentSenseMessage(src, internal_state, pos, vel, eclipse)
+        msg.dst = d.get('dst', None)
+        return msg
 
     def from_json(d):
         """
@@ -738,7 +751,7 @@ class AgentEndConfirmationMessage(NodeToEnvironmentMessage):
         """
         super().__init__(src, dst, NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION)
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Agent End Confirmation Message class object from a dictionary
         """
@@ -803,7 +816,7 @@ class ObservationSenseMessage(NodeToEnvironmentMessage):
 
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Observation Sense Message class object from a dictionary
         """
@@ -825,8 +838,9 @@ class ObservationSenseMessage(NodeToEnvironmentMessage):
         elif _type is not NodeToEnvironmentMessageTypes.OBSERVATION_SENSE:
             raise Exception(f'Cannot load a Observation Sense Message from a dictionary of type {type_name}.')
 
-
-        return ObservationSenseMessage(src, lat, lon, obs)
+        msg = ObservationSenseMessage(src, lat, lon, obs)
+        msg.dst = d.get('dst', None)
+        return msg
 
     def from_json(d):
         """`
@@ -846,7 +860,7 @@ class PrintRequestMessage(NodeToEnvironmentMessage):
         req_dict = super().to_dict()
         req_dict['content'] = self.conten
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a message class object from a dictionary 
         """
@@ -924,7 +938,7 @@ class EnvironmentBroadcastMessage(SimulationMessage):
         msg_dict['t'] = self.t
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a message class object from a dictionary 
         """
@@ -965,7 +979,7 @@ class TicEventBroadcast(EnvironmentBroadcastMessage):
         """
         super().__init__(src, EnvironmentBroadcastMessageTypes.TIC_EVENT, t)
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a message class object from a dictionary 
         """
@@ -1027,7 +1041,7 @@ class EventBroadcastMessage(EnvironmentBroadcastMessage):
         msg_dict['t'] = self.t
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of an Event Broadcast Message class object from a dictionary
         """
@@ -1083,7 +1097,7 @@ class EclipseEventBroadcastMessage(EventBroadcastMessage):
         """
         super().__init__(src, dst, EnvironmentBroadcastMessageTypes.ECLIPSE_EVENT, t, rise)
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of an access Event Broadcast Message class object from a dictionary
         """
@@ -1147,7 +1161,7 @@ class AgentAccessEventBroadcastMessage(EventBroadcastMessage):
         msg_dict['target'] = self.target
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of an access Event Broadcast Message class object from a dictionary
         """
@@ -1224,7 +1238,7 @@ class GndPntAccessEventBroadcastMessage(EventBroadcastMessage):
         msg_dict['point index'] = self.gp_index
         return msg_dict
     
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of an access Event Broadcast Message class object from a dictionary
         """
@@ -1292,7 +1306,7 @@ class GndStnAccessEventBroadcastMessage(EventBroadcastMessage):
         msg_dict['target'] = self.target
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of an access Event Broadcast Message class object from a dictionary
         """
@@ -1357,7 +1371,7 @@ class SimulationStartBroadcastMessage(EnvironmentBroadcastMessage):
         msg_dict['clock info'] = self.clock_info.copy()
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Simulation Start Broadcast Message class object from a dictionary
         """
@@ -1418,7 +1432,7 @@ class SimulationEndBroadcastMessage(EnvironmentBroadcastMessage):
         msg_dict['t_end'] = self.t_end
         return msg_dict
 
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a Simulation End Broadcast Message class object from a dictionary
         """
@@ -1460,7 +1474,7 @@ INTER MODULE MESSAGES
 ------------------------
 """
 class InternalMessage:
-    def __init__(self, src_module: str, dst_module: str, content) -> None:
+    def __init__(self, src_module: str, dst_module: str, content, name:str = 'InternalMessage') -> None:
         """
         Abstract message used to for inter-module communication
 
@@ -1471,6 +1485,7 @@ class InternalMessage:
         content: 
             content of the message being sent
         """
+        self.name = name
         self.src_module = src_module  
         self.dst_module = dst_module 
         self.content = content
@@ -1478,18 +1493,21 @@ class InternalMessage:
     def generate_response(self):
         return InternalMessage(src_module=self.dst_module, dst_module=self.src_module, content=self.content)
 
-class RequestMessage(InternalMessage):
+    def __str__(self) -> str:
+        return f'{self.name}, {self.src_module}, {self.dst_module}, {self.content}'
+
+class MeasurementRequestMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, request : Request) -> None:
         """
         Internal message comminicating a measurement request to be scheduled
         """
-        super().__init__(src_module, dst_module, request)
+        super().__init__(src_module, dst_module, request, name='MeasurementRequestMessage')
     
     def get_request(self) -> Request:
         return self.content
 
 class DataMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str) -> None:
+    def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str, name:str = 'DataMessage') -> None:
         """
         Message carrying sensor data from one module to another
 
@@ -1504,7 +1522,7 @@ class DataMessage(InternalMessage):
         data:        
             data to be sent
         """
-        super().__init__(src_module, dst_module, data)
+        super().__init__(src_module, dst_module, data, name)
         self._target = (target_lat, target_lon)
 
     def get_data(self):
@@ -1537,7 +1555,7 @@ class DataDeletedMessage(DataMessage):
         data:        
             data that is no longer available
         """
-        super().__init__(src_module, dst_module, target_lat, target_lon, data)
+        super().__init__(src_module, dst_module, target_lat, target_lon, data, name='DataDeletedMessage')
         
 
 """
@@ -1548,7 +1566,7 @@ class ComponentTaskMessage(InternalMessage):
         """
         Intermodule message carrying a component task
         """
-        super().__init__(src_module, dst_module, task)
+        super().__init__(src_module, dst_module, task, name='ComponentTaskMessage')
 
     def get_task(self) -> ComponentTask:
         return self.content
@@ -1559,7 +1577,7 @@ class ComponentTaskCompletionMessage(InternalMessage):
         Internal message informing a module of the status of a component task 
         """
         tupple = (task, status)
-        super().__init__(src_module, dst_module, tupple)
+        super().__init__(src_module, dst_module, tupple, name='ComponentTaskCompletionMessage')
 
     def get_task(self) -> ComponentTask:
         task, _ = self.content
@@ -1574,7 +1592,7 @@ class ComponentStateMessage(InternalMessage):
         """
         Inter module communicating the latest state of a component module
         """
-        super().__init__(src_module, dst_module, state)
+        super().__init__(src_module, dst_module, state, name='ComponentStateMessage')
 
         if state is None:
             raise Exception('State of NoneType not supported')
@@ -1592,7 +1610,7 @@ class SubsystemTaskMessage(InternalMessage):
         """
         Intermodule message carrying a subsystem task
         """
-        super().__init__(src_module, dst_module, task)
+        super().__init__(src_module, dst_module, task, name='SubsystemTaskMessage')
 
     def get_task(self) -> SubsystemTask:
         return self.content
@@ -1602,7 +1620,7 @@ class SubsystemTaskCompletionMessage(InternalMessage):
         """
         Internal message informing a module of the status of a subsystem task 
         """
-        super().__init__(src_module, dst_module, (task, status))
+        super().__init__(src_module, dst_module, (task, status), name='SubsystemTaskCompletionMessage')
 
     def get_task(self) -> SubsystemTask:
         task, _ = self.content
@@ -1617,7 +1635,7 @@ class SubsystemStateMessage(InternalMessage):
         """
         Inter module message communicating the latest state of a subsystem module
         """
-        super().__init__(src_module, dst_module, state)
+        super().__init__(src_module, dst_module, state, name='SubsystemStateMessage')
 
     def get_state(self):
         return self.content
@@ -1627,7 +1645,7 @@ class SubsystemStateRequestMessage(InternalMessage):
         """
         Inter module message requesting the latest state of a particular subsystem module
         """
-        super().__init__(src_module, dst_module, None)
+        super().__init__(src_module, dst_module, None, name='SubsystemStateRequestMessage')
 
 """
 PLATFORM TASK MESSAGES
@@ -1637,7 +1655,7 @@ class PlatformTaskMessage(InternalMessage):
         """
         Intermodule message carrying an agent platform task
         """
-        super().__init__(src_module, dst_module, task)
+        super().__init__(src_module, dst_module, task, name='PlatformTaskMessage')
 
     def get_task(self) -> SubsystemTask:
         """
@@ -1650,4 +1668,4 @@ class PlatformTaskCompletionMessage(InternalMessage):
         """
         Internal message informing a module of the status of a platform task 
         """
-        super().__init__(src_module, dst_module, (task, status))
+        super().__init__(src_module, dst_module, (task, status), name='PlatformTaskCompletionMessage')
