@@ -14,14 +14,24 @@ from utils import *
 
 
 class ComponentTask:
-    def __init__(self, component: str) -> None:
+    def __init__(self, component: str, name : str) -> None:
         """
         Abstract component task class meant to communicate a task to be performed by a specific component
 
         component:
             Name of component to perform the task
+        name:
+            Name of the task to be performed
         """
         self.component : str = component
+        self.name = name
+
+    def __str__(self) -> str:
+        out = dict()
+        out['name'] = self.name
+        out['@type'] = 'ComponentTask'
+        out['component'] = self.component
+        return json.dumps(out)
 
 class ComponentAbortTask(ComponentTask):
     def __init__(self, component: str, target_task : ComponentTask) -> None:
@@ -33,16 +43,21 @@ class ComponentAbortTask(ComponentTask):
         target_task:
             Task to be aborted
         """
-        super().__init__(component)
+        super().__init__(component, 'ComponentAbortTask')
         self.target_task = target_task
+    
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target_task'] = str(self.target_task)
+        return json.dumps(out)
 
 class ComponentMaintenanceTask(ComponentTask):
-    def __init__(self, component: str) -> None:
+    def __init__(self, component: str, name : str) -> None:
         """
         Abstract component task representing maintenance tasks to be performed to the component. 
         Includes tasks that regulate a component's status, health, or power-supply.
         """
-        super().__init__(component)
+        super().__init__(component, name)
 
 class ComponentActuationTask(ComponentMaintenanceTask):
     def __init__(self, component: str, actuation_status: ComponentStatus) -> None:
@@ -54,8 +69,13 @@ class ComponentActuationTask(ComponentMaintenanceTask):
         actuation_status:
             Status of the component actuation to be set by this task
         """
-        super().__init__(component)
-        self.component_status : ComponentStatus = actuation_status
+        super().__init__(component, 'ComponentActuationTask')
+        self.actuation_status : ComponentStatus = actuation_status
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['actuation_status'] = self.actuation_status
+        return json.dumps(out)
 
 class DisableComponentTask(ComponentActuationTask):
     def __init__(self, component: str) -> None:
@@ -72,17 +92,22 @@ class EnableComponentTask(ComponentActuationTask):
         super().__init__(component, ComponentStatus.ON)
 
 class ReceivePowerTask(ComponentMaintenanceTask):
-    def __init__(self, component: str, power_to_supply : float) -> None:
+    def __init__(self, component: str, power_to_receive : float) -> None:
         """
         Tells a specific component that it is receiving some amount of power from the EPS
 
         component:
             name of component to supply power
-        power_to_supply:
-            amout of power supplied in [W]
+        power_to_receive:
+            amout of power received in [W]
         """
-        super().__init__(component)
-        self.power_to_supply = power_to_supply
+        super().__init__(component, 'ReceivePowerTask')
+        self.power_to_receive = power_to_receive
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['power_to_receive'] = self.power_to_receive
+        return json.dumps(out)
 
 class StopReceivingPowerTask(ReceivePowerTask):
     def __init__(self, component: str, power_supplied: float) -> None:
@@ -108,9 +133,15 @@ class ProvidePowerTask(ComponentTask):
         target:
             name of component to be supplied with power
         """
-        super().__init__(eps_component)
+        super().__init__(eps_component, 'ProvidePowerTask')
         self.power_to_supply = power_to_supply
         self.target = target
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['power_to_supply'] = self.power_to_supply
+        out['target'] = self.target
+        return json.dumps(out)
 
 class StopProvidingPowerTask(ProvidePowerTask):
     def __init__(self, eps_component: str, power_to_stop: float, target: str) -> None:
@@ -138,9 +169,15 @@ class SaveToMemoryTask(ComponentTask):
         data:        
             data to be saved
         """
-        super().__init__(ComponentNames.ONBOARD_COMPUTER.value)
+        super().__init__(ComponentNames.ONBOARD_COMPUTER.value, 'SaveToMemoryTask')
         self._target = (target_lat, target_lon)
         self._data = data
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target_lat'] = self.get_target_lat()
+        out['target_lon'] = self.get_target_lon()
+        return json.dumps(out)
 
     def get_data(self):
         return self._data
@@ -177,12 +214,24 @@ class MeasurementTask(ComponentTask):
         target_lon:
             longitude of target in [°]
         attitude_state:
-            attitude of the agent
+            current attitude of the agent
         """
-        super().__init__(instrument_name)
+        super().__init__(instrument_name, 'MeasurementTask')
         self.duration = duration
         self.target = [target_lat, target_lon]
         self.attitude_state = attitude_state
+
+    def __str__(self) -> str:
+        lat, lon = self.target
+
+        out = json.loads( super().__str__() )
+        out['duration'] = self.duration
+        out['target_lat'] = lat
+        out['target_lon'] = lon
+
+        # TODO Include str of attitude state
+        # out['attitude_state'] = self.attitude_state
+        return json.dumps(out)
 
 class ControlSignalTask(ComponentTask):
     def __init__(self, component, control_signal: float) -> None:
@@ -194,11 +243,16 @@ class ControlSignalTask(ComponentTask):
         control_signal:
             value of the step control signal being given to the actuator. Must be a value within [0, 1]
         """
-        super().__init__(component)
+        super().__init__(component, 'ControlSignalTask')
         self.control_signal = control_signal
 
         if control_signal < 0 or 1 < control_signal:
             raise Exception("Control signal must be a value between [0, 1]!")
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['control_signal'] = self.control_signal
+        return json.dumps(out)
 
 class AccelerationUpdateTask(ComponentTask):
     def __init__(self, actuator_name : str, angular_acceleration : list) -> None:
@@ -210,18 +264,30 @@ class AccelerationUpdateTask(ComponentTask):
         angular_acceleration:
             angular acceleration being excerted on the spacecraft in [rad/s^2] in the body-fixed frame
         """
-        super().__init__(ComponentNames.IMU.value)
+        super().__init__(ComponentNames.IMU.value, 'AccelerationUpdateTask')
         self.actuator_name = actuator_name
         self.angular_acceleration = angular_acceleration
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['actuator_name'] = self.actuator_name
+        out['angular_acceleration'] = self.angular_acceleration
+        return json.dumps(out)
 
 class AttitudeUpdateTask(ComponentTask):
     def __init__(self, new_angular_pos, new_angular_vel) -> None:
         """
         Manually updates the attitude in an IMU
         """
-        super().__init__(ComponentNames.IMU.value)
+        super().__init__(ComponentNames.IMU.value, 'AttitudeUpdateTask')
         self.new_angular_pos = new_angular_pos
-        self.new_angular_vel = new_angular_vel        
+        self.new_angular_vel = new_angular_vel
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['new_angular_pos'] = self.new_angular_pos
+        out['new_angular_vel'] = self.new_angular_vel
+        return json.dumps(out)
 
 class TransmitMessageTask(ComponentTask):
     def __init__(self, target_agent: str, msg, timeout : float) -> None:
@@ -235,17 +301,24 @@ class TransmitMessageTask(ComponentTask):
         timeout:
             transmission timeout in [s]
         """
-        super().__init__(ComponentNames.TRANSMITTER.value)
+        super().__init__(ComponentNames.TRANSMITTER.value, 'TransmitMessageTask')
         self.target_agent = target_agent
         self.msg = msg
         self.timeout = timeout
     
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target_agent'] = self.target_agent
+        out['msg'] = self.msg
+        out['timeout'] = self.timeout
+        return json.dumps(out)
+
 class ReceiveMessageTransmission(ComponentTask):
     def __init__(self) -> None:
         """
         Instructs comms receiver to be open for message transmission reception 
         """
-        super().__init__(ComponentNames.RECEIVER.value)
+        super().__init__(ComponentNames.RECEIVER.value, 'ReceiveMessageTransmission')
 
 """
 -------------------------------
@@ -253,7 +326,7 @@ SUBSYSTEM TASKS
 -------------------------------
 """
 class SubsystemTask:
-    def __init__(self, subsystem: str) -> None:
+    def __init__(self, subsystem: str, name: str) -> None:
         """
         Abstract subsystem task class meant to communicate a task to be performed by a particular subsystem
 
@@ -261,6 +334,14 @@ class SubsystemTask:
             Name of subsystem to perform the task
         """
         self.subsystem : str = subsystem
+        self.name : str = name
+
+    def __str__(self) -> str:
+        out = dict()
+        out['name'] = self.name
+        out['@type'] = 'SubsystemTask'
+        out['subsystem'] = self.subsystem
+        return json.dumps(out)
 
 class SubsystemAbortTask(SubsystemTask):
     def __init__(self, subsystem: str, target_task : SubsystemTask) -> None:
@@ -275,6 +356,11 @@ class SubsystemAbortTask(SubsystemTask):
         super().__init__(subsystem)
         self.target_task = target_task
 
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target_task'] = str(self.target_task)
+        return json.dumps(out)
+
 class PowerSupplyRequestTask(SubsystemTask):
     def __init__(self, target : str, power_requested : float) -> None:
         """
@@ -285,9 +371,15 @@ class PowerSupplyRequestTask(SubsystemTask):
         power_requested:
             amount of power being requested in [W]
         """
-        super().__init__(SubsystemNames.EPS.value)
+        super().__init__(SubsystemNames.EPS.value, 'PowerSupplyRequestTask')
         self.target = target
         self.power_requested = power_requested
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target'] = self.target
+        out['power_requested'] = self.power_requested
+        return json.dumps(out)
 
 class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
     def __init__(self, target: str, power_supplied: float) -> None:
@@ -311,9 +403,15 @@ class PerformAttitudeManeuverTask(SubsystemTask):
         target_angular_pos:
             quaternion vector describing the target angular velocity of the agent
         """
-        super().__init__(SubsystemNames.ADCS.value)
+        super().__init__(SubsystemNames.ADCS.value, 'PerformAttitudeManeuverTask')
         self.target_angular_pos = target_angular_pos
         self.target_angular_vel = target_angular_vel
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target_angular_pos'] = self.target_angular_pos
+        out['target_angular_vel'] = self.target_angular_vel
+        return json.dumps(out)
 
 class PerformMeasurement(SubsystemTask):
     def __init__(self, target_lat : float, target_lon : float, instruments : list, durations : list) -> None:
@@ -330,7 +428,7 @@ class PerformMeasurement(SubsystemTask):
         duration:
             list of duration of each instrument measurement
         """
-        super().__init__(SubsystemNames.PAYLOAD.value)
+        super().__init__(SubsystemNames.PAYLOAD.value, 'PerformMeasurementTask')
         self.target = (target_lat, target_lon)
 
         self.instruments = []
@@ -340,6 +438,15 @@ class PerformMeasurement(SubsystemTask):
         self.durations = []
         for duration in durations:
             self.durations.append(duration)
+    def __str__(self) -> str:
+        lat, lon = self.target
+
+        out = json.loads( super().__str__() )
+        out['target_lat'] = lat
+        out['target_lon'] = lon
+        out['instruments'] = self.instruments
+        out['durations'] = self.durations
+        return json.dumps(out)
 
 """
 -------------------------------
@@ -347,11 +454,17 @@ PLATOFRM TASK
 -------------------------------
 """
 class PlatformTask:
-    def __init__(self) -> None:
+    def __init__(self, name : str) -> None:
         """
         Abstract platform task class meant to communicate a task to be performed by the agent's platform
         """
-        return
+        self.name = name
+
+    def __str__(self) -> str:
+        out = dict()
+        out['name'] = self.name
+        out['@type'] = 'PlatformTask'
+        return json.dumps(out)
 
 class PlatformAbortTask(PlatformTask):
     def __init__(self, target_task : PlatformTask) -> None:
@@ -361,12 +474,17 @@ class PlatformAbortTask(PlatformTask):
         target_task:
             Task to be aborted
         """
-        super().__init__()
+        super().__init__('PlatformAbortTask')
         self.target_task = target_task
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['target_task'] = str( self.target_task )
+        return json.dumps(out)
 
 class ObservationTask(PlatformTask):
     def __init__(self, target_lan : float, target_lon : float, instrument_list : list, durations : list) -> None:
-        super().__init__()
+        super().__init__('ObservationTask')
         self.target = (target_lan, target_lon)
 
         self.instrument_list = []
@@ -380,6 +498,16 @@ class ObservationTask(PlatformTask):
     def get_target(self):
         return self.target
 
+    def __str__(self) -> str:
+        lat, lon = self.target
+
+        out = json.loads( super().__str__() )
+        out['target_lat'] = lat
+        out['target_lon'] = lon
+        out['instruments'] = self.instrument_list
+        out['durations'] = self.durations
+        return json.dumps(out)
+
 """
 -------------------------------
 PLANNER TASK
@@ -388,7 +516,7 @@ PLANNER TASK
 class PlannerTask:
     def __init__(self) -> None:
         """
-        Abstract platform task class meant to communicate from obs planner to ops planner
+        Abstract platform task class meant to communicate from observations planner to operations planner
         """
         return
 
@@ -460,3 +588,14 @@ class InformationRequest(Request):
 class DataProcessingRequest(Request):
     def __init__(self, data_type: type, target_lat: float, target_lon: float, data : str) -> None:
         super().__init__(data_type)
+        self._target = [target_lat, target_lon]
+        self._data = data
+
+    def get_data_type(self):
+        return self._type
+
+    def get_target(self):
+        return self._target
+
+    def get_data(self):
+        return self._data
