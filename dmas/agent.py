@@ -104,21 +104,21 @@ class AgentClient(NodeModule):
         self.log(f'Starting activation routine...', level=logging.INFO)
 
         # initiate network ports and connect to environment server
-        self.log('Configuring network ports...')
+        self.log('Configuring network ports...', level=logging.INFO)
         await self.network_config()
-        self.log('Network configuration completed!')
+        self.log('Network configuration completed!', level=logging.INFO)
 
         # confirm online status to environment server 
-        self.log("Synchronizing with environment...")
+        self.log("Synchronizing with environment...", level=logging.INFO)
         await self.sync_environment()
-        self.log(f'Synchronization response received! Synchronized with environment.')
+        self.log(f'Synchronization response received! Synchronized with environment.', level=logging.INFO)
 
         # await for start-simulation message from environment
-        self.log(f'Waiting for simulation start broadcast...')
+        self.log(f'Waiting for simulation start broadcast...', level=logging.INFO)
         await self.wait_sim_start()
-        self.log(f'Simulation start broadcast received!')
+        self.log(f'Simulation start broadcast received!', level=logging.INFO)
 
-        self.log(f'Activating agent submodules...')
+        self.log(f'Activating agent submodules...', level=logging.INFO)
         await super().activate()
         self.log('Agent activated!', level=logging.INFO)
 

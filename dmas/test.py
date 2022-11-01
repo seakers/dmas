@@ -5,8 +5,8 @@ from agent import ScienceTestAgent
 from agent import IridiumTestAgent
 
 def suominpp_run():
-    print(f'SuomiNPP run')
-    agent = ScienceTestAgent(f'SuomiNPP', './scenarios/sim_test/')
+    print(f'Suomi NPP run')
+    agent = ScienceTestAgent(f'Suomi NPP', './scenarios/sim_test/')
     asyncio.run(agent.live())
 
 def jason_run():

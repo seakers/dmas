@@ -1062,14 +1062,14 @@ class EnvironmentServer(NodeModule):
             for agent_name in self.AGENT_NAME_LIST:
                 if (agent_name in msg_src) and (agent_name not in self.alive_subscribers):
                     self.alive_subscribers.append(agent_name)
-                    self.log(f"{agent_name} is now synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} is now synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     
                     subscriber_to_port_map[msg_src] = src_port
                     break
                 elif (agent_name in self.alive_subscribers):
-                    self.log(f"{agent_name} is already synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} is already synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                 elif (msg_src not in self.AGENT_NAME_LIST):
-                    self.log(f"{agent_name} agent node not in list of agents for this environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} agent node not in list of agents for this environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     
             # send synchronization reply
             await self.reqservice.send_string('')
@@ -1242,7 +1242,7 @@ if __name__ == '__main__':
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, ['SuomiNPP', 'Jason-3', 'CustomSat', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, ['Suomi NPP', 'Jason-3', 'CustomSat', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
     print('DONE')

@@ -374,7 +374,7 @@ class ScienceValueModule(Module):
 
                 science_value = self.compute_science_value(lat, lon, obs)                
 
-                measurement_request = MeasurementRequest("chlorophyll-a", lat, lon, science_value)
+                measurement_request = MeasurementRequest("tss", lat, lon, science_value)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
@@ -505,17 +505,20 @@ class OnboardProcessingModule(Module):
                 self.log(f'Received measurement result from ({lat}°, {lon}°)!', level=logging.INFO)
 
                 # process result
-                b4,b5,prefix,stored_data_filepath = self.store_measurement(obs_str)
+                obs_process_time = self.get_current_time()
+
                 parent_agent = self.get_top_module()
                 instrument = parent_agent.payload[parent_agent.name]["name"]
                 self.log(f'Instrument: {instrument}',level=logging.INFO)
-                if(instrument == "VIIRS"):
-                    processed_data = self.compute_chlorophyll_obs_value(b4,b5)
-                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
-                    self.log(f'Chlorophyll measurement data successfully saved in on-board data-base.', level=logging.INFO)
-                elif(instrument == "Jason3"):
+                if(instrument == "VIIRS"): # TODO replace this hardcoding
+                    data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
+                    processed_data = self.compute_tss_obs_value(data)
+                    self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"tss",raw_data_filename,processed_data)
+                    self.log(f'TSS measurement data successfully saved in on-board data-base.', level=logging.INFO)
+                elif(instrument == "POSEIDON-3B Altimeter"): # TODO replace this hardcoding
+                    data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_altimetry()
-                    self.sd = self.add_data_product(self.sd,lat,lon,0.01,"altimetry",prefix+"alt_"+stored_data_filepath,processed_data)
+                    self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"altimetry",raw_data_filename,processed_data)
                     self.log(f'Altimetry measurement data successfully saved in on-board data-base.', level=logging.INFO)
                 else:
                     self.log(f'Instrument not yet supported by science module!',level=logging.INFO)
@@ -527,12 +530,11 @@ class OnboardProcessingModule(Module):
         except asyncio.CancelledError:
             return
 
-    def store_measurement(self,dataprod):
+    def store_raw_measurement(self,dataprod,lat,lon,obs_process_time):
         im = Image.open(BytesIO(base64.b64decode(dataprod)))
 
         img_np = np.array(im)
-        b5 = img_np[:,:,0]
-        b4 = img_np[:,:,1]
+        data = img_np[:,:,0]
         img_np = np.delete(img_np,3,2)
         # from https://stackoverflow.com/questions/67831382/obtaining-rgb-data-from-image-and-writing-it-to-csv-file-with-the-corresponding
         xy_coords = np.flip(np.column_stack(np.where(np.all(img_np >= 0, axis=2))), axis=1)
@@ -544,28 +546,34 @@ class OnboardProcessingModule(Module):
 
         # Properly save as CSV
         prefix = "./scenarios/sim_test/results/"+str(self.parent_module.parent_module.name)+"/sd/"
-        np.savetxt(prefix+"outputdata.csv", value, delimiter='\t', fmt='%4d')
-        return b4, b5, prefix, "outputdata.csv"
+        filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
+        np.savetxt(filename, value, delimiter='\t', fmt='%4d')
+        return data, filename
 
     def compute_chlorophyll_obs_value(self,b4,b5):
         bda = b5 - b5/b4 + b4
         return bda
 
+    def compute_tss_obs_value(self,b4):
+        tss = 195.6 * b4
+        return tss
+
     def compute_altimetry(self):
         return np.random.rand(100,100)
 
-    def add_data_product(self,sd,lat,lon,time,product_type,filepath,data):
+    def add_data_product(self,sd,lat,lon,time,product_type,filename,data):
         data_product_dict = dict()
         data_product_dict["lat"] = lat
         data_product_dict["lon"] = lon
         data_product_dict["time"] = time
         data_product_dict["product_type"] = product_type
-        data_product_dict["filepath"] = filepath
-        data_product_dict["chlorophyll checked"] = False
-        pd.DataFrame(data).to_csv(filepath,index=False,header=False)
+        data_product_dict["filepath"] = filename[:-8]+"_"+product_type+".csv"
+        data_product_dict["checked"] = False
+        pd.DataFrame(data).to_csv(data_product_dict["filepath"],index=False,header=False)
         sd.append(data_product_dict)
         prefix = "./scenarios/sim_test/results/"+str(self.parent_module.parent_module.name)+"/sd/"
-        with open(prefix+"dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
+        filename = prefix+"dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt"
+        with open(filename, mode="wt") as datafile:
             datafile.write(json.dumps(data_product_dict))
         return sd
 
@@ -636,9 +644,9 @@ class ScienceReasoningModule(Module):
 
         try:
             ## Internal coroutines
-            check_chlorophyll_outliers = asyncio.create_task(self.check_chlorophyll_outliers())
-            check_chlorophyll_outliers.set_name (f'{self.name}_check_chlorophyll_outliers')
-            coroutines.append(check_chlorophyll_outliers)
+            check_sd = asyncio.create_task(self.check_sd())
+            check_sd.set_name (f'{self.name}_check_sd')
+            coroutines.append(check_sd)
 
             # wait for the first coroutine to complete
             _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
@@ -674,40 +682,71 @@ class ScienceReasoningModule(Module):
                 break
         return mean, sd, lat, lon
 
-    async def check_chlorophyll_outliers(self):
+    
+
+    async def check_sd(self):
         try:
             while True:
                 msg = await self.updated_queue.get()
-                points = np.zeros(shape=(2000, 5))
-                chlorophyll_outliers = []
-                with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
-                    reader = csv.reader(csvfile)
-                    count = 0
-                    for row in reader:
-                        if count == 0:
-                            count = 1
-                            continue
-                        points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
-                        count = count + 1
+                outliers = []
                 for item in self.sd:
-                    if(item["chlorophyll checked"] is False):
-                        mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
-                        pixel_value = self.get_pixel_value_from_image(item,lat,lon,30) # 30 meters is landsat resolution
-                        pixel_value = 100000 # TODO remove this hardcode
-                        if pixel_value > mean+stddev:
-                            item["severity"] = (pixel_value-mean) / stddev
-                            chlorophyll_outliers.append(item)
-                            self.log(f'Chlorophyll outlier detected at {lat}, {lon}!',level=logging.INFO)
-                        else:
-                            self.log(f'No chlorophyll outlier detected at {lat}, {lon}',level=logging.INFO)
-                        item["chlorophyll checked"] = True
-                for outlier in chlorophyll_outliers:
+                    if(item["product_type"] == "tss"):
+                        outlier, outlier_data = self.check_tss_outliers(item)
+                        if outlier is True:
+                            outliers.append(outlier_data)
+                    elif(item["product_type"] == "altimetry"):
+                        outlier, outlier_data = self.check_altimetry_outliers(item)
+                        if outlier is True:
+                            outliers.append(outlier_data)
+                    else:
+                        self.log(f'Item in science database unsupported by science processing module.',level=logging.INFO)
+                for outlier in outliers:
                     self.log(f'Outliers: {outlier}',level=logging.INFO)
                     msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, outlier)
                     await self.send_internal_message(msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
+    
+    def check_tss_outliers(self,item):
+        outlier = False
+        outlier_data = None
+        if(item["checked"] is False):
+            points = np.zeros(shape=(2000, 5))
+            with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+                reader = csv.reader(csvfile)
+                count = 0
+                for row in reader:
+                    if count == 0:
+                        count = 1
+                        continue
+                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                    count = count + 1
+            mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
+            pixel_value = self.get_pixel_value_from_image(item,lat,lon,30) # 30 meters is landsat resolution
+            if random.randrange(0,10) > 5: # TODO remove this hardcode
+                item["severity"] = (pixel_value-mean) / stddev
+                outlier_data = item
+                self.log(f'TSS outlier detected at {lat}, {lon}!',level=logging.INFO)
+            else:
+                self.log(f'No TSS outlier detected at {lat}, {lon}',level=logging.INFO)
+            item["tss checked"] = True
+        return outlier, outlier_data
+
+    def check_altimetry_outliers(self,item):
+        outlier = False
+        outlier_data = None
+        if(item["checked"] is False):
+            data = np.genfromtxt(item["filepath"], delimiter=',')
+            lat = item["lat"]
+            lon = item["lon"]
+            if(data[0,0] > 0.5):
+                outlier = True
+                outlier_data = item
+                self.log(f'Altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+            else:
+                self.log(f'No altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+        return outlier, outlier_data
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):
         topleftlat = image["lat"]

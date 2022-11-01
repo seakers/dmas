@@ -59,7 +59,9 @@ class InstrumentCapabilityModule(Module):
         """
         try:
             if(isinstance(msg.content, MeasurementRequest)):
-                if self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", "OLI", msg):
+                parent_agent = self.get_top_module()
+                instrument = parent_agent.payload[parent_agent.name]["name"]
+                if self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", instrument, msg):
                     msg.dst_module = PlanningSubmoduleTypes.OBSERVATION_PLANNER.value
                     await self.send_internal_message(msg)
             else:
@@ -85,13 +87,19 @@ class InstrumentCapabilityModule(Module):
         capable = False
         with driver.session() as session:
             product = "None"
-            if(event_msg.content._type == "chlorophyll-a"):
+            if(event_msg.content._type == "tss"):
                 product = "Ocean chlorophyll concentration"
+            elif(event_msg.content._type == "altimetry"):
+                product = "Sea level"
+            else:
+                self.log(f'Unsupported observable type.',level=logging.INFO)
             observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
                 if(observer.get("name") == sc_name):
                     self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
                     capable = True
+            if capable is False:
+                self.log(f'The instruments onboard cannot observe the requested observable.',level=logging.INFO)
         return capable
 
 
@@ -108,6 +116,7 @@ class InstrumentCapabilityModule(Module):
 class ObservationPlanningModule(Module):
     def __init__(self, parent_module : Module) -> None:
         self.obs_plan = []
+        self.obs_candidates = []
         self.orbit_data: dict = OrbitData.from_directory(parent_module.scenario_dir)
         self.orbit_data = self.orbit_data[parent_module.parent_module.name]
         super().__init__(PlanningSubmoduleTypes.OBSERVATION_PLANNER.value, parent_module)
@@ -148,7 +157,9 @@ class ObservationPlanningModule(Module):
             if(isinstance(msg.content, MeasurementRequest)):
                 meas_req = msg.content
                 new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,["OLI"],0.0,1.0)
-                await self.obs_list.put(new_obs)
+                new_obs_list = []
+                new_obs_list.append(new_obs)
+                await self.obs_list.put(new_obs_list)
         except asyncio.CancelledError:
             return
 
@@ -189,7 +200,6 @@ class ObservationPlanningModule(Module):
             while True:
                 # wait for observation request
                 obs_list = await self.obs_list.get()
-                obs_candidates = []
                 for obs in obs_list:
                     # estimate next observation opportunities
                     gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
@@ -201,8 +211,8 @@ class ObservationPlanningModule(Module):
                         self.log(f'Adding observation candidate!',level=logging.INFO)
                         obs.start = gp_access_list[0]['time index']
                         obs.end = obs.start + 5
-                        obs_candidates.append(obs)
-                self.obs_plan = self.rule_based_planner(obs_candidates)
+                        self.obs_candidates.append(obs)
+                self.obs_plan = self.rule_based_planner(self.obs_candidates)
                 # schedule observation plan and send to operations planner for further development
                 plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
                 await self.parent_module.send_internal_message(plan_msg)

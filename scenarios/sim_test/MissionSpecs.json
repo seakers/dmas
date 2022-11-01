@@ -4,7 +4,7 @@
     "spacecraft": [
         {
             "@id": "sp1", 
-            "name": "SuomiNPP",
+            "name": "Suomi NPP",
             "spacecraftBus":{"name": "BlueCanyon", "mass": 20, "volume": 0.5,
                             "orientation":{"referenceFrame": "NADIR_POINTING", "convention": "REF_FRAME_ALIGNED"},
                             "components": {
@@ -89,7 +89,7 @@
                                 }
                             }
                             },
-            "instrument": {"name": "Jason3", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+            "instrument": {"name": "POSEIDON-3B Altimeter", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
                             "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
