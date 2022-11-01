@@ -2815,7 +2815,7 @@ class TransmitterComponent(ComponentModule):
             
             elif isinstance(msg.content, MeasurementRequest):
                 self.log(f'Received a measurement request!',level=logging.INFO)
-                inter_node_msg = MeasurementRequestMessage(self,"Iridium",msg.content)
+                inter_node_msg = InterNodeMeasurementRequestMessage(self,"Iridium",msg.content)
                 task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
                 await self.tasks.put(task_msg)
             else:
@@ -2839,7 +2839,7 @@ class TransmitterComponent(ComponentModule):
         try:
             # check if component was the intended performer of this task
             if task.component != self.name:
-                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
+                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...',level=logging.DEBUG)
                 raise asyncio.CancelledError
 
             if isinstance(task, TransmitMessageTask):
@@ -2880,7 +2880,7 @@ class TransmitterComponent(ComponentModule):
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!')                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!', level=logging.INFO)                    
                     self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
                     return TaskStatus.DONE
 
@@ -2919,7 +2919,6 @@ class TransmitterComponent(ComponentModule):
 
     async def transmit_message(self, msg: InterNodeMessage):
         try:
-            self.log(f'In transmit_message',level=logging.DEBUG)
             # reformat message
             msg.src = self.name
             msg_json = msg.to_json()
@@ -2931,7 +2930,7 @@ class TransmitterComponent(ComponentModule):
             self.log(f'Connected to agent {msg.dst}!',level=logging.DEBUG)
 
             # submit request
-            self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.INFO)
+            self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.DEBUG)
             await parent_agent.agent_socket_out_lock.acquire()
             self.log(f'Acquired lock.',level=logging.DEBUG)
             await parent_agent.agent_socket_out.send_json(msg_json)

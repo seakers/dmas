@@ -69,12 +69,12 @@ class InstrumentCapabilityModule(Module):
         except asyncio.CancelledError:
             return
 
-    def queryGraphDatabase(self, uri, user, password, sc_name,event_msg):
+    def queryGraphDatabase(self, uri, user, password, instrument,event_msg):
         try:
             capable = False
             self.log(f'Querying knowledge graph...', level=logging.INFO)
             driver = GraphDatabase.driver(uri, auth=(user, password))
-            capable = self.print_observers(driver,sc_name,event_msg)
+            capable = self.print_observers(driver,instrument,event_msg)
             driver.close()
             return capable
         except Exception as e:
@@ -83,7 +83,7 @@ class InstrumentCapabilityModule(Module):
             return False
         
 
-    def print_observers(self,driver,sc_name,event_msg):
+    def print_observers(self,driver,instrument,event_msg):
         capable = False
         with driver.session() as session:
             product = "None"
@@ -95,7 +95,7 @@ class InstrumentCapabilityModule(Module):
                 self.log(f'Unsupported observable type.',level=logging.INFO)
             observers = session.read_transaction(self.get_observers, title=product)
             for observer in observers:
-                if(observer.get("name") == sc_name):
+                if(observer.get("name") == instrument):
                     self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
                     capable = True
             if capable is False:
@@ -331,7 +331,7 @@ class OperationsPlanningModule(Module):
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
                         if(task.start < curr_time < task.end):
-                            self.log(f'Sending observation task to engineering module!',level=logging.INFO)
+                            self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1])
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
                             await self.send_internal_message(msg)

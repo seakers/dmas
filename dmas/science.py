@@ -407,7 +407,7 @@ class ScienceValueModule(Module):
     def get_pop(self, lat, lon, points):
         pop = 0.0
         for i in range(len(points[:, 0])):
-            if (float(lat)-points[i, 1] < 0.01) and (float(lon) - points[i, 0] < 0.01):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
                 pop = points[i,4]
                 break
         return pop
@@ -509,7 +509,7 @@ class OnboardProcessingModule(Module):
 
                 parent_agent = self.get_top_module()
                 instrument = parent_agent.payload[parent_agent.name]["name"]
-                self.log(f'Instrument: {instrument}',level=logging.INFO)
+                self.log(f'Instrument: {instrument}',level=logging.DEBUG)
                 if(instrument == "VIIRS"): # TODO replace this hardcoding
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_tss_obs_value(data)
@@ -730,7 +730,7 @@ class ScienceReasoningModule(Module):
                 self.log(f'TSS outlier detected at {lat}, {lon}!',level=logging.INFO)
             else:
                 self.log(f'No TSS outlier detected at {lat}, {lon}',level=logging.INFO)
-            item["tss checked"] = True
+            item["checked"] = True
         return outlier, outlier_data
 
     def check_altimetry_outliers(self,item):
@@ -746,6 +746,7 @@ class ScienceReasoningModule(Module):
                 self.log(f'Altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
             else:
                 self.log(f'No altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+            item["checked"] = True
         return outlier, outlier_data
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):

@@ -155,7 +155,7 @@ class PrintMessage(InterNodeMessage):
         """
         return PrintMessage.from_dict(json.loads(j))
 
-class MeasurementRequestMessage(InterNodeMessage):
+class InterNodeMeasurementRequestMessage(InterNodeMessage):
     def __init__(self, src: str, dst: str, content : str) -> None:
         super().__init__(src, dst, InterNodeMessageTypes.MEASUREMENT_REQUEST, content)
 

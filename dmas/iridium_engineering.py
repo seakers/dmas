@@ -128,14 +128,14 @@ class IridiumTransmitterComponent(ComponentModule):
                 self.environment_events.put(msg.content)
 
             elif isinstance(msg.content, InterNodeMessage):
-                self.log(f'Received an internode message!',level=logging.INFO)
+                self.log(f'Received an internode message!',level=logging.DEBUG)
                 agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
                 for agent_port in agent_port_dict:
                     agent = agent_port_dict[agent_port]
-                    self.log(f'Sending to agent: {agent_port}',level=logging.INFO)
+                    self.log(f'Sending to agent: {agent_port}',level=logging.DEBUG)
                     if(agent_port == "Iridium"):
                         continue
-                    inter_node_msg = MeasurementRequestMessage("Iridium",agent_port,msg.content)
+                    inter_node_msg = InterNodeMeasurementRequestMessage("Iridium",agent_port,msg.content)
                     task_msg = TransmitMessageTask(agent,inter_node_msg,1.0)
                     await self.tasks.put(task_msg)
             elif isinstance(msg.content, MeasurementRequest):
@@ -259,7 +259,7 @@ class IridiumTransmitterComponent(ComponentModule):
             self.log(f'Connected to agent {msg.dst}!',level=logging.DEBUG)
 
             # submit request
-            self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.INFO)
+            self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.DEBUG)
             await parent_agent.agent_socket_out_lock.acquire()
             self.log(f'Acquired lock.',level=logging.DEBUG)
             await parent_agent.agent_socket_out.send_json(msg_json)
