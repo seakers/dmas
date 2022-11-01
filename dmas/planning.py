@@ -303,8 +303,8 @@ class OperationsPlanningModule(Module):
         try:
             while True:
                 # Replace with basic module that adds charging to plan
-                self.log(f'Creating operations plan!',level=logging.INFO)
                 plan = await self.obs_plan.get()
+                self.log(f'Creating operations plan!',level=logging.INFO)
                 plan_beginning = self.get_current_time()
                 starts = []
                 ends = []
