@@ -1,7 +1,9 @@
 import asyncio
 from enum import Enum
-import random
 import numpy
+import base64
+from IPython.display import Image, display
+import matplotlib.pyplot as plt
 
 class EventPair:
     def __init__(self) -> None:
@@ -240,50 +242,91 @@ class Container:
 def mwhr_to_joules(e):
     return e * 3600.0
 
+# sequence diagrams
+
+def load_actions(node_results_dir : str):
+    dir = node_results_dir + '/ACTIONS.log'
+
+def load_internal_messages(node_results_dir : str):
+    dir = node_results_dir + '/INTERNAL_MESSAGE.log'
+
+def generate_internal_sequence_diagram(dir : str):
+    
+    # load data
+    internal_messages = load_internal_messages(dir)
+    actions = load_actions(dir)
+
+    # create graphs
+
+
+
+    # print to directory
+
+
+def diagram_from_ascii(graph : str):
+        graphbytes = graph.encode("ascii")
+        base64_bytes = base64.b64encode(graphbytes)
+        base64_string = base64_bytes.decode("ascii")
+        display(Image(url="https://mermaid.ink/img/" + base64_string))
+
 """
 ---------------------------
 Container Class Testing 
 ---------------------------
 """
 
-async def f1(container: Container):
-    print('tast1 starting...')    
-    await asyncio.sleep(1)
-    await container.put(1)
+# async def f1(container: Container):
+#     print('tast1 starting...')    
+#     await asyncio.sleep(1)
+#     await container.put(1)
     
-async def f2(container: Container):
-    print('tast2 starting...')
-    # await asyncio.sleep(0.5)
-    print(f'current container level: {container.level}')
-    # await container.when_greater_than(0)
+# async def f2(container: Container):
+#     print('tast2 starting...')
+#     # await asyncio.sleep(0.5)
+#     print(f'current container level: {container.level}')
+#     # await container.when_greater_than(0)
     
-    await container.get(1)
-    print(f'current container level: {container.level}')
+#     await container.get(1)
+#     print(f'current container level: {container.level}')
 
-async def f3(container: Container):
-    for _ in range(100):
-        await container.put(1)
-        await asyncio.sleep(random.random()/10)
-        await container.get(1)
+# async def f3(container: Container):
+#     for _ in range(100):
+#         await container.put(1)
+#         await asyncio.sleep(random.random()/10)
+#         await container.get(1)
 
-async def main():
-    container = Container(0, 100)
+# async def main():
+#     container = Container(0, 100)
 
-    # t1 = asyncio.create_task(f1(container))
-    # t2 = asyncio.create_task(f2(container))
-    t1 = asyncio.create_task(f3(container))
-    t2 = asyncio.create_task(f3(container))
+#     # t1 = asyncio.create_task(f1(container))
+#     # t2 = asyncio.create_task(f2(container))
+#     t1 = asyncio.create_task(f3(container))
+#     t2 = asyncio.create_task(f3(container))
     
-    print(f'Initial container level: {container.level}')
-    await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
-    print(f'Final container level: {container.level}')
+#     print(f'Initial container level: {container.level}')
+#     await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
+#     print(f'Final container level: {container.level}')
 
-class SequenceDiagram:
-    def __init__(self) -> None:
-        pass
+# class SequenceDiagram:
+#     def __init__(self) -> None:
+#         pass
 
-    def from_dir(self, dir):
-        pass
+#     def from_dir(self, dir):
+#        
+#  
+
+def main():
+    diagram_from_ascii("""
+    graph LR;
+        A--> B & C & D;
+        B--> A & E;
+        C--> A & E;
+        D--> A & E;
+        E--> B & C & D;
+    """)
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    # asyncio.run(main())
+    main()
+
+    

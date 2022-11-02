@@ -981,6 +981,8 @@ class SubsystemModule(Module):
         """
         Processes messages being sent to this subsystem.
         """
+        self.log(f'MSG TYPE: {type(msg)}')
+
         try:
             if self.failure.is_set():
                 self.log(f'Subsystem is in failure state. Ignoring message...')
@@ -1021,6 +1023,7 @@ class SubsystemModule(Module):
                 await self.component_state_updates.put(component_state)
                 
             elif isinstance(msg, SubsystemStateMessage):
+                self.log(f'Received subsystem state message from subsystem type \'NONE\'!')
                 subsystem_state : SubsystemState = msg.get_state()
                 if subsystem_state is None:
                     self.log(f'Received subsystem state message from subsystem type \'NONE\'!')
@@ -1681,7 +1684,15 @@ class ComponentState:
         pass
 
     def __str__(self) -> str:
-        return f'\"@type\" : \"ComponentState\", \"name\" : \"{self.component_name}\", \"power_consumed\" : {self.power_consumed}, \"power_supplied\" : {self.power_supplied}, \"health\" : \"{self.health.name}\", \"status\" : \"{self.status.name}\"'
+        out = dict()
+        out['@type'] = 'ComponentState'
+        out['name'] = self.component_name
+        out['power_consumed'] = self.power_consumed
+        out['power_supplied'] = self.power_supplied
+        out['health'] = self.health.name
+        out['status'] = self.status.name
+
+        return json.dumps(out)
 
 class SubsystemState:
     def __init__(self, name: str, subsystem_type : type, component_states : dict, health : SubsystemHealth, status : SubsystemStatus):
@@ -1707,19 +1718,17 @@ class SubsystemState:
         pass
 
     def __str__(self) -> str:
-        out = f'\"@type\" : \"SubsystemState\", \"name\" : \"{self.subsystem_name}\", \"health\" : \"{self.health.name}\", \"status\" : \"{self.status.name}\", \"component_states\" : ['
-        components = []
+        out = dict()
+        out['@type'] = 'SubsystemState'
+        out['name'] = self.subsystem_name
+        out['health'] = self.health.name
+        out['status'] = self.status.name
+
+        component_states = []
         for component in self.component_states:
-            components.append(component)
+            component_states.append(str(self.component_states[component]))
+        out['component_states'] = component_states
 
-        for component in components:
-            component_state = self.component_states[component]
-            out += '{' + str(component_state) + '}'
-
-            if component != components[-1]:
-                out += ', '
-
-        out += ']'
         return out
 
 """
@@ -1744,20 +1753,18 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
         
         # log system state
         parent_agent = self.get_top_module()
-        out = '{' + f' \"@type\" : \"SystemState\", \"name\" : \"{parent_agent.name}\", \"subsystem_states\" : ['
-        
-        subsystems = []
-        for subsystem in self.subsystem_states:
-            subsystems.append(subsystem)
 
-        for subsystem in subsystems:
-            subsystem_state = self.subsystem_states[subsystem]
-            out += '{' + str(subsystem_state) + '}'
+        out = dict()
+        out['@type'] = 'SystemState'
+        out['name'] = parent_agent.name
+        out['health'] = self.health.name
+                
+        # subsystem_states = []
+        # for subsystem in self.subsystem_states:
+        #     subsystem_states.append(str(self.subsystem_states[subsystem]))
+        # out['subsystem_states'] = subsystem_states
 
-            if subsystem != subsystems[-1]:
-                out += ', '
-
-        out += ']}'
+        # out = json.dumps(out)
         self.log(f'{out}', logger_type=LoggerTypes.STATE, level=logging.INFO)
 
 
@@ -2452,6 +2459,8 @@ class ElectricPowerSubsystemState(SubsystemState):
     def from_subsystem(eps: ElectricPowerSubsystem):
         return ElectricPowerSubsystemState(eps.component_states, eps.health, eps.status)
 
+
+
 class PowerSupplyComponent(ComponentModule):
     def __init__(self, 
                 name : str, 
@@ -2621,7 +2630,11 @@ class EPSComponentState(ComponentState):
                             component.status)
 
     def __str__(self) -> str:
-        return super().__str__() + f', \"power_output\" : {self.power_output}, \"maximum_power_output\" : {self.maximum_power_output}, \"components_powered\" : {json.dumps(self.components_powered)}'
+        out = json.loads( super().__str__() )
+        out['power_output'] = self.power_output
+        out['maximum_power_output'] = self.maximum_power_output
+        out['components_powered'] = self.components_powered
+        return json.dumps(out)
 
 class BatteryModule(PowerSupplyComponent):
     def __init__(self, 
