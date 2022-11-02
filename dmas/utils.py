@@ -1,5 +1,8 @@
 import asyncio
+import csv
 from enum import Enum
+import json
+import pandas as pd
 import numpy
 import base64
 from IPython.display import Image, display
@@ -243,12 +246,61 @@ def mwhr_to_joules(e):
     return e * 3600.0
 
 # sequence diagrams
-
 def load_actions(node_results_dir : str):
-    dir = node_results_dir + '/ACTIONS.log'
+    file_dir = node_results_dir + '/ACTIONS.log'
+    
+    names = []
+    paths = []
+    times = []
+    actions = []
+    statuses = []
+
+    with open(file_dir, newline='') as csvfile:
+
+        reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+
+        for row in reader:
+            # agent_name, module_path, t, action_str, status = row
+            # action_dict = json.loads(action_str)
+            # datum = [agent_name, module_path, t, action_dict, status]
+            # data.append(datum)
+
+            agent_name, module_path, t, action_str, status = None, None, None, None, None
+
+            for i in range(len(row)):
+                if i == 0:
+                    agent_name = row[i]
+                elif i == 1:
+                    module_path = row[i]
+                elif i == 2:
+                    t = float(row[i])
+                elif row[i] == row[-1]:
+                    status = row[i]
+                else:
+                    if action_str is None:
+                        action_str = str(row[i])
+                    else:
+                        action_str += ',' + str(row[i])
+
+            names.append(agent_name)
+            paths.append(module_path)
+            times.append(t)
+            actions.append(json.loads(action_str))
+            statuses.append(status)
+
+    columns = ['Agent Name', 'Module Path', 't [s]', 'Action', 'Status']
+    data = [names, paths, times, actions, statuses]
+    return pd.DataFrame(data, columns)
 
 def load_internal_messages(node_results_dir : str):
     dir = node_results_dir + '/INTERNAL_MESSAGE.log'
+    print(dir)
+
+def diagram_from_ascii(graph : str):
+        graphbytes = graph.encode("ascii")
+        base64_bytes = base64.b64encode(graphbytes)
+        base64_string = base64_bytes.decode("ascii")
+        display(Image(url="https://mermaid.ink/img/" + base64_string))
 
 def generate_internal_sequence_diagram(dir : str):
     
@@ -256,18 +308,19 @@ def generate_internal_sequence_diagram(dir : str):
     internal_messages = load_internal_messages(dir)
     actions = load_actions(dir)
 
+    print(actions)
+
     # create graphs
-
-
+    diagram_from_ascii("""
+                        sequenceDiagram;
+                            participant Alice
+                            participant Bob
+                            Alice->>Bob: Hi Bob
+                            Bob->>Alice: Hi Alice
+                        """)
 
     # print to directory
-
-
-def diagram_from_ascii(graph : str):
-        graphbytes = graph.encode("ascii")
-        base64_bytes = base64.b64encode(graphbytes)
-        base64_string = base64_bytes.decode("ascii")
-        display(Image(url="https://mermaid.ink/img/" + base64_string))
+    
 
 """
 ---------------------------
@@ -307,23 +360,9 @@ Container Class Testing
 #     await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
 #     print(f'Final container level: {container.level}')
 
-# class SequenceDiagram:
-#     def __init__(self) -> None:
-#         pass
-
-#     def from_dir(self, dir):
-#        
-#  
 
 def main():
-    diagram_from_ascii("""
-    graph LR;
-        A--> B & C & D;
-        B--> A & E;
-        C--> A & E;
-        D--> A & E;
-        E--> B & C & D;
-    """)
+    generate_internal_sequence_diagram('./scenarios/sim_test/results/Mars1')
 
 if __name__ == '__main__':
     # asyncio.run(main())
