@@ -260,11 +260,6 @@ def load_actions(node_results_dir : str):
         reader = csv.reader(csvfile, delimiter=',', quotechar='|')
 
         for row in reader:
-            # agent_name, module_path, t, action_str, status = row
-            # action_dict = json.loads(action_str)
-            # datum = [agent_name, module_path, t, action_dict, status]
-            # data.append(datum)
-
             agent_name, module_path, t, action_str, status = None, None, None, None, None
 
             for i in range(len(row)):
@@ -293,8 +288,42 @@ def load_actions(node_results_dir : str):
     return pd.DataFrame(data, columns)
 
 def load_internal_messages(node_results_dir : str):
-    dir = node_results_dir + '/INTERNAL_MESSAGE.log'
-    print(dir)
+    file_dir = node_results_dir + '/INTERNAL_MESSAGE.log'
+    
+    names = []
+    paths = []
+    times = []
+    contents = []
+
+    with open(file_dir, newline='') as csvfile:
+
+        reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+
+        for row in reader:
+            agent_name, module_path, t, content_str = None, None, None, None
+
+            for i in range(len(row)):
+                if i == 0:
+                    agent_name = row[i]
+                elif i == 1:
+                    module_path = row[i]
+                elif i == 2:
+                    t = float(row[i])
+                else:
+                    if content_str is None:
+                        content_str = str(row[i])
+                    else:
+                        content_str += ',' + str(row[i])
+
+            names.append(agent_name)
+            paths.append(module_path)
+            times.append(t)
+            contents.append(json.loads(content_str))
+
+    columns = ['Agent Name', 'Module Path', 't [s]', 'Message Contents']
+    data = [names, paths, times, contents]
+    return pd.DataFrame(data, columns)
+        
 
 def diagram_from_ascii(graph : str):
         graphbytes = graph.encode("ascii")
@@ -308,6 +337,7 @@ def generate_internal_sequence_diagram(dir : str):
     internal_messages = load_internal_messages(dir)
     actions = load_actions(dir)
 
+    print(internal_messages)
     print(actions)
 
     # create graphs
