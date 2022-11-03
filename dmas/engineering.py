@@ -2,6 +2,7 @@ from abc import abstractmethod
 from asyncio import CancelledError
 from typing import Union
 import logging
+import numpy as np
 from messages import *
 from utils import *
 from modules import Module
@@ -1767,7 +1768,11 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
         if isinstance(task, ObservationTask):
             lat, lon = task.target
             self.log(f'Decompose observation platform-level task into subsystem-level tasks')
+            self.log(f'Received observation task!',level=logging.INFO)
             return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations) ]
+        elif isinstance(task, ManeuverTask):
+            self.log(f'Received maneuver task!',level=logging.INFO)
+            return [ task.maneuver_task ]
         else:
             return await super().decompose_platform_task(task)
 
@@ -2047,11 +2052,13 @@ class PayloadSubsystem(SubsystemModule):
             await self.send_internal_message(msg)
 
             attitude_state = await self.attitude_state.get()
+            comp_tasks.append(EnableComponentTask(InstrumentNames.TEST.value))
             # instruct each instrument in the observation task to perform the masurement 
             for instrument in task.instruments:
                 i = task.instruments.index(instrument)
                 target_lat, target_lon = task.target
                 comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state) )
+            comp_tasks.append(DisableComponentTask(InstrumentNames.TEST.value))
             return comp_tasks
         else:
             return await super().decompose_subsystem_task(task)
@@ -2123,7 +2130,6 @@ class InstrumentComponent(ComponentModule):
                 raise asyncio.CancelledError
 
             if isinstance(task, MeasurementTask):
-                self.status = ComponentStatus.ON # TODO remove this hardcode
                 if self.status is ComponentStatus.OFF:
                     self.log(f'Cannot perform measurement while component status is {self.status}.')
                     raise asyncio.CancelledError
@@ -2139,7 +2145,7 @@ class InstrumentComponent(ComponentModule):
                 # TODO consider real-time delays from environment server querying for the data being sensed
                 await self.sim_wait(task.duration)
 
-                self.log(f'Measurement complete! Sending data to internal memory.')
+                self.log(f'Measurement complete! Sending data to internal memory.',level=logging.INFO)
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage
@@ -2215,7 +2221,8 @@ class AttitudeDeterminationAndControlSubsystem(SubsystemModule):
                 status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.ADCS.value, parent_platform_sim, AttitudeDeterminationAndControlState, health, status)
         self.submodules = [
-                            InertialMeasurementUnitModule(self, 1)
+                            InertialMeasurementUnitModule(self, 1),
+                            ReactionWheelModule(self, 10)
                           ]
 
     async def decompose_subsystem_task(self, task : SubsystemTask) -> list:
@@ -2223,7 +2230,11 @@ class AttitudeDeterminationAndControlSubsystem(SubsystemModule):
         Decomposes a subsystem-level task and returns a list of component-level tasks to be performed by this subsystem.
         """
         if isinstance(task, PerformAttitudeManeuverTask):
-            return [ AttitudeUpdateTask(task.target_angular_pos, task.target_angular_vel) ]
+            comp_tasks = []
+            comp_tasks.append(EnableComponentTask(ComponentNames.REACTION_WHEELS.value))
+            comp_tasks.append(AttitudeManeuverTask(task.maneuver_time, task.target_angular_pos, task.target_angular_vel))
+            comp_tasks.append(DisableComponentTask(ComponentNames.REACTION_WHEELS.value))
+            return comp_tasks
         else:
             await super().decompose_subsystem_task(task)
 
@@ -2306,6 +2317,81 @@ class InertialMeasurementUnitState(ComponentState):
 
     def from_component(imu: InertialMeasurementUnitModule):
         return InertialMeasurementUnitState(imu.power_consumed, imu.power_supplied, imu.angular_pos, imu.angular_vel, imu.health, imu.status)
+
+class ReactionWheelModule(ComponentModule):
+    def __init__(self, 
+                parent_subsystem: Module, 
+                average_power_consumption: float, 
+                health: ComponentHealth = ComponentHealth.NOMINAL, 
+                status: ComponentStatus = ComponentStatus.OFF, 
+                f_update: float = 1) -> None:
+        super().__init__(ComponentNames.REACTION_WHEELS.value, parent_subsystem, ReactionWheelState, average_power_consumption, health, status, f_update)
+
+        self.angular_pos = [0.0, None, None, None] # TODO change to 3 axis attitude
+        self.angular_vel = [0.0, None, None, None] # TODO change to 3 axis attitude
+
+    async def update_properties(self, dt):
+        await super().update_properties(dt)
+        # TODO sense angular position and velocity
+
+    async def perform_task(self, task: ComponentTask) -> TaskStatus:
+        """
+        Performs a task given to this component. 
+        Rejects any tasks that is not intended to be performed by this component. 
+        """
+        try:
+            # check if component was the intended performer of this task
+            self.log(f'Performing task')
+            if task.component != self.name:
+                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
+                raise asyncio.CancelledError
+            
+            acquire = None
+            if isinstance(task, AttitudeManeuverTask):
+                acquire = await self.state_lock.acquire()
+                slew_torque = 4 * abs(np.deg2rad(task.new_angular_pos)-np.deg2rad(self.angular_pos[0]))*0.05 / pow(abs(5),2)
+                momentum = 0.1 # Nms, based on Blue Canyon RWP100
+                power_consumed = 1000 * slew_torque + 4.51 * pow(momentum,0.47) # from https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=1080&context=smallsat
+                self.log(f'{power_consumed} W of power consumed by attitude maneuver!',level=logging.INFO)
+                self.angular_pos = [task.new_angular_pos, None, None, None]
+                self.angular_vel = [task.new_angular_vel, None, None, None]
+                await self.sim_wait(5.0)
+                self.log(f'Attitude changed! New state: angular pos=[{self.angular_pos}], angular vel=[{self.angular_vel}]',level=logging.INFO)
+
+                self.state_lock.release()
+            else:
+                self.log(f'Task of type {type(task)} not yet supported.',level=logging.INFO)
+                raise asyncio.CancelledError
+            return TaskStatus.DONE
+
+        except asyncio.CancelledError:
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
+
+            if acquire:
+                self.state_lock.release()
+
+            # return task abort status
+            return TaskStatus.ABORTED
+
+class ReactionWheelState(ComponentState):
+    def __init__(self,
+                power_consumed: float, 
+                power_supplied: float, 
+                angular_pos : list,
+                angular_vel : list,
+                health: ComponentHealth, 
+                status: ComponentStatus) -> None:
+        super().__init__(ComponentNames.REACTION_WHEELS.value, ReactionWheelModule, power_consumed, power_supplied, health, status)
+        self.angular_pos = []
+        for x_i in angular_pos:
+            self.angular_pos.append(x_i)
+
+        self.angular_vel = []
+        for v_i in angular_vel:
+            self.angular_pos.append(v_i)
+
+    def from_component(rw: ReactionWheelModule):
+        return ReactionWheelState(rw.power_consumed, rw.power_supplied, rw.angular_pos, rw.angular_vel, rw.health, rw.status)
 
 """
 EPS
@@ -2406,7 +2492,7 @@ class ElectricPowerSubsystem(SubsystemModule):
                     for component in self.submodules:
                         component : PowerSupplyComponent
                         
-                        state : EPSComponentState = await self.get_state()
+                        state : EPSComponentState = await component.get_state()
 
                         for component_name in state.components_powered:
                             if component_name == task.target:

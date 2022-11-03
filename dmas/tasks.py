@@ -74,7 +74,7 @@ class ComponentActuationTask(ComponentMaintenanceTask):
 
     def __str__(self) -> str:
         out = json.loads( super().__str__() )
-        out['actuation_status'] = self.actuation_status
+        out['actuation_status'] = str(self.actuation_status)
         return json.dumps(out)
 
 class DisableComponentTask(ComponentActuationTask):
@@ -289,6 +289,22 @@ class AttitudeUpdateTask(ComponentTask):
         out['new_angular_vel'] = self.new_angular_vel
         return json.dumps(out)
 
+class AttitudeManeuverTask(ComponentTask):
+    def __init__(self, maneuver_time, new_angular_pos, new_angular_vel) -> None:
+        """
+        Manually updates the attitude in an IMU
+        """
+        super().__init__(ComponentNames.REACTION_WHEELS.value, 'AttitudeManeuverTask')
+        self.new_angular_pos = new_angular_pos
+        self.new_angular_vel = new_angular_vel
+        self.maneuver_time = maneuver_time
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['new_angular_pos'] = self.new_angular_pos
+        out['new_angular_vel'] = self.new_angular_vel
+        return json.dumps(out)
+
 class TransmitMessageTask(ComponentTask):
     def __init__(self, target_agent: str, msg, timeout : float) -> None:
         """
@@ -394,7 +410,7 @@ class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
         super().__init__(target, -power_supplied)
 
 class PerformAttitudeManeuverTask(SubsystemTask):
-    def __init__(self, target_angular_pos : list, target_angular_vel = list) -> None:
+    def __init__(self,maneuver_time, target_angular_pos : list, target_angular_vel = list) -> None:
         """
         Tasks the ADCS to perform an attitude maneouver
 
@@ -406,6 +422,7 @@ class PerformAttitudeManeuverTask(SubsystemTask):
         super().__init__(SubsystemNames.ADCS.value, 'PerformAttitudeManeuverTask')
         self.target_angular_pos = target_angular_pos
         self.target_angular_vel = target_angular_vel
+        self.maneuver_time = maneuver_time
 
     def __str__(self) -> str:
         out = json.loads( super().__str__() )
@@ -508,6 +525,11 @@ class ObservationTask(PlatformTask):
         out['durations'] = self.durations
         return json.dumps(out)
 
+class ManeuverTask(PlatformTask):
+    def __init__(self, maneuver_task) -> None:
+        super().__init__('ManeuverTask')
+        self.maneuver_task = maneuver_task
+
 """
 -------------------------------
 PLANNER TASK
@@ -539,6 +561,15 @@ class ObservationPlannerTask(PlannerTask):
 class ChargePlannerTask(PlannerTask):
     def __init__(self, start: float, end: float) -> None:
         super().__init__()
+
+        self.start = start
+        self.end = end
+
+class ManeuverPlannerTask(PlannerTask):
+    def __init__(self, start_angle : float, end_angle : float, start: float, end: float) -> None:
+        super().__init__()
+        self.start_angle = start_angle
+        self.end_angle = end_angle
 
         self.start = start
         self.end = end
