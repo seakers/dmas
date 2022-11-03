@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 import csv
 import base64
-from PIL import Image
+import random
+import PIL.Image
 from io import BytesIO
 from modules import Module
 from messages import *
@@ -531,7 +532,7 @@ class OnboardProcessingModule(Module):
             return
 
     def store_raw_measurement(self,dataprod,lat,lon,obs_process_time):
-        im = Image.open(BytesIO(base64.b64decode(dataprod)))
+        im = PIL.Image.open(BytesIO(base64.b64decode(dataprod)))
 
         img_np = np.array(im)
         data = img_np[:,:,0]

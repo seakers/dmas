@@ -26,12 +26,16 @@ class ComponentTask:
         self.component : str = component
         self.name = name
 
-    def __str__(self) -> str:
+    def to_dict(self) -> dict:
         out = dict()
         out['name'] = self.name
         out['@type'] = 'ComponentTask'
         out['component'] = self.component
-        return json.dumps(out)
+
+        return out
+
+    def __str__(self) -> str:
+        return json.dumps(self.to_dict())
 
 class ComponentAbortTask(ComponentTask):
     def __init__(self, component: str, target_task : ComponentTask) -> None:
@@ -46,10 +50,11 @@ class ComponentAbortTask(ComponentTask):
         super().__init__(component, 'ComponentAbortTask')
         self.target_task = target_task
     
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target_task'] = str(self.target_task)
-        return json.dumps(out)
+        
+        return out
 
 class ComponentMaintenanceTask(ComponentTask):
     def __init__(self, component: str, name : str) -> None:
@@ -72,10 +77,11 @@ class ComponentActuationTask(ComponentMaintenanceTask):
         super().__init__(component, 'ComponentActuationTask')
         self.actuation_status : ComponentStatus = actuation_status
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['actuation_status'] = str(self.actuation_status)
-        return json.dumps(out)
+        
+        return out
 
 class DisableComponentTask(ComponentActuationTask):
     def __init__(self, component: str) -> None:
@@ -104,10 +110,11 @@ class ReceivePowerTask(ComponentMaintenanceTask):
         super().__init__(component, 'ReceivePowerTask')
         self.power_to_receive = power_to_receive
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['power_to_receive'] = self.power_to_receive
-        return json.dumps(out)
+        
+        return out
 
 class StopReceivingPowerTask(ReceivePowerTask):
     def __init__(self, component: str, power_supplied: float) -> None:
@@ -137,11 +144,12 @@ class ProvidePowerTask(ComponentTask):
         self.power_to_supply = power_to_supply
         self.target = target
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['power_to_supply'] = self.power_to_supply
         out['target'] = self.target
-        return json.dumps(out)
+        
+        return out
 
 class StopProvidingPowerTask(ProvidePowerTask):
     def __init__(self, eps_component: str, power_to_stop: float, target: str) -> None:
@@ -173,11 +181,12 @@ class SaveToMemoryTask(ComponentTask):
         self._target = (target_lat, target_lon)
         self._data = data
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target_lat'] = self.get_target_lat()
         out['target_lon'] = self.get_target_lon()
-        return json.dumps(out)
+        
+        return out
 
     def get_data(self):
         return self._data
@@ -221,17 +230,18 @@ class MeasurementTask(ComponentTask):
         self.target = [target_lat, target_lon]
         self.attitude_state = attitude_state
 
-    def __str__(self) -> str:
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         lat, lon = self.target
 
-        out = json.loads( super().__str__() )
         out['duration'] = self.duration
         out['target_lat'] = lat
         out['target_lon'] = lon
 
         # TODO Include str of attitude state
         # out['attitude_state'] = self.attitude_state
-        return json.dumps(out)
+        
+        return out
 
 class ControlSignalTask(ComponentTask):
     def __init__(self, component, control_signal: float) -> None:
@@ -249,10 +259,11 @@ class ControlSignalTask(ComponentTask):
         if control_signal < 0 or 1 < control_signal:
             raise Exception("Control signal must be a value between [0, 1]!")
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['control_signal'] = self.control_signal
-        return json.dumps(out)
+        
+        return out
 
 class AccelerationUpdateTask(ComponentTask):
     def __init__(self, actuator_name : str, angular_acceleration : list) -> None:
@@ -268,11 +279,12 @@ class AccelerationUpdateTask(ComponentTask):
         self.actuator_name = actuator_name
         self.angular_acceleration = angular_acceleration
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['actuator_name'] = self.actuator_name
         out['angular_acceleration'] = self.angular_acceleration
-        return json.dumps(out)
+        
+        return out
 
 class AttitudeUpdateTask(ComponentTask):
     def __init__(self, new_angular_pos, new_angular_vel) -> None:
@@ -283,11 +295,12 @@ class AttitudeUpdateTask(ComponentTask):
         self.new_angular_pos = new_angular_pos
         self.new_angular_vel = new_angular_vel
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['new_angular_pos'] = self.new_angular_pos
         out['new_angular_vel'] = self.new_angular_vel
-        return json.dumps(out)
+        
+        return out
 
 class AttitudeManeuverTask(ComponentTask):
     def __init__(self, maneuver_time, new_angular_pos, new_angular_vel) -> None:
@@ -322,12 +335,13 @@ class TransmitMessageTask(ComponentTask):
         self.msg = msg
         self.timeout = timeout
     
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target_agent'] = self.target_agent
         out['msg'] = self.msg
         out['timeout'] = self.timeout
-        return json.dumps(out)
+        
+        return out
 
 class ReceiveMessageTransmission(ComponentTask):
     def __init__(self) -> None:
@@ -352,12 +366,16 @@ class SubsystemTask:
         self.subsystem : str = subsystem
         self.name : str = name
 
-    def __str__(self) -> str:
+    def to_dict(self) -> dict:
         out = dict()
         out['name'] = self.name
         out['@type'] = 'SubsystemTask'
         out['subsystem'] = self.subsystem
-        return json.dumps(out)
+        
+        return out
+
+    def __str__(self) -> str:
+        return json.dumps(self.to_dict())
 
 class SubsystemAbortTask(SubsystemTask):
     def __init__(self, subsystem: str, target_task : SubsystemTask) -> None:
@@ -372,10 +390,11 @@ class SubsystemAbortTask(SubsystemTask):
         super().__init__(subsystem)
         self.target_task = target_task
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target_task'] = str(self.target_task)
-        return json.dumps(out)
+        
+        return out
 
 class PowerSupplyRequestTask(SubsystemTask):
     def __init__(self, target : str, power_requested : float) -> None:
@@ -391,11 +410,12 @@ class PowerSupplyRequestTask(SubsystemTask):
         self.target = target
         self.power_requested = power_requested
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target'] = self.target
         out['power_requested'] = self.power_requested
-        return json.dumps(out)
+        
+        return out
 
 class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
     def __init__(self, target: str, power_supplied: float) -> None:
@@ -424,11 +444,12 @@ class PerformAttitudeManeuverTask(SubsystemTask):
         self.target_angular_vel = target_angular_vel
         self.maneuver_time = maneuver_time
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target_angular_pos'] = self.target_angular_pos
         out['target_angular_vel'] = self.target_angular_vel
-        return json.dumps(out)
+        
+        return out
 
 class PerformMeasurement(SubsystemTask):
     def __init__(self, target_lat : float, target_lon : float, instruments : list, durations : list) -> None:
@@ -455,15 +476,17 @@ class PerformMeasurement(SubsystemTask):
         self.durations = []
         for duration in durations:
             self.durations.append(duration)
-    def __str__(self) -> str:
+
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         lat, lon = self.target
 
-        out = json.loads( super().__str__() )
         out['target_lat'] = lat
         out['target_lon'] = lon
         out['instruments'] = self.instruments
         out['durations'] = self.durations
-        return json.dumps(out)
+        
+        return out
 
 """
 -------------------------------
@@ -477,11 +500,15 @@ class PlatformTask:
         """
         self.name = name
 
-    def __str__(self) -> str:
+    def to_dict(self) -> dict:
         out = dict()
         out['name'] = self.name
         out['@type'] = 'PlatformTask'
-        return json.dumps(out)
+        
+        return out
+
+    def __str__(self) -> str:
+        return json.dumps(self.to_dict())
 
 class PlatformAbortTask(PlatformTask):
     def __init__(self, target_task : PlatformTask) -> None:
@@ -494,10 +521,11 @@ class PlatformAbortTask(PlatformTask):
         super().__init__('PlatformAbortTask')
         self.target_task = target_task
 
-    def __str__(self) -> str:
-        out = json.loads( super().__str__() )
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         out['target_task'] = str( self.target_task )
-        return json.dumps(out)
+        
+        return out
 
 class ObservationTask(PlatformTask):
     def __init__(self, target_lan : float, target_lon : float, instrument_list : list, durations : list) -> None:
@@ -515,15 +543,16 @@ class ObservationTask(PlatformTask):
     def get_target(self):
         return self.target
 
-    def __str__(self) -> str:
+    def to_dict(self) -> dict:
+        out = super().to_dict()
         lat, lon = self.target
 
-        out = json.loads( super().__str__() )
         out['target_lat'] = lat
         out['target_lon'] = lon
         out['instruments'] = self.instrument_list
         out['durations'] = self.durations
-        return json.dumps(out)
+        
+        return out
 
 class ManeuverTask(PlatformTask):
     def __init__(self, maneuver_task) -> None:

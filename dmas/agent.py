@@ -521,10 +521,6 @@ class AgentClient(NodeModule):
         await self.agent_socket_out.send_json(blanc_json)
 
     def process_results(self):
-        # sequence diagrams
-        self.generate_internal_sequence_diagram()
-  
-    def generate_internal_sequence_diagram(self):
         pass
 
 """

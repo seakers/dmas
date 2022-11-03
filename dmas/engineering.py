@@ -242,6 +242,7 @@ class ComponentModule(Module):
         try:
             while True:
                 # wait for next periodic update
+                self.log(f'Waiting for next update period...')
                 await self.sim_wait(1/self.UPDATE_FREQUENCY)
 
                 # update component state
@@ -260,18 +261,19 @@ class ComponentModule(Module):
                     break
 
                 # inform parent subsystem of current state
+                
                 # if self.health is ComponentHealth.NOMINAL:
                 #     self.log(f'Component state is nominal. Sharing state with parent subsystem.')
                 #     state : ComponentState = await self.get_state()
                 #     msg = ComponentStateMessage(self.name, self.parent_module.name, state)
                 #     await self.send_internal_message(msg)                  
+                
                 # TODO: uncomment previous 5 lines and comment out the next 4 lines whenever crit and failure monitures are activated
                 self.log(f'Sharing state with parent subsystem.')
                 state : ComponentState = await self.get_state()
-                self.log(f'state of type: {type(state)}')
                 msg = ComponentStateMessage(self.name, self.parent_module.name, state)
                 await self.send_internal_message(msg) 
-
+                self.log(f'Periodic update completed!')
 
             while True:
                 # sleep for the rest of the simulation
@@ -466,7 +468,7 @@ class ComponentModule(Module):
                 # perform task 
                 self.log(f'Component state updated! Performing task...')
                 status = await self.perform_maintenance_task(task)
-                self.log(f'{task}, {status}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
+                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
                 # update component state 
                 self.log(f'Updating comopnent state...')
@@ -981,6 +983,8 @@ class SubsystemModule(Module):
         """
         Processes messages being sent to this subsystem.
         """
+        self.log(f'MSG TYPE: {type(msg)}')
+
         try:
             if self.failure.is_set():
                 self.log(f'Subsystem is in failure state. Ignoring message...')
@@ -1021,6 +1025,7 @@ class SubsystemModule(Module):
                 await self.component_state_updates.put(component_state)
                 
             elif isinstance(msg, SubsystemStateMessage):
+                self.log(f'Received subsystem state message from subsystem type \'NONE\'!')
                 subsystem_state : SubsystemState = msg.get_state()
                 if subsystem_state is None:
                     self.log(f'Received subsystem state message from subsystem type \'NONE\'!')
@@ -1144,12 +1149,30 @@ class SubsystemModule(Module):
                 if (self.is_subsystem_critical() or self.is_component_critical()
                     or self.is_subsystem_failure() or self.is_component_failure()):
 
+                    if self.is_subsystem_critical():
+                        self.log(f'Subsystem is in a subsystem-level critical state!')
+                    elif self.is_component_critical():
+                        self.log(f'Subsystem is in a component-level critical state!')
+                    elif self.is_subsystem_failure():
+                        self.log(f'Subsystem is in a subsystem-level failure state!')
+                    elif self.is_component_failure():
+                        self.log(f'Subsystem is in a component-level failure state!')
+
                     # set component health to critical
                     self.health = SubsystemHealth.CRITIAL
 
                     # trigger critical state event if it hasn't been triggered already
                     if self.is_subsystem_critical() and not self.critical.is_set():
                         self.critical.set()
+                else:
+                    self.log(f'Subsystem state is nominal!')
+
+                    # set component health to nominal
+                    self.health = SubsystemHealth.NOMINAL
+
+                    # reset critical state event
+                    if not self.critical.is_set():
+                        self.critical.clear() 
 
                 # release update lock
                 self.state_lock.release()
@@ -1158,16 +1181,12 @@ class SubsystemModule(Module):
                 # communicate to other processes that the subsystem's component states have been updated
                 self.updated.set()
                 self.updated.clear()
-                self.log(f'Sybsystem state updated!')
+                self.log(f'Subsystem state has been updated!')
 
                 # communicate to Command and data handling that the subsystem's state has been updated
                 state = await self.get_state()
-                self.log(f'state of type: {type(state)}')
                 msg = SubsystemStateMessage(self.name, SubsystemNames.CNDH.value, state)
                 await self.send_internal_message(msg)
-
-                # log state
-                # self.log(f'{state}', logger_type=LoggerTypes.STATE, level=logging.INFO)
 
         except asyncio.CancelledError:
             self.log(f'Update interrupted!')
@@ -1677,10 +1696,24 @@ class ComponentState:
 
     @abstractmethod
     def from_component(component : ComponentModule):
+        """
+        Creates a component state object from a component module object
+        """
         pass
 
+    def to_dict(self) -> dict:
+        out = dict()
+        out['@type'] = 'ComponentState'
+        out['name'] = self.component_name
+        out['power_consumed'] = self.power_consumed
+        out['power_supplied'] = self.power_supplied
+        out['health'] = self.health.name
+        out['status'] = self.status.name
+
+        return out
+
     def __str__(self) -> str:
-        return f'\"@type\" : \"ComponentState\", \"name\" : \"{self.component_name}\", \"power_consumed\" : {self.power_consumed}, \"power_supplied\" : {self.power_supplied}, \"health\" : \"{self.health.name}\", \"status\" : \"{self.status.name}\"'
+        return json.dumps(self.to_dict())
 
 class SubsystemState:
     def __init__(self, name: str, subsystem_type : type, component_states : dict, health : SubsystemHealth, status : SubsystemStatus):
@@ -1705,21 +1738,23 @@ class SubsystemState:
     def from_subsystem(subsystem : SubsystemModule):
         pass
 
-    def __str__(self) -> str:
-        out = f'\"@type\" : \"SubsystemState\", \"name\" : \"{self.subsystem_name}\", \"health\" : \"{self.health.name}\", \"status\" : \"{self.status.name}\", \"component_states\" : ['
-        components = []
+    def to_dict(self) -> dict:
+        out = dict()
+        out['@type'] = 'SubsystemState'
+        out['name'] = self.subsystem_name
+        out['health'] = self.health.name
+        out['status'] = self.status.name
+
+        component_states = []
         for component in self.component_states:
-            components.append(component)
+            state : ComponentState = self.component_states[component]
+            component_states.append(state.to_dict())
+        out['component_states'] = component_states
 
-        for component in components:
-            component_state = self.component_states[component]
-            out += '{' + str(component_state) + '}'
-
-            if component != components[-1]:
-                out += ', '
-
-        out += ']'
         return out
+
+    def __str__(self) -> str:
+        return json.dumps(self.to_dict())
 
 """
 COMMAND AND DATA HANDLING SUBSYSTEM
@@ -1743,20 +1778,19 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
         
         # log system state
         parent_agent = self.get_top_module()
-        out = '{' + f' \"@type\" : \"SystemState\", \"name\" : \"{parent_agent.name}\", \"subsystem_states\" : ['
-        
-        subsystems = []
+
+        out = dict()
+        out['@type'] = 'SystemState'
+        out['name'] = parent_agent.name
+        out['health'] = self.health.name
+                
+        subsystem_states = []
         for subsystem in self.subsystem_states:
-            subsystems.append(subsystem)
+            state : SubsystemState = self.subsystem_states[subsystem]
+            subsystem_states.append(state.to_dict())
+        out['subsystem_states'] = subsystem_states
 
-        for subsystem in subsystems:
-            subsystem_state = self.subsystem_states[subsystem]
-            out += '{' + str(subsystem_state) + '}'
-
-            if subsystem != subsystems[-1]:
-                out += ', '
-
-        out += ']}'
+        out = json.dumps(out)
         self.log(f'{out}', logger_type=LoggerTypes.STATE, level=logging.INFO)
 
 
@@ -2530,6 +2564,8 @@ class ElectricPowerSubsystemState(SubsystemState):
     def from_subsystem(eps: ElectricPowerSubsystem):
         return ElectricPowerSubsystemState(eps.component_states, eps.health, eps.status)
 
+
+
 class PowerSupplyComponent(ComponentModule):
     def __init__(self, 
                 name : str, 
@@ -2627,6 +2663,12 @@ class PowerSupplyComponent(ComponentModule):
                     await self.send_internal_message(msg)
                     self.log(f'Now providing { task.power_to_supply} [W] of power to \'{task.target}\'! (Current power output: {self.power_output}[W]/{self.maximum_power_output}[W])')
 
+                    # inform target component of its new power supply
+                    self.log(f'Informing \'{task.target}\' that they are now receiving { task.power_to_supply} [W] of power...')
+                    power_supply_task = ReceivePowerTask(task.target, task.power_to_supply)
+                    msg = ComponentTaskMessage(self.name, task.target, power_supply_task)
+                    await self.send_internal_message(msg)
+                    
                     return TaskStatus.DONE
                 else:
                     # component is requesting for power to no longer be provided
@@ -2698,8 +2740,16 @@ class EPSComponentState(ComponentState):
                             component.health,
                             component.status)
 
+    def to_dict(self) -> dict:
+        out = super().to_dict()
+        out['power_output'] = self.power_output
+        out['maximum_power_output'] = self.maximum_power_output
+        out['components_powered'] = self.components_powered
+
+        return out
+
     def __str__(self) -> str:
-        return super().__str__() + f', \"power_output\" : {self.power_output}, \"maximum_power_output\" : {self.maximum_power_output}, \"components_powered\" : {json.dumps(self.components_powered)}'
+        return str(self.to_dict())
 
 class BatteryModule(PowerSupplyComponent):
     def __init__(self, 

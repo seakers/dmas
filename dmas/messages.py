@@ -1493,8 +1493,17 @@ class InternalMessage:
     def generate_response(self):
         return InternalMessage(src_module=self.dst_module, dst_module=self.src_module, content=self.content)
 
+    def to_dict(self):
+        out = dict()
+        out['name'] = self.name
+        out['src_module']  = self.src_module
+        out['dst_module']  = self.src_module
+        out['content']  = str(self.content)
+
+        return out
+
     def __str__(self) -> str:
-        return f'{self.name}, {self.src_module}, {self.dst_module}, {self.content}'
+        return json.dumps(self.to_dict())
 
 class MeasurementRequestMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, request : Request) -> None:
@@ -1567,9 +1576,16 @@ class ComponentTaskMessage(InternalMessage):
         Intermodule message carrying a component task
         """
         super().__init__(src_module, dst_module, task, name='ComponentTaskMessage')
+        self.content : ComponentTask
 
     def get_task(self) -> ComponentTask:
         return self.content
+
+    def to_dict(self):
+        out = super().to_dict()
+        out['content']  = self.content.to_dict()
+
+        return out
 
 class ComponentTaskCompletionMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, task: ComponentTask, status : TaskStatus) -> None:
@@ -1587,6 +1603,18 @@ class ComponentTaskCompletionMessage(InternalMessage):
         _, status = self.content
         return status
 
+    def to_dict(self):
+        out = super().to_dict()
+        tupple_dict = dict()
+        task = self.get_task()
+        status = self.get_task_status()
+
+        tupple_dict['task'] = task.to_dict()
+        tupple_dict['status'] = status.name
+        out['content'] = tupple_dict
+
+        return out
+
 class ComponentStateMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, state) -> None:
         """
@@ -1602,6 +1630,12 @@ class ComponentStateMessage(InternalMessage):
     def get_state(self):
         return self.state
 
+    def to_dict(self):
+        out = super().to_dict()
+        out['content']  = self.state.to_dict()
+
+        return out
+
 """
 SUBSYSTEM TASK MESSAGES
 """
@@ -1611,9 +1645,17 @@ class SubsystemTaskMessage(InternalMessage):
         Intermodule message carrying a subsystem task
         """
         super().__init__(src_module, dst_module, task, name='SubsystemTaskMessage')
+        self.content : SubsystemTask
 
     def get_task(self) -> SubsystemTask:
         return self.content
+
+
+    def to_dict(self):
+        out = super().to_dict()
+        out['content']  = self.content.to_dict()
+
+        return out
 
 class SubsystemTaskCompletionMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, task: SubsystemTask, status : TaskStatus) -> None:
@@ -1630,6 +1672,18 @@ class SubsystemTaskCompletionMessage(InternalMessage):
         _, status = self.content
         return status
 
+    def to_dict(self):
+        out = super().to_dict()
+        tupple_dict = dict()
+        task = self.get_task()
+        status = self.get_task_status()
+
+        tupple_dict['task'] = task.to_dict()
+        tupple_dict['status'] = status.name
+        out['content'] = tupple_dict
+
+        return out
+
 class SubsystemStateMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, state = None) -> None:
         """
@@ -1639,6 +1693,12 @@ class SubsystemStateMessage(InternalMessage):
 
     def get_state(self):
         return self.content
+
+    def to_dict(self):
+        out = super().to_dict()
+        out['content']  = self.content.to_dict()
+
+        return out
 
 class SubsystemStateRequestMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str) -> None:
