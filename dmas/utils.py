@@ -313,6 +313,10 @@ def load_actions(node_results_dir : str):
                     t = float(row[i])
                 elif row[i] == row[-1]:
                     status = row[i]
+
+                    # remove blank spaces
+                    status = status.replace(" ", "")
+                    status = status.replace("\n", "")
                 else:
                     if action_str is None:
                         action_str = str(row[i])
@@ -325,41 +329,84 @@ def load_actions(node_results_dir : str):
             actions.append(json.loads(action_str))
             statuses.append(status)
 
-    columns = ['Agent Name', 'Module Path', 't [s]', 'Action', 'Status']
-    data = [names, paths, times, actions, statuses]
-    return pd.DataFrame(data, columns)
+    data = {'Agent Name' : names, 'Module Path' : paths, 't [s]' : times, 'Action' : actions, 'Status' : statuses}
+    return pd.DataFrame(data)
     
 def internal_sequence_diagram_from_data(internal_messages : pd.DataFrame, actions : pd.DataFrame, level : InternalSequenceDiagramLevel):
+    # merge message and action logs and sort 
+    joint = pd.concat(objs=[internal_messages, actions])
+    joint = joint.sort_values(by=['t [s]'])
+
+    # initialize out string
     out = 'sequenceDiagram;\n'
 
     # find unique participants in the simulation
     participants = []
-    for _, row in internal_messages.iterrows():
+    for _, row in joint.iterrows():
         msg_dict = row['Message']
+        if isinstance(msg_dict, dict):
+            # event is a message being sent
+            src_module = msg_dict['src_module']
+            dst_module = msg_dict['dst_module']
 
-        src_module = msg_dict['src_module']
-        dst_module = msg_dict['dst_module']
+            if src_module not in participants:
+                participants.append(src_module)
+            if dst_module not in participants:
+                participants.append(dst_module)
+            
+        else:
+            # event is an action starting or ending
+            action = row['Action']
+            action_type = action['@type']
 
-        if src_module not in participants:
-            participants.append(src_module)
-        if dst_module not in participants:
-            participants.append(dst_module)
-    # TODO include actions when looking for unique participants
+            if action_type == 'ComponentTask':
+                actor = action['component']
+            elif action_type == 'SubsystemTask':
+                actor = action['subsystem']
+            elif action_type == 'PlatformTask':
+                actor = action['component']
+            
+            if actor not in participants:
+                participants.append(actor)
 
     # initialize participants in diagram
     for participant in participants:
         out += f'participant {participant}\n'
 
-    # log messages in chronological order
-    for _, row in internal_messages.iterrows():
+    # log events in chronological order
+    for _, row in joint.iterrows():
         msg_dict = row['Message']
+        if isinstance(msg_dict, dict):
+            # event is a message being sent
+            msg_dict = row['Message']
 
-        src_module = msg_dict['src_module']
-        dst_module = msg_dict['dst_module']
-        msg = msg_dict['name']
+            src_module = msg_dict['src_module']
+            dst_module = msg_dict['dst_module']
+            msg = msg_dict['name']
 
-        out += f'{src_module}->>{dst_module}: {msg}\n'
-        
+            out += f'{src_module}->>{dst_module}: {msg}\n'
+        else:
+            # event is an action starting or ending
+            action = row['Action']
+            status = row['Status']
+            action_type = action['@type']
+            action_name = action['name']
+
+            if action_type == 'ComponentTask':
+                actor = action['component']
+            elif action_type == 'SubsystemTask':
+                actor = action['subsystem']
+            elif action_type == 'PlatformTask':
+                actor = action['component']
+            else:
+                continue
+                    
+            if status == TaskStatus.IN_PROCESS.name:
+                out += f'activate {actor}\n'
+                out += f'Note right of {actor}: {action_name}\n'
+            else:
+                out += f'deactivate {actor}\n'
+    
     return out 
 
 def diagram_from_ascii(graph : str):
@@ -367,7 +414,8 @@ def diagram_from_ascii(graph : str):
         base64_bytes = base64.b64encode(graphbytes)
         base64_string = base64_bytes.decode("ascii")
 
-        return Image(url="https://mermaid.ink/img/" + base64_string)
+        url="https://mermaid.ink/img/" + base64_string
+        return Image(url=url)
 
 def generate_internal_sequence_diagram(dir : str, level:InternalSequenceDiagramLevel = InternalSequenceDiagramLevel.MODULE):
     
@@ -381,7 +429,7 @@ def generate_internal_sequence_diagram(dir : str, level:InternalSequenceDiagramL
     # create graph object
     graph = diagram_from_ascii(graph_text)
 
-    # return grapth
+    # return image
     return graph
     
 
@@ -423,12 +471,8 @@ Container Class Testing
 #     await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
 #     print(f'Final container level: {container.level}')
 
-
-
 if __name__ == '__main__':
     # asyncio.run(main())
     
     graph = generate_internal_sequence_diagram('./scenarios/sim_test/results/Mars1')
     display(graph)
-
-    

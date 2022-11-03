@@ -463,12 +463,12 @@ class ComponentModule(Module):
                 
                 # update component state
                 self.log(f'Starting execution of task of type {type(task)}! Updating component state...')
+                self.log(f'{task}, {TaskStatus.IN_PROCESS.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
                 await self.update(crit_flag=False)
 
                 # perform task 
                 self.log(f'Component state updated! Performing task...')
-                status = await self.perform_maintenance_task(task)
-                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
+                status : TaskStatus = await self.perform_maintenance_task(task)
 
                 # update component state 
                 self.log(f'Updating comopnent state...')
@@ -489,6 +489,9 @@ class ComponentModule(Module):
                 else:
                     self.log(f'Component state updated! Finished processing task of type {type(task)}!')
                 self.log(f'Performed task of type {type(task)}!', level=logging.INFO)
+
+                # log task completion status
+                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
         except asyncio.CancelledError:
             return
@@ -638,6 +641,7 @@ class ComponentModule(Module):
                     return
 
                 self.log(f'Starting task of type {type(task)}...')
+                self.log(f'{task}, {TaskStatus.IN_PROCESS.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
                 # update component state
                 await self.update()
@@ -674,10 +678,9 @@ class ComponentModule(Module):
                         done_process : asyncio.Task
                         self.log(f'{done_process.get_name()} completed before the task of type {type(task)} was successfully completed')
                 
-                # log task completion
+                # get task completion status
                 status : TaskStatus = perform_task.result()
-                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
-
+                
                 # cancell all pending processes
                 for pending_process in pending:
                     pending_process : asyncio.Task
@@ -704,6 +707,9 @@ class ComponentModule(Module):
                 await self.send_internal_message(msg)
 
                 self.log(f'Component state communicated! Finished processing task of type {type(task)}!')
+
+                # log task completion
+                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
         except asyncio.CancelledError:
             if isinstance(perform_task, asyncio.Task) and not perform_task.done():
@@ -1406,6 +1412,9 @@ class SubsystemModule(Module):
                 # wait for the next incoming task
                 task : Union[ComponentTask, SubsystemTask, PlatformTask] = await self.tasks.get()
 
+                self.log(f'Starting task of type: \'{type(task)}\'')
+                self.log(f'{task}, {TaskStatus.IN_PROCESS.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
+
                 # inform Command and Data Handling subsytem of the current subsystem state
                 state = await self.get_state()
                 msg = SubsystemStateMessage(self.name, SubsystemNames.CNDH.value, state)
@@ -1434,10 +1443,9 @@ class SubsystemModule(Module):
                         await pending_process
                         self.log(f'{pending_process.get_name()} successfully aborted!')
 
-                # log task completion status
+                # get task completion status
                 status = perform_task.result()
                 self.log(f'Task status: \'{status.name}\'')
-                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
                 
                 self.log(f'Informing Command and Data Handling Subsystem of task status...')
                 # inform Command and Data Handling subsystem of the status of completion of component tasks
@@ -1456,6 +1464,9 @@ class SubsystemModule(Module):
                 msg = SubsystemStateMessage(self.name, SubsystemNames.CNDH.value, state)
                 await self.send_internal_message(msg)
                 self.log(f'Subsystem state communicated! Finished processing task of type {type(task)}!')
+
+                # log task completion status
+                self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
 
         except asyncio.CancelledError:
             for process in processes:

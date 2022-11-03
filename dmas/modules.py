@@ -145,8 +145,6 @@ class Module:
                 # check destination
                 if dst_name == self.name:
                     # if this module is the intended receiver, handle message
-                    self.log(f'{str(msg)}', logger_type=LoggerTypes.INTERNAL_MESSAGE, level=logging.INFO)
-
                     self.log(f'Handling message of type {type(msg)}...')
                     await self.internal_message_handler(msg)
                     self.log(f'Message handled!')
@@ -235,6 +233,7 @@ class Module:
             raise TypeError('Attepmting to send a message of an unknown type')
 
         self.log(f'Sending internal message of type {type(msg)} to module \'{msg.dst_module}\'...')
+        self.log(f'{str(msg)}', logger_type=LoggerTypes.INTERNAL_MESSAGE, level=logging.INFO)
         await self.inbox.put(msg)
 
     async def put_in_inbox(self, msg: InternalMessage):
