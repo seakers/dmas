@@ -2165,6 +2165,7 @@ class InstrumentComponent(ComponentModule):
 
             if isinstance(task, MeasurementTask):
                 self.status = ComponentStatus.ON # TODO remove this hardcode
+                
                 if self.status is ComponentStatus.OFF:
                     self.log(f'Cannot perform measurement while component status is {self.status}.')
                     raise asyncio.CancelledError

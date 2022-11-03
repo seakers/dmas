@@ -246,6 +246,51 @@ def mwhr_to_joules(e):
     return e * 3600.0
 
 # sequence diagrams
+class InternalSequenceDiagramLevel(Enum):
+    MODULE = 1000
+    PLATFORM = 100
+    SUBSYSTEM = 10
+    COMPONENT = 1
+
+def load_internal_messages(node_results_dir : str):
+    file_dir = node_results_dir + '/INTERNAL_MESSAGE.log'
+    
+    names = []
+    paths = []
+    times = []
+    contents = []
+
+    with open(file_dir, newline='') as csvfile:
+
+        reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+
+        for row in reader:
+            agent_name, module_path, t, content_str = None, None, None, None
+
+            for i in range(len(row)):
+                if i == 0:
+                    agent_name = row[i]
+                elif i == 1:
+                    module_path = row[i]
+                elif i == 2:
+                    t = float(row[i])
+                else:
+                    if content_str is None:
+                        content_str = str(row[i])
+                    else:
+                        content_str += ',' + str(row[i])
+
+            names.append(agent_name)
+            paths.append(module_path)
+            times.append(t)
+            contents.append(json.loads(content_str))
+
+    columns = ['Agent Name', 'Module Path', 't [s]', 'Message']
+    data_vals = [names, paths, times, contents]
+
+    data = {'Agent Name' : names, 'Module Path' : paths, 't [s]' : times, 'Message' : contents}
+    return pd.DataFrame(data)
+        
 def load_actions(node_results_dir : str):
     file_dir = node_results_dir + '/ACTIONS.log'
     
@@ -286,70 +331,51 @@ def load_actions(node_results_dir : str):
     columns = ['Agent Name', 'Module Path', 't [s]', 'Action', 'Status']
     data = [names, paths, times, actions, statuses]
     return pd.DataFrame(data, columns)
-
-def load_internal_messages(node_results_dir : str):
-    file_dir = node_results_dir + '/INTERNAL_MESSAGE.log'
     
-    names = []
-    paths = []
-    times = []
-    contents = []
+def internal_sequence_diagram_from_data(internal_messages : pd.DataFrame, actions : pd.DataFrame, level : InternalSequenceDiagramLevel):
+    out = ''
 
-    with open(file_dir, newline='') as csvfile:
+    for _, row in internal_messages.iterrows():
 
-        reader = csv.reader(csvfile, delimiter=',', quotechar='|')
+        msg_dict = row['Message']
+        print (msg_dict)
 
-        for row in reader:
-            agent_name, module_path, t, content_str = None, None, None, None
+        print(msg_dict['src_module'])
+        print(msg_dict['dst_module'])
 
-            for i in range(len(row)):
-                if i == 0:
-                    agent_name = row[i]
-                elif i == 1:
-                    module_path = row[i]
-                elif i == 2:
-                    t = float(row[i])
-                else:
-                    if content_str is None:
-                        content_str = str(row[i])
-                    else:
-                        content_str += ',' + str(row[i])
+        break
+    
 
-            names.append(agent_name)
-            paths.append(module_path)
-            times.append(t)
-            contents.append(json.loads(content_str))
-
-    columns = ['Agent Name', 'Module Path', 't [s]', 'Message Contents']
-    data = [names, paths, times, contents]
-    return pd.DataFrame(data, columns)
-        
+    return out 
+    # return """
+    #         sequenceDiagram;
+    #             participant Alice
+    #             participant Bob
+    #             Alice->>Bob: Hi Bob
+    #             Bob->>Alice: Hi Alice
+    #         """
 
 def diagram_from_ascii(graph : str):
         graphbytes = graph.encode("ascii")
         base64_bytes = base64.b64encode(graphbytes)
         base64_string = base64_bytes.decode("ascii")
-        display(Image(url="https://mermaid.ink/img/" + base64_string))
 
-def generate_internal_sequence_diagram(dir : str):
+        return Image(url="https://mermaid.ink/img/" + base64_string)
+
+def generate_internal_sequence_diagram(dir : str, level:InternalSequenceDiagramLevel = InternalSequenceDiagramLevel.MODULE):
     
     # load data
     internal_messages = load_internal_messages(dir)
     actions = load_actions(dir)
 
-    print(internal_messages)
-    print(actions)
+    # generate graph from data
+    graph_text = internal_sequence_diagram_from_data(internal_messages, actions, level)
 
-    # create graphs
-    diagram_from_ascii("""
-                        sequenceDiagram;
-                            participant Alice
-                            participant Bob
-                            Alice->>Bob: Hi Bob
-                            Bob->>Alice: Hi Alice
-                        """)
+    # create graph object
+    graph = diagram_from_ascii(graph_text)
 
-    # print to directory
+    # return grapth
+    return graph
     
 
 """
