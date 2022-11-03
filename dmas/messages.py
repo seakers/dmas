@@ -1455,7 +1455,7 @@ class InternalMessage:
         out = dict()
         out['name'] = self.name
         out['src_module']  = self.src_module
-        out['dst_module']  = self.src_module
+        out['dst_module']  = self.dst_module
         out['content']  = str(self.content)
 
         return out

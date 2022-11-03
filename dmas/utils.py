@@ -285,9 +285,6 @@ def load_internal_messages(node_results_dir : str):
             times.append(t)
             contents.append(json.loads(content_str))
 
-    columns = ['Agent Name', 'Module Path', 't [s]', 'Message']
-    data_vals = [names, paths, times, contents]
-
     data = {'Agent Name' : names, 'Module Path' : paths, 't [s]' : times, 'Message' : contents}
     return pd.DataFrame(data)
         
@@ -333,27 +330,37 @@ def load_actions(node_results_dir : str):
     return pd.DataFrame(data, columns)
     
 def internal_sequence_diagram_from_data(internal_messages : pd.DataFrame, actions : pd.DataFrame, level : InternalSequenceDiagramLevel):
-    out = ''
+    out = 'sequenceDiagram;\n'
 
+    # find unique participants in the simulation
+    participants = []
     for _, row in internal_messages.iterrows():
-
         msg_dict = row['Message']
-        print (msg_dict)
 
-        print(msg_dict['src_module'])
-        print(msg_dict['dst_module'])
+        src_module = msg_dict['src_module']
+        dst_module = msg_dict['dst_module']
 
-        break
-    
+        if src_module not in participants:
+            participants.append(src_module)
+        if dst_module not in participants:
+            participants.append(dst_module)
+    # TODO include actions when looking for unique participants
 
+    # initialize participants in diagram
+    for participant in participants:
+        out += f'participant {participant}\n'
+
+    # log messages in chronological order
+    for _, row in internal_messages.iterrows():
+        msg_dict = row['Message']
+
+        src_module = msg_dict['src_module']
+        dst_module = msg_dict['dst_module']
+        msg = msg_dict['name']
+
+        out += f'{src_module}->>{dst_module}: {msg}\n'
+        
     return out 
-    # return """
-    #         sequenceDiagram;
-    #             participant Alice
-    #             participant Bob
-    #             Alice->>Bob: Hi Bob
-    #             Bob->>Alice: Hi Alice
-    #         """
 
 def diagram_from_ascii(graph : str):
         graphbytes = graph.encode("ascii")
@@ -417,11 +424,11 @@ Container Class Testing
 #     print(f'Final container level: {container.level}')
 
 
-def main():
-    generate_internal_sequence_diagram('./scenarios/sim_test/results/Mars1')
 
 if __name__ == '__main__':
     # asyncio.run(main())
-    main()
+    
+    graph = generate_internal_sequence_diagram('./scenarios/sim_test/results/Mars1')
+    display(graph)
 
     
