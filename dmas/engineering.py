@@ -555,7 +555,7 @@ class ComponentModule(Module):
 
                         # ask for end of power supply from eps
                         self.log(f'Component has been turned off and state lock has been released! Communicating loss of power draw to EPS...')
-                        stop_power_supply_task = PowerSupplyStopRequestTask(self.name, self.average_power_consumption)
+                        stop_power_supply_task = PowerSupplyRequestTask(self.name, -self.average_power_consumption)
                         msg = SubsystemTaskMessage(self.name, SubsystemNames.EPS.value, stop_power_supply_task)
                         await self.send_internal_message(msg)
                         self.log(f'Loss of power draw communicated to EPS! Actuation task sucessfully performed!')
@@ -2387,6 +2387,7 @@ class ReactionWheelModule(ComponentModule):
                 momentum = 0.1 # Nms, based on Blue Canyon RWP100
                 power_consumed = 1000 * slew_torque + 4.51 * pow(momentum,0.47) # from https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=1080&context=smallsat
                 self.log(f'{power_consumed} W of power consumed by attitude maneuver!',level=logging.INFO)
+                self.average_power_consumption = power_consumed
                 self.angular_pos = [task.new_angular_pos, None, None, None]
                 self.angular_vel = [task.new_angular_vel, None, None, None]
                 await self.sim_wait(5.0)
@@ -2490,63 +2491,61 @@ class ElectricPowerSubsystem(SubsystemModule):
                 power_to_supply = dict()
 
                 # check if power is to be provided or stopped
-                if remaining_power_to_supply > 0:
-                    self.log(f'\'{task.target}\' is requesting {task.power_requested} [W] to be provided.')
+                # if remaining_power_to_supply > 0:
+                self.log(f'\'{task.target}\' is requesting {task.power_requested} [W] to be provided.')
 
-                    # check which components are available to provide power to target
-                    for component in self.submodules:
-                        component : PowerSupplyComponent
-                        power_available = component.maximum_power_output - component.power_output
+                # check which components are available to provide power to target
+                for component in self.submodules:
+                    component : PowerSupplyComponent
+                    power_available = component.maximum_power_output - component.power_output
 
-                        if power_available > 0.0:
-                            if remaining_power_to_supply <= power_available:
-                                power_to_supply[component.name] = remaining_power_to_supply
-                                remaining_power_to_supply -= remaining_power_to_supply
-                            else:
-                                power_to_supply[component.name] = power_available
-                                remaining_power_to_supply -= power_available
-                        
-                        if remaining_power_to_supply < 1e-6:
-                            break
+                    if power_available > 0.0:
+                        if remaining_power_to_supply <= power_available:
+                            power_to_supply[component.name] = remaining_power_to_supply
+                            remaining_power_to_supply -= remaining_power_to_supply
+                        else:
+                            power_to_supply[component.name] = power_available
+                            remaining_power_to_supply -= power_available
                     
                     if remaining_power_to_supply < 1e-6:
-                        # if enough power can be provided, send tasks to eps components
-                        comp_tasks = []
-                        for eps_component_name in power_to_supply:
-                            self.log(f'Instructing \'{eps_component_name}\' to provide \'{task.target}\' with {power_to_supply[eps_component_name]} [W] of power...')
-                            comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
-                        return comp_tasks
-                    else:
-                        # else abort task
-                        self.log(f'{self.name} cannot meet power request of {task.power_requested} [W].')
-                        return []
+                        break
+                
+                if remaining_power_to_supply < 1e-6:
+                    # if enough power can be provided, send tasks to eps components
+                    comp_tasks = []
+                    for eps_component_name in power_to_supply:
+                        self.log(f'Instructing \'{eps_component_name}\' to provide \'{task.target}\' with {power_to_supply[eps_component_name]} [W] of power...')
+                        comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
+                    return comp_tasks
                 else:
-                    self.log(f'\'{task.target}\' is requesting {-task.power_requested} [W] to no longer be provided.')
+                    # else abort task
+                    self.log(f'{self.name} cannot meet power request of {task.power_requested} [W].')
+                    return []
+                # else:
+                #     self.log(f'\'{task.target}\' is requesting {-task.power_requested} [W] to no longer be provided.',level=logging.INFO)
 
-                    for component in self.submodules:
-                        component : PowerSupplyComponent
+                #     for component in self.submodules:
+                #         component : PowerSupplyComponent
                         
-                        state : EPSComponentState = await component.get_state()
+                #         state : EPSComponentState = await component.get_state()
 
-                        for component_name in state.components_powered:
-                            if component_name == task.target:
-                                remaining_power_to_supply -= state.components_powered[component_name]
-                                power_to_supply[component_name] = state.components_powered[component_name]
-
-                            if remaining_power_to_supply < 1e-6:
-                                break
+                #         for component_name in state.components_powered:
+                #             if component_name == task.target:
+                #                 remaining_power_to_supply -= state.components_powered[component_name]
+                #                 power_to_supply[component_name] = -state.components_powered[component_name]
                     
-                    if remaining_power_to_supply < 1e-6:
-                        # if enough power can be provided, send tasks to eps components
-                        comp_tasks = []
-                        for eps_component_name in power_to_supply:
-                            self.log(f'Instructing \'{eps_component_name}\' to stop providing \'{task.target}\' with {power_to_supply[eps_component_name]}[W] of power...')
-                            comp_tasks.append( StopProvidingPowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
-                        return comp_tasks
-                    else:
-                        # else abort task
-                        self.log(f'{self.name} cannot meet power stop request of {task.power_requested} [W].')
-                        return []
+                #     if remaining_power_to_supply < 1e-6:
+                #         # if enough power can be provided, send tasks to eps components
+                #         comp_tasks = []
+                #         for eps_component_name in power_to_supply:
+                #             self.log(f'Instructing \'{eps_component_name}\' to stop providing \'{task.target}\' with {power_to_supply[eps_component_name]}[W] of power...',level=logging.INFO)
+                #             comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
+                #         self.log(f'Done instructing',level=logging.INFO)
+                #         return comp_tasks
+                #     else:
+                #         # else abort task
+                #         self.log(f'{self.name} cannot meet power stop request of {task.power_requested} [W].',level=logging.INFO)
+                #         return []
 
             else:
                 return await super().decompose_subsystem_task(task)
@@ -2672,10 +2671,10 @@ class PowerSupplyComponent(ComponentModule):
                     return TaskStatus.DONE
                 else:
                     # component is requesting for power to no longer be provided
-                    
+
                     if task.target in self.components_powered:
                         # check if component can satisfy power supply demand and update internal power output 
-                        if self.components_powered[task.target] < abs(task.power_to_supply):
+                        if self.components_powered[task.target] <= abs(task.power_to_supply):
                             task.power_to_supply = -self.components_powered[task.target]
 
                         # update internal list of powered components    
@@ -2689,9 +2688,9 @@ class PowerSupplyComponent(ComponentModule):
                         raise asyncio.CancelledError
 
                     # inform target component of its new power supply
-                    power_supply_task = StopReceivingPowerTask(task.target, task.power_to_supply)
+                    power_supply_task = ReceivePowerTask(task.target, task.power_to_supply)
                     msg = ComponentTaskMessage(self.name, task.target, power_supply_task)
-                    self.send_internal_message(msg)
+                    await self.send_internal_message(msg)
                     self.log(f'No longer providing { task.power_to_supply} [W] of power to \'{task.target}\'! (Current power output: {self.power_output}[W]/{self.maximum_power_output}[W])')
 
                     return TaskStatus.DONE
@@ -2701,7 +2700,7 @@ class PowerSupplyComponent(ComponentModule):
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.')
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
 
             # release update lock if cancelled during task handling
             if acquired:

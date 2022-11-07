@@ -533,6 +533,7 @@ class EnvironmentServer(NodeModule):
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
         self.NUMBER_OF_TIMED_COROUTINES_AGENTS = 0                      # Number of timed co-routines to be performed by other agents
+        self.scenario_dir = scenario_dir
 
         for agent_name in agent_name_list:
             self.AGENT_NAME_LIST.append(agent_name)
@@ -869,7 +870,7 @@ class EnvironmentServer(NodeModule):
                     self.log(f'Received observation sense message from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
                     
 
-                    with open("./scenarios/sim_test/sample_landsat_image.png", "rb") as image_file:
+                    with open(self.scenario_dir+"sample_landsat_image.png", "rb") as image_file:
                         encoded_string = base64.b64encode(image_file.read())
                     observation_sense_msg.obs = encoded_string.decode('utf-8')
                     
@@ -1231,7 +1232,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/sim_test/'
+    scenario_dir = './scenarios/full_mission/'
     dt = 4.6656879355937875
     # duration = 6048
     duration = 86400

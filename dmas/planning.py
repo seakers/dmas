@@ -13,6 +13,17 @@ class PlanningModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
         super().__init__(AgentModuleTypes.PLANNING_MODULE.value, parent_agent, [], 0)
         self.scenario_dir = scenario_dir
+
+        parent_agent = self.get_top_module()
+        data = dict()
+        spacecraft_list = parent_agent.mission_dict.get('spacecraft')
+        for spacecraft in spacecraft_list:
+            name = spacecraft.get('name')
+            # land coverage data metrics data
+            mission_profile = spacecraft.get('missionProfile')
+            data[name] = mission_profile
+        self.mission_profile = data[parent_agent.name]
+        
         self.submodules = [
             InstrumentCapabilityModule(self),
             ObservationPlanningModule(self),
@@ -132,7 +143,7 @@ class ObservationPlanningModule(Module):
     async def initialize_plan(self):
         # this is just for testing!
         points = np.zeros(shape=(2000, 5))
-        with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+        with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
             reader = csv.reader(csvfile)
             count = 0
             for row in reader:
@@ -154,12 +165,15 @@ class ObservationPlanningModule(Module):
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(isinstance(msg.content, MeasurementRequest)):
+            if(isinstance(msg.content, MeasurementRequest) and self.parent_module.mission_profile=="3D-CHESS"):
                 meas_req = msg.content
                 new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,["OLI"],0.0,1.0)
                 new_obs_list = []
                 new_obs_list.append(new_obs)
                 await self.obs_list.put(new_obs_list)
+            else:
+                if(self.parent_module.mission_profile=="agile"):
+                    self.log(f'Mission cannot replan based on new events.',level=logging.INFO)
         except asyncio.CancelledError:
             return
 
