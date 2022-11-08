@@ -40,7 +40,7 @@
                                 }
                             }
                             },
-            "instrument": {"name": "VIIRS", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 15, "spatial_res": 50, "spectral_res": 7e-9,
+            "instrument": {"name": "VIIRS", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 33, "spatial_res": 50, "spectral_res": 7e-9,
                             "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":5 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},

@@ -244,7 +244,7 @@ class ObservationPlanningModule(Module):
             for obs in obs_list:
                 rho = (86400.0 - obs.end)/86400.0
                 e = pow(rho,0.99) * estimated_reward
-                adjusted_reward = obs.science_val + e
+                adjusted_reward = obs.science_val*self.meas_perf() + e
                 if(adjusted_reward > maximum):
                     maximum = adjusted_reward
                     best_obs = obs
@@ -252,6 +252,22 @@ class ObservationPlanningModule(Module):
             obs_list.remove(best_obs)
         return rule_based_plan
 
+    def meas_perf(self):
+        a = 8.9e-5
+        b = 1.4e-3
+        c = 6.1e-3
+        d = 0.85
+        parent_agent = self.get_top_module()
+        instrument = parent_agent.payload[parent_agent.name]["name"]
+        if(instrument=="VIIRS"):
+            x = parent_agent.payload[parent_agent.name]["snr"]
+            y = parent_agent.payload[parent_agent.name]["spatial_res"]
+            z = parent_agent.payload[parent_agent.name]["spectral_res"]
+            perf = a*pow(x,3)-b*pow(y,2)-c*np.log10(z)+d
+        else:
+            perf = 1
+        #self.log(f'Measurement performance: {perf}',level=logging.INFO)
+        return perf
             
 
 class OperationsPlanningModule(Module):

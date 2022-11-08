@@ -28,7 +28,7 @@ def iridium_run(directory):
 
 if __name__ == '__main__':
     print('Initializing agents...')
-    directory = ["./scenarios/full_mission/"]
+    directory = ["./scenarios/default_mission/"]
 
     n_agents = 3
     processes = []

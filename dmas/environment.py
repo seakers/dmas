@@ -1232,7 +1232,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/full_mission/'
+    scenario_dir = './scenarios/default_mission/'
     dt = 4.6656879355937875
     # duration = 6048
     duration = 86400

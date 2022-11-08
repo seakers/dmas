@@ -40,7 +40,7 @@
                                 }
                             }
                             },
-            "instrument": {"name": "VIIRS", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+            "instrument": {"name": "VIIRS", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 33, "spatial_res": 50, "spectral_res": 7e-9,
                             "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":5 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
@@ -235,6 +235,6 @@
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":2, "latLower":0, "lonUpper":180, "lonLower":-180, "gridRes": 1}, 
              {"@type": "autogrid", "@id": 2, "latUpper":22, "latLower":20, "lonUpper":180, "lonLower":-180, "gridRes": 1}],
-    "scenario": {"@type": "TEST", "duration": 0.25},
+    "scenario": {"@type": "TEST", "duration": 1.0},
     "settings": {"coverageType": "GRID COVERAGE"}
 }

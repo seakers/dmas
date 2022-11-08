@@ -488,7 +488,7 @@ class ComponentModule(Module):
                     self.log(f'Component state communicated to parent subsystem! Finished processing task of type {type(task)}!')
                 else:
                     self.log(f'Component state updated! Finished processing task of type {type(task)}!')
-                self.log(f'Performed task of type {type(task)}!', level=logging.INFO)
+                self.log(f'Performed task of type {type(task)}!', level=logging.DEBUG)
 
         except asyncio.CancelledError:
             return
