@@ -2,7 +2,7 @@ from abc import abstractmethod
 from asyncio import CancelledError
 from typing import Union
 import logging
-# from agent import AgentClient
+import numpy as np
 from messages import *
 from utils import *
 from modules import Module
@@ -42,7 +42,7 @@ class ComponentModule(Module):
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
                 f_update: float = 1.0,
-                n_timed_coroutines: int = 2) -> None:
+                n_timed_coroutines: int = 0) -> None:
         """
         Describes a generic component of an agent's platform.
 
@@ -152,7 +152,7 @@ class ComponentModule(Module):
                 self.environment_events.put(msg.content)
 
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
         except asyncio.CancelledError:
             return    
@@ -488,7 +488,7 @@ class ComponentModule(Module):
                     self.log(f'Component state communicated to parent subsystem! Finished processing task of type {type(task)}!')
                 else:
                     self.log(f'Component state updated! Finished processing task of type {type(task)}!')
-                self.log(f'Performed task of type {type(task)}!', level=logging.INFO)
+                self.log(f'Performed task of type {type(task)}!', level=logging.DEBUG)
 
                 # log task completion status
                 self.log(f'{task}, {status.name}', logger_type=LoggerTypes.ACTIONS, level=logging.INFO)
@@ -558,7 +558,7 @@ class ComponentModule(Module):
 
                         # ask for end of power supply from eps
                         self.log(f'Component has been turned off and state lock has been released! Communicating loss of power draw to EPS...')
-                        stop_power_supply_task = PowerSupplyStopRequestTask(self.name, self.average_power_consumption)
+                        stop_power_supply_task = PowerSupplyRequestTask(self.name, -self.average_power_consumption)
                         msg = SubsystemTaskMessage(self.name, SubsystemNames.EPS.value, stop_power_supply_task)
                         await self.send_internal_message(msg)
                         self.log(f'Loss of power draw communicated to EPS! Actuation task sucessfully performed!')
@@ -723,7 +723,7 @@ class ComponentModule(Module):
     async def listen_for_abort(self, task: ComponentTask) -> None:
         """
         Listens for any abort command targetted towards the task being performed.
-        Any aborts targetted to other tasks are ignored but not discarted.
+        Any aborts targetted to other tasks are ignored but not discarded.
         """
         try:
             other_aborts = []
@@ -919,7 +919,7 @@ class SubsystemModule(Module):
                 subsystem_state : type, 
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
-                n_timed_coroutines: int = 2) -> None:
+                n_timed_coroutines: int = 0) -> None:
         """
         Describes a generic subsyem of an agent's platform.
 
@@ -1054,7 +1054,7 @@ class SubsystemModule(Module):
                 await self.recevied_task_status.put(msg.content)
 
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
         except asyncio.CancelledError:
             return
@@ -1477,7 +1477,7 @@ class SubsystemModule(Module):
     async def listen_for_abort(self, task: Union[PlatformTask, SubsystemTask, ComponentTask]) -> None:
         """
         Listens for any abort command targetted towards the task being performed.
-        Any aborts targetted to other tasks are ignored but not discarted.
+        Any aborts targetted to other tasks are ignored but not discarded.
         """
         try:
             other_aborts = []
@@ -1602,17 +1602,16 @@ class SubsystemModule(Module):
             resp : list = []
             while True:
                 resp_task, resp_status = await self.recevied_task_status.get()
-
                 if resp_task == task:
                     status = resp_status              
-                    self.log(f'Completion status for target task received! Status for task of type {type(task)}: {status.name}')
+                    self.log(f'Completion status for target task received! Status for task of type {type(task)}: {status.value}')
                     break
                 else:
                     self.log(f'Received a task completion status for another task. Waiting for task completion status response...')
                     resp.append( (resp_task, resp_status) )
 
             for resp_task, resp_status in resp:
-                self.recevied_task_status.put( (resp_task, resp_status) )
+                await self.recevied_task_status.put( (resp_task, resp_status) )
 
             return status
 
@@ -1814,7 +1813,11 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
         if isinstance(task, ObservationTask):
             lat, lon = task.target
             self.log(f'Decompose observation platform-level task into subsystem-level tasks')
+            self.log(f'Received observation task!',level=logging.INFO)
             return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations) ]
+        elif isinstance(task, ManeuverTask):
+            self.log(f'Received maneuver task!',level=logging.INFO)
+            return [ task.maneuver_task ]
         else:
             return await super().decompose_platform_task(task)
 
@@ -1824,6 +1827,8 @@ class CommandAndDataHandlingState(SubsystemState):
                 health: SubsystemHealth, 
                 status: SubsystemStatus):
         super().__init__(SubsystemNames.CNDH.value, CommandAndDataHandlingSubsystem, component_states, health, status)
+    def from_subsystem(cndh: CommandAndDataHandlingSubsystem):
+        return CommandAndDataHandlingState(cndh.component_states, cndh.health, cndh.status)
 
     def from_subsystem(cndh: CommandAndDataHandlingSubsystem):
         return CommandAndDataHandlingState(cndh.component_states, cndh.health, cndh.status)
@@ -1868,9 +1873,7 @@ class OnboardComputerModule(ComponentModule):
                 raise asyncio.CancelledError
 
             if isinstance(task, SaveToMemoryTask):
-                self.log(f'In save to memory task')
                 #await self.enabled.set() TODO fix this enable setting?
-                self.log(f'In save to memory task')
                 data = task.get_data()
                 lat, lon = task.get_target()
                 data_vol = len(data.encode('utf-8'))
@@ -1890,7 +1893,6 @@ class OnboardComputerModule(ComponentModule):
                         self.memory_stored -= data_vol
                         self.log(f'Data successfully deleted from internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).')
                 else:
-                    self.log(f'In else')
                     if self.memory_stored + data_vol > self.memory_capacity:
                         # insufficient memory storage for incoming data, discarding task.
                         self.log(f'Module does NOT contain enough memory space to store data. Data size: {data_vol}, memory state: ({self.memory_stored}/{self.memory_capacity}).')
@@ -2081,7 +2083,6 @@ class PayloadSubsystem(SubsystemModule):
         """
         Reacts to other subsystem state updates.
         """
-        self.log(f'payload subsystem state update handler')
         if isinstance(subsystem_state, AttitudeDeterminationAndControlState):
             await self.attitude_state.put(subsystem_state)
 
@@ -2091,19 +2092,18 @@ class PayloadSubsystem(SubsystemModule):
         """
         if isinstance(task, PerformMeasurement):
             comp_tasks = []
-            self.log(f'In decompose subsystem task in Payload')
             # ask for latest attitude state
             msg = SubsystemStateRequestMessage(self.name, SubsystemNames.ADCS.value)
             await self.send_internal_message(msg)
 
             attitude_state = await self.attitude_state.get()
-            self.log(f'Past attitude state')
+            comp_tasks.append(EnableComponentTask(InstrumentNames.TEST.value))
             # instruct each instrument in the observation task to perform the masurement 
             for instrument in task.instruments:
                 i = task.instruments.index(instrument)
                 target_lat, target_lon = task.target
                 comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state) )
-            self.log(f'End of decompose subsystem task in Payload')
+            comp_tasks.append(DisableComponentTask(InstrumentNames.TEST.value))
             return comp_tasks
         else:
             return await super().decompose_subsystem_task(task)
@@ -2163,7 +2163,7 @@ class InstrumentComponent(ComponentModule):
             if acquired:
                 self.state_lock.release()
 
-    async def perform_task(self, task : ComponentTask) -> None:
+    async def perform_task(self, task : ComponentTask) -> TaskStatus:
         """
         Handles tasks to be performed by this battery component. 
         """
@@ -2175,8 +2175,6 @@ class InstrumentComponent(ComponentModule):
                 raise asyncio.CancelledError
 
             if isinstance(task, MeasurementTask):
-                self.status = ComponentStatus.ON # TODO remove this hardcode
-                
                 if self.status is ComponentStatus.OFF:
                     self.log(f'Cannot perform measurement while component status is {self.status}.')
                     raise asyncio.CancelledError
@@ -2190,11 +2188,9 @@ class InstrumentComponent(ComponentModule):
         
                 # wait for measurement duration
                 # TODO consider real-time delays from environment server querying for the data being sensed
-                self.log(f'sim_wait in payload')
-                print(task.duration)
                 await self.sim_wait(task.duration)
 
-                self.log(f'Measurement complete! Sending data to internal memory.')
+                self.log(f'Measurement complete! Sending data to internal memory.',level=logging.INFO)
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage
@@ -2215,6 +2211,7 @@ class InstrumentComponent(ComponentModule):
                 # release state lock
                 self.state_lock.release()
                 acquired = None
+                return TaskStatus.DONE
 
             else:
                 self.log(f'Task of type {type(task)} not yet supported.')
@@ -2269,7 +2266,8 @@ class AttitudeDeterminationAndControlSubsystem(SubsystemModule):
                 status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.ADCS.value, parent_platform_sim, AttitudeDeterminationAndControlState, health, status)
         self.submodules = [
-                            InertialMeasurementUnitModule(self, 1)
+                            InertialMeasurementUnitModule(self, 1),
+                            ReactionWheelModule(self, 10)
                           ]
 
     async def decompose_subsystem_task(self, task : SubsystemTask) -> list:
@@ -2277,7 +2275,11 @@ class AttitudeDeterminationAndControlSubsystem(SubsystemModule):
         Decomposes a subsystem-level task and returns a list of component-level tasks to be performed by this subsystem.
         """
         if isinstance(task, PerformAttitudeManeuverTask):
-            return [ AttitudeUpdateTask(task.target_angular_pos, task.target_angular_vel) ]
+            comp_tasks = []
+            comp_tasks.append(EnableComponentTask(ComponentNames.REACTION_WHEELS.value))
+            comp_tasks.append(AttitudeManeuverTask(task.maneuver_time, task.target_angular_pos, task.target_angular_vel))
+            comp_tasks.append(DisableComponentTask(ComponentNames.REACTION_WHEELS.value))
+            return comp_tasks
         else:
             await super().decompose_subsystem_task(task)
 
@@ -2361,6 +2363,82 @@ class InertialMeasurementUnitState(ComponentState):
     def from_component(imu: InertialMeasurementUnitModule):
         return InertialMeasurementUnitState(imu.power_consumed, imu.power_supplied, imu.angular_pos, imu.angular_vel, imu.health, imu.status)
 
+class ReactionWheelModule(ComponentModule):
+    def __init__(self, 
+                parent_subsystem: Module, 
+                average_power_consumption: float, 
+                health: ComponentHealth = ComponentHealth.NOMINAL, 
+                status: ComponentStatus = ComponentStatus.OFF, 
+                f_update: float = 1) -> None:
+        super().__init__(ComponentNames.REACTION_WHEELS.value, parent_subsystem, ReactionWheelState, average_power_consumption, health, status, f_update)
+
+        self.angular_pos = [0.0, None, None, None] # TODO change to 3 axis attitude
+        self.angular_vel = [0.0, None, None, None] # TODO change to 3 axis attitude
+
+    async def update_properties(self, dt):
+        await super().update_properties(dt)
+        # TODO sense angular position and velocity
+
+    async def perform_task(self, task: ComponentTask) -> TaskStatus:
+        """
+        Performs a task given to this component. 
+        Rejects any tasks that is not intended to be performed by this component. 
+        """
+        try:
+            # check if component was the intended performer of this task
+            self.log(f'Performing task')
+            if task.component != self.name:
+                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
+                raise asyncio.CancelledError
+            
+            acquire = None
+            if isinstance(task, AttitudeManeuverTask):
+                acquire = await self.state_lock.acquire()
+                slew_torque = 4 * abs(np.deg2rad(task.new_angular_pos)-np.deg2rad(self.angular_pos[0]))*0.05 / pow(abs(5),2)
+                momentum = 0.1 # Nms, based on Blue Canyon RWP100
+                power_consumed = 1000 * slew_torque + 4.51 * pow(momentum,0.47) # from https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=1080&context=smallsat
+                self.log(f'{power_consumed} W of power consumed by attitude maneuver!',level=logging.INFO)
+                self.average_power_consumption = power_consumed
+                self.angular_pos = [task.new_angular_pos, None, None, None]
+                self.angular_vel = [task.new_angular_vel, None, None, None]
+                await self.sim_wait(5.0)
+                self.log(f'Attitude changed! New state: angular pos=[{self.angular_pos}], angular vel=[{self.angular_vel}]',level=logging.INFO)
+
+                self.state_lock.release()
+            else:
+                self.log(f'Task of type {type(task)} not yet supported.',level=logging.INFO)
+                raise asyncio.CancelledError
+            return TaskStatus.DONE
+
+        except asyncio.CancelledError:
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
+
+            if acquire:
+                self.state_lock.release()
+
+            # return task abort status
+            return TaskStatus.ABORTED
+
+class ReactionWheelState(ComponentState):
+    def __init__(self,
+                power_consumed: float, 
+                power_supplied: float, 
+                angular_pos : list,
+                angular_vel : list,
+                health: ComponentHealth, 
+                status: ComponentStatus) -> None:
+        super().__init__(ComponentNames.REACTION_WHEELS.value, ReactionWheelModule, power_consumed, power_supplied, health, status)
+        self.angular_pos = []
+        for x_i in angular_pos:
+            self.angular_pos.append(x_i)
+
+        self.angular_vel = []
+        for v_i in angular_vel:
+            self.angular_pos.append(v_i)
+
+    def from_component(rw: ReactionWheelModule):
+        return ReactionWheelState(rw.power_consumed, rw.power_supplied, rw.angular_pos, rw.angular_vel, rw.health, rw.status)
+
 """
 EPS
 """
@@ -2424,63 +2502,61 @@ class ElectricPowerSubsystem(SubsystemModule):
                 power_to_supply = dict()
 
                 # check if power is to be provided or stopped
-                if remaining_power_to_supply > 0:
-                    self.log(f'\'{task.target}\' is requesting {task.power_requested} [W] to be provided.')
+                # if remaining_power_to_supply > 0:
+                self.log(f'\'{task.target}\' is requesting {task.power_requested} [W] to be provided.')
 
-                    # check which components are available to provide power to target
-                    for component in self.submodules:
-                        component : PowerSupplyComponent
-                        power_available = component.maximum_power_output - component.power_output
+                # check which components are available to provide power to target
+                for component in self.submodules:
+                    component : PowerSupplyComponent
+                    power_available = component.maximum_power_output - component.power_output
 
-                        if power_available > 0.0:
-                            if remaining_power_to_supply <= power_available:
-                                power_to_supply[component.name] = remaining_power_to_supply
-                                remaining_power_to_supply -= remaining_power_to_supply
-                            else:
-                                power_to_supply[component.name] = power_available
-                                remaining_power_to_supply -= power_available
-                        
-                        if remaining_power_to_supply < 1e-6:
-                            break
+                    if power_available > 0.0:
+                        if remaining_power_to_supply <= power_available:
+                            power_to_supply[component.name] = remaining_power_to_supply
+                            remaining_power_to_supply -= remaining_power_to_supply
+                        else:
+                            power_to_supply[component.name] = power_available
+                            remaining_power_to_supply -= power_available
                     
                     if remaining_power_to_supply < 1e-6:
-                        # if enough power can be provided, send tasks to eps components
-                        comp_tasks = []
-                        for eps_component_name in power_to_supply:
-                            self.log(f'Instructing \'{eps_component_name}\' to provide \'{task.target}\' with {power_to_supply[eps_component_name]} [W] of power...')
-                            comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
-                        return comp_tasks
-                    else:
-                        # else abort task
-                        self.log(f'{self.name} cannot meet power request of {task.power_requested} [W].')
-                        return []
+                        break
+                
+                if remaining_power_to_supply < 1e-6:
+                    # if enough power can be provided, send tasks to eps components
+                    comp_tasks = []
+                    for eps_component_name in power_to_supply:
+                        self.log(f'Instructing \'{eps_component_name}\' to provide \'{task.target}\' with {power_to_supply[eps_component_name]} [W] of power...')
+                        comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
+                    return comp_tasks
                 else:
-                    self.log(f'\'{task.target}\' is requesting {-task.power_requested} [W] to no longer be provided.')
+                    # else abort task
+                    self.log(f'{self.name} cannot meet power request of {task.power_requested} [W].')
+                    return []
+                # else:
+                #     self.log(f'\'{task.target}\' is requesting {-task.power_requested} [W] to no longer be provided.',level=logging.INFO)
 
-                    for component in self.submodules:
-                        component : PowerSupplyComponent
+                #     for component in self.submodules:
+                #         component : PowerSupplyComponent
                         
-                        state : EPSComponentState = await self.get_state()
+                #         state : EPSComponentState = await component.get_state()
 
-                        for component_name in state.components_powered:
-                            if component_name == task.target:
-                                remaining_power_to_supply -= state.components_powered[component_name]
-                                power_to_supply[component_name] = state.components_powered[component_name]
-
-                            if remaining_power_to_supply < 1e-6:
-                                break
+                #         for component_name in state.components_powered:
+                #             if component_name == task.target:
+                #                 remaining_power_to_supply -= state.components_powered[component_name]
+                #                 power_to_supply[component_name] = -state.components_powered[component_name]
                     
-                    if remaining_power_to_supply < 1e-6:
-                        # if enough power can be provided, send tasks to eps components
-                        comp_tasks = []
-                        for eps_component_name in power_to_supply:
-                            self.log(f'Instructing \'{eps_component_name}\' to stop providing \'{task.target}\' with {power_to_supply[eps_component_name]}[W] of power...')
-                            comp_tasks.append( StopProvidingPowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
-                        return comp_tasks
-                    else:
-                        # else abort task
-                        self.log(f'{self.name} cannot meet power stop request of {task.power_requested} [W].')
-                        return []
+                #     if remaining_power_to_supply < 1e-6:
+                #         # if enough power can be provided, send tasks to eps components
+                #         comp_tasks = []
+                #         for eps_component_name in power_to_supply:
+                #             self.log(f'Instructing \'{eps_component_name}\' to stop providing \'{task.target}\' with {power_to_supply[eps_component_name]}[W] of power...',level=logging.INFO)
+                #             comp_tasks.append( ProvidePowerTask(eps_component_name, power_to_supply[eps_component_name], task.target) )
+                #         self.log(f'Done instructing',level=logging.INFO)
+                #         return comp_tasks
+                #     else:
+                #         # else abort task
+                #         self.log(f'{self.name} cannot meet power stop request of {task.power_requested} [W].',level=logging.INFO)
+                #         return []
 
             else:
                 return await super().decompose_subsystem_task(task)
@@ -2548,7 +2624,7 @@ class PowerSupplyComponent(ComponentModule):
         """
         Updates the current state of the component given a time-step dt
         """
-        super().update_properties(dt)
+        await super().update_properties(dt)
 
         # update power output
         self.power_output = 0
@@ -2591,6 +2667,10 @@ class PowerSupplyComponent(ComponentModule):
                     else:
                         self.components_powered[task.target] = task.power_to_supply
                     
+                    # inform target component of its new power supply
+                    power_supply_task = ReceivePowerTask(task.target, task.power_to_supply)
+                    msg = ComponentTaskMessage(self.name, task.target, power_supply_task)
+                    await self.send_internal_message(msg)
                     self.log(f'Now providing { task.power_to_supply} [W] of power to \'{task.target}\'! (Current power output: {self.power_output}[W]/{self.maximum_power_output}[W])')
 
                     # inform target component of its new power supply
@@ -2602,10 +2682,10 @@ class PowerSupplyComponent(ComponentModule):
                     return TaskStatus.DONE
                 else:
                     # component is requesting for power to no longer be provided
-                    
+
                     if task.target in self.components_powered:
                         # check if component can satisfy power supply demand and update internal power output 
-                        if self.components_powered[task.target] < abs(task.power_to_supply):
+                        if self.components_powered[task.target] <= abs(task.power_to_supply):
                             task.power_to_supply = -self.components_powered[task.target]
 
                         # update internal list of powered components    
@@ -2619,9 +2699,9 @@ class PowerSupplyComponent(ComponentModule):
                         raise asyncio.CancelledError
 
                     # inform target component of its new power supply
-                    power_supply_task = StopReceivingPowerTask(task.target, task.power_to_supply)
+                    power_supply_task = ReceivePowerTask(task.target, task.power_to_supply)
                     msg = ComponentTaskMessage(self.name, task.target, power_supply_task)
-                    self.send_internal_message(msg)
+                    await self.send_internal_message(msg)
                     self.log(f'No longer providing { task.power_to_supply} [W] of power to \'{task.target}\'! (Current power output: {self.power_output}[W]/{self.maximum_power_output}[W])')
 
                     return TaskStatus.DONE
@@ -2631,7 +2711,7 @@ class PowerSupplyComponent(ComponentModule):
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.')
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
 
             # release update lock if cancelled during task handling
             if acquired:
@@ -2929,7 +3009,7 @@ class TransmitterComponent(ComponentModule):
                 elif isinstance(task, TransmitMessageTask):
                     await self.state_lock.acquire()
 
-                    t_msg : NodeToEnvironmentMessage = task.msg
+                    t_msg = task.msg
                     t_msg_str = t_msg.to_json()
                     t_msg_length = len(t_msg_str.encode('utf-8'))
 
@@ -2940,7 +3020,7 @@ class TransmitterComponent(ComponentModule):
                         self.log(f'Out-going message of length {t_msg_length} now stored in out-going buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                     else:
                         self.log(f'Rejected out-going transmission into buffer.')
-                        self.log(f'Out-going buffer cannot store out-going message of length {t_msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarting message...')
+                        self.log(f'Out-going buffer cannot store out-going message of length {t_msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarding message...')
 
                     self.state_lock.release()                   
             
@@ -2948,8 +3028,18 @@ class TransmitterComponent(ComponentModule):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
 
+            elif isinstance(msg.content, InterNodeMessage):
+                self.log(f'Received an internode message!',level=logging.INFO)
+                task_msg = TransmitMessageTask(AgentModuleTypes.IRIDIUM_ENGINEERING_MODULE,msg,1.0)
+                await self.tasks.put(task_msg)
+            
+            elif isinstance(msg.content, MeasurementRequest):
+                self.log(f'Received a measurement request!',level=logging.INFO)
+                inter_node_msg = InterNodeMeasurementRequestMessage(self,"Iridium",msg.content)
+                task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
+                await self.tasks.put(task_msg)
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarting message...')
+                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
         except asyncio.CancelledError:
             return  
@@ -2969,7 +3059,7 @@ class TransmitterComponent(ComponentModule):
         try:
             # check if component was the intended performer of this task
             if task.component != self.name:
-                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...')
+                self.log(f'Component task not intended for this component. Initially intended for component \'{task.component}\'. Aborting task...',level=logging.DEBUG)
                 raise asyncio.CancelledError
 
             if isinstance(task, TransmitMessageTask):
@@ -2984,60 +3074,60 @@ class TransmitterComponent(ComponentModule):
 
                 # unpackage message
                 msg : InterNodeMessage = task.msg
-
+                self.log(f'Right before wait_for_access_start in perform_task',level=logging.DEBUG)
                 # wait for access to target node
-                wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
-                await wait_for_access_start
-
+                #wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
+                #await wait_for_access_start
+                self.log(f'Right before create_tasks in perform_task',level=logging.DEBUG)
                 # wait for msg to be transmitted successfully or interrupted due to access end or message timeout
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
-                wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
-                wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
-                wait_for_message_timeout = asyncio.create_task( self.sim_wait(task.timeout) )
-                processes = [transmit_msg, wait_for_access_end, wait_for_access_end_event, wait_for_message_timeout]
+                #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
+                #wait_for_access_end_event = asyncio.create_task( self.access_events[msg.dst].wait_end() ) 
+                #wait_for_message_timeout = asyncio.create_task( self.sim_wait(100.0) )
+                processes = [transmit_msg] # TODO add waits back:  wait_for_access_end, wait_for_access_end_event
 
                 _, pending = await asyncio.wait(processes, return_when=asyncio.FIRST_COMPLETED)
                 
                 # cancel all pending processes
                 for pending_task in pending:
+                    self.log(f'Cancelling pending processes!',level=logging.DEBUG)
                     pending_task : asyncio.Task
                     pending_task.cancel()
-                    await pending_task
-
+                self.log(f'Cancelled pending processes!',level=logging.DEBUG)
                 # remove message from out-going buffer
-                await self.remove_msg_from_buffer(msg)
-                self.access_events.pop(msg.dst)
+                # await self.remove_msg_from_buffer(msg)
+                # self.access_events.pop(msg.dst)
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Sucessfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!')                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!', level=logging.INFO)                    
                     self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
                     return TaskStatus.DONE
 
-                elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
-                    self.log(f'Access to target \'{msg.dst}\' lost during transmission of message of type {type(msg)}!')
-                    raise asyncio.CancelledError
+                # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
+                #     self.log(f'Access to target \'{msg.dst}\' lost during transmission of message of type {type(msg)}!',level=logging.DEBUG)
+                #     raise asyncio.CancelledError
 
                 else:
-                    self.log(f'Message of type {type(msg)} timed out!')
+                    self.log(f'Message of type {type(msg)} timed out!',level=logging.DEBUG)
                     raise asyncio.CancelledError
 
             else:
-                self.log(f'Task of type {type(task)} not yet supported.')
+                self.log(f'Task of type {type(task)} not yet supported.',level=logging.DEBUG)
                 acquired = None 
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.')
+            self.log(f'Aborting task of type {type(task)}.',level=logging.DEBUG)
 
             # release update lock if cancelled during task handling
             if acquired:
                 self.state_lock.release()
 
             # cancel any task that's not yet completed
-            if not wait_for_access_start.done():
-                wait_for_access_start.cancel()
-                await wait_for_access_start
+            # if not wait_for_access_start.done():
+            #     wait_for_access_start.cancel()
+            #     await wait_for_access_start
 
             for process in processes:
                 if process is not None and isinstance(process, asyncio.Task) and not process.done():
@@ -3047,9 +3137,72 @@ class TransmitterComponent(ComponentModule):
             # return task abort status
             return TaskStatus.ABORTED
 
-    async def remove_msg_from_buffer(self, msg : NodeToEnvironmentMessage):
+    async def transmit_message(self, msg: InterNodeMessage):
         try:
-            self.log(f'Removing message from out-going buffer...')
+            # reformat message
+            msg.src = self.name
+            msg_json = msg.to_json()
+            parent_agent = self.get_top_module()
+            # connect socket to destination 
+            port = parent_agent.AGENT_TO_PORT_MAP[msg.dst]
+            self.log(f'Connecting to agent {msg.dst} through port number {port}...',level=logging.DEBUG)
+            parent_agent.agent_socket_out.connect(f"tcp://localhost:{port}")
+            self.log(f'Connected to agent {msg.dst}!',level=logging.DEBUG)
+
+            # submit request
+            self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.DEBUG)
+            await parent_agent.agent_socket_out_lock.acquire()
+            self.log(f'Acquired lock.',level=logging.DEBUG)
+            await parent_agent.agent_socket_out.send_json(msg_json)
+            self.log(f'{type(msg)} message sent successfully. Awaiting response...',level=logging.DEBUG)
+                        
+            # wait for server reply
+            await parent_agent.agent_socket_out.recv_json()
+            self.log(f'Received message reception confirmation!',level=logging.DEBUG)  
+            parent_agent.agent_socket_out_lock.release()
+            self.log(f'Released agent_socket_out',level=logging.DEBUG)      
+
+            # disconnect socket from destination
+            self.log(f'Disconnecting from agent {msg.dst}...',level=logging.DEBUG)
+            parent_agent.agent_socket_out.disconnect(f"tcp://localhost:{port}")
+            self.log(f'Disconnected from agent {msg.dst}!',level=logging.DEBUG)
+        except asyncio.CancelledError:
+            self.log(f'asyncio CancelledError in transmit_message',level=logging.DEBUG)
+            parent_agent.agent_socket_out_lock.release()
+            self.log(f'Released agent_socket_out lock.',level=logging.DEBUG)
+            return
+
+
+    # async def transmit_message(self, msg: InterNodeMessage):
+    #     # reformat message
+    #     msg.src = self.name
+    #     msg_json = msg.to_json()
+
+    #     # connect socket to destination 
+    #     port = self.AGENT_TO_PORT_MAP[msg.dst]
+    #     self.log(f'Connecting to agent {msg.dst} through port number {port}...')
+    #     self.agent_socket_out.connect(f"tcp://localhost:{port}")
+    #     self.log(f'Connected to agent {msg.dst}!')
+
+    #     # submit request
+    #     self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...')
+    #     await self.agent_socket_out_lock.acquire()
+    #     await self.agent_socket_out.send_json(msg_json)
+    #     self.log(f'{type(msg)} message sent successfully. Awaiting response...')
+        
+    #     # wait for server reply
+    #     await self.agent_socket_out.recv()
+    #     self.agent_socket_out_lock.release()
+    #     self.log(f'Received message reception confirmation!')      
+
+    #     # disconnect socket from destination
+    #     self.log(f'Disconnecting from agent {msg.dst}...')
+    #     self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
+    #     self.log(f'Disconnected from agent {msg.dst}!')
+
+    async def remove_msg_from_buffer(self, msg : InterNodeMessage):
+        try:
+            self.log(f'Removing message from out-going buffer...',level=logging.DEBUG)
             acquired = await self.state_lock.acquire()
 
             msg_str = msg.to_json()
@@ -3058,7 +3211,7 @@ class TransmitterComponent(ComponentModule):
                 self.buffer_allocated -= msg_length
             else:
                 self.buffer_allocated = 0
-            self.log(f'Message sucessfully removed from buffer!')
+            self.log(f'Message sucessfully removed from buffer!',level=logging.DEBUG)
 
             self.state_lock.release()
 
@@ -3068,13 +3221,15 @@ class TransmitterComponent(ComponentModule):
     
     async def wait_for_access_start(self, target : str):
         try:
-            msg = AgentAccessSenseMessage(self.name, target)
+            msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
+            if response is None:
+                raise asyncio.CancelledError
             while not response.result:
-                self.sim_wait(1/self.UPDATE_FREQUENCY)
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
-
+            self.log(f'Response {response} in wait_for_access_start in perform_task',level=logging.DEBUG)
             if target not in self.access_events:
                 self.access_events[target] = EventPair()        
 
@@ -3084,11 +3239,17 @@ class TransmitterComponent(ComponentModule):
 
     async def wait_for_access_end(self, target : str):
         try:
-            msg = AgentAccessSenseMessage(self.name, target)
+            msg = AgentAccessSenseMessage(self.get_top_module().name, target)
 
             response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
+            self.log(f'Response: {response}',level=logging.DEBUG)
+            if response is None:
+                self.log(f'Raising asyncio cancelled error',level=logging.DEBUG)
+                raise asyncio.CancelledError
+            self.log(f'After response is none if',level=logging.DEBUG)
+
             while response.result:
-                self.sim_wait(1/self.UPDATE_FREQUENCY)
+                await self.sim_wait(1/self.UPDATE_FREQUENCY)
                 response : AgentAccessSenseMessage = await self.submit_environment_message(msg)
 
             if target not in self.access_events:
@@ -3096,6 +3257,7 @@ class TransmitterComponent(ComponentModule):
             self.access_events[target].trigger_end()
 
         except asyncio.CancelledError:
+            self.log(f'In except handler in wait_for_access_end',level=logging.DEBUG)
             return
 
     async def environment_event_handler(self, event_msg : EnvironmentBroadcastMessage) -> bool:
@@ -3160,6 +3322,8 @@ class ReceiverComponent(ComponentModule):
         await super().activate()
 
         self.access_events = dict()
+        task = ReceiveMessageTransmission()
+        await self.tasks.put(task)
 
     def is_critical(self) -> bool:
         threshold = 0.05
@@ -3195,10 +3359,14 @@ class ReceiverComponent(ComponentModule):
                     msg_dict = None
 
                     # listen for messages from other agents
-                    self.log('Waiting for agent messages...')
-                    msg_dict = await parent_agent.agent_socket_in.recv_json()
-                    self.log(f'Agent message received!')
-
+                    self.log('Waiting for agent messages...',level=logging.DEBUG)
+                    msg_json = await parent_agent.agent_socket_in.recv_json()
+                    self.log(f'Agent message received!',level=logging.DEBUG)
+                    blank = dict()
+                    blank_json = json.dumps(blank)
+                    await parent_agent.agent_socket_in.send_json(blank_json)
+                    msg = InterNodeMessage.from_json(msg_json)
+                    msg_dict = InterNodeMessage.to_dict(msg)
                     # check if message can fit in incoming buffer
                     msg_str = json.dumps(msg_dict)
                     msg_length = len(msg_str.encode('utf-8'))
@@ -3208,6 +3376,7 @@ class ReceiverComponent(ComponentModule):
                         self.buffer_allocated += msg_length
                         self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                         self.state_lock.release()
+                        acquired = None
                 
                         # handle request
                         msg_type : InterNodeMessageTypes = InterNodeMessageTypes[msg_dict['@type']]
@@ -3221,8 +3390,15 @@ class ReceiverComponent(ComponentModule):
 
                         # elif msg_type is InterNodeMessageTypes.PLANNER_MESSAGE:
                         #     pass
-                        # elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
-                        #     pass
+                        elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
+                            msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
+                            msg_contents = json.loads(msg.content)["content"]
+                            msg_contents = json.loads(msg_contents)
+                            self.log(f'Msg contents: {msg_contents}',level=logging.DEBUG)
+                            measurement_request = MeasurementRequest(msg_contents["_type"],msg_contents["_target"][0],msg_contents["_target"][1],msg_contents["_science_val"])
+                            req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
+                            self.log(f'Sending measurement request to planning module (hopefully)!',level=logging.DEBUG)
+                            await self.send_internal_message(req_msg) # send measurement request to planning module
                         # elif msg_type is InterNodeMessageTypes.MEASUREMENT_MESSAGE:
                         #     pass
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_REQUEST:
@@ -3237,13 +3413,14 @@ class ReceiverComponent(ComponentModule):
                         self.buffer_allocated -= msg_length
                         self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
                         self.state_lock.release()
+                        acquired = None
 
                         if msg is not None:
                             self.log(f'RECEIVED, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
 
                     else:
-                        self.log(f'Incoming buffer cannot store incoming message of length {msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarting message...')
-                    
+                        self.log(f'Incoming buffer cannot store incoming message of length {msg_length} (current state: {self.buffer_allocated}/{self.buffer_capacity}). Discarding message...')
+
             else:
                 self.log(f'Task of type {type(task)} not yet supported.')
                 raise asyncio.CancelledError
@@ -3329,7 +3506,7 @@ class PlatformSim(Module):
                     await self.send_internal_message(msg)
                 else:
                     # this module is the intended receiver for this message. Handling message
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
         except asyncio.CancelledError:
             return
@@ -3376,7 +3553,7 @@ class EngineeringModule(Module):
                     await self.send_internal_message(msg)
                 else:
                     # this module is the intended receiver for this message. Handling message
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
         except asyncio.CancelledError:
             return

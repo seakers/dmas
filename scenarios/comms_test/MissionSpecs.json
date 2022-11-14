@@ -136,6 +136,6 @@
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":2, "latLower":0, "lonUpper":180, "lonLower":-180, "gridRes": 1}, 
              {"@type": "autogrid", "@id": 2, "latUpper":22, "latLower":20, "lonUpper":180, "lonLower":-180, "gridRes": 1}],
-    "scenario": {"@type": "TEST", "duration": 0.25},
+    "scenario": {"@type": "TEST", "duration": 1.0},
     "settings": {"coverageType": "GRID COVERAGE"}
 }

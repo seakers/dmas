@@ -13,7 +13,6 @@ from modules import  *
 from utils import Container, SimClocks, EnvironmentModuleTypes
 import pandas as pd
 import base64
-from scienceserver import *
 
 """
 --------------------------------------------------------
@@ -481,7 +480,7 @@ class AgentExternalStatePropagator(Module):
         super().__init__(EnvironmentModuleTypes.AGENT_EXTERNAL_PROPAGATOR_MODULE.value, 
                             parent_module, 
                             submodules=[], 
-                            n_timed_coroutines=1)
+                            n_timed_coroutines=0)
         self.submodules = [
                             EclipseEventModule(self), 
                             GPAccessEventModule(self),
@@ -534,6 +533,7 @@ class EnvironmentServer(NodeModule):
         self.AGENT_NAME_LIST = []                                       # List of names of agent present in the simulation
         self.NUMBER_AGENTS = len(agent_name_list)                       # Number of agents present in the simulation
         self.NUMBER_OF_TIMED_COROUTINES_AGENTS = 0                      # Number of timed co-routines to be performed by other agents
+        self.scenario_dir = scenario_dir
 
         for agent_name in agent_name_list:
             self.AGENT_NAME_LIST.append(agent_name)
@@ -563,8 +563,8 @@ class EnvironmentServer(NodeModule):
         # set up submodules
         self.submodules = [ 
                             TicRequestModule(self),
-                            AgentExternalStatePropagator(self),
-                            # ImageServerModule(self)
+                            AgentExternalStatePropagator(self)
+                            #ImageServerModule(self)
                           ]
         
         # # set up results dir
@@ -766,6 +766,8 @@ class EnvironmentServer(NodeModule):
                     # query agent access database
                     is_accessing: bool = self.orbit_data[agent_access_msg.src].is_accessing_agent(agent_access_msg.target, t_curr)
                     agent_access_msg.set_result(is_accessing)
+                    if(agent_access_msg.src == "Iridium" or agent_access_msg.target == "Iridium"):
+                        agent_access_msg.set_result(True)
                     
                     # change source and destination for response message
                     agent_access_msg.dst = agent_access_msg.src
@@ -868,7 +870,7 @@ class EnvironmentServer(NodeModule):
                     self.log(f'Received observation sense message from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
                     
 
-                    with open("./scenarios/sim_test/sample_landsat_image.png", "rb") as image_file:
+                    with open(self.scenario_dir+"sample_landsat_image.png", "rb") as image_file:
                         encoded_string = base64.b64encode(image_file.read())
                     observation_sense_msg.obs = encoded_string.decode('utf-8')
                     
@@ -959,14 +961,14 @@ class EnvironmentServer(NodeModule):
 
                 if not isinstance(msg, EnvironmentBroadcastMessage):
                     # if message to be broadcasted is not of any supported format, reject and dump
-                    self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarting task...')
+                    self.log(f'Broadcast task of type {type(msg)} not yet supported. Discarding task...')
                     continue
                 else:
                     if msg.src != self.name:
                         msg.src = self.name
                     
                     if msg.dst == self.name:
-                        self.log(f'Broadcast task of type {msg.get_type()} received! Destination originally set to this environment server. Discarting task...')
+                        self.log(f'Broadcast task of type {msg.get_type()} received! Destination originally set to this environment server. Discarding task...')
                         continue
 
                     self.log(f'Broadcast task of type {msg.get_type()} received! Publishing to all agents...')
@@ -1061,14 +1063,14 @@ class EnvironmentServer(NodeModule):
             for agent_name in self.AGENT_NAME_LIST:
                 if (agent_name in msg_src) and (agent_name not in self.alive_subscribers):
                     self.alive_subscribers.append(agent_name)
-                    self.log(f"{agent_name} is now synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} is now synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     
                     subscriber_to_port_map[msg_src] = src_port
                     break
                 elif (agent_name in self.alive_subscribers):
-                    self.log(f"{agent_name} is already synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} is already synchronized to environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                 elif (msg_src not in self.AGENT_NAME_LIST):
-                    self.log(f"{agent_name} agent node not in list of agents for this environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).")
+                    self.log(f"{agent_name} agent node not in list of agents for this environment ({len(self.alive_subscribers)}/{self.NUMBER_AGENTS}).", level=logging.INFO)
                     
             # send synchronization reply
             await self.reqservice.send_string('')
@@ -1136,7 +1138,7 @@ class EnvironmentServer(NodeModule):
 
             if NodeToEnvironmentMessageTypes[msg_type] is not NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION:
                 # if request is not of the type end-of-simulation, then discard and wait for the next
-                self.log(f'Request of type {msg_type} received at the end of simulation. Discarting request and sending a blank response...', level=logging.INFO)
+                self.log(f'Request of type {msg_type} received at the end of simulation. Discarding request and sending a blank response...', level=logging.INFO)
                 await self.send_blanc_response()
                 continue
             
@@ -1230,18 +1232,18 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/sim_test/'
+    scenario_dir = './scenarios/default_mission/'
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 3
+    duration = 86400
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
 
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
-    environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=1)
-    # environment = EnvironmentServer(scenario_dir, ['Mars1', 'Mars2'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
+    environment = EnvironmentServer(scenario_dir, ['Suomi NPP', 'Jason-3', 'CustomSat', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
     print('DONE')

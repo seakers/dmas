@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 import csv
 import base64
-from PIL import Image
+import random
+import PIL.Image
 from io import BytesIO
 from modules import Module
 from messages import *
@@ -15,7 +16,7 @@ from tasks import InformationRequest, DataProcessingRequest, MeasurementRequest
 
 class ScienceModule(Module):
     def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
-        super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [])
+        super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [], 0)
 
         self.scenario_dir = scenario_dir
 
@@ -73,7 +74,7 @@ class ScienceModule(Module):
                     await self.send_internal_message(msg)
 
                 else:
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
 
         except asyncio.CancelledError:
             return
@@ -151,14 +152,14 @@ class ScienceModule(Module):
 
 #             elif isinstance(msg, RequestMessage) and isinstance(msg.get_request(), InformationRequest):
 #                 # TODO add support for information requests 
-#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')            
+#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')            
 
 #             elif isinstance(msg, RequestMessage) and isinstance(msg.get_request(), DataProcessingRequest):
 #                 # TODO add support for data processing requests 
-#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')            
+#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')            
 
 #             else:
-#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')            
+#                 self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')            
             
 #         except asyncio.CancelledError:
 #             return
@@ -304,11 +305,13 @@ class ScienceValueModule(Module):
         self.model_requests_queue = []
         self.model_results_queue = []
         self.prop_meas_obs_metrics = []
+        self.science_value_sum = 0
 
     async def activate(self):
         await super().activate()
 
         self.request_msg_queue = asyncio.Queue()
+        self.meas_msg_queue = asyncio.Queue()
 
     async def internal_message_handler(self, msg: InternalMessage):
         """
@@ -317,15 +320,17 @@ class ScienceValueModule(Module):
         try:
             if(msg.src_module == ScienceSubmoduleTypes.SCIENCE_REASONING.value):
                 # Event of interest sent from the science reasoning module
-                self.unvalued_queue.append(msg)
+                await self.request_msg_queue.put(msg)
             elif(msg.src_module == ScienceSubmoduleTypes.SCIENCE_PREDICTIVE_MODEL.value):
                 # receiving result from science predictive models module
                 self.model_results_queue.append(msg)
+            elif(msg.src_module == ScienceSubmoduleTypes.ONBOARD_PROCESSING.value):
+                await self.meas_msg_queue.put(msg)
             else:
                 self.log(f'Unsupported message type for this module.')
 
             # event-driven
-            await self.request_msg_queue.put(msg)
+            
         except asyncio.CancelledError:
             return
 
@@ -340,7 +345,11 @@ class ScienceValueModule(Module):
             # broadcast_meas_req.set_name('broadcast_meas_req')
             request_handler = asyncio.create_task(self.request_handler())
             request_handler.set_name('request_handler')
-            coroutines = [request_handler]
+
+            meas_handler = asyncio.create_task(self.meas_handler())
+            meas_handler.set_name('meas_handler')
+
+            coroutines = [request_handler,meas_handler]
 
             done, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
 
@@ -367,28 +376,48 @@ class ScienceValueModule(Module):
     async def request_handler(self):
         try:
             while True:
-                self.log(f'In science value request handler')
                 msg : DataMessage = await self.request_msg_queue.get()
                 lat = msg.content["lat"]
                 lon = msg.content["lon"]
-                obs = msg.content["product_type"]
+                obs = msg.content
 
                 science_value = self.compute_science_value(lat, lon, obs)                
 
-                measurement_request = MeasurementRequest(lat, lon, science_value)
+                measurement_request = MeasurementRequest("tss", lat, lon, science_value)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
+                ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
                 await self.send_internal_message(req_msg)
+                await self.send_internal_message(ext_msg)
+                self.log(f'Sent message to transmitter!',level=logging.INFO)
+
+        except asyncio.CancelledError:
+            return
+
+    async def meas_handler(self):
+        try:
+            while True:
+                msg : DataMessage = await self.meas_msg_queue.get()
+                lat = msg.content["lat"]
+                lon = msg.content["lon"]
+                obs = msg.content
+
+                science_value = self.compute_science_value(lat, lon, obs)                
+
+                self.log(f'Received measurement with value {science_value}!',level=logging.INFO)
+                self.science_value_sum = self.science_value_sum + science_value
+                self.log(f'Sum of science values: {self.science_value_sum}',level=logging.INFO)
+                self.log(f'Sum of science values: {self.science_value_sum}', logger_type=LoggerTypes.RESULTS, level=logging.INFO)
 
         except asyncio.CancelledError:
             return
 
     def compute_science_value(self, lat, lon, obs):
-        self.log(f'Computing science value...')
+        self.log(f'Computing science value...', level=logging.INFO)
         
         points = np.zeros(shape=(2000, 5))
 
-        with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
+        with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
             reader = csv.reader(csvfile)
             count = 0
             for row in reader:
@@ -399,16 +428,70 @@ class ScienceValueModule(Module):
                 count = count + 1
 
         science_val = self.get_pop(lat, lon, points)
-        self.log(f'computed science value: {science_val}')
-        return science_val
+        if(self.check_tss_outlier(obs)):
+            science_val = science_val * 10
+            self.log(f'Computed bonus science value: {science_val}', level=logging.INFO)
+        else:
+            self.log(f'Computed normal science value: {science_val}', level=logging.INFO)
+        return science_val*self.meas_perf()
 
     def get_pop(self, lat, lon, points):
         pop = 0.0
         for i in range(len(points[:, 0])):
-            if (float(lat)-points[i, 1] < 0.01) and (float(lon) - points[i, 0] < 0.01):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
                 pop = points[i,4]
                 break
         return pop
+
+    def check_tss_outlier(self,item):
+        outlier = False
+        points = np.zeros(shape=(2000, 5))
+        with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+            reader = csv.reader(csvfile)
+            count = 0
+            for row in reader:
+                if count == 0:
+                    count = 1
+                    continue
+                points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                count = count + 1
+        mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
+        if mean > 30000: # TODO remove this hardcode
+            self.log(f'TSS outlier measured at {lat}, {lon}!',level=logging.INFO)
+            outlier = True
+        else:
+            self.log(f'No TSS outlier measured at {lat}, {lon}',level=logging.INFO)
+        item["checked"] = True
+        return outlier
+
+    def get_mean_sd(self, lat, lon, points):
+        mean = None
+        sd = None
+        for i in range(len(points[:, 0])):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
+                mean = points[i, 2]
+                sd = points[i, 3]
+                lat = points[i, 0]
+                lon = points[i, 1]
+                break
+        return mean, sd, lat, lon
+
+    def meas_perf(self):
+        a = 8.9e-5
+        b = 1.4e-3
+        c = 6.1e-3
+        d = 0.85
+        parent_agent = self.get_top_module()
+        instrument = parent_agent.payload[parent_agent.name]["name"]
+        if(instrument=="VIIRS"):
+            x = parent_agent.payload[parent_agent.name]["snr"]
+            y = parent_agent.payload[parent_agent.name]["spatial_res"]
+            z = parent_agent.payload[parent_agent.name]["spectral_res"]
+            perf = a*pow(x,3)-b*pow(y,2)-c*np.log10(z)+d
+        else:
+            perf = 1
+        self.log(f'Measurement performance: {perf}',level=logging.INFO)
+        return perf
 
 
 
@@ -439,7 +522,7 @@ class OnboardProcessingModule(Module):
         try:
             if isinstance(msg, DataMessage):
                 # event-driven
-                self.log(f'Received new observation data! Processing...')            
+                self.log(f'Received new observation data! Processing...', level=logging.INFO)            
                 await self.incoming_results.put(msg)
         except asyncio.CancelledError:
             return
@@ -500,26 +583,43 @@ class OnboardProcessingModule(Module):
                 obs_str = msg.get_data()
                 lat, lon = msg.get_target()
 
-                self.log(f'Received measurement result from ({lat}°, {lon}°)!')
+                self.log(f'Received measurement result from ({lat}°, {lon}°)!', level=logging.INFO)
 
                 # process result
-                b4,b5,prefix,stored_data_filepath = self.store_measurement(obs_str)
-                processed_data = self.compute_chlorophyll_obs_value(b4,b5)
-                self.sd = self.add_data_product(self.sd,lat,lon,0.01,"chlorophyll-a",prefix+"chla_"+stored_data_filepath,processed_data)
+                obs_process_time = self.get_current_time()
 
+                parent_agent = self.get_top_module()
+                instrument = parent_agent.payload[parent_agent.name]["name"]
+                self.log(f'Instrument: {instrument}',level=logging.DEBUG)
+                if(instrument == "VIIRS"): # TODO replace this hardcoding
+                    data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
+                    processed_data = self.compute_tss_obs_value(data)
+                    self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"tss",raw_data_filename,processed_data)
+                    self.log(f'TSS measurement data successfully saved in on-board data-base.', level=logging.INFO)
+                elif(instrument == "POSEIDON-3B Altimeter"): # TODO replace this hardcoding
+                    data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
+                    processed_data = self.compute_altimetry()
+                    self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"altimetry",raw_data_filename,processed_data)
+                    self.log(f'Altimetry measurement data successfully saved in on-board data-base.', level=logging.INFO)
+                else:
+                    self.log(f'Instrument not yet supported by science module!',level=logging.INFO)
                 # release database lock and inform other processes that the database has been updated
-                self.log(f'Measurement data successfully saved in on-board data-base.')
                 self.database_lock.release()
                 self.updated.set()
+                updated_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_REASONING.value, self.updated)
+                await self.send_internal_message(updated_msg)
+                for item in self.sd:
+                    if item["lat"] == lat and item["lon"] == lon and item["time"] == obs_process_time:
+                        value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
+                        await self.send_internal_message(value_msg)
         except asyncio.CancelledError:
             return
 
-    def store_measurement(self,dataprod):
-        im = Image.open(BytesIO(base64.b64decode(dataprod)))
+    def store_raw_measurement(self,dataprod,lat,lon,obs_process_time):
+        im = PIL.Image.open(BytesIO(base64.b64decode(dataprod)))
 
         img_np = np.array(im)
-        b5 = img_np[:,:,0]
-        b4 = img_np[:,:,1]
+        data = img_np[:,:,0]
         img_np = np.delete(img_np,3,2)
         # from https://stackoverflow.com/questions/67831382/obtaining-rgb-data-from-image-and-writing-it-to-csv-file-with-the-corresponding
         xy_coords = np.flip(np.column_stack(np.where(np.all(img_np >= 0, axis=2))), axis=1)
@@ -530,24 +630,35 @@ class OnboardProcessingModule(Module):
         value = np.hstack([pixel_numbers, xy_coords, rgb])
 
         # Properly save as CSV
-        prefix = "./scenarios/sim_test/results/sd/"
-        np.savetxt(prefix+"outputdata.csv", value, delimiter='\t', fmt='%4d')
-        return b4, b5, prefix, "outputdata.csv"
+        prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
+        filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
+        np.savetxt(filename, value, delimiter='\t', fmt='%4d')
+        return data, filename
 
     def compute_chlorophyll_obs_value(self,b4,b5):
         bda = b5 - b5/b4 + b4
         return bda
 
-    def add_data_product(self,sd,lat,lon,time,product_type,filepath,data):
+    def compute_tss_obs_value(self,b4):
+        tss = 195.6 * b4
+        return tss
+
+    def compute_altimetry(self):
+        return np.random.rand(100,100)
+
+    def add_data_product(self,sd,lat,lon,time,product_type,filename,data):
         data_product_dict = dict()
         data_product_dict["lat"] = lat
         data_product_dict["lon"] = lon
         data_product_dict["time"] = time
         data_product_dict["product_type"] = product_type
-        data_product_dict["filepath"] = filepath
-        pd.DataFrame(data).to_csv(filepath,index=False,header=False)
+        data_product_dict["filepath"] = filename[:-8]+"_"+product_type+".csv"
+        data_product_dict["checked"] = False
+        pd.DataFrame(data).to_csv(data_product_dict["filepath"],index=False,header=False)
         sd.append(data_product_dict)
-        with open("./scenarios/sim_test/results/sd/dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt", mode="wt") as datafile:
+        prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
+        filename = prefix+"dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt"
+        with open(filename, mode="wt") as datafile:
             datafile.write(json.dumps(data_product_dict))
         return sd
 
@@ -597,14 +708,17 @@ class ScienceReasoningModule(Module):
     model_results = []
     async def activate(self):
         await super().activate()
+        self.updated_queue = asyncio.Queue()
 
     async def internal_message_handler(self, msg):
         """
         Handles message intended for this module and performs actions accordingly.
         """
         try:
-            if(msg.src_module == ScienceSubmoduleTypes.PREDICTIVE_MODELS.value):
+            if(msg.src_module == ScienceSubmoduleTypes.SCIENCE_PREDICTIVE_MODEL.value):
                 self.model_results.append(msg.content)
+            elif(msg.src_module == ScienceSubmoduleTypes.ONBOARD_PROCESSING.value):
+                await self.updated_queue.put(msg)
             else:
                 self.log(f'Unsupported message for this module.')
         except asyncio.CancelledError:
@@ -615,9 +729,9 @@ class ScienceReasoningModule(Module):
 
         try:
             ## Internal coroutines
-            check_chlorophyll_outliers = asyncio.create_task(self.check_chlorophyll_outliers())
-            check_chlorophyll_outliers.set_name (f'{self.name}_check_chlorophyll_outliers')
-            coroutines.append(check_chlorophyll_outliers)
+            check_sd = asyncio.create_task(self.check_sd())
+            check_sd.set_name (f'{self.name}_check_sd')
+            coroutines.append(check_sd)
 
             # wait for the first coroutine to complete
             _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
@@ -642,10 +756,10 @@ class ScienceReasoningModule(Module):
                         await coroutine
 
     def get_mean_sd(self, lat, lon, points):
-        mean = 0.0
-        sd = 0.0
+        mean = None
+        sd = None
         for i in range(len(points[:, 0])):
-            if (float(lat)-points[i, 0] < 0.01) and (float(lon) - points[i, 1] < 0.01):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
                 mean = points[i, 2]
                 sd = points[i, 3]
                 lat = points[i, 0]
@@ -653,42 +767,79 @@ class ScienceReasoningModule(Module):
                 break
         return mean, sd, lat, lon
 
-    async def check_chlorophyll_outliers(self):
+    
+
+    async def check_sd(self):
         try:
             while True:
-                points = np.zeros(shape=(2000, 5))
-                chlorophyll_outliers = []
-                with open('./scenarios/sim_test/chlorophyll_baseline.csv') as csvfile:
-                    reader = csv.reader(csvfile)
-                    count = 0
-                    for row in reader:
-                        if count == 0:
-                            count = 1
-                            continue
-                        points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
-                        count = count + 1
+                msg = await self.updated_queue.get()
+                outliers = []
                 for item in self.sd:
-                    mean, stddev, lat, lon = self.get_mean_sd(45.590934, 47.716708, points) # TODO fix hard coding
-                    pixel_value = self.get_pixel_value_from_image(item,lat,lon,30)
-                    pixel_value = 100000
-                    if pixel_value > mean+stddev:
-                        item["severity"] = (pixel_value-mean) / stddev
-                        chlorophyll_outliers.append(item)
-                for outlier in chlorophyll_outliers:
+                    if(item["product_type"] == "tss"):
+                        outlier, outlier_data = self.check_tss_outliers(item)
+                        if outlier is True:
+                            outliers.append(outlier_data)
+                    elif(item["product_type"] == "altimetry"):
+                        outlier, outlier_data = self.check_altimetry_outliers(item)
+                        if outlier is True:
+                            outliers.append(outlier_data)
+                    else:
+                        self.log(f'Item in science database unsupported by science processing module.',level=logging.INFO)
+                for outlier in outliers:
+                    self.log(f'Outliers: {outlier}',level=logging.INFO)
                     msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, outlier)
-                    await self.parent_module.send_internal_message(msg)
+                    await self.send_internal_message(msg)
                 await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
+    
+    def check_tss_outliers(self,item):
+        outlier = False
+        outlier_data = None
+        if(item["checked"] is False):
+            points = np.zeros(shape=(2000, 5))
+            with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+                reader = csv.reader(csvfile)
+                count = 0
+                for row in reader:
+                    if count == 0:
+                        count = 1
+                        continue
+                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                    count = count + 1
+            mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], points)
+            pixel_value = self.get_pixel_value_from_image(item,lat,lon,30) # 30 meters is landsat resolution
+            if mean > 30000: # TODO remove this hardcode
+                item["severity"] = (pixel_value-mean) / stddev
+                outlier_data = item
+                self.log(f'TSS outlier detected at {lat}, {lon}!',level=logging.INFO)
+            else:
+                self.log(f'No TSS outlier detected at {lat}, {lon}',level=logging.INFO)
+            item["checked"] = True
+        return outlier, outlier_data
+
+    def check_altimetry_outliers(self,item):
+        outlier = False
+        outlier_data = None
+        if(item["checked"] is False):
+            data = np.genfromtxt(item["filepath"], delimiter=',')
+            lat = item["lat"]
+            lon = item["lon"]
+            if(data[0,0] > 0.5):
+                outlier = True
+                outlier_data = item
+                self.log(f'Altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+            else:
+                self.log(f'No altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+            item["checked"] = True
+        return outlier, outlier_data
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):
-        # topleftlat = image["lat"]
-        # topleftlon = image["lon"]
-        topleftlat = 45.590834
-        topleftlon = 47.716608 # TODO fix this hardcoding
+        topleftlat = image["lat"]
+        topleftlon = image["lon"]
         latdiff = lat-topleftlat
         londiff = lon-topleftlon
-        row = (latdiff*111139)//resolution
+        row = (latdiff*111139)//resolution # latitude to meters
         col = (londiff*111139)//resolution
         data = pd.read_csv(image["filepath"])
         pixel_values = data.values

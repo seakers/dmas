@@ -79,7 +79,7 @@ class ComponentActuationTask(ComponentMaintenanceTask):
 
     def to_dict(self) -> dict:
         out = super().to_dict()
-        out['actuation_status'] = self.actuation_status
+        out['actuation_status'] = str(self.actuation_status)
         
         return out
 
@@ -302,6 +302,22 @@ class AttitudeUpdateTask(ComponentTask):
         
         return out
 
+class AttitudeManeuverTask(ComponentTask):
+    def __init__(self, maneuver_time, new_angular_pos, new_angular_vel) -> None:
+        """
+        Manually updates the attitude in an IMU
+        """
+        super().__init__(ComponentNames.REACTION_WHEELS.value, 'AttitudeManeuverTask')
+        self.new_angular_pos = new_angular_pos
+        self.new_angular_vel = new_angular_vel
+        self.maneuver_time = maneuver_time
+
+    def __str__(self) -> str:
+        out = json.loads( super().__str__() )
+        out['new_angular_pos'] = self.new_angular_pos
+        out['new_angular_vel'] = self.new_angular_vel
+        return json.dumps(out)
+
 class TransmitMessageTask(ComponentTask):
     def __init__(self, target_agent: str, msg, timeout : float) -> None:
         """
@@ -414,7 +430,7 @@ class PowerSupplyStopRequestTask(PowerSupplyRequestTask):
         super().__init__(target, -power_supplied)
 
 class PerformAttitudeManeuverTask(SubsystemTask):
-    def __init__(self, target_angular_pos : list, target_angular_vel = list) -> None:
+    def __init__(self,maneuver_time, target_angular_pos : list, target_angular_vel = list) -> None:
         """
         Tasks the ADCS to perform an attitude maneouver
 
@@ -426,6 +442,7 @@ class PerformAttitudeManeuverTask(SubsystemTask):
         super().__init__(SubsystemNames.ADCS.value, 'PerformAttitudeManeuverTask')
         self.target_angular_pos = target_angular_pos
         self.target_angular_vel = target_angular_vel
+        self.maneuver_time = maneuver_time
 
     def to_dict(self) -> dict:
         out = super().to_dict()
@@ -449,7 +466,7 @@ class PerformMeasurement(SubsystemTask):
         duration:
             list of duration of each instrument measurement
         """
-        super().__init__(SubsystemNames.PAYLOAD.value)
+        super().__init__(SubsystemNames.PAYLOAD.value, 'PerformMeasurementTask')
         self.target = (target_lat, target_lon)
 
         self.instruments = []
@@ -537,6 +554,11 @@ class ObservationTask(PlatformTask):
         
         return out
 
+class ManeuverTask(PlatformTask):
+    def __init__(self, maneuver_task) -> None:
+        super().__init__('ManeuverTask')
+        self.maneuver_task = maneuver_task
+
 """
 -------------------------------
 PLANNER TASK
@@ -572,6 +594,15 @@ class ChargePlannerTask(PlannerTask):
         self.start = start
         self.end = end
 
+class ManeuverPlannerTask(PlannerTask):
+    def __init__(self, start_angle : float, end_angle : float, start: float, end: float) -> None:
+        super().__init__()
+        self.start_angle = start_angle
+        self.end_angle = end_angle
+
+        self.start = start
+        self.end = end
+
 """
 
 MODULE REQUESTS
@@ -599,6 +630,9 @@ class MeasurementRequest(Request):
 
     def get_science_val(self):
         return self._science_val
+    
+    def to_json(self):
+        return json.dumps(self, default=lambda o:o.__dict__, sort_keys=True, indent=4)
 
 class InformationRequest(Request):
     def __init__(self, data_type : type, target_lat : float, target_lon: float) -> None:

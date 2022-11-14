@@ -5,6 +5,7 @@ from enum import Enum
 import logging
 import os
 import random
+import shutil
 import sys
 import time
 from messages import *
@@ -135,7 +136,7 @@ class Module:
 
                 # if dst_name is None or src_name is None:
                 if not isinstance(msg, InternalMessage):
-                    self.log(f'Received invalid internal message. Discarting message: {msg}')
+                    self.log(f'Received invalid internal message. Discarding message: {msg}')
                     continue
                 
                 src_name = msg.src_module
@@ -147,7 +148,7 @@ class Module:
                     # if this module is the intended receiver, handle message
                     self.log(f'Handling message of type {type(msg)}...')
                     await self.internal_message_handler(msg)
-                    self.log(f'Message handled!')
+                    self.log(f'Message handled!',level=logging.DEBUG)
                 else:
                     # else, search if any of this module's submodule is the intended destination
                     dst = None
@@ -170,7 +171,7 @@ class Module:
                             if dst is None:
                                 self.log(f'Couldn\'t find destination to forward message to. Disregarding message...')
                                 continue
-                    self.log(f'Forwarding message to \'{dst.name}\'...')
+                    self.log(f'Forwarding message to \'{dst.name}\'...', level=logging.DEBUG)
                     await dst.put_in_inbox(msg)
 
         except asyncio.CancelledError:
@@ -196,7 +197,7 @@ class Module:
                 await self.send_internal_message(msg)
             else:
                 # this module is the intended receiver for this message. Handling message
-                self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarting message.')
+                self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
         except asyncio.CancelledError:
             return
 
@@ -517,7 +518,6 @@ class NodeModule(Module):
         """
         Creates directories for agent results and clears them if they already exist
         """
-
         scenario_results_path = scenario_dir + '/results'
         if not os.path.exists(scenario_results_path):
             # if directory does not exists, create it
@@ -527,10 +527,19 @@ class NodeModule(Module):
         if os.path.exists(agent_results_path):
             # if directory already exists, clear contents
             for f in os.listdir(agent_results_path):
-                os.remove(os.path.join(agent_results_path, f)) 
+                path = os.path.join(agent_results_path, f)
+                try:
+                    shutil.rmtree(path)
+                except:
+                    os.remove(path)
         else:
             # if directory does not exist, create a new onw
             os.mkdir(agent_results_path)
+
+        if(os.path.exists(agent_results_path+'/sd')):
+            pass
+        else:
+            os.mkdir(agent_results_path+'/sd')
 
         return scenario_results_path, agent_results_path
 
@@ -539,8 +548,8 @@ class NodeModule(Module):
         set root logger to default settings
         """
 
-        logging.root.setLevel(logging.NOTSET)
-        logging.basicConfig(level=logging.NOTSET)
+        logging.root.setLevel(logging.INFO)
+        logging.basicConfig(level=logging.INFO)
         
         loggers = dict()
         for logger_type in (LoggerTypes):
