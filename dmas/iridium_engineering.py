@@ -55,6 +55,9 @@ class IridiumCommsSubsystemState(SubsystemState):
     def __init__(self, component_states: dict, health: SubsystemHealth, status: SubsystemStatus):
         super().__init__(SubsystemNames.COMMS.value, IridiumCommsSubsystem, component_states, health, status)
 
+    def from_subsystem(comms : IridiumCommsSubsystem):
+        return IridiumCommsSubsystemState(comms.component_states, comms.health, comms.status)
+
 class IridiumTransmitterComponent(ComponentModule):
     def __init__(self, 
                 parent_subsystem: Module, 

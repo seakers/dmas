@@ -1691,12 +1691,17 @@ class SubsystemStateMessage(InternalMessage):
         """
         super().__init__(src_module, dst_module, state, name='SubsystemStateMessage')
 
+        if state is None:
+            raise Exception('State of NoneType not supported')
+
+        self.state = state
+
     def get_state(self):
-        return self.content
+        return self.state
 
     def to_dict(self):
         out = super().to_dict()
-        out['content']  = self.content.to_dict()
+        out['content']  = self.state.to_dict()
 
         return out
 

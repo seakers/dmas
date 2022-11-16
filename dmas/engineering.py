@@ -1668,11 +1668,9 @@ class SubsystemModule(Module):
 
             # wait for any possible update process to finish
             acquired = await self.state_lock.acquire()
-
             # get state object from component status
             self.subsystem_state : SubsystemState
             state = self.subsystem_state.from_subsystem(self)
-
             # release update lock
             self.state_lock.release()
 
