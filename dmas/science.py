@@ -477,22 +477,30 @@ class ScienceValueModule(Module):
         return mean, sd, lat, lon
 
     def meas_perf(self):
-        a = 8.9e-5
-        b = 1.4e-3
-        c = 6.1e-3
-        d = 0.85
+        a = 8.94e-5
+        b = 1.45e-3
+        c = 0.164
+        d = 1.03
+        a1 = 1.97e-6
+        b1 = -0.007
+        a2 = -1.42e-6
+        b2 = 3.08e-4
+        c1 = 13.14
+        c2 = -2.81e-2
+        d2 = 1.03
         parent_agent = self.get_top_module()
         instrument = parent_agent.payload[parent_agent.name]["name"]
         if(instrument=="VIIRS"):
             x = parent_agent.payload[parent_agent.name]["snr"]
             y = parent_agent.payload[parent_agent.name]["spatial_res"]
             z = parent_agent.payload[parent_agent.name]["spectral_res"]
-            perf = a*pow(x,3)-b*pow(y,2)-c*np.log10(z)+d
+            meas = a*x-b*y-c*np.log10(z)+d
+            spatial = a1*pow(np.e,(b1*y+c1))
+            perf = 0.75*meas+0.25*spatial # modify to include temporal res at some point
         else:
             perf = 1
         self.log(f'Measurement performance: {perf}',level=logging.INFO)
         return perf
-
 
 
 class OnboardProcessingModule(Module):
