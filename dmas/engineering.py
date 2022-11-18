@@ -3026,10 +3026,10 @@ class TransmitterComponent(ComponentModule):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
 
-            elif isinstance(msg.content, InterNodeMessage):
-                self.log(f'Received an internode message!',level=logging.INFO)
-                task_msg = TransmitMessageTask(AgentModuleTypes.IRIDIUM_ENGINEERING_MODULE,msg,1.0)
-                await self.tasks.put(task_msg)
+            # elif isinstance(msg.content, InterNodeMessage):
+            #     self.log(f'Received an internode message!',level=logging.INFO)
+            #     task_msg = TransmitMessageTask(AgentModuleTypes.IRIDIUM_ENGINEERING_MODULE,msg,1.0)
+            #     await self.tasks.put(task_msg)
             
             elif isinstance(msg.content, MeasurementRequest):
                 self.log(f'Received a measurement request!',level=logging.INFO)

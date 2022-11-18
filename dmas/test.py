@@ -21,6 +21,12 @@ def customsat_run(directory):
     agent = ScienceTestAgent(f'CustomSat', directory)
     asyncio.run(agent.live())
 
+def landsat_run(directory):
+    print(f'Landsat run')
+    agent = ScienceTestAgent(f'Landsat 9', directory)
+    asyncio.run(agent.live())
+
+
 def iridium_run(directory):
     print(f'Iridium run')
     agent = IridiumTestAgent(f'Iridium', directory)
@@ -28,15 +34,16 @@ def iridium_run(directory):
 
 if __name__ == '__main__':
     print('Initializing agents...')
-    directory = ["./scenarios/default_mission/"]
+    directory = ["./scenarios/landsat_agile/"]
 
     n_agents = 3
     processes = []
     print('Creating agent run processes...')
 
-    processes.append(Process(target=suominpp_run, args=(directory)))
+    #processes.append(Process(target=suominpp_run, args=(directory)))
     processes.append(Process(target=jason_run, args=(directory)))
-    processes.append(Process(target=customsat_run, args=(directory)))
+    processes.append(Process(target=landsat_run, args=(directory)))
+    #processes.append(Process(target=customsat_run, args=(directory)))
     processes.append(Process(target=iridium_run, args=(directory)))
     print('Starting agent run process...')
     for process in processes:

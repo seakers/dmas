@@ -1232,7 +1232,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/default_mission/'
+    scenario_dir = './scenarios/landsat_agile/'
     dt = 4.6656879355937875
     # duration = 6048
     duration = 86400
@@ -1243,7 +1243,7 @@ if __name__ == '__main__':
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, ['Suomi NPP', 'Jason-3', 'CustomSat', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, ['Landsat 9', 'Jason-3', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
     print('DONE')

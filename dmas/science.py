@@ -20,6 +20,16 @@ class ScienceModule(Module):
 
         self.scenario_dir = scenario_dir
 
+        parent_agent = self.get_top_module()
+        data = dict()
+        spacecraft_list = parent_agent.mission_dict.get('spacecraft')
+        for spacecraft in spacecraft_list:
+            name = spacecraft.get('name')
+            # land coverage data metrics data
+            mission_profile = spacecraft.get('missionProfile')
+            data[name] = mission_profile
+        self.mission_profile = data[parent_agent.name]
+
         data_products = self.load_data_products()        
 
         self.submodules = [
@@ -381,7 +391,7 @@ class ScienceValueModule(Module):
                 lon = msg.content["lon"]
                 obs = msg.content
 
-                science_value = self.compute_science_value(lat, lon, obs)                
+                science_value, outlier = self.compute_science_value(lat, lon, obs)                
 
                 measurement_request = MeasurementRequest("tss", lat, lon, science_value)
 
@@ -396,14 +406,23 @@ class ScienceValueModule(Module):
 
     async def meas_handler(self):
         try:
+            oli_outlier_count = 0
+            jason_outlier_count = 0
             while True:
                 msg : DataMessage = await self.meas_msg_queue.get()
                 lat = msg.content["lat"]
                 lon = msg.content["lon"]
                 obs = msg.content
 
-                science_value = self.compute_science_value(lat, lon, obs)                
-
+                science_value, outlier = self.compute_science_value(lat, lon, obs)
+                parent_agent = self.get_top_module()
+                instrument = parent_agent.payload[parent_agent.name]["name"]                
+                if outlier is True and instrument == "OLI": # TODO fix this hardcode
+                    oli_outlier_count+=1
+                    self.log(f'Landsat outlier count: {oli_outlier_count}',level=logging.INFO)
+                if outlier is True and instrument == "POSEIDON-3B Altimeter": # TODO fix this hardcode
+                    jason_outlier_count+=1
+                    self.log(f'Jason outlier count: {jason_outlier_count}',level=logging.INFO)
                 self.log(f'Received measurement with value {science_value}!',level=logging.INFO)
                 self.science_value_sum = self.science_value_sum + science_value
                 self.log(f'Sum of science values: {self.science_value_sum}',level=logging.INFO)
@@ -416,7 +435,7 @@ class ScienceValueModule(Module):
         self.log(f'Computing science value...', level=logging.INFO)
         
         points = np.zeros(shape=(2000, 5))
-
+        outlier = False
         with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
             reader = csv.reader(csvfile)
             count = 0
@@ -428,12 +447,13 @@ class ScienceValueModule(Module):
                 count = count + 1
 
         science_val = self.get_pop(lat, lon, points)
-        if(self.check_tss_outlier(obs)):
+        if(self.check_altimetry_outlier(obs)):
             science_val = science_val * 10
             self.log(f'Computed bonus science value: {science_val}', level=logging.INFO)
+            outlier = True
         else:
             self.log(f'Computed normal science value: {science_val}', level=logging.INFO)
-        return science_val*self.meas_perf()
+        return science_val*self.meas_perf(), outlier
 
     def get_pop(self, lat, lon, points):
         pop = 0.0
@@ -442,6 +462,16 @@ class ScienceValueModule(Module):
                 pop = points[i,4]
                 break
         return pop
+
+    def get_flood_chance(self, lat, lon, points):
+        flood_chance = None
+        for i in range(len(points[:, 0])):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
+                flood_chance = points[i, 5]
+                lat = points[i, 0]
+                lon = points[i, 1]
+                break
+        return flood_chance, lat, lon
 
     def check_tss_outlier(self,item):
         outlier = False
@@ -463,6 +493,30 @@ class ScienceValueModule(Module):
             self.log(f'No TSS outlier measured at {lat}, {lon}',level=logging.INFO)
         item["checked"] = True
         return outlier
+
+    def check_altimetry_outlier(self,item):
+        outlier = False
+        outlier_data = None
+        if(item["checked"] is False):
+            points = np.zeros(shape=(2000, 6))
+            with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+                reader = csv.reader(csvfile)
+                count = 0
+                for row in reader:
+                    if count == 0:
+                        count = 1
+                        continue
+                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
+                    count = count + 1
+            flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], points)
+            if flood_chance > 0.75: # TODO remove this hardcode
+                item["severity"] = flood_chance
+                outlier_data = item
+                self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
+            else:
+                self.log(f'No flood detected at {lat}, {lon}',level=logging.INFO)
+            item["checked"] = True
+        return outlier, outlier_data
 
     def get_mean_sd(self, lat, lon, points):
         mean = None
@@ -490,7 +544,7 @@ class ScienceValueModule(Module):
         d2 = 1.03
         parent_agent = self.get_top_module()
         instrument = parent_agent.payload[parent_agent.name]["name"]
-        if(instrument=="VIIRS"):
+        if(instrument=="VIIRS" or instrument=="OLI"):
             x = parent_agent.payload[parent_agent.name]["snr"]
             y = parent_agent.payload[parent_agent.name]["spatial_res"]
             z = parent_agent.payload[parent_agent.name]["spectral_res"]
@@ -599,7 +653,7 @@ class OnboardProcessingModule(Module):
                 parent_agent = self.get_top_module()
                 instrument = parent_agent.payload[parent_agent.name]["name"]
                 self.log(f'Instrument: {instrument}',level=logging.DEBUG)
-                if(instrument == "VIIRS"): # TODO replace this hardcoding
+                if(instrument == "VIIRS" or instrument == "OLI"): # TODO replace this hardcoding
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_tss_obs_value(data)
                     self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"tss",raw_data_filename,processed_data)
@@ -775,7 +829,15 @@ class ScienceReasoningModule(Module):
                 break
         return mean, sd, lat, lon
 
-    
+    def get_flood_chance(self, lat, lon, points):
+        flood_chance = None
+        for i in range(len(points[:, 0])):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
+                flood_chance = points[i, 5]
+                lat = points[i, 0]
+                lon = points[i, 1]
+                break
+        return flood_chance, lat, lon
 
     async def check_sd(self):
         try:
@@ -784,9 +846,10 @@ class ScienceReasoningModule(Module):
                 outliers = []
                 for item in self.sd:
                     if(item["product_type"] == "tss"):
-                        outlier, outlier_data = self.check_tss_outliers(item)
-                        if outlier is True:
-                            outliers.append(outlier_data)
+                        self.log(f'TSS data not checked for outliers.',level=logging.INFO)
+                        #outlier, outlier_data = self.check_tss_outliers(item)
+                        #if outlier is True:
+                        #    outliers.append(outlier_data)
                     elif(item["product_type"] == "altimetry"):
                         outlier, outlier_data = self.check_altimetry_outliers(item)
                         if outlier is True:
@@ -830,17 +893,42 @@ class ScienceReasoningModule(Module):
         outlier = False
         outlier_data = None
         if(item["checked"] is False):
-            data = np.genfromtxt(item["filepath"], delimiter=',')
-            lat = item["lat"]
-            lon = item["lon"]
-            if(data[0,0] > 0.5):
+            points = np.zeros(shape=(2000, 6))
+            with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+                reader = csv.reader(csvfile)
+                count = 0
+                for row in reader:
+                    if count == 0:
+                        count = 1
+                        continue
+                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
+                    count = count + 1
+            flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], points)
+            if flood_chance > 0.75: # TODO remove this hardcode
+                item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item
-                self.log(f'Altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+                self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
             else:
-                self.log(f'No altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+                self.log(f'No flood detected at {lat}, {lon}',level=logging.INFO)
             item["checked"] = True
         return outlier, outlier_data
+
+    # def check_altimetry_outliers(self,item):
+    #     outlier = False
+    #     outlier_data = None
+    #     if(item["checked"] is False):
+    #         data = np.genfromtxt(item["filepath"], delimiter=',')
+    #         lat = item["lat"]
+    #         lon = item["lon"]
+    #         if(data[0,0] > 0.0): # TODO change this!
+    #             outlier = True
+    #             outlier_data = item
+    #             self.log(f'Altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+    #         else:
+    #             self.log(f'No altimetry outlier detected at {lat}, {lon}!',level=logging.INFO)
+    #         item["checked"] = True
+    #     return outlier, outlier_data
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):
         topleftlat = image["lat"]

@@ -335,13 +335,10 @@ class TransmitMessageTask(ComponentTask):
         self.msg = msg
         self.timeout = timeout
 
-    def __str__(self) -> str:
-        return json.dumps(self.to_dict())
-    
     def to_dict(self) -> dict:
         out = super().to_dict()
-        out['target_agent'] = self.target_agent
-        out['msg'] = self.msg
+        out['target_agent'] = str(self.target_agent)
+        out['msg'] = str(self.msg)
         out['timeout'] = self.timeout
         
         return out
