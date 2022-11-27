@@ -408,6 +408,7 @@ class ScienceValueModule(Module):
         try:
             oli_outlier_count = 0
             jason_outlier_count = 0
+            coobs_outlier_count = 0
             while True:
                 msg : DataMessage = await self.meas_msg_queue.get()
                 lat = msg.content["lat"]
@@ -423,6 +424,9 @@ class ScienceValueModule(Module):
                 if outlier is True and instrument == "POSEIDON-3B Altimeter": # TODO fix this hardcode
                     jason_outlier_count+=1
                     self.log(f'Jason outlier count: {jason_outlier_count}',level=logging.INFO)
+                if outlier is True and instrument == "OLI" and self.get_data_product(lat,lon,"altimetry"):
+                    coobs_outlier_count+=1
+                    self.log(f'Co-obs outlier count: {coobs_outlier_count}',level=logging.INFO)
                 self.log(f'Received measurement with value {science_value}!',level=logging.INFO)
                 self.science_value_sum = self.science_value_sum + science_value
                 self.log(f'Sum of science values: {self.science_value_sum}',level=logging.INFO)
@@ -446,8 +450,9 @@ class ScienceValueModule(Module):
                 points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
                 count = count + 1
 
-        science_val = self.get_pop(lat, lon, points)
-        if(self.check_altimetry_outlier(obs)):
+        science_val = 1.0 #self.get_pop(lat, lon, points) TODO replace this?
+        flood, flood_data = self.check_altimetry_outlier(obs)
+        if(flood):
             science_val = science_val * 10
             self.log(f'Computed bonus science value: {science_val}', level=logging.INFO)
             outlier = True
@@ -472,6 +477,20 @@ class ScienceValueModule(Module):
                 lon = points[i, 1]
                 break
         return flood_chance, lat, lon
+
+    def get_data_product(self, lat, lon, product_type):
+        exists = False
+        for item in self.sd:
+            if item["lat"] == lat and item["lon"] == lon and item["product_type"]==product_type:
+                if(item["filepath"].lower().endswith('.csv')):
+                    self.log("Found data product!",level=logging.INFO)
+                    exists = True
+                else:
+                    self.log("Found data product but file type not supported")
+            else:
+                self.log("Could not find data product")
+        return exists
+
 
     def check_tss_outlier(self,item):
         outlier = False
@@ -509,8 +528,9 @@ class ScienceValueModule(Module):
                     points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
                     count = count + 1
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], points)
-            if flood_chance > 0.75: # TODO remove this hardcode
+            if flood_chance > 0.5: # TODO remove this hardcode
                 item["severity"] = flood_chance
+                outlier = True
                 outlier_data = item
                 self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
             else:
@@ -904,7 +924,7 @@ class ScienceReasoningModule(Module):
                     points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
                     count = count + 1
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], points)
-            if flood_chance > 0.75: # TODO remove this hardcode
+            if flood_chance > 0.5: # TODO remove this hardcode
                 item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item

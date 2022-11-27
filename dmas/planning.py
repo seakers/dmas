@@ -248,7 +248,7 @@ class ObservationPlanningModule(Module):
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
                         gp_access_list.append(row)
-                    print(gp_accesses)
+                    #print(gp_accesses)
                     if(len(gp_accesses) != 0):
                         self.log(f'Adding observation candidate!',level=logging.INFO)
                         obs.start = gp_access_list[0]['time index']

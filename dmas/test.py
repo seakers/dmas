@@ -16,6 +16,26 @@ def jason_run(directory):
     agent = ScienceTestAgent(f'Jason-3', directory)
     asyncio.run(agent.live())
 
+def cryosat_run(directory):
+    print(f'CryoSat-2 run')
+    agent = ScienceTestAgent(f'CryoSat-2', directory)
+    asyncio.run(agent.live())
+
+def swot_run(directory):
+    print(f'SWOT run')
+    agent = ScienceTestAgent(f'SWOT', directory)
+    asyncio.run(agent.live())
+
+def sentinel6a_run(directory):
+    print(f'Sentinel-6A run')
+    agent = ScienceTestAgent(f'Sentinel-6A', directory)
+    asyncio.run(agent.live())
+
+def sentinel6b_run(directory):
+    print(f'Sentinel-6B run')
+    agent = ScienceTestAgent(f'Sentinel-6B', directory)
+    asyncio.run(agent.live())
+
 def customsat_run(directory):
     print(f'CustomSat run')
     agent = ScienceTestAgent(f'CustomSat', directory)
@@ -34,7 +54,7 @@ def iridium_run(directory):
 
 if __name__ == '__main__':
     print('Initializing agents...')
-    directory = ["./scenarios/landsat_agile/"]
+    directory = ["./scenarios/landsat_altimeters/"]
 
     n_agents = 3
     processes = []
@@ -42,6 +62,10 @@ if __name__ == '__main__':
 
     #processes.append(Process(target=suominpp_run, args=(directory)))
     processes.append(Process(target=jason_run, args=(directory)))
+    processes.append(Process(target=swot_run, args=(directory)))
+    processes.append(Process(target=sentinel6a_run, args=(directory)))
+    processes.append(Process(target=sentinel6b_run, args=(directory)))
+    processes.append(Process(target=cryosat_run, args=(directory)))
     processes.append(Process(target=landsat_run, args=(directory)))
     #processes.append(Process(target=customsat_run, args=(directory)))
     processes.append(Process(target=iridium_run, args=(directory)))
