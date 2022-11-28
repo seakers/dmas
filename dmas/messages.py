@@ -71,6 +71,7 @@ class InterNodeMessageTypes(Enum):
     MEASUREMENT_MESSAGE = 'MEASUREMENT_MESSAGE'
     INFORMATION_REQUEST = 'INFORMATION_REQUEST'
     INFORMATION_MESSAGE = 'INFO_MESSAGE'
+    DOWNLINK = 'DOWNLINK'
 
 class InterNodeMessage(SimulationMessage):
     def __init__(self, src: str, dst: str, _type: InterNodeMessageTypes, content) -> None:
@@ -193,6 +194,45 @@ class InterNodeMeasurementRequestMessage(InterNodeMessage):
         Creates an instance of a message class object from a json object 
         """
         return MeasurementRequestMessage.from_dict(json.loads(j))
+
+class InterNodeDownlinkMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, content : str) -> None:
+        super().__init__(src, dst, InterNodeMessageTypes.DOWNLINK, content)
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        d['content'] = self.content
+        return d
+
+    def from_dict(d : dict):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        content = d.get('content', None)
+
+        if src is None or dst is None or type_name is None or content is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in InterNodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not InterNodeMessageTypes.DOWNLINK:
+            raise Exception(f'Cannot load a downlink Message from a dictionary of type {type_name}.')
+
+        return InterNodeDownlinkMessage(src, dst, content)
+    
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return InterNodeDownlinkMessage.from_dict(json.loads(j))
 
 class NodeToEnvironmentMessageTypes(Enum):
     """
@@ -1516,7 +1556,7 @@ class MeasurementRequestMessage(InternalMessage):
         return self.content
 
 class DataMessage(InternalMessage):
-    def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str, name:str = 'DataMessage') -> None:
+    def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str, name:str = 'DataMessage', metadata : dict = {}) -> None:
         """
         Message carrying sensor data from one module to another
 
@@ -1533,9 +1573,13 @@ class DataMessage(InternalMessage):
         """
         super().__init__(src_module, dst_module, data, name)
         self._target = (target_lat, target_lon)
+        self.metadata = metadata
 
     def get_data(self):
         return self.content
+
+    def get_metadata(self):
+        return self.metadata
 
     def get_target(self):
         return self._target

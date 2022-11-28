@@ -194,7 +194,7 @@ class ObservationPlanningModule(Module):
             if isinstance(msg.content, MeasurementRequest):
                 if self.parent_module.mission_profile=="3D-CHESS":
                     meas_req = msg.content
-                    new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,["OLI"],0.0,1.0)
+                    new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,["OLI"],0.0,1.0,meas_req.metadata)
                     new_obs_list = []
                     new_obs_list.append(new_obs)
                     await self.obs_list.put(new_obs_list)
@@ -427,7 +427,8 @@ class OperationsPlanningModule(Module):
                     if(isinstance(task,ObservationPlannerTask)):
                         if(task.start <= curr_time <= task.end):
                             self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
-                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1])
+                            self.log(f'Task metadata: {task.obs_info}',level=logging.INFO)
+                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1], task.obs_info)
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
                             self.ops_plan.remove(task)
                             await self.send_internal_message(msg)

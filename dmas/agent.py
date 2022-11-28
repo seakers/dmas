@@ -558,6 +558,14 @@ class IridiumTestAgent(AgentClient):
                             IridiumEngineeringModule(self)
                           ]
 
+class GroundTestAgent(AgentClient):
+    def __init__(self, name, scenario_dir) -> None:
+        super().__init__(name, scenario_dir)
+        self.submodules = [
+                            ScienceModule(self,scenario_dir),
+                            EngineeringModule(self)
+                          ]
+
 """
 --------------------
 MAIN

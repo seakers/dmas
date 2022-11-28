@@ -1243,7 +1243,7 @@ if __name__ == '__main__':
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, ['Landsat 9', 'Jason-3', 'CryoSat-2', 'Sentinel-6A', 'Sentinel-6B', 'SWOT', 'Iridium'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, ['Landsat 9', 'Jason-3', 'CryoSat-2', 'Sentinel-6A', 'Sentinel-6B', 'SWOT', 'Iridium', 'Central Node'], duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
     print('DONE')

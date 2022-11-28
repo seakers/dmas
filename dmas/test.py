@@ -1,8 +1,7 @@
 import asyncio
 from multiprocessing import Process
 
-from agent import ScienceTestAgent
-from agent import IridiumTestAgent
+from agent import ScienceTestAgent, IridiumTestAgent, GroundTestAgent
 
 
 
@@ -52,6 +51,11 @@ def iridium_run(directory):
     agent = IridiumTestAgent(f'Iridium', directory)
     asyncio.run(agent.live())
 
+def centralnode_run(directory):
+    print(f'Central node run')
+    agent = GroundTestAgent(f'Central Node', directory)
+    asyncio.run(agent.live())
+
 if __name__ == '__main__':
     print('Initializing agents...')
     directory = ["./scenarios/landsat_altimeters/"]
@@ -69,6 +73,7 @@ if __name__ == '__main__':
     processes.append(Process(target=landsat_run, args=(directory)))
     #processes.append(Process(target=customsat_run, args=(directory)))
     processes.append(Process(target=iridium_run, args=(directory)))
+    processes.append(Process(target=centralnode_run, args=(directory)))
     print('Starting agent run process...')
     for process in processes:
         process.start()

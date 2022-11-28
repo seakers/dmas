@@ -1812,7 +1812,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
             lat, lon = task.target
             self.log(f'Decompose observation platform-level task into subsystem-level tasks')
             self.log(f'Received observation task!',level=logging.INFO)
-            return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations) ]
+            return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations, task.obs_info) ]
         elif isinstance(task, ManeuverTask):
             self.log(f'Received maneuver task!',level=logging.INFO)
             return [ task.maneuver_task ]
@@ -1873,6 +1873,7 @@ class OnboardComputerModule(ComponentModule):
             if isinstance(task, SaveToMemoryTask):
                 #await self.enabled.set() TODO fix this enable setting?
                 data = task.get_data()
+                metadata = task.get_metadata()
                 lat, lon = task.get_target()
                 data_vol = len(data.encode('utf-8'))
 
@@ -1898,7 +1899,7 @@ class OnboardComputerModule(ComponentModule):
 
                     else:
                         # data successfully stored in internal memory, send to science module for processing
-                        msg = DataMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, lat, lon, data)
+                        msg = DataMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, lat, lon, data, "", metadata)
                         self.log(f'Sending data to {AgentModuleTypes.SCIENCE_MODULE} for processing...')
                         
                         self.memory_stored += data_vol
@@ -2100,7 +2101,7 @@ class PayloadSubsystem(SubsystemModule):
             for instrument in task.instruments:
                 i = task.instruments.index(instrument)
                 target_lat, target_lon = task.target
-                comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state) )
+                comp_tasks.append( MeasurementTask(instrument, task.durations[i], target_lat, target_lon, attitude_state, task.metadata) )
             comp_tasks.append(DisableComponentTask(InstrumentNames.TEST.value))
             return comp_tasks
         else:
@@ -2192,7 +2193,7 @@ class InstrumentComponent(ComponentModule):
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage
-                    data_save_task = SaveToMemoryTask(lat, lon, response.obs)
+                    data_save_task = SaveToMemoryTask(lat, lon, response.obs, task.obs_metadata)
                     data_msg = ComponentTaskMessage(self.name, ComponentNames.ONBOARD_COMPUTER.name, data_save_task)
 
                     await self.send_internal_message(data_msg)
@@ -3036,6 +3037,12 @@ class TransmitterComponent(ComponentModule):
                 inter_node_msg = InterNodeMeasurementRequestMessage(self,"Iridium",msg.content)
                 task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
                 await self.tasks.put(task_msg)
+
+            elif isinstance(msg.content, InterNodeDownlinkMessage):
+                self.log(f'Received a downlink message!',level=logging.INFO)
+                task_msg = TransmitMessageTask("Iridium",msg.content,1.0)
+                await self.tasks.put(task_msg)
+
             else:
                 self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
             
@@ -3072,11 +3079,9 @@ class TransmitterComponent(ComponentModule):
 
                 # unpackage message
                 msg : InterNodeMessage = task.msg
-                self.log(f'Right before wait_for_access_start in perform_task',level=logging.DEBUG)
                 # wait for access to target node
                 #wait_for_access_start = asyncio.create_task( self.wait_for_access_start(msg.dst) )
                 #await wait_for_access_start
-                self.log(f'Right before create_tasks in perform_task',level=logging.DEBUG)
                 # wait for msg to be transmitted successfully or interrupted due to access end or message timeout
                 transmit_msg = asyncio.create_task( self.transmit_message(msg) )
                 #wait_for_access_end = asyncio.create_task( self.wait_for_access_end(msg.dst) )
@@ -3392,8 +3397,7 @@ class ReceiverComponent(ComponentModule):
                             msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
                             msg_contents = json.loads(msg.content)["content"]
                             msg_contents = json.loads(msg_contents)
-                            self.log(f'Msg contents: {msg_contents}',level=logging.DEBUG)
-                            measurement_request = MeasurementRequest(msg_contents["_type"],msg_contents["_target"][0],msg_contents["_target"][1],msg_contents["_science_val"])
+                            measurement_request = MeasurementRequest(msg_contents["_type"],msg_contents["_target"][0],msg_contents["_target"][1],msg_contents["_science_val"],msg_contents["metadata"])
                             req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                             self.log(f'Sending measurement request to planning module (hopefully)!',level=logging.DEBUG)
                             await self.send_internal_message(req_msg) # send measurement request to planning module
@@ -3403,6 +3407,8 @@ class ReceiverComponent(ComponentModule):
                         #     pass
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_MESSAGE:
                         #     pass
+                        elif msg_type is InterNodeMessageTypes.DOWNLINK:
+                            self.log(f'Received downlink message!',level=logging.INFO)
                         else:
                             msg = None
                             self.log(content=f'Internode message of type {msg_type.name} not yet supported. Discarding message...')

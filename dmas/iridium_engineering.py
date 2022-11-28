@@ -129,14 +129,19 @@ class IridiumTransmitterComponent(ComponentModule):
             elif isinstance(msg.content, EnvironmentBroadcastMessage):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
-
+            elif isinstance(msg.content, InterNodeDownlinkMessage):
+                self.log(f'Received an internode downlink message!',level=logging.DEBUG)
+                agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
+                msg.content.dst = "Central Node"
+                task_msg = TransmitMessageTask(agent_port_dict["Central Node"],msg.content,1.0)
+                await self.tasks.put(task_msg)
             elif isinstance(msg.content, InterNodeMessage):
                 self.log(f'Received an internode message!',level=logging.DEBUG)
                 agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
                 for agent_port in agent_port_dict:
                     agent = agent_port_dict[agent_port]
                     self.log(f'Sending to agent: {agent_port}',level=logging.DEBUG)
-                    if(agent_port == "Iridium"):
+                    if(agent_port == "Iridium" or agent_port == msg.src_module or agent_port == "Central Node"):
                         continue
                     inter_node_msg = InterNodeMeasurementRequestMessage("Iridium",agent_port,msg.content)
                     task_msg = TransmitMessageTask(agent,inter_node_msg,1.0)
@@ -146,11 +151,13 @@ class IridiumTransmitterComponent(ComponentModule):
                 agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
                 for agent_port in agent_port_dict:
                     agent = agent_port_dict[agent_port]
+                    self.log(f'Sending to agent: {agent_port}',level=logging.DEBUG)
+                    if(agent_port == "Iridium" or agent_port == msg.src_module or agent_port == "Central Node"):
+                        continue
                     task_msg = TransmitMessageTask(agent,msg,1.0)
                     await self.tasks.put(task_msg)
-                await self.tasks.put(task_msg)
             else:
-                self.log(f'Internal message of type {type(msg)} not yet supported. Discarding message...')
+                self.log(f'Internal message of type {type(msg.content)} not yet supported. Discarding message...',level=logging.INFO)
             
         except asyncio.CancelledError:
             return  
@@ -502,6 +509,10 @@ class IridiumReceiverComponent(ComponentModule):
                             self.log(f'Internal message type is {msg.content}',level=logging.DEBUG)
                             self.log(f'Sending measurement request to other agents (hopefully)!',level=logging.DEBUG)
                             await self.send_internal_message(ext_msg) # send measurement request to all other agents
+                        elif msg_type is InterNodeMessageTypes.DOWNLINK:
+                            msg : InterNodeDownlinkMessage = InterNodeDownlinkMessage.from_dict(msg_dict)
+                            ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, msg)
+                            await self.send_internal_message(ext_msg) # send measurement request to all other agents
                         # elif msg_type is InterNodeMessageTypes.MEASUREMENT_MESSAGE:
                         #     pass
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_REQUEST:
@@ -509,7 +520,7 @@ class IridiumReceiverComponent(ComponentModule):
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_MESSAGE:
                         #     pass
                         else:
-                            self.log(content=f'Internode message of type {msg_type.name} not yet supported. Discarding message...')
+                            self.log(content=f'Internode message of type {msg_type.name} not yet supported. Discarding message...',level=logging.INFO)
 
                         acquired = await self.state_lock.acquire()
                         self.buffer_allocated -= msg_length

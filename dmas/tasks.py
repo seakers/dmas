@@ -166,7 +166,7 @@ class StopProvidingPowerTask(ProvidePowerTask):
         super().__init__(eps_component, -power_to_stop, target)
 
 class SaveToMemoryTask(ComponentTask):
-    def __init__(self, target_lat: float, target_lon: float, data : str) -> None:
+    def __init__(self, target_lat: float, target_lon: float, data : str, metadata : dict) -> None:
         """
         Instructs component to save observation data in internal memory 
 
@@ -180,6 +180,7 @@ class SaveToMemoryTask(ComponentTask):
         super().__init__(ComponentNames.ONBOARD_COMPUTER.value, 'SaveToMemoryTask')
         self._target = (target_lat, target_lon)
         self._data = data
+        self.metadata = metadata
 
     def to_dict(self) -> dict:
         out = super().to_dict()
@@ -190,6 +191,9 @@ class SaveToMemoryTask(ComponentTask):
 
     def get_data(self):
         return self._data
+
+    def get_metadata(self):
+        return self.metadata
 
     def get_target(self):
         return self._target
@@ -210,7 +214,7 @@ class DeleteFromMemoryTask(SaveToMemoryTask):
         super().__init__(ComponentNames.ONBOARD_COMPUTER.value, target_lat, target_lon, data)
         
 class MeasurementTask(ComponentTask):
-    def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, attitude_state : dict) -> None:
+    def __init__(self, instrument_name: str, duration : float, target_lat :float, target_lon : float, attitude_state : dict, obs_metadata : dict) -> None:
         """
         Instructs an instrument to perform a measurement.
 
@@ -229,6 +233,7 @@ class MeasurementTask(ComponentTask):
         self.duration = duration
         self.target = [target_lat, target_lon]
         self.attitude_state = attitude_state
+        self.obs_metadata = obs_metadata
 
     def to_dict(self) -> dict:
         out = super().to_dict()
@@ -452,7 +457,7 @@ class PerformAttitudeManeuverTask(SubsystemTask):
         return out
 
 class PerformMeasurement(SubsystemTask):
-    def __init__(self, target_lat : float, target_lon : float, instruments : list, durations : list) -> None:
+    def __init__(self, target_lat : float, target_lon : float, instruments : list, durations : list, metadata : dict) -> None:
         """
         Instructs the payload subsystem to perform a measurement of a target lat-lon with 
         a given list of instruments for a given set of durations
@@ -468,6 +473,7 @@ class PerformMeasurement(SubsystemTask):
         """
         super().__init__(SubsystemNames.PAYLOAD.value, 'PerformMeasurementTask')
         self.target = (target_lat, target_lon)
+        self.metadata = metadata
 
         self.instruments = []
         for instrument in instruments:
@@ -485,6 +491,7 @@ class PerformMeasurement(SubsystemTask):
         out['target_lon'] = lon
         out['instruments'] = self.instruments
         out['durations'] = self.durations
+        out['metadata'] = self.metadata
         
         return out
 
@@ -528,9 +535,10 @@ class PlatformAbortTask(PlatformTask):
         return out
 
 class ObservationTask(PlatformTask):
-    def __init__(self, target_lan : float, target_lon : float, instrument_list : list, durations : list) -> None:
+    def __init__(self, target_lan : float, target_lon : float, instrument_list : list, durations : list, obs_info: dict) -> None:
         super().__init__('ObservationTask')
         self.target = (target_lan, target_lon)
+        self.obs_info = obs_info
 
         self.instrument_list = []
         for instrument in instrument_list:
@@ -543,6 +551,9 @@ class ObservationTask(PlatformTask):
     def get_target(self):
         return self.target
 
+    def get_obs_info(self):
+        return self.obs_info
+
     def to_dict(self) -> dict:
         out = super().to_dict()
         lat, lon = self.target
@@ -551,6 +562,7 @@ class ObservationTask(PlatformTask):
         out['target_lon'] = lon
         out['instruments'] = self.instrument_list
         out['durations'] = self.durations
+        out['obs_info'] = self.obs_info
         
         return out
 
@@ -572,7 +584,7 @@ class PlannerTask:
         return
 
 class ObservationPlannerTask(PlannerTask):
-    def __init__(self, target_lat : float, target_lon : float, science_val: float, instrument_list : list, start: float, end: float) -> None:
+    def __init__(self, target_lat : float, target_lon : float, science_val: float, instrument_list : list, start: float, end: float, obs_info : dict = {}) -> None:
         super().__init__()
         self.target = (target_lat, target_lon)
         self.science_val = science_val
@@ -581,6 +593,7 @@ class ObservationPlannerTask(PlannerTask):
         for instrument in instrument_list:
             self.instrument_list.append(instrument)
 
+        self.obs_info = obs_info
         self.start = start
         self.end = end
 
@@ -614,10 +627,11 @@ class Request:
         self._type = req_type
 
 class MeasurementRequest(Request):
-    def __init__(self, measurement_type : type, target_lat : float, target_lon: float, science_val: float = 0) -> None:
+    def __init__(self, measurement_type : type, target_lat : float, target_lon: float, science_val: float = 0, metadata : dict = {}) -> None:
         super().__init__(measurement_type)
         self._target = (target_lat, target_lon)
         self._science_val = science_val
+        self.metadata = metadata
 
     def get_measurement_type(self):
         return self._type

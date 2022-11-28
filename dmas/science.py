@@ -392,8 +392,10 @@ class ScienceValueModule(Module):
                 obs = msg.content
 
                 science_value, outlier = self.compute_science_value(lat, lon, obs)                
-
-                measurement_request = MeasurementRequest("tss", lat, lon, science_value)
+                metadata = {
+                    "altimetry" : "wtf"
+                }
+                measurement_request = MeasurementRequest("tss", lat, lon, science_value, metadata)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
@@ -414,6 +416,7 @@ class ScienceValueModule(Module):
                 lat = msg.content["lat"]
                 lon = msg.content["lon"]
                 obs = msg.content
+                metadata = msg.content["metadata"]
 
                 science_value, outlier = self.compute_science_value(lat, lon, obs)
                 parent_agent = self.get_top_module()
@@ -424,9 +427,15 @@ class ScienceValueModule(Module):
                 if outlier is True and instrument == "POSEIDON-3B Altimeter": # TODO fix this hardcode
                     jason_outlier_count+=1
                     self.log(f'Jason outlier count: {jason_outlier_count}',level=logging.INFO)
-                if outlier is True and instrument == "OLI" and self.get_data_product(lat,lon,"altimetry"):
+                if outlier is True and instrument == "OLI" and metadata:
                     coobs_outlier_count+=1
                     self.log(f'Co-obs outlier count: {coobs_outlier_count}',level=logging.INFO)
+
+                downlink_message = InterNodeDownlinkMessage(self,"Iridium",obs)
+
+                ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, downlink_message)
+                await self.send_internal_message(ext_msg)
+                self.log(f'Sent message to transmitter!',level=logging.INFO)
                 self.log(f'Received measurement with value {science_value}!',level=logging.INFO)
                 self.science_value_sum = self.science_value_sum + science_value
                 self.log(f'Sum of science values: {self.science_value_sum}',level=logging.INFO)
@@ -692,6 +701,7 @@ class OnboardProcessingModule(Module):
                 await self.send_internal_message(updated_msg)
                 for item in self.sd:
                     if item["lat"] == lat and item["lon"] == lon and item["time"] == obs_process_time:
+                        item["metadata"] = msg.metadata
                         value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
                         await self.send_internal_message(value_msg)
         except asyncio.CancelledError:
