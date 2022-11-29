@@ -3409,6 +3409,10 @@ class ReceiverComponent(ComponentModule):
                         #     pass
                         elif msg_type is InterNodeMessageTypes.DOWNLINK:
                             self.log(f'Received downlink message!',level=logging.INFO)
+                            msg : InterNodeDownlinkMessage = InterNodeDownlinkMessage.from_dict(msg_dict)
+                            downlink_msg = InternalMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, msg)
+                            self.log(f'Sending downlink message to science module (hopefully)!',level=logging.INFO)
+                            await self.send_internal_message(downlink_msg) # send measurement request to planning module
                         else:
                             msg = None
                             self.log(content=f'Internode message of type {msg_type.name} not yet supported. Discarding message...')

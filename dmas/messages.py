@@ -1592,6 +1592,22 @@ class DataMessage(InternalMessage):
         _, lon = self._target
         return lon
 
+    def to_json(self):
+        return json.dumps(self, default=lambda o:o.__dict__, sort_keys=True, indent=4)
+
+    def from_dict(d : dict):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src_module = d.get('src_module', None)
+        dst_module = d.get('dst_module', None)
+        content = d.get('content', None)
+        target = d.get('_target', None)
+        name = d.get('name',None)
+        metadata = d.get('metadata',None)
+
+        return DataMessage(src_module, dst_module, target[0], target[1], content, name, metadata)
+
 class DataDeletedMessage(DataMessage):
     def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str) -> None:
         """

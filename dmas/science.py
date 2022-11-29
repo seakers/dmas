@@ -15,7 +15,7 @@ from utils import ScienceSubmoduleTypes
 from tasks import InformationRequest, DataProcessingRequest, MeasurementRequest
 
 class ScienceModule(Module):
-    def __init__(self, parent_agent : Module, scenario_dir : str) -> None:
+    def __init__(self, parent_agent : Module, scenario_dir : str, predictive_model : bool) -> None:
         super().__init__(AgentModuleTypes.SCIENCE_MODULE.value, parent_agent, [], 0)
 
         self.scenario_dir = scenario_dir
@@ -36,8 +36,9 @@ class ScienceModule(Module):
             OnboardProcessingModule(self, data_products),            
             ScienceReasoningModule(self, data_products),
             ScienceValueModule(self, data_products)
-            # SciencePredictiveModelModule(self,self.data_products),           
         ]
+        if predictive_model:
+            self.submodules.append(SciencePredictiveModelModule(self,data_products))
 
     def load_data_products(self) -> list:
         data_products = []
@@ -83,8 +84,15 @@ class ScienceModule(Module):
 
                     await self.send_internal_message(msg)
 
+                elif isinstance(msg.content, InterNodeDownlinkMessage):
+                    downlink_msg = msg.content
+                    obs = DataMessage.from_dict(json.loads(downlink_msg.content))
+                    obs.dst_module = ScienceSubmoduleTypes.ONBOARD_PROCESSING.value
+                    await self.send_internal_message(obs)
+
+
                 else:
-                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.')
+                    self.log(f'Internal messages with contents of type: {type(msg.content)} not yet supported. Discarding message.',level=logging.INFO)
 
         except asyncio.CancelledError:
             return
@@ -393,7 +401,7 @@ class ScienceValueModule(Module):
 
                 science_value, outlier = self.compute_science_value(lat, lon, obs)                
                 metadata = {
-                    "altimetry" : "wtf"
+                    "altimetry" : obs
                 }
                 measurement_request = MeasurementRequest("tss", lat, lon, science_value, metadata)
 
@@ -430,12 +438,7 @@ class ScienceValueModule(Module):
                 if outlier is True and instrument == "OLI" and metadata:
                     coobs_outlier_count+=1
                     self.log(f'Co-obs outlier count: {coobs_outlier_count}',level=logging.INFO)
-
-                downlink_message = InterNodeDownlinkMessage(self,"Iridium",obs)
-
-                ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, downlink_message)
-                await self.send_internal_message(ext_msg)
-                self.log(f'Sent message to transmitter!',level=logging.INFO)
+                
                 self.log(f'Received measurement with value {science_value}!',level=logging.INFO)
                 self.science_value_sum = self.science_value_sum + science_value
                 self.log(f'Sum of science values: {self.science_value_sum}',level=logging.INFO)
@@ -673,15 +676,26 @@ class OnboardProcessingModule(Module):
                 # unpackage result
                 obs_str = msg.get_data()
                 lat, lon = msg.get_target()
-
+                metadata = msg.get_metadata()
                 self.log(f'Received measurement result from ({lat}°, {lon}°)!', level=logging.INFO)
+
+
 
                 # process result
                 obs_process_time = self.get_current_time()
 
                 parent_agent = self.get_top_module()
                 instrument = parent_agent.payload[parent_agent.name]["name"]
-                self.log(f'Instrument: {instrument}',level=logging.DEBUG)
+                
+                if(instrument != "Ground Sensor"): # TODO change this hardcode
+                    metadata["measuring_instrument"] = instrument
+                    msg.metadata = metadata
+                    self.log(f'Message to be downlinked: {msg}',level=logging.INFO)
+                    downlink_message = InterNodeDownlinkMessage(self,"Iridium",msg)
+                    ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, downlink_message)
+                    await self.send_internal_message(ext_msg)
+                    self.log(f'Sent message to transmitter!',level=logging.INFO)
+
                 if(instrument == "VIIRS" or instrument == "OLI"): # TODO replace this hardcoding
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_tss_obs_value(data)
@@ -692,6 +706,11 @@ class OnboardProcessingModule(Module):
                     processed_data = self.compute_altimetry()
                     self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"altimetry",raw_data_filename,processed_data)
                     self.log(f'Altimetry measurement data successfully saved in on-board data-base.', level=logging.INFO)
+                elif(instrument == "Ground Sensor"):
+                    data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
+                    metadata = msg.get_metadata()
+                    self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,metadata["measuring_instrument"],raw_data_filename,data)
+                    self.downlink_statistics()
                 else:
                     self.log(f'Instrument not yet supported by science module!',level=logging.INFO)
                 # release database lock and inform other processes that the database has been updated
@@ -708,20 +727,23 @@ class OnboardProcessingModule(Module):
             return
 
     def store_raw_measurement(self,dataprod,lat,lon,obs_process_time):
-        im = PIL.Image.open(BytesIO(base64.b64decode(dataprod)))
+        # #im = PIL.Image.open(BytesIO(base64.b64decode(dataprod))) TODO uncomment
+        
 
-        img_np = np.array(im)
-        data = img_np[:,:,0]
-        img_np = np.delete(img_np,3,2)
-        # from https://stackoverflow.com/questions/67831382/obtaining-rgb-data-from-image-and-writing-it-to-csv-file-with-the-corresponding
-        xy_coords = np.flip(np.column_stack(np.where(np.all(img_np >= 0, axis=2))), axis=1)
-        rgb = np.reshape(img_np, (np.prod(img_np.shape[:2]), 3))
+        # img_np = np.array(im)
+        # data = img_np[:,:,0]
+        # img_np = np.delete(img_np,3,2)
+        # # from https://stackoverflow.com/questions/67831382/obtaining-rgb-data-from-image-and-writing-it-to-csv-file-with-the-corresponding
+        # xy_coords = np.flip(np.column_stack(np.where(np.all(img_np >= 0, axis=2))), axis=1)
+        # rgb = np.reshape(img_np, (np.prod(img_np.shape[:2]), 3))
 
-        # Add pixel numbers in front
-        pixel_numbers = np.expand_dims(np.arange(1, xy_coords.shape[0] + 1), axis=1)
-        value = np.hstack([pixel_numbers, xy_coords, rgb])
+        # # Add pixel numbers in front
+        # pixel_numbers = np.expand_dims(np.arange(1, xy_coords.shape[0] + 1), axis=1)
+        # value = np.hstack([pixel_numbers, xy_coords, rgb])
 
         # Properly save as CSV
+        data = np.random.rand(100,100)
+        value = np.random.rand(100,100)
         prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
         filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
         np.savetxt(filename, value, delimiter='\t', fmt='%4d')
@@ -754,6 +776,43 @@ class OnboardProcessingModule(Module):
             datafile.write(json.dumps(data_product_dict))
         return sd
 
+    def downlink_statistics(self):
+        coobs_count = 0
+        tss_coords = []
+        alt_coords = []
+        coobs_coords = []
+        for potential_tss_item in self.sd:
+            already_counted = False
+            if(potential_tss_item["product_type"] == "OLI"):
+                tss_coords.append((potential_tss_item["lat"],potential_tss_item["lon"]))
+                for potential_alt_item in self.sd:
+                    if potential_alt_item["product_type"] == "POSEIDON-3B Altimeter":
+                        if potential_alt_item["lat"] == potential_tss_item["lat"] and potential_alt_item["lon"] == potential_tss_item["lon"] and not already_counted:
+                            coobs_count += 1
+                            coobs_coords.append((potential_alt_item["lat"],potential_alt_item["lon"]))
+                            already_counted = True
+        for potential_alt_item in self.sd:
+            if potential_alt_item["product_type"] == "POSEIDON-3B Altimeter":
+                alt_coords.append((potential_alt_item["lat"],potential_alt_item["lon"]))
+        self.log(f'Co-obs count: {coobs_count}',level=logging.INFO)
+        with open(self.parent_module.scenario_dir+'tss_obs.csv','w') as out:
+            csv_out=csv.writer(out)
+            csv_out.writerow(['lat','lon'])
+            for row in tss_coords:
+                csv_out.writerow(row)
+        with open(self.parent_module.scenario_dir+'alt_obs.csv','w') as out:
+            csv_out=csv.writer(out)
+            csv_out.writerow(['lat','lon'])
+            for row in alt_coords:
+                csv_out.writerow(row)
+        with open(self.parent_module.scenario_dir+'coobs_obs.csv','w') as out:
+            csv_out=csv.writer(out)
+            csv_out.writerow(['lat','lon'])
+            for row in coobs_coords:
+                csv_out.writerow(row)
+
+
+
 
 
 
@@ -785,11 +844,45 @@ class SciencePredictiveModelModule(Module):
             return
 
     async def coroutines(self):
+        coroutines = []
+
         try:
-            while True:
-                await self.sim_wait(1e6)
+            ## Internal coroutines
+            send_meas_req = asyncio.create_task(self.send_meas_req())
+            send_meas_req.set_name (f'{self.name}_send_meas_req')
+            coroutines.append(send_meas_req)
+
+            # wait for the first coroutine to complete
+            _, pending = await asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+            
+            done_name = None
+            for coroutine in coroutines:
+                if coroutine not in pending:
+                    done_name = coroutine.get_name()
+
+            # cancel all other coroutine tasks
+            self.log(f'{done_name} Coroutine ended. Terminating all other coroutines...', level=logging.INFO)
+            for subroutine in pending:
+                subroutine.cancel()
+                await subroutine
+        
         except asyncio.CancelledError:
-            return
+            if len(coroutines) > 0:
+                for coroutine in coroutines:
+                    coroutine : asyncio.Task
+                    if not coroutine.done():
+                        coroutine.cancel()
+                        await coroutine
+
+    async def send_meas_req(self):
+        forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'ForecastWarnings-All.csv', delimiter=',')
+        for row in forecast_data:
+            measurement_request = MeasurementRequest("tss", row[2], row[3], 1.0, {})
+            req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
+            ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+            await self.send_internal_message(req_msg)
+            await self.send_internal_message(ext_msg)
+            self.log(f'Sent message from predictive model!',level=logging.INFO)
 
 class ScienceReasoningModule(Module):
     def __init__(self, parent_module, sd) -> None:
@@ -885,7 +978,7 @@ class ScienceReasoningModule(Module):
                         if outlier is True:
                             outliers.append(outlier_data)
                     else:
-                        self.log(f'Item in science database unsupported by science processing module.',level=logging.INFO)
+                        self.log(f'Item in science database unsupported by science processing module.',level=logging.DEBUG)
                 for outlier in outliers:
                     self.log(f'Outliers: {outlier}',level=logging.INFO)
                     msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, outlier)
