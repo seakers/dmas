@@ -130,7 +130,7 @@ class IridiumTransmitterComponent(ComponentModule):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
             elif isinstance(msg.content, InterNodeDownlinkMessage):
-                self.log(f'Received an internode downlink message!',level=logging.DEBUG)
+                self.log(f'Received an internode downlink message!',level=logging.INFO)
                 agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
                 msg.content.dst = "Central Node"
                 task_msg = TransmitMessageTask(agent_port_dict["Central Node"],msg.content,1.0)
@@ -219,7 +219,7 @@ class IridiumTransmitterComponent(ComponentModule):
 
                 # return task completion status                
                 if transmit_msg.done():
-                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.DEBUG)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
                     return TaskStatus.DONE
 
                 # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
@@ -486,7 +486,7 @@ class IridiumReceiverComponent(ComponentModule):
                     acquired = await self.state_lock.acquire()
                     if self.buffer_allocated + msg_length <= self.buffer_capacity:
                         self.buffer_allocated += msg_length
-                        self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
+                        self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).',level=logging.DEBUG)
                         self.state_lock.release()
                         acquired = None
                 

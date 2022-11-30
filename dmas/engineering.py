@@ -3362,9 +3362,9 @@ class ReceiverComponent(ComponentModule):
                     msg_dict = None
 
                     # listen for messages from other agents
-                    self.log('Waiting for agent messages...',level=logging.DEBUG)
+                    self.log('Waiting for agent messages...',level=logging.INFO)
                     msg_json = await parent_agent.agent_socket_in.recv_json()
-                    self.log(f'Agent message received!',level=logging.DEBUG)
+                    self.log(f'Agent message received!',level=logging.INFO)
                     blank = dict()
                     blank_json = json.dumps(blank)
                     await parent_agent.agent_socket_in.send_json(blank_json)
@@ -3377,7 +3377,7 @@ class ReceiverComponent(ComponentModule):
                     acquired = await self.state_lock.acquire()
                     if self.buffer_allocated + msg_length <= self.buffer_capacity:
                         self.buffer_allocated += msg_length
-                        self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
+                        self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).',level=logging.DEBUG)
                         self.state_lock.release()
                         acquired = None
                 
@@ -3408,7 +3408,7 @@ class ReceiverComponent(ComponentModule):
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_MESSAGE:
                         #     pass
                         elif msg_type is InterNodeMessageTypes.DOWNLINK:
-                            self.log(f'Received downlink message!',level=logging.DEBUG)
+                            self.log(f'Received downlink message!',level=logging.INFO)
                             msg : InterNodeDownlinkMessage = InterNodeDownlinkMessage.from_dict(msg_dict)
                             downlink_msg = InternalMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, msg)
                             self.log(f'Sending downlink message to science module (hopefully)!',level=logging.DEBUG)
