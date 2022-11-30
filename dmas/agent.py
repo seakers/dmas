@@ -546,7 +546,7 @@ class ScienceTestAgent(AgentClient):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
         self.submodules = [
-                            ScienceModule(self,scenario_dir),
+                            ScienceModule(self,scenario_dir,False),
                             PlanningModule(self,scenario_dir),
                             EngineeringModule(self)
                           ]
@@ -562,7 +562,7 @@ class GroundTestAgent(AgentClient):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
         self.submodules = [
-                            ScienceModule(self,scenario_dir),
+                            ScienceModule(self,scenario_dir,False),
                             EngineeringModule(self)
                           ]
 

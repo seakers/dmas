@@ -1,5 +1,5 @@
 {   
-    "epoch":{"@type":"GREGORIAN_UT1", "year":2021, "month":8, "day":19, "hour":12, "minute":0, "second":0},
+    "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
     "duration": 1.0,
     "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR", "stepSize": 1},
     "spacecraft": [
@@ -45,7 +45,7 @@
                                 "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                                 "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":60 },
                                 "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7083.137, "ecc": 0.001, "inc": 98.2, "raan": 0, "aop": 0, "ta": 0}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
@@ -95,11 +95,11 @@
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 60}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "nadir"
         },
         {
             "@id": "sp3", 
@@ -144,11 +144,11 @@
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7268, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 120}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "nadir"
         },
         {
             "@id": "sp4", 
@@ -193,11 +193,11 @@
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 180}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "nadir"
         },
         {
             "@id": "sp5", 
@@ -242,11 +242,11 @@
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 240}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "nadir"
         },
         {
             "@id": "sp6", 
@@ -291,11 +291,11 @@
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7000, "ecc": 0.001, "inc": 92, "raan": 180, "aop": 0, "ta": 300}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "nadir"
         },
         {
             "@id": "iridium", 
@@ -339,7 +339,7 @@
                             "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":5 },
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 6878.137, "ecc": 0.001, "inc": 45, "raan": 0, "aop": 145, "ta": 10}
                             }, 
             "planner" : {"@type": "COMMS_TEST"}
@@ -386,7 +386,7 @@
                             "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":5 },
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 6878.137, "ecc": 0.001, "inc": 45, "raan": 0, "aop": 145, "ta": 10}
                             }, 
             "planner" : {"@type": "COMMS_TEST"}

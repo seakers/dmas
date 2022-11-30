@@ -219,7 +219,7 @@ class IridiumTransmitterComponent(ComponentModule):
 
                 # return task completion status                
                 if transmit_msg.done():
-                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.DEBUG)                    
                     return TaskStatus.DONE
 
                 # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):

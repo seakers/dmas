@@ -1,6 +1,7 @@
 {   
-    "epoch":{"@type":"GREGORIAN_UT1", "year":2021, "month":8, "day":19, "hour":12, "minute":0, "second":0},
+    "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
     "duration": 1.0,
+    "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR", "stepSize": 1},
     "spacecraft": [
         {
             "@id": "sp1", 
@@ -44,11 +45,11 @@
                                 "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                                 "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":60 },
                                 "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7083.137, "ecc": 0.001, "inc": 98.2, "raan": 0, "aop": 0, "ta": 0}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "agile"
         },
 
         {
@@ -94,11 +95,207 @@
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
                             "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
-                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 0}
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 60}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
-            "missionProfile" : "3D-CHESS"
+            "missionProfile" : "nadir"
+        },
+        {
+            "@id": "sp3", 
+            "name": "SWOT",
+            "spacecraftBus":{"name": "BlueCanyon", "mass": 20, "volume": 0.5,
+                            "orientation":{"referenceFrame": "NADIR_POINTING", "convention": "REF_FRAME_ALIGNED"},
+                            "components": {
+                                "cmdh" : {
+                                    "power": 2,
+                                    "memorySize": 100
+                                },
+                                "comms":{
+                                    "transmitter": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10,
+                                        "numChannels": 1
+                                    },
+                                    "receiver": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10
+                                    }
+                                },
+                                "eps": {
+                                    "powerGenerator": {
+                                        "@type" : "Solar Panel",
+                                        "maxPowerGeneration": 10
+                                    },
+                                    "powerStorage": {
+                                        "@type": "Battery",
+                                        "maxPowerGeneration": 10,
+                                        "energyStorageCapacity": 0.010,
+                                        "depthOfDischarge": 0.99,
+                                        "initialCharge": 1
+                                    }
+                                }
+                            }
+                            },
+            "instrument": {"name": "POSEIDON-3B Altimeter", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+                            "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
+                            "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
+                            "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
+                            "@id":"bs1", "@type":"Basic Sensor"},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7268, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 120}
+                            }, 
+            "planner" : {"@type": "COMMS_TEST"},
+            "missionProfile" : "nadir"
+        },
+        {
+            "@id": "sp4", 
+            "name": "Sentinel-6A",
+            "spacecraftBus":{"name": "BlueCanyon", "mass": 20, "volume": 0.5,
+                            "orientation":{"referenceFrame": "NADIR_POINTING", "convention": "REF_FRAME_ALIGNED"},
+                            "components": {
+                                "cmdh" : {
+                                    "power": 2,
+                                    "memorySize": 100
+                                },
+                                "comms":{
+                                    "transmitter": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10,
+                                        "numChannels": 1
+                                    },
+                                    "receiver": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10
+                                    }
+                                },
+                                "eps": {
+                                    "powerGenerator": {
+                                        "@type" : "Solar Panel",
+                                        "maxPowerGeneration": 10
+                                    },
+                                    "powerStorage": {
+                                        "@type": "Battery",
+                                        "maxPowerGeneration": 10,
+                                        "energyStorageCapacity": 0.010,
+                                        "depthOfDischarge": 0.99,
+                                        "initialCharge": 1
+                                    }
+                                }
+                            }
+                            },
+            "instrument": {"name": "POSEIDON-3B Altimeter", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+                            "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
+                            "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
+                            "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
+                            "@id":"bs1", "@type":"Basic Sensor"},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 180}
+                            }, 
+            "planner" : {"@type": "COMMS_TEST"},
+            "missionProfile" : "nadir"
+        },
+        {
+            "@id": "sp5", 
+            "name": "Sentinel-6B",
+            "spacecraftBus":{"name": "BlueCanyon", "mass": 20, "volume": 0.5,
+                            "orientation":{"referenceFrame": "NADIR_POINTING", "convention": "REF_FRAME_ALIGNED"},
+                            "components": {
+                                "cmdh" : {
+                                    "power": 2,
+                                    "memorySize": 100
+                                },
+                                "comms":{
+                                    "transmitter": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10,
+                                        "numChannels": 1
+                                    },
+                                    "receiver": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10
+                                    }
+                                },
+                                "eps": {
+                                    "powerGenerator": {
+                                        "@type" : "Solar Panel",
+                                        "maxPowerGeneration": 10
+                                    },
+                                    "powerStorage": {
+                                        "@type": "Battery",
+                                        "maxPowerGeneration": 10,
+                                        "energyStorageCapacity": 0.010,
+                                        "depthOfDischarge": 0.99,
+                                        "initialCharge": 1
+                                    }
+                                }
+                            }
+                            },
+            "instrument": {"name": "POSEIDON-3B Altimeter", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+                            "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
+                            "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
+                            "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
+                            "@id":"bs1", "@type":"Basic Sensor"},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 240}
+                            }, 
+            "planner" : {"@type": "COMMS_TEST"},
+            "missionProfile" : "nadir"
+        },
+        {
+            "@id": "sp6", 
+            "name": "CryoSat-2",
+            "spacecraftBus":{"name": "BlueCanyon", "mass": 20, "volume": 0.5,
+                            "orientation":{"referenceFrame": "NADIR_POINTING", "convention": "REF_FRAME_ALIGNED"},
+                            "components": {
+                                "cmdh" : {
+                                    "power": 2,
+                                    "memorySize": 100
+                                },
+                                "comms":{
+                                    "transmitter": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10,
+                                        "numChannels": 1
+                                    },
+                                    "receiver": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10
+                                    }
+                                },
+                                "eps": {
+                                    "powerGenerator": {
+                                        "@type" : "Solar Panel",
+                                        "maxPowerGeneration": 10
+                                    },
+                                    "powerStorage": {
+                                        "@type": "Battery",
+                                        "maxPowerGeneration": 10,
+                                        "energyStorageCapacity": 0.010,
+                                        "depthOfDischarge": 0.99,
+                                        "initialCharge": 1
+                                    }
+                                }
+                            }
+                            },
+            "instrument": {"name": "POSEIDON-3B Altimeter", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+                            "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
+                            "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":1 },
+                            "maneuver":{"maneuverType": "CIRCULAR", "diameter":10},
+                            "@id":"bs1", "@type":"Basic Sensor"},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7000, "ecc": 0.001, "inc": 92, "raan": 180, "aop": 0, "ta": 300}
+                            }, 
+            "planner" : {"@type": "COMMS_TEST"},
+            "missionProfile" : "nadir"
         },
         {
             "@id": "iridium", 
@@ -142,7 +339,54 @@
                             "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                             "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":5 },
                             "@id":"bs1", "@type":"Basic Sensor"},
-            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2021, "month":2, "day":25, "hour":6, "minute":0, "second":0},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+                            "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 6878.137, "ecc": 0.001, "inc": 45, "raan": 0, "aop": 145, "ta": 10}
+                            }, 
+            "planner" : {"@type": "COMMS_TEST"}
+        },
+        {
+            "@id": "centralnode", 
+            "name": "Central Node",
+            "spacecraftBus":{"name": "BlueCanyon", "mass": 20, "volume": 0.5,
+                            "orientation":{"referenceFrame": "NADIR_POINTING", "convention": "REF_FRAME_ALIGNED"},
+                            "components": {
+                                "cmdh" : {
+                                    "power": 2,
+                                    "memorySize": 100
+                                },
+                                "comms":{
+                                    "transmitter": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10,
+                                        "numChannels": 1
+                                    },
+                                    "receiver": {
+                                        "power": 3,
+                                        "maxDataRate": 1,
+                                        "bufferSize": 10
+                                    }
+                                },
+                                "eps": {
+                                    "powerGenerator": {
+                                        "@type" : "Solar Panel",
+                                        "maxPowerGeneration": 10
+                                    },
+                                    "powerStorage": {
+                                        "@type": "Battery",
+                                        "maxPowerGeneration": 10,
+                                        "energyStorageCapacity": 0.010,
+                                        "depthOfDischarge": 0.99,
+                                        "initialCharge": 1
+                                    }
+                                }
+                            }
+                            },
+            "instrument": {"name": "Ground Sensor", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+                            "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
+                            "fieldOfViewGeometry": {"shape": "CIRCULAR", "diameter":5 },
+                            "@id":"bs1", "@type":"Basic Sensor"},
+            "orbitState": {"date":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 6878.137, "ecc": 0.001, "inc": 45, "raan": 0, "aop": 145, "ta": 10}
                             }, 
             "planner" : {"@type": "COMMS_TEST"}
@@ -184,6 +428,6 @@
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":2, "latLower":0, "lonUpper":180, "lonLower":-180, "gridRes": 1}, 
              {"@type": "autogrid", "@id": 2, "latUpper":22, "latLower":20, "lonUpper":180, "lonLower":-180, "gridRes": 1}],
-    "scenario": {"@type": "TEST", "duration": 0.25},
+    "scenario": {"@type": "TEST", "duration": 1.0},
     "settings": {"coverageType": "GRID COVERAGE"}
 }

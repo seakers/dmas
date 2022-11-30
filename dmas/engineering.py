@@ -41,7 +41,7 @@ class ComponentModule(Module):
                 average_power_consumption: float, 
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
-                f_update: float = 1.0,
+                f_update: float = 0.1,
                 n_timed_coroutines: int = 0) -> None:
         """
         Describes a generic component of an agent's platform.
@@ -1838,7 +1838,7 @@ class OnboardComputerModule(ComponentModule):
                 memory_capacity : float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 1.0) -> None:
+                f_update: float = 0.1) -> None:
         super().__init__(ComponentNames.ONBOARD_COMPUTER.value, parent_subsystem, OnboardComputerState, average_power_consumption, health, status, f_update)
         self.memory_stored = 0
         self.memory_capacity = memory_capacity
@@ -1976,7 +1976,7 @@ class PositionDeterminationModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         super().__init__(ComponentNames.POS.value, parent_subsystem, PositionDeterminationState, average_power_consumption, health, status, f_update)
         self.pos = [None, None, None]
         self.vel = [None, None, None]
@@ -2028,7 +2028,7 @@ class SunSensorModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         super().__init__(ComponentNames.SUN_SENSOR.value, parent_subsystem, SunSensorState, average_power_consumption, health, status, f_update)
         self.eclipse = None
         self.sun_vector = [None, None, None]
@@ -2123,7 +2123,7 @@ class InstrumentComponent(ComponentModule):
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 1, 
+                f_update: float = 0.1, 
                 n_timed_coroutines: int = 3) -> None:
         super().__init__(name, parent_subsystem, InstrumentState, average_power_consumption, health, status, f_update, n_timed_coroutines)
         self.data_rate = data_rate
@@ -2298,7 +2298,7 @@ class InertialMeasurementUnitModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         super().__init__(ComponentNames.IMU.value, parent_subsystem, InertialMeasurementUnitState, average_power_consumption, health, status, f_update)
 
         self.angular_pos = [None, None, None, None]
@@ -2368,7 +2368,7 @@ class ReactionWheelModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         super().__init__(ComponentNames.REACTION_WHEELS.value, parent_subsystem, ReactionWheelState, average_power_consumption, health, status, f_update)
 
         self.angular_pos = [0.0, None, None, None] # TODO change to 3 axis attitude
@@ -2583,7 +2583,7 @@ class PowerSupplyComponent(ComponentModule):
                 maximum_power_output : float = 1e10,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         """
         Describes a generic power supply component within the EPS subsystem
 
@@ -2770,7 +2770,7 @@ class BatteryModule(PowerSupplyComponent):
                 depth_of_discharge: float = 1.0,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         """
         Describes a battery component in the EPS subsystem
 
@@ -2962,7 +2962,7 @@ class TransmitterComponent(ComponentModule):
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         """
         Describes a receiver transmitter capable of sending messages to other agents
 
@@ -3039,7 +3039,7 @@ class TransmitterComponent(ComponentModule):
                 await self.tasks.put(task_msg)
 
             elif isinstance(msg.content, InterNodeDownlinkMessage):
-                self.log(f'Received a downlink message!',level=logging.INFO)
+                self.log(f'Received a downlink message!',level=logging.DEBUG)
                 task_msg = TransmitMessageTask("Iridium",msg.content,1.0)
                 await self.tasks.put(task_msg)
 
@@ -3103,7 +3103,7 @@ class TransmitterComponent(ComponentModule):
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!', level=logging.INFO)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!', level=logging.DEBUG)                    
                     self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
                     return TaskStatus.DONE
 
@@ -3300,7 +3300,7 @@ class ReceiverComponent(ComponentModule):
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL,
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 1) -> None:
+                f_update: float = 0.1) -> None:
         """
         Describes a radio receiver capable of sending messages to other agents
 
@@ -3408,10 +3408,10 @@ class ReceiverComponent(ComponentModule):
                         # elif msg_type is InterNodeMessageTypes.INFORMATION_MESSAGE:
                         #     pass
                         elif msg_type is InterNodeMessageTypes.DOWNLINK:
-                            self.log(f'Received downlink message!',level=logging.INFO)
+                            self.log(f'Received downlink message!',level=logging.DEBUG)
                             msg : InterNodeDownlinkMessage = InterNodeDownlinkMessage.from_dict(msg_dict)
                             downlink_msg = InternalMessage(self.name, AgentModuleTypes.SCIENCE_MODULE.value, msg)
-                            self.log(f'Sending downlink message to science module (hopefully)!',level=logging.INFO)
+                            self.log(f'Sending downlink message to science module (hopefully)!',level=logging.DEBUG)
                             await self.send_internal_message(downlink_msg) # send measurement request to planning module
                         else:
                             msg = None

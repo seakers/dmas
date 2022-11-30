@@ -28,8 +28,8 @@ class PlanningModule(Module):
             InstrumentCapabilityModule(self),
             ObservationPlanningModule(self),
             OperationsPlanningModule(self),
-            PredictiveModelsModule(self),
-            MeasurementPerformanceModule(self)
+            #PredictiveModelsModule(self),
+            #MeasurementPerformanceModule(self)
         ]
 
     async def internal_message_handler(self, msg: InternalMessage):
@@ -144,7 +144,7 @@ class ObservationPlanningModule(Module):
         if self.parent_module.mission_profile=="3D-CHESS" or self.parent_module.mission_profile=="agile":
             parent_agent = self.get_top_module()
             instrument = parent_agent.payload[parent_agent.name]["name"]
-            if instrument=="POSEIDON-3B Altimeter": #TODO fix hardcode
+            if instrument=="POSEIDON-3B Altimeter" or instrument=="OLI": #TODO fix hardcode
                 points = np.zeros(shape=(2000, 5))
                 with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
                     reader = csv.reader(csvfile)
@@ -181,7 +181,17 @@ class ObservationPlanningModule(Module):
                 lat = points[i, 0]
                 lon = points[i, 1]
                 obs = ObservationPlannerTask(lat,lon,1.0,["OLI"],0.0,1.0) # TODO fix hardcode
-                obs_list.append(obs)
+                gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
+                gp_access_list = []
+                for _, row in gp_accesses.iterrows():
+                    gp_access_list.append(row)
+                #print(gp_accesses)
+                if(len(gp_accesses) != 0):
+                    self.log(f'Adding observation candidate!',level=logging.DEBUG)
+                    obs.start = gp_access_list[0]['time index']
+                    obs.end = obs.start # TODO change this hardcode
+                    obs.angle = gp_access_list[0]['look angle [deg]']
+                    obs_list.append(obs)
         else:
             obs_list = []
         await self.obs_list.put(obs_list)
@@ -250,15 +260,20 @@ class ObservationPlanningModule(Module):
                         gp_access_list.append(row)
                     #print(gp_accesses)
                     if(len(gp_accesses) != 0):
-                        self.log(f'Adding observation candidate!',level=logging.INFO)
+                        self.log(f'Adding observation candidate!',level=logging.DEBUG)
                         obs.start = gp_access_list[0]['time index']
-                        obs.end = obs.start + 5 # TODO change this hardcode
+                        obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
                         self.obs_candidates.append(obs)
-                self.obs_plan = self.rule_based_planner(self.obs_candidates)
+                old_obs_plan = self.obs_plan.copy()
+                if self.parent_module.mission_profile=="nadir":
+                    self.obs_plan = self.nadir_planner(self.obs_candidates.copy())
+                else:
+                    self.obs_plan = self.rule_based_planner(self.obs_candidates.copy())
                 # schedule observation plan and send to operations planner for further development
-                plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
-                await self.parent_module.send_internal_message(plan_msg)
+                if(self.obs_plan != old_obs_plan):
+                    plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
+                    await self.parent_module.send_internal_message(plan_msg)
 
         except asyncio.CancelledError:
             return
@@ -266,19 +281,56 @@ class ObservationPlanningModule(Module):
     def rule_based_planner(self,obs_list):
         rule_based_plan = []
         estimated_reward = 100000.0
-        while len(obs_list) > 0:
+        more_actions = True
+        curr_time = 0.0
+        while more_actions:
             best_obs = None
             maximum = 0.0
-            for obs in obs_list:
-                rho = (86400.0 - obs.end)/86400.0
+            actions = self.get_action_space(curr_time,obs_list)
+            if(len(actions) == 0):
+                break
+            for action in actions:
+                rho = (86400.0 - action.end)/86400.0
                 e = pow(rho,0.99) * estimated_reward
-                adjusted_reward = obs.science_val*self.meas_perf() + e
+                adjusted_reward = action.science_val*self.meas_perf() + e
                 if(adjusted_reward > maximum):
                     maximum = adjusted_reward
-                    best_obs = obs
+                    best_obs = action
+            curr_time = best_obs.end
             rule_based_plan.append(best_obs)
             obs_list.remove(best_obs)
+            if(len(self.get_action_space(curr_time,obs_list)) == 0):
+                more_actions = False
         return rule_based_plan
+
+    def nadir_planner(self,obs_list):
+        nadir_plan = []
+        more_actions = True
+        curr_time = 0.0
+        while more_actions:
+            soonest = 100000
+            soonest_action = None
+            actions = self.get_action_space(curr_time,obs_list)
+            if(len(actions) == 0):
+                break
+            for action in actions:
+                if action.start < soonest:
+                    soonest_action = action
+                    soonest = action.start
+            nadir_plan.append(soonest_action)
+            obs_list.remove(soonest_action)
+            curr_time = soonest_action.start
+            if(len(self.get_action_space(curr_time,obs_list)) == 0):
+                more_actions = False
+        return nadir_plan
+
+    def get_action_space(self,curr_time,obs_list):
+        feasible_actions = []
+        for obs in obs_list:
+            if(obs.start >= curr_time):
+                feasible_actions.append(obs)
+        return feasible_actions
+
 
     def meas_perf(self):
         a = 8.9e-5
@@ -382,12 +434,12 @@ class OperationsPlanningModule(Module):
                                 charge_task = ChargePlannerTask(ends[i],starts[i+1])
                                 self.ops_plan.append(charge_task)
                             obs_task = plan[i]
-                            if curr_time < obs_task.start and self.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start):
+                            if curr_time <= obs_task.start and self.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start):
                                 self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.INFO)
                                 self.ops_plan.append(obs_task)
-                                self.log(f'Adding maneuver task from {curr_angle} to {obs_task.angle} to operations plan!',level=logging.INFO)
-                                maneuver_task = ManeuverPlannerTask(curr_angle,obs_task.angle,curr_time,obs_task.start)
-                                self.ops_plan.append(maneuver_task)
+                                #self.log(f'Adding maneuver task from {curr_angle} to {obs_task.angle} to operations plan!',level=logging.DEBUG)
+                                #maneuver_task = ManeuverPlannerTask(curr_angle,obs_task.angle,curr_time,obs_task.start+1)
+                                #self.ops_plan.append(maneuver_task)
                                 curr_time = obs_task.end
                                 curr_angle = obs_task.angle
                             else:
@@ -411,8 +463,8 @@ class OperationsPlanningModule(Module):
                                 charge_task = ChargePlannerTask(ends[i],starts[i+1])
                                 self.ops_plan.append(charge_task)
                             obs_task = plan[i]
-                            if curr_time < obs_task.start:
-                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.INFO)
+                            if curr_time <= obs_task.start:
+                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.DEBUG)
                                 self.ops_plan.append(obs_task)
                                 curr_time = obs_task.end
         except asyncio.CancelledError:
@@ -423,17 +475,21 @@ class OperationsPlanningModule(Module):
             while True:
                 # Replace with basic module that adds charging to plan
                 curr_time = self.get_current_time()
+                starts = []
+                for ops in self.ops_plan:
+                    if(isinstance(ops,ObservationPlannerTask)):
+                        starts.append(ops.start)
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
-                        if(task.start <= curr_time <= task.end):
+                        if(task.start <= curr_time):
                             self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
-                            self.log(f'Task metadata: {task.obs_info}',level=logging.INFO)
+                            self.log(f'Task metadata: {task.obs_info}',level=logging.DEBUG)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1], task.obs_info)
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
                             self.ops_plan.remove(task)
                             await self.send_internal_message(msg)
                     elif(isinstance(task,ManeuverPlannerTask)):
-                        if(task.start <= curr_time <= task.end):
+                        if(task.start <= curr_time):
                             self.log(f'Sending maneuver task to engineering module!',level=logging.DEBUG)
                             perf_maneuver_task = PerformAttitudeManeuverTask((task.end-task.start),task.end_angle,0.0)
                             maneuver_task = ManeuverTask(perf_maneuver_task)
@@ -442,11 +498,13 @@ class OperationsPlanningModule(Module):
                             await self.send_internal_message(msg)
                     else:
                         self.log(f'Currently unsupported task type!')
-                await self.sim_wait(1.0)
+                await self.sim_wait(10.0)
         except asyncio.CancelledError:
             return
     
     def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
+        if(abs(curr_angle-new_angle) < 15):
+            return True
         slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
         maxTorque = 4e-3
         return slewTorque < maxTorque
