@@ -41,7 +41,7 @@ class ComponentModule(Module):
                 average_power_consumption: float, 
                 health : ComponentHealth = ComponentHealth.NOMINAL,
                 status : ComponentStatus = ComponentStatus.OFF,
-                f_update: float = 0.1,
+                f_update: float = 1,
                 n_timed_coroutines: int = 0) -> None:
         """
         Describes a generic component of an agent's platform.
@@ -1316,7 +1316,7 @@ class SubsystemModule(Module):
                                 if component.UPDATE_FREQUENCY < f_min:
                                     f_min = component.UPDATE_FREQUENCY
 
-                            await self.sim_wait(1/f_min)
+                            #await self.sim_wait(1/f_min) TODO readd this!!!
 
                             acquired = await self.state_lock.acquire()
 
@@ -1838,7 +1838,7 @@ class OnboardComputerModule(ComponentModule):
                 memory_capacity : float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         super().__init__(ComponentNames.ONBOARD_COMPUTER.value, parent_subsystem, OnboardComputerState, average_power_consumption, health, status, f_update)
         self.memory_stored = 0
         self.memory_capacity = memory_capacity
@@ -1976,7 +1976,7 @@ class PositionDeterminationModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         super().__init__(ComponentNames.POS.value, parent_subsystem, PositionDeterminationState, average_power_consumption, health, status, f_update)
         self.pos = [None, None, None]
         self.vel = [None, None, None]
@@ -2028,7 +2028,7 @@ class SunSensorModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         super().__init__(ComponentNames.SUN_SENSOR.value, parent_subsystem, SunSensorState, average_power_consumption, health, status, f_update)
         self.eclipse = None
         self.sun_vector = [None, None, None]
@@ -2123,7 +2123,7 @@ class InstrumentComponent(ComponentModule):
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 0.1, 
+                f_update: float = 1, 
                 n_timed_coroutines: int = 3) -> None:
         super().__init__(name, parent_subsystem, InstrumentState, average_power_consumption, health, status, f_update, n_timed_coroutines)
         self.data_rate = data_rate
@@ -2187,12 +2187,15 @@ class InstrumentComponent(ComponentModule):
         
                 # wait for measurement duration
                 # TODO consider real-time delays from environment server querying for the data being sensed
-                await self.sim_wait(task.duration)
+                # await self.sim_wait(task.duration) TODO not sure if we want to block off the agent from doing things
 
                 self.log(f'Measurement complete! Sending data to internal memory.',level=logging.INFO)
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage
+                    metadata = task.obs_metadata
+                    metadata["time"] = self.get_current_time()
+                    task.obs_metadata = metadata
                     data_save_task = SaveToMemoryTask(lat, lon, response.obs, task.obs_metadata)
                     data_msg = ComponentTaskMessage(self.name, ComponentNames.ONBOARD_COMPUTER.name, data_save_task)
 
@@ -2298,7 +2301,7 @@ class InertialMeasurementUnitModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         super().__init__(ComponentNames.IMU.value, parent_subsystem, InertialMeasurementUnitState, average_power_consumption, health, status, f_update)
 
         self.angular_pos = [None, None, None, None]
@@ -2368,7 +2371,7 @@ class ReactionWheelModule(ComponentModule):
                 average_power_consumption: float, 
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         super().__init__(ComponentNames.REACTION_WHEELS.value, parent_subsystem, ReactionWheelState, average_power_consumption, health, status, f_update)
 
         self.angular_pos = [0.0, None, None, None] # TODO change to 3 axis attitude
@@ -2394,13 +2397,13 @@ class ReactionWheelModule(ComponentModule):
             if isinstance(task, AttitudeManeuverTask):
                 acquire = await self.state_lock.acquire()
                 slew_torque = 4 * abs(np.deg2rad(task.new_angular_pos)-np.deg2rad(self.angular_pos[0]))*0.05 / pow(abs(5),2)
-                momentum = 0.1 # Nms, based on Blue Canyon RWP100
+                momentum = 0.09 # Nms, based on Blue Canyon RWP100
                 power_consumed = 1000 * slew_torque + 4.51 * pow(momentum,0.47) # from https://digitalcommons.usu.edu/cgi/viewcontent.cgi?article=1080&context=smallsat
                 self.log(f'{power_consumed} W of power consumed by attitude maneuver!',level=logging.INFO)
                 self.average_power_consumption = power_consumed
                 self.angular_pos = [task.new_angular_pos, None, None, None]
                 self.angular_vel = [task.new_angular_vel, None, None, None]
-                await self.sim_wait(5.0)
+                # await self.sim_wait(5.0) TODO not sure if blocking things is really the desired behavior
                 self.log(f'Attitude changed! New state: angular pos=[{self.angular_pos}], angular vel=[{self.angular_vel}]',level=logging.INFO)
 
                 self.state_lock.release()
@@ -2583,7 +2586,7 @@ class PowerSupplyComponent(ComponentModule):
                 maximum_power_output : float = 1e10,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         """
         Describes a generic power supply component within the EPS subsystem
 
@@ -2770,7 +2773,7 @@ class BatteryModule(PowerSupplyComponent):
                 depth_of_discharge: float = 1.0,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         """
         Describes a battery component in the EPS subsystem
 
@@ -2962,7 +2965,7 @@ class TransmitterComponent(ComponentModule):
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.OFF, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         """
         Describes a receiver transmitter capable of sending messages to other agents
 
@@ -3300,7 +3303,7 @@ class ReceiverComponent(ComponentModule):
                 buffer_capacity: float,
                 health: ComponentHealth = ComponentHealth.NOMINAL,
                 status: ComponentStatus = ComponentStatus.ON, 
-                f_update: float = 0.1) -> None:
+                f_update: float = 1) -> None:
         """
         Describes a radio receiver capable of sending messages to other agents
 
@@ -3362,9 +3365,9 @@ class ReceiverComponent(ComponentModule):
                     msg_dict = None
 
                     # listen for messages from other agents
-                    self.log('Waiting for agent messages...',level=logging.INFO)
+                    self.log('Waiting for agent messages...',level=logging.DEBUG)
                     msg_json = await parent_agent.agent_socket_in.recv_json()
-                    self.log(f'Agent message received!',level=logging.INFO)
+                    self.log(f'Agent message received!',level=logging.DEBUG)
                     blank = dict()
                     blank_json = json.dumps(blank)
                     await parent_agent.agent_socket_in.send_json(blank_json)

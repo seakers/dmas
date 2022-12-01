@@ -363,6 +363,7 @@ class OnboardProcessingModule(Module):
         self.meas_results = []
         self.data_processing_requests = []
         self.downlink_items = []
+        self.tss_count = 0 # TODO remove
 
     async def activate(self):
         await super().activate()
@@ -463,6 +464,8 @@ class OnboardProcessingModule(Module):
                     self.log(f'Sent message to transmitter!',level=logging.DEBUG)
 
                 if(instrument == "VIIRS" or instrument == "OLI"): # TODO replace this hardcoding
+                    self.tss_count+=1
+                    self.log(f'TSS count: {self.tss_count}',level=logging.INFO)
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_tss_obs_value(data)
                     self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"tss",raw_data_filename,processed_data)
@@ -481,10 +484,11 @@ class OnboardProcessingModule(Module):
                     downlink_item = {
                         "lat": lat,
                         "lon": lon,
+                        "time": metadata["time"],
                         "product_type": metadata["measuring_instrument"]
                     }
                     self.downlink_items.append(downlink_item)
-                    self.downlink_statistics()
+                    await self.downlink_statistics()
                 else:
                     self.log(f'Instrument not yet supported by science module!',level=logging.DEBUG)
                 # release database lock and inform other processes that the database has been updated
@@ -551,10 +555,12 @@ class OnboardProcessingModule(Module):
             datafile.write(json.dumps(data_product_dict))
         return sd
 
-    def downlink_statistics(self):
+    async def downlink_statistics(self):
         coobs_count = 0
         tss_coords = []
         alt_coords = []
+        tss_outlier_coords = []
+        alt_outlier_coords = []
         coobs_coords = []
         for potential_alt_item in self.downlink_items:
             already_counted = False
@@ -564,28 +570,42 @@ class OnboardProcessingModule(Module):
                         if potential_alt_item["lat"] == potential_tss_item["lat"] and potential_alt_item["lon"] == potential_tss_item["lon"] and not already_counted and self.check_altimetry_outlier(potential_tss_item):
                             coobs_count += 1
                             #self.log(f'Co-obs count: {coobs_count}',level=logging.INFO)
-                            coobs_coords.append((potential_alt_item["lat"],potential_alt_item["lon"]))
+                            coobs_coords.append((potential_alt_item["lat"],potential_alt_item["lon"],potential_alt_item["time"]))
                             already_counted = True
         for potential_alt_item in self.downlink_items:
-            if potential_alt_item["product_type"] == "POSEIDON-3B Altimeter" and self.check_altimetry_outlier(potential_alt_item):
-                alt_coords.append((potential_alt_item["lat"],potential_alt_item["lon"]))
+            if potential_alt_item["product_type"] == "POSEIDON-3B Altimeter":
+                alt_coords.append((potential_alt_item["lat"],potential_alt_item["lon"],potential_alt_item["time"]))
+                if self.check_altimetry_outlier(potential_alt_item):
+                    alt_outlier_coords.append((potential_alt_item["lat"],potential_alt_item["lon"],potential_alt_item["time"]))
         for potential_tss_item in self.downlink_items:
-            if potential_tss_item["product_type"] == "OLI" and self.check_altimetry_outlier(potential_tss_item):
-                tss_coords.append((potential_tss_item["lat"],potential_tss_item["lon"]))
+            if potential_tss_item["product_type"] == "OLI":
+                tss_coords.append((potential_tss_item["lat"],potential_tss_item["lon"],potential_tss_item["time"]))
+                if self.check_altimetry_outlier(potential_tss_item):
+                    tss_outlier_coords.append((potential_tss_item["lat"],potential_tss_item["lon"],potential_tss_item["time"]))
         if len(self.downlink_items) % 100 == 0:
             with open(self.parent_module.scenario_dir+'tss_obs.csv','w') as out:
                 csv_out=csv.writer(out)
-                csv_out.writerow(['lat','lon'])
+                csv_out.writerow(['lat','lon','time'])
                 for row in tss_coords:
                     csv_out.writerow(row)
             with open(self.parent_module.scenario_dir+'alt_obs.csv','w') as out:
                 csv_out=csv.writer(out)
-                csv_out.writerow(['lat','lon'])
+                csv_out.writerow(['lat','lon','time'])
                 for row in alt_coords:
                     csv_out.writerow(row)
-            with open(self.parent_module.scenario_dir+'coobs_obs.csv','w') as out:
+            with open(self.parent_module.scenario_dir+'tss_outliers.csv','w') as out:
                 csv_out=csv.writer(out)
-                csv_out.writerow(['lat','lon'])
+                csv_out.writerow(['lat','lon','time'])
+                for row in tss_outlier_coords:
+                    csv_out.writerow(row)
+            with open(self.parent_module.scenario_dir+'alt_outliers.csv','w') as out:
+                csv_out=csv.writer(out)
+                csv_out.writerow(['lat','lon','time'])
+                for row in alt_outlier_coords:
+                    csv_out.writerow(row)
+            with open(self.parent_module.scenario_dir+'coobs_outliers.csv','w') as out:
+                csv_out=csv.writer(out)
+                csv_out.writerow(['lat','lon','time'])
                 for row in coobs_coords:
                     csv_out.writerow(row)
 

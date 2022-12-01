@@ -264,12 +264,18 @@ class ObservationPlanningModule(Module):
                         obs.start = gp_access_list[0]['time index']
                         obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
-                        self.obs_candidates.append(obs)
+                        unique_location = True
+                        for obs_can in self.obs_candidates:
+                            if obs_can.target == obs.target:
+                                unique_location = False
+                        if unique_location:
+                            self.obs_candidates.append(obs)
                 old_obs_plan = self.obs_plan.copy()
                 if self.parent_module.mission_profile=="nadir":
                     self.obs_plan = self.nadir_planner(self.obs_candidates.copy())
                 else:
                     self.obs_plan = self.rule_based_planner(self.obs_candidates.copy())
+                    self.log(f'Length of new observation plan: {len(self.obs_plan)}',level=logging.INFO)
                 # schedule observation plan and send to operations planner for further development
                 if(self.obs_plan != old_obs_plan):
                     plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
@@ -435,7 +441,7 @@ class OperationsPlanningModule(Module):
                                 self.ops_plan.append(charge_task)
                             obs_task = plan[i]
                             if curr_time <= obs_task.start and self.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start):
-                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.INFO)
+                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.DEBUG)
                                 self.ops_plan.append(obs_task)
                                 #self.log(f'Adding maneuver task from {curr_angle} to {obs_task.angle} to operations plan!',level=logging.DEBUG)
                                 #maneuver_task = ManeuverPlannerTask(curr_angle,obs_task.angle,curr_time,obs_task.start+1)
@@ -484,7 +490,7 @@ class OperationsPlanningModule(Module):
                         if(task.start <= curr_time):
                             self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
                             self.log(f'Task metadata: {task.obs_info}',level=logging.DEBUG)
-                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [1], task.obs_info)
+                            obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [0.0], task.obs_info)
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
                             self.ops_plan.remove(task)
                             await self.send_internal_message(msg)
@@ -498,13 +504,15 @@ class OperationsPlanningModule(Module):
                             await self.send_internal_message(msg)
                     else:
                         self.log(f'Currently unsupported task type!')
-                await self.sim_wait(10.0)
+                await self.sim_wait(1.0)
         except asyncio.CancelledError:
             return
     
     def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
         if(abs(curr_angle-new_angle) < 15):
             return True
+        if(new_time==curr_time):
+            return False
         slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
         maxTorque = 4e-3
         return slewTorque < maxTorque
