@@ -1233,7 +1233,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/scenario1_agile/'
+    scenario_dir = './scenarios/scenario1_nadir/'
     dt = 4.6656879355937875
     # duration = 6048
     duration = 86400

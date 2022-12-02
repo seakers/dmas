@@ -19,6 +19,7 @@ from modules import *
 from science import ScienceModule
 from planning import PlanningModule
 from engineering import EngineeringModule
+from ground_engineering import GroundEngineeringModule
 from iridium_engineering import IridiumEngineeringModule
 from json import JSONEncoder
 
@@ -563,7 +564,7 @@ class GroundTestAgent(AgentClient):
         super().__init__(name, scenario_dir)
         self.submodules = [
                             ScienceModule(self,scenario_dir,False),
-                            EngineeringModule(self)
+                            GroundEngineeringModule(self)
                           ]
 
 """

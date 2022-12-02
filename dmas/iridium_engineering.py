@@ -130,7 +130,7 @@ class IridiumTransmitterComponent(ComponentModule):
                 self.log(f'Received an environment event of type {type(msg.content)}!')
                 self.environment_events.put(msg.content)
             elif isinstance(msg.content, InterNodeDownlinkMessage):
-                self.log(f'Received an internode downlink message!',level=logging.INFO)
+                self.log(f'Transmitting an internode downlink message!',level=logging.INFO)
                 agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
                 msg.content.dst = "Central Node"
                 task_msg = TransmitMessageTask(agent_port_dict["Central Node"],msg.content,1.0)
@@ -511,6 +511,10 @@ class IridiumReceiverComponent(ComponentModule):
                             await self.send_internal_message(ext_msg) # send measurement request to all other agents
                         elif msg_type is InterNodeMessageTypes.DOWNLINK:
                             msg : InterNodeDownlinkMessage = InterNodeDownlinkMessage.from_dict(msg_dict)
+                            data_msg = DataMessage.from_dict(json.loads(msg.content))
+                            lat, lon = data_msg.get_target()
+                            metadata = data_msg.get_metadata()
+                            self.log(f'Receiving result from ({lat}°, {lon}°) taken at time {metadata["time"]}!', level=logging.INFO)
                             ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, msg)
                             await self.send_internal_message(ext_msg) # send measurement request to all other agents
                         # elif msg_type is InterNodeMessageTypes.MEASUREMENT_MESSAGE:

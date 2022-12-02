@@ -458,7 +458,7 @@ class OnboardProcessingModule(Module):
                     metadata["measuring_instrument"] = instrument
                     msg.metadata = metadata
                     self.log(f'Message to be downlinked: {msg}',level=logging.DEBUG)
-                    downlink_message = InterNodeDownlinkMessage(self,"Iridium",msg)
+                    downlink_message = InterNodeDownlinkMessage(self,"Central Node",msg)
                     ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, downlink_message)
                     await self.send_internal_message(ext_msg)
                     self.log(f'Sent message to transmitter!',level=logging.DEBUG)
