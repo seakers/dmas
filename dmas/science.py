@@ -444,7 +444,7 @@ class OnboardProcessingModule(Module):
                 obs_str = msg.get_data()
                 lat, lon = msg.get_target()
                 metadata = msg.get_metadata()
-                self.log(f'Received measurement result from ({lat}°, {lon}°)!', level=logging.INFO)
+                self.log(f'Received measurement result from ({lat}°, {lon}°) taken at time {metadata["time"]}!', level=logging.INFO)
 
 
 
@@ -470,11 +470,27 @@ class OnboardProcessingModule(Module):
                     processed_data = self.compute_tss_obs_value(data)
                     self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"tss",raw_data_filename,processed_data)
                     self.log(f'TSS measurement data successfully saved in on-board data-base.', level=logging.DEBUG)
+                    self.updated.set()
+                    updated_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_REASONING.value, self.updated)
+                    await self.send_internal_message(updated_msg)
+                    for item in self.sd:
+                        if item["lat"] == lat and item["lon"] == lon and item["time"] == obs_process_time:
+                            item["metadata"] = msg.metadata
+                            value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
+                            await self.send_internal_message(value_msg)
                 elif(instrument == "POSEIDON-3B Altimeter"): # TODO replace this hardcoding
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_altimetry()
                     self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"altimetry",raw_data_filename,processed_data)
                     self.log(f'Altimetry measurement data successfully saved in on-board data-base.', level=logging.DEBUG)
+                    self.updated.set()
+                    updated_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_REASONING.value, self.updated)
+                    await self.send_internal_message(updated_msg)
+                    for item in self.sd:
+                        if item["lat"] == lat and item["lon"] == lon and item["time"] == obs_process_time:
+                            item["metadata"] = msg.metadata
+                            value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
+                            await self.send_internal_message(value_msg)
                 elif(instrument == "Ground Sensor"):
                     #data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time) TODO commenting this out to improve runtime
                     metadata = msg.get_metadata()
@@ -493,14 +509,7 @@ class OnboardProcessingModule(Module):
                     self.log(f'Instrument not yet supported by science module!',level=logging.DEBUG)
                 # release database lock and inform other processes that the database has been updated
                 self.database_lock.release()
-                self.updated.set()
-                updated_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_REASONING.value, self.updated)
-                await self.send_internal_message(updated_msg)
-                for item in self.sd:
-                    if item["lat"] == lat and item["lon"] == lon and item["time"] == obs_process_time:
-                        item["metadata"] = msg.metadata
-                        value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
-                        await self.send_internal_message(value_msg)
+
         except asyncio.CancelledError:
             return
 

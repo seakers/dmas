@@ -58,7 +58,7 @@ def centralnode_run(directory):
 
 if __name__ == '__main__':
     print('Initializing agents...')
-    directory = ["./scenarios/landsat_altimeters/"]
+    directory = ["./scenarios/scenario1_agile/"]
 
     n_agents = 3
     processes = []

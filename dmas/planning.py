@@ -15,14 +15,20 @@ class PlanningModule(Module):
         self.scenario_dir = scenario_dir
 
         parent_agent = self.get_top_module()
-        data = dict()
+        mission_profiles = dict()
+        preplans = dict()
         spacecraft_list = parent_agent.mission_dict.get('spacecraft')
         for spacecraft in spacecraft_list:
             name = spacecraft.get('name')
             # land coverage data metrics data
             mission_profile = spacecraft.get('missionProfile')
-            data[name] = mission_profile
-        self.mission_profile = data[parent_agent.name]
+            preplan = spacecraft.get('preplan')
+            mission_profiles[name] = mission_profile
+            preplans[name] = preplan
+            
+        self.mission_profile = mission_profiles[parent_agent.name]
+        self.preplan = preplans[parent_agent.name]
+
         
         self.submodules = [
             InstrumentCapabilityModule(self),
@@ -141,28 +147,25 @@ class ObservationPlanningModule(Module):
         await self.initialize_plan()
 
     async def initialize_plan(self):
-        if self.parent_module.mission_profile=="3D-CHESS" or self.parent_module.mission_profile=="agile":
+        if (self.parent_module.mission_profile=="3D-CHESS" and self.parent_module.preplan=="True") or self.parent_module.mission_profile=="agile":
             parent_agent = self.get_top_module()
             instrument = parent_agent.payload[parent_agent.name]["name"]
-            if instrument=="POSEIDON-3B Altimeter" or instrument=="OLI": #TODO fix hardcode
-                points = np.zeros(shape=(2000, 5))
-                with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
-                    reader = csv.reader(csvfile)
-                    count = 0
-                    for row in reader:
-                        if count == 0:
-                            count = 1
-                            continue
-                        points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
-                        count = count + 1
-                obs_list = []
-                for i in range(len(points[:, 0])):
-                    lat = points[i, 0]
-                    lon = points[i, 1]
-                    obs = ObservationPlannerTask(lat,lon,1.0,["OLI"],0.0,1.0) # TODO fix hardcode
-                    obs_list.append(obs)
-            else:
-                obs_list = []
+            points = np.zeros(shape=(2000, 5))
+            with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+                reader = csv.reader(csvfile)
+                count = 0
+                for row in reader:
+                    if count == 0:
+                        count = 1
+                        continue
+                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                    count = count + 1
+            obs_list = []
+            for i in range(len(points[:, 0])):
+                lat = points[i, 0]
+                lon = points[i, 1]
+                obs = ObservationPlannerTask(lat,lon,1.0,[instrument],0.0,1.0)
+                obs_list.append(obs)
         elif self.parent_module.mission_profile=="nadir":
             parent_agent = self.get_top_module()
             instrument = parent_agent.payload[parent_agent.name]["name"]
@@ -180,7 +183,7 @@ class ObservationPlanningModule(Module):
             for i in range(len(points[:, 0])):
                 lat = points[i, 0]
                 lon = points[i, 1]
-                obs = ObservationPlannerTask(lat,lon,1.0,["OLI"],0.0,1.0) # TODO fix hardcode
+                obs = ObservationPlannerTask(lat,lon,1.0,[instrument],0.0,1.0)
                 gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
                 gp_access_list = []
                 for _, row in gp_accesses.iterrows():
@@ -509,12 +512,12 @@ class OperationsPlanningModule(Module):
             return
     
     def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
-        if(abs(curr_angle-new_angle) < 15):
+        if(abs(curr_angle-new_angle) < 7.5):
             return True
         if(new_time==curr_time):
             return False
         slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
-        maxTorque = 4e-3
+        maxTorque = 4e-5
         return slewTorque < maxTorque
 
 class PredictiveModelsModule(Module):
