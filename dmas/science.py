@@ -621,7 +621,7 @@ class OnboardProcessingModule(Module):
     def check_altimetry_outlier(self,item):
         outlier = False
         flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-        if flood_chance > 0.90: # TODO remove this hardcode
+        if flood_chance > 0.50: # TODO remove this hardcode
             item["severity"] = flood_chance
             outlier = True
         return outlier
@@ -829,7 +829,7 @@ class ScienceReasoningModule(Module):
         outlier_data = None
         if(item["checked"] is False):
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.90: # TODO remove this hardcode
+            if flood_chance > 0.50: # TODO remove this hardcode
                 item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item

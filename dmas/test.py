@@ -1,4 +1,6 @@
 import asyncio
+import signal
+import sys
 from multiprocessing import Process
 
 from agent import ScienceTestAgent, IridiumTestAgent, GroundTestAgent
@@ -57,8 +59,10 @@ def centralnode_run(directory):
     asyncio.run(agent.live())
 
 if __name__ == '__main__':
+    #signal.signal(signal.SIGALRM,handler_function)
+    signal.alarm(3600*3)
     print('Initializing agents...')
-    directory = ["./scenarios/scenario1_nadir/"]
+    directory = ["./scenarios/scenario1_"+sys.argv[1]+"/"]
 
     n_agents = 3
     processes = []

@@ -1012,7 +1012,7 @@ class EnvironmentServer(NodeModule):
     
         # Assign ports to sockets
         ## Set up socket to broadcast information to agents
-        self.environment_port_number = '5561'
+        self.environment_port_number = sys.argv[2]
         if is_port_in_use(int(self.environment_port_number)):
             raise Exception(f"{self.environment_port_number} port already in use")
         self.publisher = self.context.socket(zmq.PUB)                   
@@ -1022,7 +1022,7 @@ class EnvironmentServer(NodeModule):
         self.publisher_queue = asyncio.Queue()
 
         ## Set up socket to receive synchronization and measurement requests from agents
-        self.request_port_number = '5562'
+        self.request_port_number = sys.argv[3]
         if is_port_in_use(int(self.request_port_number)):
             raise Exception(f"{self.request_port_number} port already in use")
         self.reqservice = self.context.socket(zmq.REP)
@@ -1233,7 +1233,7 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = './scenarios/scenario1_nadir/'
+    scenario_dir = "./scenarios/scenario1_"+sys.argv[1]+"/"
     dt = 4.6656879355937875
     # duration = 6048
     duration = 86400

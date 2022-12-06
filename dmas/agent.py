@@ -87,8 +87,8 @@ class AgentClient(NodeModule):
         super().__init__(name, scenario_dir, n_timed_coroutines=0)
                 
         # Network information
-        self.ENVIRONMENT_PORT_NUMBER =  env_port_number
-        self.REQUEST_PORT_NUMBER = env_request_port_number
+        self.ENVIRONMENT_PORT_NUMBER =  sys.argv[2]
+        self.REQUEST_PORT_NUMBER = sys.argv[3]
         self.AGENT_TO_PORT_MAP = None
         self.payload = load_payload(scenario_dir)
         self.mission_dict = load_mission_dict(scenario_dir)
