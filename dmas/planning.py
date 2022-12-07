@@ -166,6 +166,35 @@ class ObservationPlanningModule(Module):
                 lon = points[i, 1]
                 obs = ObservationPlannerTask(lat,lon,1.0,[instrument],0.0,1.0)
                 obs_list.append(obs)
+            for obs in obs_list:
+                    # estimate next observation opportunities
+                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
+                    #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
+                    gp_access_list = []
+                    for _, row in gp_accesses.iterrows():
+                        gp_access_list.append(row)
+                    #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
+                    if(len(gp_accesses) != 0):
+                        self.log(f'Adding observation candidate!',level=logging.DEBUG)
+                        obs.start = gp_access_list[0]['time index']
+                        obs.end = obs.start
+                        obs.angle = gp_access_list[0]['look angle [deg]']
+                        unique_location = True
+                        for obs_can in self.obs_candidates:
+                            if obs_can.target == obs.target:
+                                unique_location = False
+                        if unique_location:
+                            self.obs_candidates.append(obs)
+            old_obs_plan = self.obs_plan.copy()
+            if self.parent_module.mission_profile=="nadir":
+                self.obs_plan = self.nadir_planner(self.obs_candidates.copy())
+            else:
+                self.obs_plan = self.rule_based_planner(self.obs_candidates.copy())
+                self.log(f'Length of new observation plan: {len(self.obs_plan)}',level=logging.INFO)
+            # schedule observation plan and send to operations planner for further development
+            if(self.obs_plan != old_obs_plan):
+                plan_msg = InternalMessage(self.name, PlanningSubmoduleTypes.OPERATIONS_PLANNER.value, self.obs_plan)
+                await self.parent_module.send_internal_message(plan_msg)
         elif self.parent_module.mission_profile=="nadir":
             parent_agent = self.get_top_module()
             instrument = parent_agent.payload[parent_agent.name]["name"]
@@ -255,13 +284,15 @@ class ObservationPlanningModule(Module):
             while True:
                 # wait for observation request
                 obs_list = await self.obs_list.get()
+                #self.log(f'Length of obs list: {len(obs_list)}',level=logging.INFO)
                 for obs in obs_list:
                     # estimate next observation opportunities
                     gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
+                    #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
                         gp_access_list.append(row)
-                    #print(gp_accesses)
+                    #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
                         self.log(f'Adding observation candidate!',level=logging.DEBUG)
                         obs.start = gp_access_list[0]['time index']
@@ -274,6 +305,10 @@ class ObservationPlanningModule(Module):
                         if unique_location:
                             self.obs_candidates.append(obs)
                 old_obs_plan = self.obs_plan.copy()
+                curr_time = self.get_current_time()
+                for obs_can in self.obs_candidates:
+                    if(obs_can.start <= curr_time):
+                        self.obs_candidates.remove(obs_can)
                 if self.parent_module.mission_profile=="nadir":
                     self.obs_plan = self.nadir_planner(self.obs_candidates.copy())
                 else:
@@ -376,6 +411,7 @@ class OperationsPlanningModule(Module):
         """
         try:
             if(msg.src_module==PlanningSubmoduleTypes.OBSERVATION_PLANNER.value):
+                self.log(f'Received observation plan!',level=logging.INFO)
                 await self.obs_plan.put(msg.content)
             else:
                 self.log(f'Unsupported message type for this module.)')
@@ -435,24 +471,32 @@ class OperationsPlanningModule(Module):
                     self.log(f'List of starts: {starts}',level=logging.INFO)
                     if len(starts) != 0:
                         charge_task = ChargePlannerTask(plan_beginning,starts[0])
-                        self.ops_plan.append(charge_task)
+                        #self.ops_plan.append(charge_task)
                         curr_angle = 0
                         curr_time = plan_beginning
                         for i in range(len(starts)):
                             if(i+1 < len(starts)):
                                 charge_task = ChargePlannerTask(ends[i],starts[i+1])
-                                self.ops_plan.append(charge_task)
+                                #self.ops_plan.append(charge_task) TODO add back charge tasks
                             obs_task = plan[i]
-                            if curr_time <= obs_task.start and self.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start):
+                            feasible, moved = self.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start)
+                            if curr_time <= obs_task.start and feasible:
                                 self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.DEBUG)
-                                self.ops_plan.append(obs_task)
+                                unique = True
+                                for ops in self.ops_plan:
+                                    if(ops.start == obs_task.start and ops.target == obs_task.target):
+                                        unique = False
+                                if unique:
+                                    self.ops_plan.append(obs_task)
                                 #self.log(f'Adding maneuver task from {curr_angle} to {obs_task.angle} to operations plan!',level=logging.DEBUG)
                                 #maneuver_task = ManeuverPlannerTask(curr_angle,obs_task.angle,curr_time,obs_task.start+1)
                                 #self.ops_plan.append(maneuver_task)
                                 curr_time = obs_task.end
-                                curr_angle = obs_task.angle
+                                if moved:
+                                    curr_angle = obs_task.angle
                             else:
                                 self.log(f'Maneuver not feasible!',level=logging.DEBUG)
+                    #self.print_ops_plan()
                 elif self.parent_module.mission_profile=="nadir":
                     plan = await self.obs_plan.get()
                     self.log(f'Creating operations plan!',level=logging.INFO)
@@ -491,7 +535,8 @@ class OperationsPlanningModule(Module):
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
                         if(task.start <= curr_time):
-                            self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
+                            await self.sim_wait(5.0)
+                            self.log(f'Sending observation task to engineering module!',level=logging.INFO)
                             self.log(f'Task metadata: {task.obs_info}',level=logging.DEBUG)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [0.0], task.obs_info)
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
@@ -512,13 +557,21 @@ class OperationsPlanningModule(Module):
             return
     
     def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
+        moved = False
         if(abs(curr_angle-new_angle) < 7.5):
-            return True
+            return True, False
         if(new_time==curr_time):
-            return False
+            return False, False
         slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
-        maxTorque = 4e-5
-        return slewTorque < maxTorque
+        maxTorque = 4e-3
+        moved = True
+        return slewTorque < maxTorque, moved
+
+    def print_ops_plan(self):
+        for op in self.ops_plan:
+            if(isinstance(op,ObservationPlannerTask)):
+                self.log(f'Observation planned at {op.start} to observe {op.target}',level=logging.INFO)
+
 
 class PredictiveModelsModule(Module):
     def __init__(self, parent_module) -> None:

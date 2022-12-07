@@ -54,7 +54,7 @@
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
             "missionProfile" : "3D-CHESS",
-            "preplan": "False"
+            "preplan": "True"
         },
 
         {

@@ -454,14 +454,14 @@ class OnboardProcessingModule(Module):
                 parent_agent = self.get_top_module()
                 instrument = parent_agent.payload[parent_agent.name]["name"]
                 
-                if(instrument != "Ground Sensor"): # TODO change this hardcode
-                    metadata["measuring_instrument"] = instrument
-                    msg.metadata = metadata
-                    self.log(f'Message to be downlinked: {msg}',level=logging.DEBUG)
-                    downlink_message = InterNodeDownlinkMessage(self,"Central Node",msg)
-                    ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, downlink_message)
-                    await self.send_internal_message(ext_msg)
-                    self.log(f'Sent message to transmitter!',level=logging.DEBUG)
+                # if(instrument != "Ground Sensor"):
+                #     metadata["measuring_instrument"] = instrument
+                #     msg.metadata = metadata
+                #     self.log(f'Message to be downlinked: {msg}',level=logging.DEBUG)
+                #     downlink_message = InterNodeDownlinkMessage(self,"Central Node",msg)
+                #     ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, downlink_message)
+                #     await self.send_internal_message(ext_msg)
+                #     self.log(f'Sent message to transmitter!',level=logging.DEBUG)
 
                 if(instrument == "VIIRS" or instrument == "OLI"): # TODO replace this hardcoding
                     self.tss_count+=1
@@ -478,6 +478,15 @@ class OnboardProcessingModule(Module):
                             item["metadata"] = msg.metadata
                             value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
                             await self.send_internal_message(value_msg)
+                    metadata = msg.get_metadata()
+                    downlink_item = {
+                        "lat": lat,
+                        "lon": lon,
+                        "time": metadata["time"],
+                        #"product_type": metadata["measuring_instrument"]
+                    }
+                    self.downlink_items.append(downlink_item)
+                    await self.save_observations()
                 elif(instrument == "POSEIDON-3B Altimeter"): # TODO replace this hardcoding
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
                     processed_data = self.compute_altimetry()
@@ -491,20 +500,29 @@ class OnboardProcessingModule(Module):
                             item["metadata"] = msg.metadata
                             value_msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, item)
                             await self.send_internal_message(value_msg)
-                elif(instrument == "Ground Sensor"):
-                    #data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time) TODO commenting this out to improve runtime
                     metadata = msg.get_metadata()
-                    # prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
-                    # filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
-                    # self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,metadata["measuring_instrument"],filename,None)
                     downlink_item = {
                         "lat": lat,
                         "lon": lon,
                         "time": metadata["time"],
-                        "product_type": metadata["measuring_instrument"]
+                        #"product_type": metadata["measuring_instrument"] TODO add back for ground station
                     }
                     self.downlink_items.append(downlink_item)
-                    await self.downlink_statistics()
+                    await self.save_observations()
+                # elif(instrument == "Ground Sensor"):
+                #     #data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time) TODO commenting this out to improve runtime
+                #     metadata = msg.get_metadata()
+                #     # prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
+                #     # filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
+                #     # self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,metadata["measuring_instrument"],filename,None)
+                #     downlink_item = {
+                #         "lat": lat,
+                #         "lon": lon,
+                #         "time": metadata["time"],
+                #         "product_type": metadata["measuring_instrument"]
+                #     }
+                #     self.downlink_items.append(downlink_item)
+                #     await self.downlink_statistics()
                 else:
                     self.log(f'Instrument not yet supported by science module!',level=logging.DEBUG)
                 # release database lock and inform other processes that the database has been updated
@@ -617,6 +635,27 @@ class OnboardProcessingModule(Module):
                 csv_out.writerow(['lat','lon','time'])
                 for row in coobs_coords:
                     csv_out.writerow(row)
+
+    async def save_observations(self):
+        all_coords = []
+        outlier_coords = []
+        parent_agent = self.get_top_module()
+        sat_name = parent_agent.name
+        for potential_outlier in self.downlink_items:
+            if self.check_altimetry_outlier(potential_outlier):
+                outlier_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
+        for item in self.downlink_items:
+            all_coords.append((item["lat"],item["lon"],item["time"]))
+        with open(self.parent_module.scenario_dir+sat_name+'_outliers.csv','w') as out:
+            csv_out=csv.writer(out)
+            csv_out.writerow(['lat','lon','time'])
+            for row in outlier_coords:
+                csv_out.writerow(row)
+        with open(self.parent_module.scenario_dir+sat_name+'_all.csv','w') as out:
+            csv_out=csv.writer(out)
+            csv_out.writerow(['lat','lon','time'])
+            for row in all_coords:
+                csv_out.writerow(row)
 
     def check_altimetry_outlier(self,item):
         outlier = False
