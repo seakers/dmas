@@ -563,7 +563,7 @@ class OperationsPlanningModule(Module):
         if(new_time==curr_time):
             return False, False
         slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
-        maxTorque = 4e-3
+        maxTorque = 4e-5
         moved = True
         return slewTorque < maxTorque, moved
 
