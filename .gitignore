@@ -22,3 +22,7 @@ orbitpy/*
 *.pyc
 scenarios/sim_test/imagery/*
 scenarios/sim_test/imagery
+cesium_app/
+czml_templates/
+dmaspy.czml
+plot2D.gif

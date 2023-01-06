@@ -28,7 +28,10 @@ class ScienceModule(Module):
             # land coverage data metrics data
             mission_profile = spacecraft.get('missionProfile')
             data[name] = mission_profile
-        self.mission_profile = data[parent_agent.name]
+        if parent_agent.name == "Central Node":
+            self.mission_profile = None
+        else:
+            self.mission_profile = data[parent_agent.name]
         self.chl_points = np.zeros(shape=(2000, 6))
         with open(self.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
             reader = csv.reader(csvfile)
