@@ -6,35 +6,44 @@ SEAK Lab - Texas A&M University
 
 ## Linux and Mac Install
 
-### Automatic Install
-UNDER DEVELOPMENT
-```
- python setup.py install
-```
 
 ### Manual Install
-`{ENVORINMENT_NAME}`: user-defined environment name (`.env` directory name recommended)
 
-Create and activate conda virtual environment
+  
+
+Install [miniconda](https://docs.conda.io/en/latest/miniconda.html).
+
+  
+
 ```
-conda create -p ./{ENVORINMENT_NAME} python=3.10
-conda activate ./{ENVORINMENT_NAME}
+
+conda create -p ./.venv
+
+conda activate ./.venv
+
 conda install pip
+
+pip install -r requirements.txt
+
 ```
 
-Install dependencies
-```
-./{ENVORINMENT_NAME}/bin/pip install -r requirements.txt
-```
-Set your IDE's interpreter as `./.env/bin/python3.10`
+Install [InstruPy](github.com/EarthObservationSimulator/instrupy) in DMASpy folder.
 
-OPTIONAL: rename terminal prompt
-```
-conda config --set env_prompt '({ENVORINMENT_NAME})'
-```
+Install [OrbitPy](github.com/EarthObservationSimulator/orbitpy) in DMASpy folder.
 
-# DEV ONLY
-If new libraries are added to the project, add them to the `requirements.txt` file
-```
-pip freeze > requirements.txt
-```
+### Running 3D-CHESS Scenarios
+
+Run dmas/environment.py as follows: `python dmas/environment.py nadir 5561 5562` where `nadir` is your desired scenario and `5561 5562` are the ports for message broadcasts.
+
+Run dmas/test.py as follows: `python dmas/test.py nadir 5561 5562`  in a separate Ubuntu terminal, after activating the conda environment.
+
+### Neo4J Instructions (not strictly necessary, but without this the knowledge graph queries will fail)
+
+Download [Neo4j Desktop](https://neo4j.com/download/).
+
+Start a local DBMS, with password "ceosdb".
+
+Set up github.com/seakers/historical_db. Switch to "ben" branch. Run scraper following directions.
+
+Set up github.com/CREATE-knowledge-planning. Run measurement_type_rule.py. (Email Ben for updated measurement_type_rule.py script).
+

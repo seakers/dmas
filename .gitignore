@@ -26,3 +26,7 @@ cesium_app/
 czml_templates/
 dmaspy.czml
 plot2D.gif
+utils/images/*
+!utils/images/.gitkeep
+utils/usgs_data/*
+!utils/usgs_data/.gitkeep
