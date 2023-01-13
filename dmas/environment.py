@@ -870,7 +870,7 @@ class EnvironmentServer(NodeModule):
                     self.log(f'Received observation sense message from {observation_sense_msg.src} to ({lat}°, {lon}°) at simulation time t={t_curr}!')
                     
 
-                    # with open(self.scenario_dir+"sample_landsat_image.png", "rb") as image_file:
+                    # with open(self.scenario_dir+"resources/sample_landsat_image.png", "rb") as image_file:
                     #     encoded_string = base64.b64encode(image_file.read())
                     # observation_sense_msg.obs = encoded_string.decode('utf-8')
                     observation_sense_msg.obs = "xd"

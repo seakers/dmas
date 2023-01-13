@@ -32,15 +32,25 @@ class ScienceModule(Module):
             self.mission_profile = None
         else:
             self.mission_profile = data[parent_agent.name]
-        self.chl_points = np.zeros(shape=(2000, 6))
-        with open(self.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+        # self.chl_points = np.zeros(shape=(2000, 6))
+        # with open(self.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
+        #     reader = csv.reader(csvfile)
+        #     count = 0
+        #     for row in reader:
+        #         if count == 0:
+        #             count = 1
+        #             continue
+        #         self.chl_points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
+        #         count = count + 1
+        self.chl_points = np.zeros(shape=(1000, 4))
+        with open(self.scenario_dir+'resources/riverATLAS.csv') as csvfile:
             reader = csv.reader(csvfile)
             count = 0
             for row in reader:
                 if count == 0:
                     count = 1
                     continue
-                self.chl_points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
+                self.chl_points[count-1,:] = [row[0], row[1], row[2], row[3]]
                 count = count + 1
 
         data_products = self.load_data_products()        
@@ -247,6 +257,9 @@ class ScienceValueModule(Module):
             return
 
     def compute_science_value(self, lat, lon, obs):
+        """
+        Computes science value of a particular observation. Currently 10 for outliers, 1 for anything else.
+        """
         self.log(f'Computing science value...', level=logging.DEBUG)
         outlier = False
 
@@ -261,6 +274,9 @@ class ScienceValueModule(Module):
         return science_val*self.meas_perf(), outlier
 
     def get_pop(self, lat, lon, points):
+        """
+        Gets population from CSV data (originally from hydroATLAS)
+        """
         pop = 0.0
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
@@ -269,16 +285,22 @@ class ScienceValueModule(Module):
         return pop
 
     def get_flood_chance(self, lat, lon, points):
+        """
+        Gets flood chance from CSV data.
+        """
         flood_chance = None
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 5]
+                flood_chance = points[i, 3] # change this back to 5 for chlorophyll_baseline.csv
                 lat = points[i, 0]
                 lon = points[i, 1]
                 break
         return flood_chance, lat, lon
 
     def get_data_product(self, lat, lon, product_type):
+        """
+        Gets data product from science database based on latitude, longitude and product type. TODO add time as a parameter.
+        """
         exists = False
         for item in self.sd:
             if item["lat"] == lat and item["lon"] == lon and item["product_type"]==product_type:
@@ -293,6 +315,9 @@ class ScienceValueModule(Module):
 
 
     def check_tss_outlier(self,item):
+        """
+        Checks TSS data for outliers. Currently hardcoded. TODO use real data source.
+        """
         outlier = False
         mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], self.parent_module.chl_points)
         if mean > 30000: # TODO remove this hardcode
@@ -304,11 +329,14 @@ class ScienceValueModule(Module):
         return outlier
 
     def check_altimetry_outlier(self,item):
+        """
+        Checks altimetry data for outliers. Currently hardcoded. TODO use real data source.
+        """
         outlier = False
         outlier_data = None
         if(item["checked"] is False):
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.95: # TODO remove this hardcode
+            if flood_chance > 0.50: # TODO remove this hardcode
                 item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item
@@ -319,6 +347,9 @@ class ScienceValueModule(Module):
         return outlier, outlier_data
 
     def get_mean_sd(self, lat, lon, points):
+        """
+        Computes mean and standard deviation from CSV data.
+        """
         mean = None
         sd = None
         for i in range(len(points[:, 0])):
@@ -331,6 +362,10 @@ class ScienceValueModule(Module):
         return mean, sd, lat, lon
 
     def meas_perf(self):
+        """
+        Evaluates the measurement performance based on the parameters of the satellite and payload.
+        """
+        # Coefficients taken from Molly Stroud's work
         a = 8.94e-5
         b = 1.45e-3
         c = 0.164
@@ -424,6 +459,9 @@ class OnboardProcessingModule(Module):
                         await coroutine
 
     async def process_meas_results(self):
+        """
+        This function gets measurement results in the form of DataMessages from the engineering module and saves them in the onboard database
+        """
         try:
             while True:
                 # for i in range(len(self.meas_results)):
@@ -526,6 +564,10 @@ class OnboardProcessingModule(Module):
             return
 
     def store_raw_measurement(self,dataprod,lat,lon,obs_process_time):
+        """
+        This function stores the raw data from a DataMessage prior to any preprocessing.
+        It stores the raw message as a CSV identified by the lat, lon and time of the observation.
+        """
         # #im = PIL.Image.open(BytesIO(base64.b64decode(dataprod))) TODO uncomment
         
 
@@ -549,17 +591,29 @@ class OnboardProcessingModule(Module):
         return data, filename
 
     def compute_chlorophyll_obs_value(self,b4,b5):
+        """
+        Computes chlorophyll concentration using the 2BDA algorithm.
+        """
         bda = b5 - b5/b4 + b4
         return bda
 
     def compute_tss_obs_value(self,b4):
+        """
+        Computes TSS from the paper that Molly sent me TODO add reference
+        """
         tss = 195.6 * b4
         return tss
 
     def compute_altimetry(self):
+        """
+        Generates random altimetry data until we have an altimetry data source.
+        """
         return np.random.rand(100,100)
 
     def add_data_product(self,sd,lat,lon,time,product_type,filename,data):
+        """
+        This function adds a data product to the science database (sd) and generates a .txt header file to represent the data product.
+        """
         data_product_dict = dict()
         data_product_dict["lat"] = lat
         data_product_dict["lon"] = lon
@@ -577,6 +631,9 @@ class OnboardProcessingModule(Module):
         return sd
 
     async def save_observations(self):
+        """
+        This function saves the lat/lon/time of all observations and all outlier observations for analysis.
+        """
         all_coords = []
         outlier_coords = []
         parent_agent = self.get_top_module()
@@ -598,18 +655,24 @@ class OnboardProcessingModule(Module):
                 csv_out.writerow(row)
 
     def check_altimetry_outlier(self,item):
+        """
+        Checks an altimetry measurement for outliers. Currently hardcoded. TODO use actual flood thresholding
+        """
         outlier = False
         flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-        if flood_chance > 0.90: # TODO remove this hardcode
+        if flood_chance > 0.50: # TODO remove this hardcode
             item["severity"] = flood_chance
             outlier = True
         return outlier
 
     def get_flood_chance(self, lat, lon, points):
+        """
+        Gets the flood chance from the csv file
+        """
         flood_chance = 0.0
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 5]
+                flood_chance = points[i, 3] # change back to 5 for chlorophyll_baseline TODO
                 lat = points[i, 0]
                 lon = points[i, 1]
                 break
@@ -743,6 +806,9 @@ class ScienceReasoningModule(Module):
                         await coroutine
 
     def get_mean_sd(self, lat, lon, points):
+        """
+        Gets the mean and standard deviation from the CSV data
+        """
         mean = None
         sd = None
         for i in range(len(points[:, 0])):
@@ -755,16 +821,22 @@ class ScienceReasoningModule(Module):
         return mean, sd, lat, lon
 
     def get_flood_chance(self, lat, lon, points):
+        """
+        Gets the flood chance from the csv file
+        """
         flood_chance = 0.0
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 5]
+                flood_chance = points[i, 3] # change back to 5 for chlorophyll_baseline.csv TODO
                 lat = points[i, 0]
                 lon = points[i, 1]
                 break
         return flood_chance, lat, lon
 
     async def check_sd(self):
+        """
+        Checks the science database for the presence of outliers. Currently Scenario 1 only checks altimetry data for outliers.
+        """
         try:
             while True:
                 msg = await self.updated_queue.get()
@@ -789,6 +861,9 @@ class ScienceReasoningModule(Module):
             return
     
     def check_tss_outliers(self,item):
+        """
+        Checks the TSS data for outliers. Currently based on GEE script that pulled historical chlorophyll data.
+        """
         outlier = False
         outlier_data = None
         if(item["checked"] is False):
@@ -804,11 +879,14 @@ class ScienceReasoningModule(Module):
         return outlier, outlier_data
 
     def check_altimetry_outliers(self,item):
+        """
+        Checks altimetry data for outliers. Currently hardcoded. TODO update to use actual data source.
+        """
         outlier = False
         outlier_data = None
         if(item["checked"] is False):
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.90: # TODO remove this hardcode
+            if flood_chance > 0.50: # TODO remove this hardcode
                 item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item
@@ -819,6 +897,9 @@ class ScienceReasoningModule(Module):
         return outlier, outlier_data
 
     def get_pixel_value_from_image(self,image, lat, lon, resolution):
+        """
+            Checks the image for the value of a specific pixel given by lat/lon inputs. Currently hardcoded for 30m landsat imagery.
+        """
         topleftlat = image["lat"]
         topleftlon = image["lon"]
         latdiff = lat-topleftlat

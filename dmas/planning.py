@@ -87,11 +87,14 @@ class InstrumentCapabilityModule(Module):
             return
 
     def queryGraphDatabase(self, uri, user, password, instrument,event_msg):
+        """
+        Sends message to neo4j database with query included.
+        """
         try:
             capable = False
             self.log(f'Querying knowledge graph...', level=logging.INFO)
             driver = GraphDatabase.driver(uri, auth=(user, password))
-            capable = self.print_observers(driver,instrument,event_msg)
+            capable = self.can_observe(driver,instrument,event_msg)
             driver.close()
             return capable
         except Exception as e:
@@ -100,7 +103,10 @@ class InstrumentCapabilityModule(Module):
             return False
         
 
-    def print_observers(self,driver,instrument,event_msg):
+    def can_observe(self,driver,instrument,event_msg):
+        """
+        Checks if the onboard instrument can observe the desired product.
+        """
         capable = False
         with driver.session() as session:
             product = "None"
@@ -122,6 +128,9 @@ class InstrumentCapabilityModule(Module):
 
     @staticmethod
     def get_observers(tx, title): # (1)
+        """
+        Generates expression to query the KG.
+        """
         result = tx.run("""
             MATCH (p:Sensor)-[r:OBSERVES]->(:ObservableProperty {name: $title})
             RETURN p
@@ -147,18 +156,31 @@ class ObservationPlanningModule(Module):
         await self.initialize_plan()
 
     async def initialize_plan(self):
+        """
+        Creates an initial plan for missions with preplanning included.
+        """
         if (self.parent_module.mission_profile=="3D-CHESS" and self.parent_module.preplan=="True") or self.parent_module.mission_profile=="agile":
             parent_agent = self.get_top_module()
             instrument = parent_agent.payload[parent_agent.name]["name"]
-            points = np.zeros(shape=(2000, 5))
-            with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+            # points = np.zeros(shape=(2000, 5))
+            # with open(self.parent_module.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
+            #     reader = csv.reader(csvfile)
+            #     count = 0
+            #     for row in reader:
+            #         if count == 0:
+            #             count = 1
+            #             continue
+            #         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+            #         count = count + 1
+            points = np.zeros(shape=(1000, 4))
+            with open(self.parent_module.scenario_dir+'resources/riverATLAS.csv') as csvfile:
                 reader = csv.reader(csvfile)
                 count = 0
                 for row in reader:
                     if count == 0:
                         count = 1
                         continue
-                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                    points[count-1,:] = [row[0], row[1], row[2], row[3]]
                     count = count + 1
             obs_list = []
             for i in range(len(points[:, 0])):
@@ -198,15 +220,25 @@ class ObservationPlanningModule(Module):
         elif self.parent_module.mission_profile=="nadir":
             parent_agent = self.get_top_module()
             instrument = parent_agent.payload[parent_agent.name]["name"]
-            points = np.zeros(shape=(2000, 5))
-            with open(self.parent_module.scenario_dir+'chlorophyll_baseline.csv') as csvfile:
+            # points = np.zeros(shape=(2000, 5))
+            # with open(self.parent_module.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
+            #     reader = csv.reader(csvfile)
+            #     count = 0
+            #     for row in reader:
+            #         if count == 0:
+            #             count = 1
+            #             continue
+            #         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+            #         count = count + 1
+            points = np.zeros(shape=(1000, 4))
+            with open(self.parent_module.scenario_dir+'resources/riverATLAS.csv') as csvfile:
                 reader = csv.reader(csvfile)
                 count = 0
                 for row in reader:
                     if count == 0:
                         count = 1
                         continue
-                    points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
+                    points[count-1,:] = [row[0], row[1], row[2], row[3]]
                     count = count + 1
             obs_list = []
             for i in range(len(points[:, 0])):
@@ -280,6 +312,9 @@ class ObservationPlanningModule(Module):
 
 
     async def create_plan(self):
+        """
+        Creates observation plan. Provides list of all future observation candidates to the planners.
+        """
         try:
             while True:
                 # wait for observation request
@@ -323,6 +358,9 @@ class ObservationPlanningModule(Module):
             return
 
     def rule_based_planner(self,obs_list):
+        """
+        Based on the "greedy planner" from Lemaitre et al. Incorporates reward information and future options to decide observation plan.
+        """
         rule_based_plan = []
         estimated_reward = 100000.0
         more_actions = True
@@ -348,6 +386,9 @@ class ObservationPlanningModule(Module):
         return rule_based_plan
 
     def nadir_planner(self,obs_list):
+        """
+        Adds all observable points to observation plan.
+        """
         nadir_plan = []
         more_actions = True
         curr_time = 0.0
@@ -377,6 +418,9 @@ class ObservationPlanningModule(Module):
 
 
     def meas_perf(self):
+        """
+        Evaluates measurement performance based on Molly's work TODO add citation/ref
+        """
         a = 8.9e-5
         b = 1.4e-3
         c = 6.1e-3
@@ -456,6 +500,9 @@ class OperationsPlanningModule(Module):
 
 
     async def create_ops_plan(self):
+        """
+        Converts the observation plan into an operations plan by adding charging and maneuvering. Also checks for observation feasibility in both maneuver agility and time.
+        """
         try:
             while True:
                 # Replace with basic module that adds charging to plan
@@ -524,6 +571,9 @@ class OperationsPlanningModule(Module):
             return
     
     async def execute_ops_plan(self):
+        """
+        Takes the ops plan and sends messages to other modules based on the ops plan. For example, sends observation tasks to the engineering module.
+        """
         try:
             while True:
                 # Replace with basic module that adds charging to plan
@@ -557,17 +607,25 @@ class OperationsPlanningModule(Module):
             return
     
     def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
+        """
+        Checks to see if the specified angle change violates the maximum slew rate constraint.
+        """
         moved = False
         if(abs(curr_angle-new_angle) < 7.5):
             return True, False
         if(new_time==curr_time):
             return False, False
-        slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
-        maxTorque = 4e-3
+        slew_rate = abs(new_angle-curr_angle)/abs(new_time-curr_time)
+        max_slew_rate = 1.0 # deg / s
+        #slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
+        #maxTorque = 4e-3
         moved = True
-        return slewTorque < maxTorque, moved
+        return slew_rate < max_slew_rate, moved
 
     def print_ops_plan(self):
+        """
+        Prints the operations plan.
+        """
         for op in self.ops_plan:
             if(isinstance(op,ObservationPlannerTask)):
                 self.log(f'Observation planned at {op.start} to observe {op.target}',level=logging.INFO)
