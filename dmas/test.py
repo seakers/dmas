@@ -62,7 +62,7 @@ if __name__ == '__main__':
     #signal.signal(signal.SIGALRM,handler_function)
     signal.alarm(3600*3)
     print('Initializing agents...')
-    directory = ["./scenarios/scenario1_"+sys.argv[1]+"/"]
+    directory = ["./scenarios/scenario1"+sys.argv[1]+"/"]
 
     n_agents = 3
     processes = []

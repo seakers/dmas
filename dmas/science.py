@@ -204,7 +204,7 @@ class ScienceValueModule(Module):
 
     async def request_handler(self):
         try:
-            while True and self.parent_module.notifier == "True" :
+            while True:
                 msg : DataMessage = await self.request_msg_queue.get()
                 lat = msg.content["lat"]
                 lon = msg.content["lon"]
@@ -218,9 +218,10 @@ class ScienceValueModule(Module):
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                await self.send_internal_message(req_msg)
-                await self.send_internal_message(ext_msg)
-                self.log(f'Sent message to transmitter!',level=logging.DEBUG)
+                if self.parent_module.notifier == "True":
+                    await self.send_internal_message(req_msg)
+                    await self.send_internal_message(ext_msg)
+                    self.log(f'Sent message to transmitter!',level=logging.DEBUG)
 
         except asyncio.CancelledError:
             return
@@ -743,14 +744,21 @@ class SciencePredictiveModelModule(Module):
                         await coroutine
 
     async def send_meas_req(self):
-        if not self.requests_sent:
-            forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'ForecastWarnings-all.csv', delimiter=',')
-            for row in forecast_data:
-                measurement_request = MeasurementRequest(["tss","altimetry"], row[2], row[3], 1.0, {})
-                ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                await self.send_internal_message(ext_msg)
-                self.log(f'Sent message from predictive model!',level=logging.INFO)
-        self.requests_sent = True
+        try:
+            while True:
+                if not self.requests_sent:
+                    forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'resources/ForecastWarnings-all.csv', delimiter=',')
+                    for row in forecast_data:
+                        measurement_request = MeasurementRequest(["tss","altimetry"], row[2], row[3], 1.0, {})
+                        ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                        await self.send_internal_message(ext_msg)
+                        self.log(f'Sent message from predictive model!',level=logging.INFO)
+                    self.requests_sent = True
+                    await self.sim_wait(1e6)
+                else:
+                    await self.sim_wait(1e6)
+        except asyncio.CancelledError:
+            return
 
 class ScienceReasoningModule(Module):
     def __init__(self, parent_module, sd) -> None:

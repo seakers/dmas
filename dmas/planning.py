@@ -109,20 +109,24 @@ class InstrumentCapabilityModule(Module):
         """
         capable = False
         with driver.session() as session:
-            product = "None"
+            products = ["None"]
             if "tss" in event_msg.content._type:
-                product = "Ocean chlorophyll concentration"
-            elif "altimetry" in event_msg.content._type:
-                product = "Sea level"
-            else:
+                products.append("Ocean chlorophyll concentration")
+            if "altimetry" in event_msg.content._type:
+                products.append("Sea level")
+            if len(products) == 0:
                 self.log(f'Unsupported observable type.',level=logging.INFO)
-            observers = session.read_transaction(self.get_observers, title=product)
-            for observer in observers:
-                if(observer.get("name") == instrument):
-                    self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
-                    capable = True
+            for product in products:
+                #self.log(f'Product: {product}',level=logging.INFO)
+                observers = session.read_transaction(self.get_observers, title=product)
+                for observer in observers:
+                    #self.log(f'Observer: {observer.get("name")}',level=logging.INFO)
+                    #self.log(f'Instrument: {instrument}',level=logging.INFO)
+                    if(observer.get("name") == instrument):
+                        self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
+                        capable = True
             if capable is False:
-                self.log(f'The instruments onboard cannot observe the requested observable.',level=logging.INFO)
+                self.log(f'The instruments onboard cannot observe the requested observables.',level=logging.INFO)
         return capable
 
 
