@@ -110,9 +110,9 @@ class InstrumentCapabilityModule(Module):
         capable = False
         with driver.session() as session:
             product = "None"
-            if(event_msg.content._type == "tss"):
+            if "tss" in event_msg.content._type:
                 product = "Ocean chlorophyll concentration"
-            elif(event_msg.content._type == "altimetry"):
+            elif "altimetry" in event_msg.content._type:
                 product = "Sea level"
             else:
                 self.log(f'Unsupported observable type.',level=logging.INFO)
@@ -268,7 +268,8 @@ class ObservationPlanningModule(Module):
             if isinstance(msg.content, MeasurementRequest):
                 if self.parent_module.mission_profile=="3D-CHESS":
                     meas_req = msg.content
-                    new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,["OLI"],0.0,1.0,meas_req.metadata)
+                    parent_agent = self.get_top_module()
+                    new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,parent_agent.payload[parent_agent.name],0.0,1.0,meas_req.metadata)
                     new_obs_list = []
                     new_obs_list.append(new_obs)
                     await self.obs_list.put(new_obs_list)

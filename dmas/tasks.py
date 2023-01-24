@@ -11,6 +11,7 @@ COMPONENT TASKS
 """
 import json
 from utils import *
+from typing import List
 
 
 class ComponentTask:
@@ -627,7 +628,7 @@ class Request:
         self._type = req_type
 
 class MeasurementRequest(Request):
-    def __init__(self, measurement_type : type, target_lat : float, target_lon: float, science_val: float = 0, metadata : dict = {}) -> None:
+    def __init__(self, measurement_type : List[str], target_lat : float, target_lon: float, science_val: float = 0, metadata : dict = {}) -> None:
         super().__init__(measurement_type)
         self._target = (target_lat, target_lon)
         self._science_val = science_val
