@@ -1,0 +1,778 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tasks &#8212; 3D-CHESS 0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for tasks</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">MODULE TASKS</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">COMPONENT TASKS</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="o">*</span>
+
+
+<div class="viewcode-block" id="ComponentTask"><a class="viewcode-back" href="../tasks.html#tasks.ComponentTask">[docs]</a><span class="k">class</span> <span class="nc">ComponentTask</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name</span> <span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract component task class meant to communicate a task to be performed by a specific component</span>
+
+<span class="sd">        component:</span>
+<span class="sd">            Name of component to perform the task</span>
+<span class="sd">        name:</span>
+<span class="sd">            Name of the task to be performed</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">component</span> <span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">component</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+
+<div class="viewcode-block" id="ComponentTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ComponentTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;@type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;ComponentTask&#39;</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;component&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">component</span>
+
+        <span class="k">return</span> <span class="n">out</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="ComponentAbortTask"><a class="viewcode-back" href="../tasks.html#tasks.ComponentAbortTask">[docs]</a><span class="k">class</span> <span class="nc">ComponentAbortTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">target_task</span> <span class="p">:</span> <span class="n">ComponentTask</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Informs a component to abort a task that is currently being performed or is scheduled to be performed</span>
+<span class="sd">        </span>
+<span class="sd">        component:</span>
+<span class="sd">            Name of component to perform the abort command</span>
+<span class="sd">        target_task:</span>
+<span class="sd">            Task to be aborted</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="s1">&#39;ComponentAbortTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_task</span> <span class="o">=</span> <span class="n">target_task</span>
+    
+<div class="viewcode-block" id="ComponentAbortTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ComponentAbortTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_task&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_task</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="ComponentMaintenanceTask"><a class="viewcode-back" href="../tasks.html#tasks.ComponentMaintenanceTask">[docs]</a><span class="k">class</span> <span class="nc">ComponentMaintenanceTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name</span> <span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract component task representing maintenance tasks to be performed to the component. </span>
+<span class="sd">        Includes tasks that regulate a component&#39;s status, health, or power-supply.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ComponentActuationTask"><a class="viewcode-back" href="../tasks.html#tasks.ComponentActuationTask">[docs]</a><span class="k">class</span> <span class="nc">ComponentActuationTask</span><span class="p">(</span><span class="n">ComponentMaintenanceTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">actuation_status</span><span class="p">:</span> <span class="n">ComponentStatus</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tasks a specific component to actuate on or off</span>
+
+<span class="sd">        component:</span>
+<span class="sd">            Name of component to be actuated</span>
+<span class="sd">        actuation_status:</span>
+<span class="sd">            Status of the component actuation to be set by this task</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="s1">&#39;ComponentActuationTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actuation_status</span> <span class="p">:</span> <span class="n">ComponentStatus</span> <span class="o">=</span> <span class="n">actuation_status</span>
+
+<div class="viewcode-block" id="ComponentActuationTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ComponentActuationTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;actuation_status&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">actuation_status</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="DisableComponentTask"><a class="viewcode-back" href="../tasks.html#tasks.DisableComponentTask">[docs]</a><span class="k">class</span> <span class="nc">DisableComponentTask</span><span class="p">(</span><span class="n">ComponentActuationTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Turns OFF a component</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="n">ComponentStatus</span><span class="o">.</span><span class="n">OFF</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="EnableComponentTask"><a class="viewcode-back" href="../tasks.html#tasks.EnableComponentTask">[docs]</a><span class="k">class</span> <span class="nc">EnableComponentTask</span><span class="p">(</span><span class="n">ComponentActuationTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Turns ON a component</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="n">ComponentStatus</span><span class="o">.</span><span class="n">ON</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ReceivePowerTask"><a class="viewcode-back" href="../tasks.html#tasks.ReceivePowerTask">[docs]</a><span class="k">class</span> <span class="nc">ReceivePowerTask</span><span class="p">(</span><span class="n">ComponentMaintenanceTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">power_to_receive</span> <span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tells a specific component that it is receiving some amount of power from the EPS</span>
+
+<span class="sd">        component:</span>
+<span class="sd">            name of component to supply power</span>
+<span class="sd">        power_to_receive:</span>
+<span class="sd">            amout of power received in [W]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="s1">&#39;ReceivePowerTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">power_to_receive</span> <span class="o">=</span> <span class="n">power_to_receive</span>
+
+<div class="viewcode-block" id="ReceivePowerTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ReceivePowerTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;power_to_receive&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">power_to_receive</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="StopReceivingPowerTask"><a class="viewcode-back" href="../tasks.html#tasks.StopReceivingPowerTask">[docs]</a><span class="k">class</span> <span class="nc">StopReceivingPowerTask</span><span class="p">(</span><span class="n">ReceivePowerTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">power_supplied</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tells a specific component that it is no longer receiving some amount of power from the EPS</span>
+
+<span class="sd">        component:</span>
+<span class="sd">            name of component to supply power</span>
+<span class="sd">        power_supplied:</span>
+<span class="sd">            amout of power being taken away in [W]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="o">-</span><span class="n">power_supplied</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ProvidePowerTask"><a class="viewcode-back" href="../tasks.html#tasks.ProvidePowerTask">[docs]</a><span class="k">class</span> <span class="nc">ProvidePowerTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eps_component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">power_to_supply</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target</span> <span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tasks a component from the EPS subsystem to provide power to another component</span>
+
+<span class="sd">        eps_component:</span>
+<span class="sd">            name of eps component to provide power</span>
+<span class="sd">        power_to_supply:</span>
+<span class="sd">            amout of power to be supplied in [W]</span>
+<span class="sd">        target:</span>
+<span class="sd">            name of component to be supplied with power</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">eps_component</span><span class="p">,</span> <span class="s1">&#39;ProvidePowerTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">power_to_supply</span> <span class="o">=</span> <span class="n">power_to_supply</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">target</span>
+
+<div class="viewcode-block" id="ProvidePowerTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ProvidePowerTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;power_to_supply&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">power_to_supply</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="StopProvidingPowerTask"><a class="viewcode-back" href="../tasks.html#tasks.StopProvidingPowerTask">[docs]</a><span class="k">class</span> <span class="nc">StopProvidingPowerTask</span><span class="p">(</span><span class="n">ProvidePowerTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">eps_component</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">power_to_stop</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tasks a component from the EPS subsystem to stop providing power to another component</span>
+
+<span class="sd">        eps_component:</span>
+<span class="sd">            name of eps component to provide power</span>
+<span class="sd">        power_to_stop:</span>
+<span class="sd">            amout of power to no longer be supplied in [W]</span>
+<span class="sd">        target:</span>
+<span class="sd">            name of component to be deprived of power</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">eps_component</span><span class="p">,</span> <span class="o">-</span><span class="n">power_to_stop</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SaveToMemoryTask"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask">[docs]</a><span class="k">class</span> <span class="nc">SaveToMemoryTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_lat</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">data</span> <span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">metadata</span> <span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Instructs component to save observation data in internal memory </span>
+
+<span class="sd">        target_lat:</span>
+<span class="sd">            lattitude of the target in [°]</span>
+<span class="sd">        target_lon:</span>
+<span class="sd">            longitude of the target in [°]</span>
+<span class="sd">        data:        </span>
+<span class="sd">            data to be saved</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">ONBOARD_COMPUTER</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;SaveToMemoryTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_target</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span>
+
+<div class="viewcode-block" id="SaveToMemoryTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_target_lat</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_target_lon</span><span class="p">()</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div>
+
+<div class="viewcode-block" id="SaveToMemoryTask.get_data"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask.get_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span></div>
+
+<div class="viewcode-block" id="SaveToMemoryTask.get_metadata"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask.get_metadata">[docs]</a>    <span class="k">def</span> <span class="nf">get_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span></div>
+
+<div class="viewcode-block" id="SaveToMemoryTask.get_target"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask.get_target">[docs]</a>    <span class="k">def</span> <span class="nf">get_target</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_target</span></div>
+
+<div class="viewcode-block" id="SaveToMemoryTask.get_target_lat"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask.get_target_lat">[docs]</a>    <span class="k">def</span> <span class="nf">get_target_lat</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">lat</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_target</span>
+        <span class="k">return</span> <span class="n">lat</span></div>
+
+<div class="viewcode-block" id="SaveToMemoryTask.get_target_lon"><a class="viewcode-back" href="../tasks.html#tasks.SaveToMemoryTask.get_target_lon">[docs]</a>    <span class="k">def</span> <span class="nf">get_target_lon</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_target</span>
+        <span class="k">return</span> <span class="n">lon</span></div></div>
+
+<div class="viewcode-block" id="DeleteFromMemoryTask"><a class="viewcode-back" href="../tasks.html#tasks.DeleteFromMemoryTask">[docs]</a><span class="k">class</span> <span class="nc">DeleteFromMemoryTask</span><span class="p">(</span><span class="n">SaveToMemoryTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_lat</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">data</span> <span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Instructs component to delete data from internal memory </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">ONBOARD_COMPUTER</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span></div>
+        
+<div class="viewcode-block" id="MeasurementTask"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementTask">[docs]</a><span class="k">class</span> <span class="nc">MeasurementTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">instrument_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">duration</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lat</span> <span class="p">:</span><span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">attitude_state</span> <span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">obs_metadata</span> <span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Instructs an instrument to perform a measurement.</span>
+
+<span class="sd">        instrument_name:</span>
+<span class="sd">            name of instrument to perform measurement</span>
+<span class="sd">        duration:</span>
+<span class="sd">            duration of measurement in [s]</span>
+<span class="sd">        target_lat:</span>
+<span class="sd">            latitude of target in [°]</span>
+<span class="sd">        target_lon:</span>
+<span class="sd">            longitude of target in [°]</span>
+<span class="sd">        attitude_state:</span>
+<span class="sd">            current attitude of the agent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">instrument_name</span><span class="p">,</span> <span class="s1">&#39;MeasurementTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">duration</span> <span class="o">=</span> <span class="n">duration</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="p">[</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attitude_state</span> <span class="o">=</span> <span class="n">attitude_state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">obs_metadata</span> <span class="o">=</span> <span class="n">obs_metadata</span>
+
+<div class="viewcode-block" id="MeasurementTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span>
+
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;duration&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">duration</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lat</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lon</span>
+
+        <span class="c1"># TODO Include str of attitude state</span>
+        <span class="c1"># out[&#39;attitude_state&#39;] = self.attitude_state</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="ControlSignalTask"><a class="viewcode-back" href="../tasks.html#tasks.ControlSignalTask">[docs]</a><span class="k">class</span> <span class="nc">ControlSignalTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">,</span> <span class="n">control_signal</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gives a control signal to an atittude actuator to perform a maneuver.</span>
+
+<span class="sd">        component:</span>
+<span class="sd">            target component performing the maneuver</span>
+<span class="sd">        control_signal:</span>
+<span class="sd">            value of the step control signal being given to the actuator. Must be a value within [0, 1]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">component</span><span class="p">,</span> <span class="s1">&#39;ControlSignalTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">control_signal</span> <span class="o">=</span> <span class="n">control_signal</span>
+
+        <span class="k">if</span> <span class="n">control_signal</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="n">control_signal</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Control signal must be a value between [0, 1]!&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ControlSignalTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ControlSignalTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;control_signal&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">control_signal</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="AccelerationUpdateTask"><a class="viewcode-back" href="../tasks.html#tasks.AccelerationUpdateTask">[docs]</a><span class="k">class</span> <span class="nc">AccelerationUpdateTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">actuator_name</span> <span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">angular_acceleration</span> <span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Informs IMU that a component is excerting some angular acceleration vector onto the spacecraft</span>
+
+<span class="sd">        actuator_name:</span>
+<span class="sd">            name of component exerting the angular acceleration vector in question</span>
+<span class="sd">        angular_acceleration:</span>
+<span class="sd">            angular acceleration being excerted on the spacecraft in [rad/s^2] in the body-fixed frame</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">IMU</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;AccelerationUpdateTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">actuator_name</span> <span class="o">=</span> <span class="n">actuator_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_acceleration</span> <span class="o">=</span> <span class="n">angular_acceleration</span>
+
+<div class="viewcode-block" id="AccelerationUpdateTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.AccelerationUpdateTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;actuator_name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">actuator_name</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;angular_acceleration&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angular_acceleration</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="AttitudeUpdateTask"><a class="viewcode-back" href="../tasks.html#tasks.AttitudeUpdateTask">[docs]</a><span class="k">class</span> <span class="nc">AttitudeUpdateTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_angular_pos</span><span class="p">,</span> <span class="n">new_angular_vel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Manually updates the attitude in an IMU</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">IMU</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;AttitudeUpdateTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_pos</span> <span class="o">=</span> <span class="n">new_angular_pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_vel</span> <span class="o">=</span> <span class="n">new_angular_vel</span>
+
+<div class="viewcode-block" id="AttitudeUpdateTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.AttitudeUpdateTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;new_angular_pos&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_pos</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;new_angular_vel&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_vel</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="AttitudeManeuverTask"><a class="viewcode-back" href="../tasks.html#tasks.AttitudeManeuverTask">[docs]</a><span class="k">class</span> <span class="nc">AttitudeManeuverTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maneuver_time</span><span class="p">,</span> <span class="n">new_angular_pos</span><span class="p">,</span> <span class="n">new_angular_vel</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Manually updates the attitude in an IMU</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">REACTION_WHEELS</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;AttitudeManeuverTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_pos</span> <span class="o">=</span> <span class="n">new_angular_pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_vel</span> <span class="o">=</span> <span class="n">new_angular_vel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maneuver_time</span> <span class="o">=</span> <span class="n">maneuver_time</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__str__</span><span class="p">()</span> <span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;new_angular_pos&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_pos</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;new_angular_vel&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_angular_vel</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">out</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TransmitMessageTask"><a class="viewcode-back" href="../tasks.html#tasks.TransmitMessageTask">[docs]</a><span class="k">class</span> <span class="nc">TransmitMessageTask</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_agent</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="n">timeout</span> <span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Instructs the transmitter component to send a message to another agent</span>
+<span class="sd">        </span>
+<span class="sd">        target_agent:</span>
+<span class="sd">            target agent to receive the message</span>
+<span class="sd">        msg:</span>
+<span class="sd">            message being transmitted</span>
+<span class="sd">        timeout:</span>
+<span class="sd">            transmission timeout in [s]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">TRANSMITTER</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;TransmitMessageTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_agent</span> <span class="o">=</span> <span class="n">target_agent</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span>
+
+<div class="viewcode-block" id="TransmitMessageTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.TransmitMessageTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_agent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_agent</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;msg&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;timeout&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="ReceiveMessageTransmission"><a class="viewcode-back" href="../tasks.html#tasks.ReceiveMessageTransmission">[docs]</a><span class="k">class</span> <span class="nc">ReceiveMessageTransmission</span><span class="p">(</span><span class="n">ComponentTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Instructs comms receiver to be open for message transmission reception </span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ComponentNames</span><span class="o">.</span><span class="n">RECEIVER</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;ReceiveMessageTransmission&#39;</span><span class="p">)</span></div>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">SUBSYSTEM TASKS</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="SubsystemTask"><a class="viewcode-back" href="../tasks.html#tasks.SubsystemTask">[docs]</a><span class="k">class</span> <span class="nc">SubsystemTask</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subsystem</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract subsystem task class meant to communicate a task to be performed by a particular subsystem</span>
+
+<span class="sd">        subsystem:</span>
+<span class="sd">            Name of subsystem to perform the task</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">subsystem</span> <span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">subsystem</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">name</span>
+
+<div class="viewcode-block" id="SubsystemTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.SubsystemTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;@type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;SubsystemTask&#39;</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;subsystem&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">subsystem</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="SubsystemAbortTask"><a class="viewcode-back" href="../tasks.html#tasks.SubsystemAbortTask">[docs]</a><span class="k">class</span> <span class="nc">SubsystemAbortTask</span><span class="p">(</span><span class="n">SubsystemTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">subsystem</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">target_task</span> <span class="p">:</span> <span class="n">SubsystemTask</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Informs a subsystem that it must abort a task that is currently being performed or is scheduled to be performed</span>
+<span class="sd">        </span>
+<span class="sd">        subsystem:</span>
+<span class="sd">            Name of the subsystem to perform the abort command</span>
+<span class="sd">        target_task:</span>
+<span class="sd">            Task to be aborted</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">subsystem</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_task</span> <span class="o">=</span> <span class="n">target_task</span>
+
+<div class="viewcode-block" id="SubsystemAbortTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.SubsystemAbortTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_task&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">target_task</span><span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="PowerSupplyRequestTask"><a class="viewcode-back" href="../tasks.html#tasks.PowerSupplyRequestTask">[docs]</a><span class="k">class</span> <span class="nc">PowerSupplyRequestTask</span><span class="p">(</span><span class="n">SubsystemTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span> <span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">power_requested</span> <span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tasks the EPS to provide power to a specific component</span>
+
+<span class="sd">        target:</span>
+<span class="sd">            name of the component to be powered</span>
+<span class="sd">        power_requested:</span>
+<span class="sd">            amount of power being requested in [W]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">SubsystemNames</span><span class="o">.</span><span class="n">EPS</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;PowerSupplyRequestTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="n">target</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">power_requested</span> <span class="o">=</span> <span class="n">power_requested</span>
+
+<div class="viewcode-block" id="PowerSupplyRequestTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.PowerSupplyRequestTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;power_requested&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">power_requested</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="PowerSupplyStopRequestTask"><a class="viewcode-back" href="../tasks.html#tasks.PowerSupplyStopRequestTask">[docs]</a><span class="k">class</span> <span class="nc">PowerSupplyStopRequestTask</span><span class="p">(</span><span class="n">PowerSupplyRequestTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">power_supplied</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tasks the EPS to stop providing power to a specific component</span>
+
+<span class="sd">        target:</span>
+<span class="sd">            name of the component to be powered</span>
+<span class="sd">        power_supplied:</span>
+<span class="sd">            amount of power being to no longer be provided to the component in [W]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="o">-</span><span class="n">power_supplied</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PerformAttitudeManeuverTask"><a class="viewcode-back" href="../tasks.html#tasks.PerformAttitudeManeuverTask">[docs]</a><span class="k">class</span> <span class="nc">PerformAttitudeManeuverTask</span><span class="p">(</span><span class="n">SubsystemTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">maneuver_time</span><span class="p">,</span> <span class="n">target_angular_pos</span> <span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">target_angular_vel</span> <span class="o">=</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Tasks the ADCS to perform an attitude maneouver</span>
+
+<span class="sd">        target_angular_pos:</span>
+<span class="sd">            quaternion vector describing the target attitude of the agent</span>
+<span class="sd">        target_angular_pos:</span>
+<span class="sd">            quaternion vector describing the target angular velocity of the agent</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">SubsystemNames</span><span class="o">.</span><span class="n">ADCS</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;PerformAttitudeManeuverTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_angular_pos</span> <span class="o">=</span> <span class="n">target_angular_pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_angular_vel</span> <span class="o">=</span> <span class="n">target_angular_vel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maneuver_time</span> <span class="o">=</span> <span class="n">maneuver_time</span>
+
+<div class="viewcode-block" id="PerformAttitudeManeuverTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.PerformAttitudeManeuverTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_angular_pos&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_angular_pos</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_angular_vel&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_angular_vel</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="PerformMeasurement"><a class="viewcode-back" href="../tasks.html#tasks.PerformMeasurement">[docs]</a><span class="k">class</span> <span class="nc">PerformMeasurement</span><span class="p">(</span><span class="n">SubsystemTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_lat</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">instruments</span> <span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">durations</span> <span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">metadata</span> <span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Instructs the payload subsystem to perform a measurement of a target lat-lon with </span>
+<span class="sd">        a given list of instruments for a given set of durations</span>
+<span class="sd">    </span>
+<span class="sd">        target_lat:</span>
+<span class="sd">            target latitude in [°]</span>
+<span class="sd">        target_lon:</span>
+<span class="sd">            target longitude in [°]</span>
+<span class="sd">        instruments:</span>
+<span class="sd">            list of instruments to perform the measurement at the same time</span>
+<span class="sd">        duration:</span>
+<span class="sd">            list of duration of each instrument measurement</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">SubsystemNames</span><span class="o">.</span><span class="n">PAYLOAD</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s1">&#39;PerformMeasurementTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">instruments</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">instrument</span> <span class="ow">in</span> <span class="n">instruments</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">instruments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instrument</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">durations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">duration</span> <span class="ow">in</span> <span class="n">durations</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">durations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">duration</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PerformMeasurement.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.PerformMeasurement.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span>
+
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lat</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lon</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;instruments&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">instruments</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;durations&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">durations</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;metadata&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">PLATOFRM TASK</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="PlatformTask"><a class="viewcode-back" href="../tasks.html#tasks.PlatformTask">[docs]</a><span class="k">class</span> <span class="nc">PlatformTask</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span> <span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract platform task class meant to communicate a task to be performed by the agent&#39;s platform</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+
+<div class="viewcode-block" id="PlatformTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.PlatformTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;@type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;PlatformTask&#39;</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="PlatformAbortTask"><a class="viewcode-back" href="../tasks.html#tasks.PlatformAbortTask">[docs]</a><span class="k">class</span> <span class="nc">PlatformAbortTask</span><span class="p">(</span><span class="n">PlatformTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_task</span> <span class="p">:</span> <span class="n">PlatformTask</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Informs a subsystem that it must abort a platform-level task that is currently being performed or is scheduled to be performed</span>
+<span class="sd">        </span>
+<span class="sd">        target_task:</span>
+<span class="sd">            Task to be aborted</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;PlatformAbortTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_task</span> <span class="o">=</span> <span class="n">target_task</span>
+
+<div class="viewcode-block" id="PlatformAbortTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.PlatformAbortTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_task&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_task</span> <span class="p">)</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="ObservationTask"><a class="viewcode-back" href="../tasks.html#tasks.ObservationTask">[docs]</a><span class="k">class</span> <span class="nc">ObservationTask</span><span class="p">(</span><span class="n">PlatformTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_lan</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">instrument_list</span> <span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">durations</span> <span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">obs_info</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;ObservationTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_lan</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">obs_info</span> <span class="o">=</span> <span class="n">obs_info</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">instrument_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">instrument</span> <span class="ow">in</span> <span class="n">instrument_list</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">instrument_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instrument</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">durations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">duration</span> <span class="ow">in</span> <span class="n">durations</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">durations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">duration</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ObservationTask.get_target"><a class="viewcode-back" href="../tasks.html#tasks.ObservationTask.get_target">[docs]</a>    <span class="k">def</span> <span class="nf">get_target</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span></div>
+
+<div class="viewcode-block" id="ObservationTask.get_obs_info"><a class="viewcode-back" href="../tasks.html#tasks.ObservationTask.get_obs_info">[docs]</a>    <span class="k">def</span> <span class="nf">get_obs_info</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">obs_info</span></div>
+
+<div class="viewcode-block" id="ObservationTask.to_dict"><a class="viewcode-back" href="../tasks.html#tasks.ObservationTask.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span>
+
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lat</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;target_lon&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lon</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;instruments&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">instrument_list</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;durations&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">durations</span>
+        <span class="n">out</span><span class="p">[</span><span class="s1">&#39;obs_info&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">obs_info</span>
+        
+        <span class="k">return</span> <span class="n">out</span></div></div>
+
+<div class="viewcode-block" id="ManeuverTask"><a class="viewcode-back" href="../tasks.html#tasks.ManeuverTask">[docs]</a><span class="k">class</span> <span class="nc">ManeuverTask</span><span class="p">(</span><span class="n">PlatformTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">maneuver_task</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s1">&#39;ManeuverTask&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">maneuver_task</span> <span class="o">=</span> <span class="n">maneuver_task</span></div>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">PLANNER TASK</span>
+<span class="sd">-------------------------------</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="PlannerTask"><a class="viewcode-back" href="../tasks.html#tasks.PlannerTask">[docs]</a><span class="k">class</span> <span class="nc">PlannerTask</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract platform task class meant to communicate from observations planner to operations planner</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span></div>
+
+<div class="viewcode-block" id="ObservationPlannerTask"><a class="viewcode-back" href="../tasks.html#tasks.ObservationPlannerTask">[docs]</a><span class="k">class</span> <span class="nc">ObservationPlannerTask</span><span class="p">(</span><span class="n">PlannerTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_lat</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">science_val</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">instrument_list</span> <span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">end</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">obs_info</span> <span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">science_val</span> <span class="o">=</span> <span class="n">science_val</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">instrument_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">instrument</span> <span class="ow">in</span> <span class="n">instrument_list</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">instrument_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instrument</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">obs_info</span> <span class="o">=</span> <span class="n">obs_info</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">start</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="n">end</span>
+
+<div class="viewcode-block" id="ObservationPlannerTask.get_target"><a class="viewcode-back" href="../tasks.html#tasks.ObservationPlannerTask.get_target">[docs]</a>    <span class="k">def</span> <span class="nf">get_target</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span></div></div>
+
+<div class="viewcode-block" id="ChargePlannerTask"><a class="viewcode-back" href="../tasks.html#tasks.ChargePlannerTask">[docs]</a><span class="k">class</span> <span class="nc">ChargePlannerTask</span><span class="p">(</span><span class="n">PlannerTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">end</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">start</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="n">end</span></div>
+
+<div class="viewcode-block" id="ManeuverPlannerTask"><a class="viewcode-back" href="../tasks.html#tasks.ManeuverPlannerTask">[docs]</a><span class="k">class</span> <span class="nc">ManeuverPlannerTask</span><span class="p">(</span><span class="n">PlannerTask</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start_angle</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">end_angle</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">start</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">end</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">start_angle</span> <span class="o">=</span> <span class="n">start_angle</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end_angle</span> <span class="o">=</span> <span class="n">end_angle</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="o">=</span> <span class="n">start</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="o">=</span> <span class="n">end</span></div>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="sd">MODULE REQUESTS</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Request"><a class="viewcode-back" href="../tasks.html#tasks.Request">[docs]</a><span class="k">class</span> <span class="nc">Request</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">req_type</span> <span class="p">:</span> <span class="nb">type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">=</span> <span class="n">req_type</span></div>
+
+<div class="viewcode-block" id="MeasurementRequest"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementRequest">[docs]</a><span class="k">class</span> <span class="nc">MeasurementRequest</span><span class="p">(</span><span class="n">Request</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">measurement_type</span> <span class="p">:</span> <span class="nb">type</span><span class="p">,</span> <span class="n">target_lat</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">science_val</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">metadata</span> <span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{})</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">measurement_type</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_target</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_science_val</span> <span class="o">=</span> <span class="n">science_val</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">metadata</span> <span class="o">=</span> <span class="n">metadata</span>
+
+<div class="viewcode-block" id="MeasurementRequest.get_measurement_type"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementRequest.get_measurement_type">[docs]</a>    <span class="k">def</span> <span class="nf">get_measurement_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span></div>
+
+<div class="viewcode-block" id="MeasurementRequest.get_target"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementRequest.get_target">[docs]</a>    <span class="k">def</span> <span class="nf">get_target</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_target</span></div>
+
+<div class="viewcode-block" id="MeasurementRequest.set_science_val"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementRequest.set_science_val">[docs]</a>    <span class="k">def</span> <span class="nf">set_science_val</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">science_val</span> <span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_science_val</span> <span class="o">=</span> <span class="n">science_val</span></div>
+
+<div class="viewcode-block" id="MeasurementRequest.get_science_val"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementRequest.get_science_val">[docs]</a>    <span class="k">def</span> <span class="nf">get_science_val</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_science_val</span></div>
+    
+<div class="viewcode-block" id="MeasurementRequest.to_json"><a class="viewcode-back" href="../tasks.html#tasks.MeasurementRequest.to_json">[docs]</a>    <span class="k">def</span> <span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="k">lambda</span> <span class="n">o</span><span class="p">:</span><span class="n">o</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span></div></div>
+
+<div class="viewcode-block" id="InformationRequest"><a class="viewcode-back" href="../tasks.html#tasks.InformationRequest">[docs]</a><span class="k">class</span> <span class="nc">InformationRequest</span><span class="p">(</span><span class="n">Request</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_type</span> <span class="p">:</span> <span class="nb">type</span><span class="p">,</span> <span class="n">target_lat</span> <span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">data_type</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_target</span> <span class="o">=</span> <span class="p">(</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">)</span>
+
+<div class="viewcode-block" id="InformationRequest.get_data_type"><a class="viewcode-back" href="../tasks.html#tasks.InformationRequest.get_data_type">[docs]</a>    <span class="k">def</span> <span class="nf">get_data_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span></div>
+
+<div class="viewcode-block" id="InformationRequest.get_target"><a class="viewcode-back" href="../tasks.html#tasks.InformationRequest.get_target">[docs]</a>    <span class="k">def</span> <span class="nf">get_target</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_target</span></div></div>
+
+<div class="viewcode-block" id="DataProcessingRequest"><a class="viewcode-back" href="../tasks.html#tasks.DataProcessingRequest">[docs]</a><span class="k">class</span> <span class="nc">DataProcessingRequest</span><span class="p">(</span><span class="n">Request</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">,</span> <span class="n">target_lat</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">data</span> <span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">data_type</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_target</span> <span class="o">=</span> <span class="p">[</span><span class="n">target_lat</span><span class="p">,</span> <span class="n">target_lon</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">data</span>
+
+<div class="viewcode-block" id="DataProcessingRequest.get_data_type"><a class="viewcode-back" href="../tasks.html#tasks.DataProcessingRequest.get_data_type">[docs]</a>    <span class="k">def</span> <span class="nf">get_data_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span></div>
+
+<div class="viewcode-block" id="DataProcessingRequest.get_target"><a class="viewcode-back" href="../tasks.html#tasks.DataProcessingRequest.get_target">[docs]</a>    <span class="k">def</span> <span class="nf">get_target</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_target</span></div>
+
+<div class="viewcode-block" id="DataProcessingRequest.get_data"><a class="viewcode-back" href="../tasks.html#tasks.DataProcessingRequest.get_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_data</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">3D-CHESS</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">dmas</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Alan Aguilar Jaramillo, Ben Gorr.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.2.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

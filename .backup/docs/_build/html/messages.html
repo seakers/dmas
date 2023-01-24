@@ -1,0 +1,1162 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>messages module &#8212; 3D-CHESS 0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="node module" href="node.html" />
+    <link rel="prev" title="iridium_engineering module" href="iridium_engineering.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-messages">
+<span id="messages-module"></span><h1>messages module<a class="headerlink" href="#module-messages" title="Permalink to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.AccessSenseMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">AccessSenseMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#messages.NodeToEnvironmentMessageTypes" title="messages.NodeToEnvironmentMessageTypes"><span class="pre">NodeToEnvironmentMessageTypes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AccessSenseMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AccessSenseMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AccessSenseMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AccessSenseMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AccessSenseMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Access Sense Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AccessSenseMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AccessSenseMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AccessSenseMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AccessSenseMessage.set_result">
+<span class="sig-name descname"><span class="pre">set_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AccessSenseMessage.set_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AccessSenseMessage.set_result" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AccessSenseMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#AccessSenseMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AccessSenseMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AccessSenseMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AccessSenseMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AccessSenseMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.AgentAccessEventBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">AgentAccessEventBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rise</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessEventBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessEventBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EventBroadcastMessage" title="messages.EventBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentAccessEventBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessEventBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessEventBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of an access Event Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentAccessEventBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessEventBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessEventBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentAccessEventBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#AgentAccessEventBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessEventBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentAccessEventBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessEventBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessEventBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.AgentAccessSenseMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">AgentAccessSenseMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessSenseMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessSenseMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.AccessSenseMessage" title="messages.AccessSenseMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">AccessSenseMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentAccessSenseMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessSenseMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessSenseMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Agent Access Sense Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentAccessSenseMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentAccessSenseMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentAccessSenseMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.AgentEndConfirmationMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">AgentEndConfirmationMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentEndConfirmationMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentEndConfirmationMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentEndConfirmationMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentEndConfirmationMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentEndConfirmationMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Agent End Confirmation Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentEndConfirmationMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentEndConfirmationMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentEndConfirmationMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.AgentSenseMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">AgentSenseMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">internal_state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[None,</span> <span class="pre">None,</span> <span class="pre">None]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[None,</span> <span class="pre">None,</span> <span class="pre">None]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eclipse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentSenseMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentSenseMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentSenseMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentSenseMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentSenseMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Access Sense Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentSenseMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentSenseMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentSenseMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentSenseMessage.set_result">
+<span class="sig-name descname"><span class="pre">set_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pos</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eclipse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#AgentSenseMessage.set_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentSenseMessage.set_result" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.AgentSenseMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#AgentSenseMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.AgentSenseMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.ComponentStateMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">ComponentStateMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentStateMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentStateMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentStateMessage.get_state">
+<span class="sig-name descname"><span class="pre">get_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentStateMessage.get_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentStateMessage.get_state" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentStateMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentStateMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentStateMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.ComponentTaskCompletionMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">ComponentTaskCompletionMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="tasks.html#tasks.ComponentTask" title="tasks.ComponentTask"><span class="pre">ComponentTask</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="utils.html#utils.TaskStatus" title="utils.TaskStatus"><span class="pre">TaskStatus</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentTaskCompletionMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskCompletionMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentTaskCompletionMessage.get_task">
+<span class="sig-name descname"><span class="pre">get_task</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="tasks.html#tasks.ComponentTask" title="tasks.ComponentTask"><span class="pre">ComponentTask</span></a></span></span><a class="reference internal" href="_modules/messages.html#ComponentTaskCompletionMessage.get_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskCompletionMessage.get_task" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentTaskCompletionMessage.get_task_status">
+<span class="sig-name descname"><span class="pre">get_task_status</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="utils.html#utils.TaskStatus" title="utils.TaskStatus"><span class="pre">TaskStatus</span></a></span></span><a class="reference internal" href="_modules/messages.html#ComponentTaskCompletionMessage.get_task_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskCompletionMessage.get_task_status" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentTaskCompletionMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentTaskCompletionMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskCompletionMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.ComponentTaskMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">ComponentTaskMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="tasks.html#tasks.ComponentTask" title="tasks.ComponentTask"><span class="pre">ComponentTask</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentTaskMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentTaskMessage.get_task">
+<span class="sig-name descname"><span class="pre">get_task</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="tasks.html#tasks.ComponentTask" title="tasks.ComponentTask"><span class="pre">ComponentTask</span></a></span></span><a class="reference internal" href="_modules/messages.html#ComponentTaskMessage.get_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskMessage.get_task" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ComponentTaskMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ComponentTaskMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ComponentTaskMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.DataDeletedMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">DataDeletedMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_lon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataDeletedMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataDeletedMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.DataMessage" title="messages.DataMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataMessage</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.DataMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">DataMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_lon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'DataMessage'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.get_data">
+<span class="sig-name descname"><span class="pre">get_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.get_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.get_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.get_metadata">
+<span class="sig-name descname"><span class="pre">get_metadata</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.get_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.get_metadata" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.get_target">
+<span class="sig-name descname"><span class="pre">get_target</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.get_target"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.get_target" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.get_target_lat">
+<span class="sig-name descname"><span class="pre">get_target_lat</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.get_target_lat"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.get_target_lat" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.get_target_lon">
+<span class="sig-name descname"><span class="pre">get_target_lon</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.get_target_lon"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.get_target_lon" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.DataMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#DataMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.DataMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.EclipseEventBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">EclipseEventBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rise</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EclipseEventBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EclipseEventBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EventBroadcastMessage" title="messages.EventBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EclipseEventBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EclipseEventBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EclipseEventBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of an access Event Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EclipseEventBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EclipseEventBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EclipseEventBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EclipseEventBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EclipseEventBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EclipseEventBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">EnvironmentBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#messages.EnvironmentBroadcastMessageTypes" title="messages.EnvironmentBroadcastMessageTypes"><span class="pre">EnvironmentBroadcastMessageTypes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'all'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EnvironmentBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EnvironmentBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.SimulationMessage" title="messages.SimulationMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">SimulationMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EnvironmentBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EnvironmentBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EnvironmentBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EnvironmentBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#EnvironmentBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EnvironmentBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EnvironmentBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EnvironmentBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">EnvironmentBroadcastMessageTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EnvironmentBroadcastMessageTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<dl class="simple">
+<dt>Types of broadcasts sent from the environemnt to all agents.</dt><dd><p>1- tic: informs all agents of environment server’s current time
+2- eclipse_event: informs agents that an agent has entered eclipse. agents must ignore transmission if they are not the agent affected by the event
+3- gp_access_event: informs an agent that it can access or can no longer access a ground point. agents must ignore transmission if they are not the agent affected by the event
+4- gs_access_event: informs an agent that it can access or can no longer access a ground station. agents must ignore transmission if they are not the agent affected by the event
+5- agent_access_event: informs an agent that it can access or can no longer access another agent. agents must ignore transmission if they are not the agent affected by the event
+6- sim_start: notifies all agents that the simulation has started
+7- sim_end: notifies all agents that the simulation has ended</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.AGENT_ACCESS_EVENT">
+<span class="sig-name descname"><span class="pre">AGENT_ACCESS_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'AGENT_ACCESS_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.AGENT_ACCESS_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.ECLIPSE_EVENT">
+<span class="sig-name descname"><span class="pre">ECLIPSE_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ECLIPSE_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.ECLIPSE_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.GP_ACCESS_EVENT">
+<span class="sig-name descname"><span class="pre">GP_ACCESS_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'GP_ACCESS_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.GP_ACCESS_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.GS_ACCESS_EVENT">
+<span class="sig-name descname"><span class="pre">GS_ACCESS_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'GS_ACCESS_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.GS_ACCESS_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.SIM_END_EVENT">
+<span class="sig-name descname"><span class="pre">SIM_END_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'SIM_END_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.SIM_END_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.SIM_START_EVENT">
+<span class="sig-name descname"><span class="pre">SIM_START_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'SIM_START_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.SIM_START_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.EnvironmentBroadcastMessageTypes.TIC_EVENT">
+<span class="sig-name descname"><span class="pre">TIC_EVENT</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'TIC_EVENT'</span></em><a class="headerlink" href="#messages.EnvironmentBroadcastMessageTypes.TIC_EVENT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.EventBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">EventBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#messages.EnvironmentBroadcastMessageTypes" title="messages.EnvironmentBroadcastMessageTypes"><span class="pre">EnvironmentBroadcastMessageTypes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rise</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EventBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EventBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EnvironmentBroadcastMessage" title="messages.EnvironmentBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnvironmentBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EventBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EventBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EventBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of an Event Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EventBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EventBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EventBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EventBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#EventBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EventBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.EventBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#EventBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.EventBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.GndPntAccessEventBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">GndPntAccessEventBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gp_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rise</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessEventBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessEventBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EventBroadcastMessage" title="messages.EventBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndPntAccessEventBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessEventBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessEventBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of an access Event Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndPntAccessEventBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessEventBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessEventBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndPntAccessEventBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#GndPntAccessEventBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessEventBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndPntAccessEventBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessEventBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessEventBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.GndPntAccessSenseMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">GndPntAccessSenseMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessSenseMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessSenseMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.AccessSenseMessage" title="messages.AccessSenseMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">AccessSenseMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndPntAccessSenseMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessSenseMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessSenseMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Ground Point Access Sense Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndPntAccessSenseMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndPntAccessSenseMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndPntAccessSenseMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.GndStnAccessEventBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">GndStnAccessEventBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rise</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessEventBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessEventBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EventBroadcastMessage" title="messages.EventBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndStnAccessEventBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessEventBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessEventBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of an access Event Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndStnAccessEventBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessEventBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessEventBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndStnAccessEventBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#GndStnAccessEventBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessEventBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndStnAccessEventBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessEventBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessEventBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.GndStnAccessSenseMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">GndStnAccessSenseMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">bool</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessSenseMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessSenseMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.AccessSenseMessage" title="messages.AccessSenseMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">AccessSenseMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndStnAccessSenseMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessSenseMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessSenseMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Ground Station Access Sense Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.GndStnAccessSenseMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#GndStnAccessSenseMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.GndStnAccessSenseMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.InterNodeDownlinkMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">InterNodeDownlinkMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeDownlinkMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeDownlinkMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InterNodeMessage" title="messages.InterNodeMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InterNodeMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeDownlinkMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeDownlinkMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeDownlinkMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeDownlinkMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeDownlinkMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeDownlinkMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeDownlinkMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#InterNodeDownlinkMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeDownlinkMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.InterNodeMeasurementRequestMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">InterNodeMeasurementRequestMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMeasurementRequestMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMeasurementRequestMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InterNodeMessage" title="messages.InterNodeMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InterNodeMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMeasurementRequestMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMeasurementRequestMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMeasurementRequestMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMeasurementRequestMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMeasurementRequestMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMeasurementRequestMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMeasurementRequestMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#InterNodeMeasurementRequestMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMeasurementRequestMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.InterNodeMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">InterNodeMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#messages.InterNodeMessageTypes" title="messages.InterNodeMessageTypes"><span class="pre">InterNodeMessageTypes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.SimulationMessage" title="messages.SimulationMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">SimulationMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#InterNodeMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InterNodeMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">InterNodeMessageTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InterNodeMessageTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InterNodeMessageTypes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.DOWNLINK">
+<span class="sig-name descname"><span class="pre">DOWNLINK</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'DOWNLINK'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.DOWNLINK" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.INFORMATION_MESSAGE">
+<span class="sig-name descname"><span class="pre">INFORMATION_MESSAGE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'INFO_MESSAGE'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.INFORMATION_MESSAGE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.INFORMATION_REQUEST">
+<span class="sig-name descname"><span class="pre">INFORMATION_REQUEST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'INFORMATION_REQUEST'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.INFORMATION_REQUEST" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.MEASUREMENT_MESSAGE">
+<span class="sig-name descname"><span class="pre">MEASUREMENT_MESSAGE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'MEASUREMENT_MESSAGE'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.MEASUREMENT_MESSAGE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.MEASUREMENT_REQUEST">
+<span class="sig-name descname"><span class="pre">MEASUREMENT_REQUEST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'MEASUREMENT_REQUEST'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.MEASUREMENT_REQUEST" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.PLANNER_MESSAGE">
+<span class="sig-name descname"><span class="pre">PLANNER_MESSAGE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'PLANNER_MESSAGE'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.PLANNER_MESSAGE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.InterNodeMessageTypes.PRINT_MESSAGE">
+<span class="sig-name descname"><span class="pre">PRINT_MESSAGE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'PRINT_MESSAGE'</span></em><a class="headerlink" href="#messages.InterNodeMessageTypes.PRINT_MESSAGE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.InternalMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">InternalMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'InternalMessage'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InternalMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InternalMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InternalMessage.generate_response">
+<span class="sig-name descname"><span class="pre">generate_response</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InternalMessage.generate_response"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InternalMessage.generate_response" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.InternalMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#InternalMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.InternalMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.MeasurementRequestMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">MeasurementRequestMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">request</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Request</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#MeasurementRequestMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.MeasurementRequestMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.MeasurementRequestMessage.get_request">
+<span class="sig-name descname"><span class="pre">get_request</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Request</span></span></span><a class="reference internal" href="_modules/messages.html#MeasurementRequestMessage.get_request"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.MeasurementRequestMessage.get_request" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">NodeToEnvironmentMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#messages.NodeToEnvironmentMessageTypes" title="messages.NodeToEnvironmentMessageTypes"><span class="pre">NodeToEnvironmentMessageTypes</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#NodeToEnvironmentMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.NodeToEnvironmentMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.SimulationMessage" title="messages.SimulationMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">SimulationMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#NodeToEnvironmentMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.NodeToEnvironmentMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#NodeToEnvironmentMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.NodeToEnvironmentMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#NodeToEnvironmentMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.NodeToEnvironmentMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#NodeToEnvironmentMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.NodeToEnvironmentMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">NodeToEnvironmentMessageTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#NodeToEnvironmentMessageTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>Contains information on requests available to be sent from an agent to the environment.
+Agents can only talk to the environment via json files. The environment may respond with a any other type of file supported by the zmq library.
+The agent must know in advance which kind of response it will receive in order to guarantee a safe reception of the message.</p>
+<dl class="simple">
+<dt>Types of requests between agents and the environment:</dt><dd><p>0- sync_request: agent notifies environment server that it is online and ready to start the simulation. Only used before the start of the simulation
+1- tic_request: agents ask to be notified when a certain time has passed in the environment’s clock
+2- agent_access_sense: agent asks the enviroment if the agent is capable of accessing another agent at the current simulation time
+3- gp_access_sense: agent asks the enviroment if the agent is capable of accessing a ground point at the current simulation time
+4- gs_access_sense: agent asks the enviroment if the agent is capable of accessing a ground station at the current simulation time
+5- agent_information_sense: agent asks for information regarding its current position, velocity, and eclipse at the current simulation time
+6- observation_sense: agent requests environment information regarding a the state of a ground point at the current simulation time
+7- agent_end_confirmation: agent notifies the environment that it has successfully terminated its operations</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.AGENT_ACCESS_SENSE">
+<span class="sig-name descname"><span class="pre">AGENT_ACCESS_SENSE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'AGENT_ACCESS_SENSE'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.AGENT_ACCESS_SENSE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION">
+<span class="sig-name descname"><span class="pre">AGENT_END_CONFIRMATION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'AGENT_END_CONFIRMATION'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.AGENT_END_CONFIRMATION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.AGENT_INFO_SENSE">
+<span class="sig-name descname"><span class="pre">AGENT_INFO_SENSE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'AGENT_INFO_SENSE'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.AGENT_INFO_SENSE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.GP_ACCESS_SENSE">
+<span class="sig-name descname"><span class="pre">GP_ACCESS_SENSE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'GP_ACCESS_SENSE'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.GP_ACCESS_SENSE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE">
+<span class="sig-name descname"><span class="pre">GS_ACCESS_SENSE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'GS_ACCESS_SENSE'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.GS_ACCESS_SENSE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.OBSERVATION_SENSE">
+<span class="sig-name descname"><span class="pre">OBSERVATION_SENSE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'OBSERVATION_SENSE'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.OBSERVATION_SENSE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.PRINT_REQUEST">
+<span class="sig-name descname"><span class="pre">PRINT_REQUEST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'PRINT_REQUEST'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.PRINT_REQUEST" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.SYNC_REQUEST">
+<span class="sig-name descname"><span class="pre">SYNC_REQUEST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'SYNC_REQUEST'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.SYNC_REQUEST" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="messages.NodeToEnvironmentMessageTypes.TIC_REQUEST">
+<span class="sig-name descname"><span class="pre">TIC_REQUEST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'TIC_REQUEST'</span></em><a class="headerlink" href="#messages.NodeToEnvironmentMessageTypes.TIC_REQUEST" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.ObservationSenseMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">ObservationSenseMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">obs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ObservationSenseMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ObservationSenseMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ObservationSenseMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ObservationSenseMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ObservationSenseMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Observation Sense Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ObservationSenseMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#ObservationSenseMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ObservationSenseMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>`
+Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.ObservationSenseMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#ObservationSenseMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.ObservationSenseMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.PlatformTaskCompletionMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">PlatformTaskCompletionMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="tasks.html#tasks.PlatformTask" title="tasks.PlatformTask"><span class="pre">PlatformTask</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="utils.html#utils.TaskStatus" title="utils.TaskStatus"><span class="pre">TaskStatus</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PlatformTaskCompletionMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PlatformTaskCompletionMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.PlatformTaskMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">PlatformTaskMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="tasks.html#tasks.PlatformTask" title="tasks.PlatformTask"><span class="pre">PlatformTask</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PlatformTaskMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PlatformTaskMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PlatformTaskMessage.get_task">
+<span class="sig-name descname"><span class="pre">get_task</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="tasks.html#tasks.SubsystemTask" title="tasks.SubsystemTask"><span class="pre">SubsystemTask</span></a></span></span><a class="reference internal" href="_modules/messages.html#PlatformTaskMessage.get_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PlatformTaskMessage.get_task" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the task to be performed by the agent platform</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.PrintMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">PrintMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InterNodeMessage" title="messages.InterNodeMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InterNodeMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#PrintMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.PrintRequestMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">PrintRequestMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">content</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintRequestMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintRequestMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintRequestMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintRequestMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintRequestMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintRequestMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintRequestMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintRequestMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintRequestMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#PrintRequestMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintRequestMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.PrintRequestMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#PrintRequestMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.PrintRequestMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SimulationEndBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SimulationEndBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_end</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationEndBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationEndBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EnvironmentBroadcastMessage" title="messages.EnvironmentBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnvironmentBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationEndBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationEndBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationEndBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Simulation End Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationEndBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationEndBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationEndBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationEndBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#SimulationEndBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationEndBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationEndBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/messages.html#SimulationEndBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationEndBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SimulationMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SimulationMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Enum</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationMessage.from_dict">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationMessage.from_json">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationMessage.get_type">
+<span class="sig-name descname"><span class="pre">get_type</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationMessage.get_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationMessage.get_type" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the type of message being sent</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#SimulationMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationMessage.to_json">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message class object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SimulationStartBroadcastMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SimulationStartBroadcastMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clock_info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationStartBroadcastMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationStartBroadcastMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EnvironmentBroadcastMessage" title="messages.EnvironmentBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnvironmentBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationStartBroadcastMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationStartBroadcastMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationStartBroadcastMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Simulation Start Broadcast Message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationStartBroadcastMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SimulationStartBroadcastMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationStartBroadcastMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationStartBroadcastMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#SimulationStartBroadcastMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationStartBroadcastMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SimulationStartBroadcastMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/messages.html#SimulationStartBroadcastMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SimulationStartBroadcastMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SubsystemStateMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SubsystemStateMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemStateMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemStateMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemStateMessage.get_state">
+<span class="sig-name descname"><span class="pre">get_state</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemStateMessage.get_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemStateMessage.get_state" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemStateMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemStateMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemStateMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SubsystemStateRequestMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SubsystemStateRequestMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemStateRequestMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemStateRequestMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SubsystemTaskCompletionMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SubsystemTaskCompletionMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="tasks.html#tasks.SubsystemTask" title="tasks.SubsystemTask"><span class="pre">SubsystemTask</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">status</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="utils.html#utils.TaskStatus" title="utils.TaskStatus"><span class="pre">TaskStatus</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemTaskCompletionMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskCompletionMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemTaskCompletionMessage.get_task">
+<span class="sig-name descname"><span class="pre">get_task</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="tasks.html#tasks.SubsystemTask" title="tasks.SubsystemTask"><span class="pre">SubsystemTask</span></a></span></span><a class="reference internal" href="_modules/messages.html#SubsystemTaskCompletionMessage.get_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskCompletionMessage.get_task" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemTaskCompletionMessage.get_task_status">
+<span class="sig-name descname"><span class="pre">get_task_status</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="utils.html#utils.TaskStatus" title="utils.TaskStatus"><span class="pre">TaskStatus</span></a></span></span><a class="reference internal" href="_modules/messages.html#SubsystemTaskCompletionMessage.get_task_status"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskCompletionMessage.get_task_status" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemTaskCompletionMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemTaskCompletionMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskCompletionMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SubsystemTaskMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SubsystemTaskMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst_module</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">task</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="tasks.html#tasks.SubsystemTask" title="tasks.SubsystemTask"><span class="pre">SubsystemTask</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemTaskMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.InternalMessage" title="messages.InternalMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">InternalMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemTaskMessage.get_task">
+<span class="sig-name descname"><span class="pre">get_task</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="tasks.html#tasks.SubsystemTask" title="tasks.SubsystemTask"><span class="pre">SubsystemTask</span></a></span></span><a class="reference internal" href="_modules/messages.html#SubsystemTaskMessage.get_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskMessage.get_task" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SubsystemTaskMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SubsystemTaskMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SubsystemTaskMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.SyncRequestMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">SyncRequestMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">port</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_coroutines</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SyncRequestMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SyncRequestMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SyncRequestMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SyncRequestMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SyncRequestMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SyncRequestMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#SyncRequestMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SyncRequestMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.SyncRequestMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#SyncRequestMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.SyncRequestMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.TicEventBroadcast">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">TicEventBroadcast</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicEventBroadcast"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicEventBroadcast" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.EnvironmentBroadcastMessage" title="messages.EnvironmentBroadcastMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnvironmentBroadcastMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicEventBroadcast.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicEventBroadcast.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicEventBroadcast.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicEventBroadcast.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicEventBroadcast.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicEventBroadcast.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicEventBroadcast.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicEventBroadcast.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicEventBroadcast.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="messages.TicRequestMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">messages.</span></span><span class="sig-name descname"><span class="pre">TicRequestMessage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">src</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dst</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_req</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicRequestMessage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicRequestMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#messages.NodeToEnvironmentMessage" title="messages.NodeToEnvironmentMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">NodeToEnvironmentMessage</span></code></a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicRequestMessage.from_dict">
+<span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicRequestMessage.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicRequestMessage.from_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a message class object from a dictionary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicRequestMessage.from_json">
+<span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicRequestMessage.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicRequestMessage.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates an instance of a Request class object from a json object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicRequestMessage.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/messages.html#TicRequestMessage.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicRequestMessage.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crates a dictionary containing all information contained in this message object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="messages.TicRequestMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/messages.html#TicRequestMessage.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#messages.TicRequestMessage.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a json file from this message</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">3D-CHESS</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">dmas</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="agent.html">agent module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="engineering.html">engineering module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="environment.html">environment module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ground_engineering.html">ground_engineering module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="iridium_engineering.html">iridium_engineering module</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">messages module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="node.html">node module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="orbitdata.html">orbitdata module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="planning.html">planning module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="science.html">science module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spacecraft.html">spacecraft module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tasks.html">tasks module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="test.html">test module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="utils.html">utils module</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  <li><a href="modules.html">dmas</a><ul>
+      <li>Previous: <a href="iridium_engineering.html" title="previous chapter">iridium_engineering module</a></li>
+      <li>Next: <a href="node.html" title="next chapter">node module</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Alan Aguilar Jaramillo, Ben Gorr.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.2.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/messages.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

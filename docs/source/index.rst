@@ -1,13 +1,11 @@
-Welcome to Lumache's documentation!
+Decentralized Multi-Agent Satellite Simulation (DMAS) Documentation
 ===================================
 
-**Lumache** (/lu'make/) is a Python library for cooks and food lovers
-that creates recipes mixing random ingredients.
-It pulls data from the `Open Food Facts database <https://world.openfoodfacts.org/>`_
-and offers a *simple* and *intuitive* API.
+**DMAS** is a simulation platform for decentralized and distributed satellite systems.
+It is meant to test and showcase novel Earth-observing satellite mission concepts using higher levels of autonomy.
+This autonomy ranges from environment detection to autonomous operations planning.
 
-Check out the :doc:`usage` section for further information, including
-how to :ref:`installation` the project.
+Check out the :doc:`usage` section for further information, including how to :ref:`installation` the project.
 
 .. note::
 

@@ -1,0 +1,46 @@
+{
+  "horizon_start" : 0,
+  "horizon_end" : 3600,
+  "plan" : [
+    {
+      "sat_id" : 2,
+      "type" : "measurement",
+      "start" : 0,
+      "end" : 2,
+      "info" : {
+        "instrument" : "L",
+        "angle" : 34,
+        "targets" : [195112, 195113, 195114, 195115, 195116],
+        "energy" : 518400.0
+      }
+    },
+    {
+      "sat_id" : 2,
+      "type" : "slew",
+      "start" : 2,
+      "end" : 4,
+      "info" : {
+        "starting_angle" : 35,
+        "target_angle" : 34
+      }
+    },
+    {
+      "sat_id" : 2,
+      "type" : "broadcast",
+      "start" : 4,
+      "end" : 5,
+      "info" : {
+        "target" : "GS1"
+      }
+    },
+    {
+      "sat_id" : 2,
+      "type" : "broadcast",
+      "start" : 5,
+      "end" : 6,
+      "info" : {
+        "target" : "s1"
+      }
+    }
+  ]
+}
