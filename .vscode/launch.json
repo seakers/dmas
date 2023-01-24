@@ -1,0 +1,98 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Driver Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/scenarios/sim_test/test.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+
+        {
+            "name": "Abstract Agent Client Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/dmas/agent.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+
+        {
+            "name": "Environment Server Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/dmas/environment.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+
+        {
+            "name": "Server Sync Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/scenarios/sim_test/server_sync_test.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        },
+
+        {
+            "name": "OrbitData debugger",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/dmas/orbitdata.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
+        }
+
+        // {
+        //     "name": "internal process test",
+        //     "type": "python",
+        //     "request": "launch",
+        //     "program": "${workspaceRoot}/scenarios/sim_test/test.py",
+        //     "console": "integratedTerminal",
+        //     "justMyCode": true,
+        //     "args": [
+        //         "${workspaceRoot}/scenarios/sim_test/"
+        //     ],
+        //     "cwd": "${workspaceRoot}",
+            // "env": {
+            //     "PYTHONPATH": "${workspaceRoot}"
+            // }
+        // }
+    ],
+
+    "compounds": [
+        {
+          "name": "Server/Client Test",
+          "configurations": ["Abstract Agent Client Test", "Environment Server Test"],
+        //   "preLaunchTask": "${defaultBuildTask}",
+          "stopAll": true
+        }
+    ]
+}

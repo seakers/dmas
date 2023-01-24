@@ -1,0 +1,192 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>test &#8212; 3D-CHESS 0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for test</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">multiprocessing</span> <span class="kn">import</span> <span class="n">Process</span>
+
+<span class="kn">from</span> <span class="nn">agent</span> <span class="kn">import</span> <span class="n">ScienceTestAgent</span><span class="p">,</span> <span class="n">IridiumTestAgent</span><span class="p">,</span> <span class="n">GroundTestAgent</span>
+
+
+
+<div class="viewcode-block" id="suominpp_run"><a class="viewcode-back" href="../test.html#test.suominpp_run">[docs]</a><span class="k">def</span> <span class="nf">suominpp_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Suomi NPP run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Suomi NPP&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="jason_run"><a class="viewcode-back" href="../test.html#test.jason_run">[docs]</a><span class="k">def</span> <span class="nf">jason_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Jason-3 run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Jason-3&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="cryosat_run"><a class="viewcode-back" href="../test.html#test.cryosat_run">[docs]</a><span class="k">def</span> <span class="nf">cryosat_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;CryoSat-2 run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;CryoSat-2&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="swot_run"><a class="viewcode-back" href="../test.html#test.swot_run">[docs]</a><span class="k">def</span> <span class="nf">swot_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SWOT run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;SWOT&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="sentinel6a_run"><a class="viewcode-back" href="../test.html#test.sentinel6a_run">[docs]</a><span class="k">def</span> <span class="nf">sentinel6a_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sentinel-6A run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sentinel-6A&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="sentinel6b_run"><a class="viewcode-back" href="../test.html#test.sentinel6b_run">[docs]</a><span class="k">def</span> <span class="nf">sentinel6b_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sentinel-6B run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sentinel-6B&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="customsat_run"><a class="viewcode-back" href="../test.html#test.customsat_run">[docs]</a><span class="k">def</span> <span class="nf">customsat_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;CustomSat run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;CustomSat&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="landsat_run"><a class="viewcode-back" href="../test.html#test.landsat_run">[docs]</a><span class="k">def</span> <span class="nf">landsat_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Landsat run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">ScienceTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Landsat 9&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="iridium_run"><a class="viewcode-back" href="../test.html#test.iridium_run">[docs]</a><span class="k">def</span> <span class="nf">iridium_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Iridium run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">IridiumTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Iridium&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="centralnode_run"><a class="viewcode-back" href="../test.html#test.centralnode_run">[docs]</a><span class="k">def</span> <span class="nf">centralnode_run</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Central node run&#39;</span><span class="p">)</span>
+    <span class="n">agent</span> <span class="o">=</span> <span class="n">GroundTestAgent</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Central Node&#39;</span><span class="p">,</span> <span class="n">directory</span><span class="p">)</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">agent</span><span class="o">.</span><span class="n">live</span><span class="p">())</span></div>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c1">#signal.signal(signal.SIGALRM,handler_function)</span>
+    <span class="n">signal</span><span class="o">.</span><span class="n">alarm</span><span class="p">(</span><span class="mi">3600</span><span class="o">*</span><span class="mi">3</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Initializing agents...&#39;</span><span class="p">)</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;./scenarios/scenario1_&quot;</span><span class="o">+</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="s2">&quot;/&quot;</span><span class="p">]</span>
+
+    <span class="n">n_agents</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">processes</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Creating agent run processes...&#39;</span><span class="p">)</span>
+
+    <span class="c1">#processes.append(Process(target=suominpp_run, args=(directory)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">jason_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">swot_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">sentinel6a_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">sentinel6b_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">cryosat_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">landsat_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="c1">#processes.append(Process(target=customsat_run, args=(directory)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">iridium_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="n">processes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Process</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">centralnode_run</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">directory</span><span class="p">)))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Starting agent run process...&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">process</span> <span class="ow">in</span> <span class="n">processes</span><span class="p">:</span>
+        <span class="n">process</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">process</span> <span class="ow">in</span> <span class="n">processes</span><span class="p">:</span>
+        <span class="n">process</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Agent runs complete! Simulation ended.&#39;</span><span class="p">)</span>
+
+    
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">3D-CHESS</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">dmas</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Alan Aguilar Jaramillo, Ben Gorr.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.2.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

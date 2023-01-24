@@ -1,0 +1,1015 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>science &#8212; 3D-CHESS 0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/sphinx_highlight.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for science</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">PIL.Image</span>
+<span class="kn">from</span> <span class="nn">io</span> <span class="kn">import</span> <span class="n">BytesIO</span>
+<span class="kn">from</span> <span class="nn">modules</span> <span class="kn">import</span> <span class="n">Module</span>
+<span class="kn">from</span> <span class="nn">messages</span> <span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span> <span class="nn">utils</span> <span class="kn">import</span> <span class="n">ScienceSubmoduleTypes</span>
+<span class="kn">from</span> <span class="nn">tasks</span> <span class="kn">import</span> <span class="n">InformationRequest</span><span class="p">,</span> <span class="n">DataProcessingRequest</span><span class="p">,</span> <span class="n">MeasurementRequest</span>
+
+<div class="viewcode-block" id="ScienceModule"><a class="viewcode-back" href="../science.html#science.ScienceModule">[docs]</a><span class="k">class</span> <span class="nc">ScienceModule</span><span class="p">(</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_agent</span> <span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">scenario_dir</span> <span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">predictive_model</span> <span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">AgentModuleTypes</span><span class="o">.</span><span class="n">SCIENCE_MODULE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">parent_agent</span><span class="p">,</span> <span class="p">[],</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">scenario_dir</span> <span class="o">=</span> <span class="n">scenario_dir</span>
+
+        <span class="n">parent_agent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_top_module</span><span class="p">()</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">spacecraft_list</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">mission_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;spacecraft&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">spacecraft</span> <span class="ow">in</span> <span class="n">spacecraft_list</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">spacecraft</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span>
+            <span class="c1"># land coverage data metrics data</span>
+            <span class="n">mission_profile</span> <span class="o">=</span> <span class="n">spacecraft</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;missionProfile&#39;</span><span class="p">)</span>
+            <span class="n">data</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">mission_profile</span>
+        <span class="k">if</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;Central Node&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mission_profile</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mission_profile</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+        <span class="c1"># self.chl_points = np.zeros(shape=(2000, 6))</span>
+        <span class="c1"># with open(self.scenario_dir+&#39;chlorophyll_baseline.csv&#39;) as csvfile:</span>
+        <span class="c1">#     reader = csv.reader(csvfile)</span>
+        <span class="c1">#     count = 0</span>
+        <span class="c1">#     for row in reader:</span>
+        <span class="c1">#         if count == 0:</span>
+        <span class="c1">#             count = 1</span>
+        <span class="c1">#             continue</span>
+        <span class="c1">#         self.chl_points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]</span>
+        <span class="c1">#         count = count + 1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chl_points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scenario_dir</span><span class="o">+</span><span class="s1">&#39;riverATLAS.csv&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">csvfile</span><span class="p">:</span>
+            <span class="n">reader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">reader</span><span class="p">(</span><span class="n">csvfile</span><span class="p">)</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">count</span> <span class="o">=</span> <span class="mi">1</span>
+                    <span class="k">continue</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">chl_points</span><span class="p">[</span><span class="n">count</span><span class="o">-</span><span class="mi">1</span><span class="p">,:]</span> <span class="o">=</span> <span class="p">[</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">row</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">row</span><span class="p">[</span><span class="mi">3</span><span class="p">]]</span>
+                <span class="n">count</span> <span class="o">=</span> <span class="n">count</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">data_products</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">load_data_products</span><span class="p">()</span>        
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">submodules</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">OnboardProcessingModule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_products</span><span class="p">),</span>            
+            <span class="n">ScienceReasoningModule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_products</span><span class="p">),</span>
+            <span class="n">ScienceValueModule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_products</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">predictive_model</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">submodules</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">SciencePredictiveModelModule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">data_products</span><span class="p">))</span>
+
+<div class="viewcode-block" id="ScienceModule.load_data_products"><a class="viewcode-back" href="../science.html#science.ScienceModule.load_data_products">[docs]</a>    <span class="k">def</span> <span class="nf">load_data_products</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="n">data_products</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scenario_dir</span><span class="p">):</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.txt&#39;</span><span class="p">)):</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="k">as</span> <span class="n">headerfile</span><span class="p">:</span>
+                    <span class="n">data_product_dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">headerfile</span><span class="p">)</span>
+                    <span class="n">data_products</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data_product_dict</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">data_products</span></div>
+
+<div class="viewcode-block" id="ScienceModule.internal_message_handler"><a class="viewcode-back" href="../science.html#science.ScienceModule.internal_message_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">internal_message_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">InternalMessage</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles message intended for this module and performs actions accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dst_name</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">dst_module</span>
+            <span class="k">if</span> <span class="n">dst_name</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                <span class="c1"># This module is NOT the intended receiver for this message. Forwarding to rightful destination</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># This module is the intended receiver for this message. Handling message</span>
+
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">DataMessage</span><span class="p">):</span>
+                    <span class="c1"># if a data message is received, forward to on-board processing submodule</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Received Data message from </span><span class="se">\&#39;</span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span><span class="si">}</span><span class="se">\&#39;</span><span class="s1">!&#39;</span><span class="p">)</span>
+                    <span class="n">msg</span><span class="o">.</span><span class="n">dst_module</span> <span class="o">=</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span>
+
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">MeasurementRequestMessage</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_request</span><span class="p">(),</span> <span class="n">InformationRequest</span><span class="p">):</span>
+                    <span class="c1"># if a request message is received, forward to on-board processing submodule</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Received Information Request message from </span><span class="se">\&#39;</span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span><span class="si">}</span><span class="se">\&#39;</span><span class="s1">!&#39;</span><span class="p">)</span>
+                    <span class="n">msg</span><span class="o">.</span><span class="n">dst_module</span> <span class="o">=</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span>
+
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">MeasurementRequestMessage</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">get_request</span><span class="p">(),</span> <span class="n">DataProcessingRequest</span><span class="p">):</span>
+                    <span class="c1"># if a request message is received, forward to on-board processing submodule</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Received Data Processing Request message from </span><span class="se">\&#39;</span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span><span class="si">}</span><span class="se">\&#39;</span><span class="s1">!&#39;</span><span class="p">)</span>
+                    <span class="n">msg</span><span class="o">.</span><span class="n">dst_module</span> <span class="o">=</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span>
+
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">,</span> <span class="n">InterNodeDownlinkMessage</span><span class="p">):</span>
+                    <span class="n">downlink_msg</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span>
+                    <span class="n">obs</span> <span class="o">=</span> <span class="n">DataMessage</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">downlink_msg</span><span class="o">.</span><span class="n">content</span><span class="p">))</span>
+                    <span class="n">obs</span><span class="o">.</span><span class="n">dst_module</span> <span class="o">=</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">obs</span><span class="p">)</span>
+
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Internal messages with contents of type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">)</span><span class="si">}</span><span class="s1"> not yet supported. Discarding message.&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div></div>
+
+
+<div class="viewcode-block" id="ScienceValueModule"><a class="viewcode-back" href="../science.html#science.ScienceValueModule">[docs]</a><span class="k">class</span> <span class="nc">ScienceValueModule</span><span class="p">(</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_module</span> <span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_VALUE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> 
+                         <span class="n">parent_module</span><span class="p">,</span> 
+                         <span class="n">submodules</span><span class="o">=</span><span class="p">[],</span>
+                         <span class="n">n_timed_coroutines</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sd</span> <span class="o">=</span> <span class="n">sd</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unvalued_queue</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">valued_queue</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model_requests_queue</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model_results_queue</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prop_meas_obs_metrics</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">science_value_sum</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="ScienceValueModule.activate"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.activate">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">activate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">activate</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">request_msg_queue</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">meas_msg_queue</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.internal_message_handler"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.internal_message_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">internal_message_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">InternalMessage</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles message intended for this module and performs actions accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span> <span class="o">==</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_REASONING</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+                <span class="c1"># Event of interest sent from the science reasoning module</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">request_msg_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span> <span class="o">==</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_PREDICTIVE_MODEL</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+                <span class="c1"># receiving result from science predictive models module</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">model_results_queue</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span> <span class="o">==</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">meas_msg_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unsupported message type for this module.&#39;</span><span class="p">)</span>
+
+            <span class="c1"># event-driven</span>
+            
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.coroutines"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.coroutines">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">coroutines</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Executes list of coroutine tasks to be executed by the science value module. These coroutine task incluide:</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># compute_science_value = asyncio.create_task(self.compute_science_value())</span>
+            <span class="c1"># compute_science_value.set_name(&#39;compute_science_value&#39;)</span>
+            <span class="c1"># broadcast_meas_req = asyncio.create_task(self.broadcast_meas_req())</span>
+            <span class="c1"># broadcast_meas_req.set_name(&#39;broadcast_meas_req&#39;)</span>
+            <span class="n">request_handler</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">request_handler</span><span class="p">())</span>
+            <span class="n">request_handler</span><span class="o">.</span><span class="n">set_name</span><span class="p">(</span><span class="s1">&#39;request_handler&#39;</span><span class="p">)</span>
+
+            <span class="n">meas_handler</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">meas_handler</span><span class="p">())</span>
+            <span class="n">meas_handler</span><span class="o">.</span><span class="n">set_name</span><span class="p">(</span><span class="s1">&#39;meas_handler&#39;</span><span class="p">)</span>
+
+            <span class="n">coroutines</span> <span class="o">=</span> <span class="p">[</span><span class="n">request_handler</span><span class="p">,</span><span class="n">meas_handler</span><span class="p">]</span>
+
+            <span class="n">done</span><span class="p">,</span> <span class="n">pending</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">coroutines</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">FIRST_COMPLETED</span><span class="p">)</span>
+
+            <span class="n">done_name</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">done</span><span class="p">:</span>
+                <span class="n">coroutine</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                <span class="n">done_name</span> <span class="o">=</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">done_name</span><span class="si">}</span><span class="s2"> completed!&quot;</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                <span class="n">p</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Terminating </span><span class="si">{</span><span class="n">p</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+                <span class="n">p</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                <span class="k">await</span> <span class="n">p</span>
+        
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coroutines</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                    <span class="n">coroutine</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                        <span class="n">coroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                        <span class="k">await</span> <span class="n">coroutine</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.request_handler"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.request_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">request_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="p">:</span> <span class="n">DataMessage</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">request_msg_queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span>
+                <span class="n">obs</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span>
+
+                <span class="n">science_value</span><span class="p">,</span> <span class="n">outlier</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_science_value</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">obs</span><span class="p">)</span>                
+                <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;altimetry&quot;</span> <span class="p">:</span> <span class="n">obs</span>
+                <span class="p">}</span>
+                <span class="n">measurement_request</span> <span class="o">=</span> <span class="n">MeasurementRequest</span><span class="p">(</span><span class="s2">&quot;tss&quot;</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">science_value</span><span class="p">,</span> <span class="n">metadata</span><span class="p">)</span>
+
+                <span class="n">req_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">AgentModuleTypes</span><span class="o">.</span><span class="n">PLANNING_MODULE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">measurement_request</span><span class="p">)</span>
+                <span class="n">ext_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ComponentNames</span><span class="o">.</span><span class="n">TRANSMITTER</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">measurement_request</span><span class="p">)</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">req_msg</span><span class="p">)</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">ext_msg</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sent message to transmitter!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.meas_handler"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.meas_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">meas_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">oli_outlier_count</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">jason_outlier_count</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">coobs_outlier_count</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="p">:</span> <span class="n">DataMessage</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">meas_msg_queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span>
+                <span class="n">obs</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span>
+                <span class="n">metadata</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+
+                <span class="n">science_value</span><span class="p">,</span> <span class="n">outlier</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_science_value</span><span class="p">(</span><span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">obs</span><span class="p">)</span>
+                <span class="n">parent_agent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_top_module</span><span class="p">()</span>
+                <span class="n">instrument</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>                
+                <span class="k">if</span> <span class="n">outlier</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">instrument</span> <span class="o">==</span> <span class="s2">&quot;OLI&quot;</span><span class="p">:</span> <span class="c1"># TODO fix this hardcode</span>
+                    <span class="n">oli_outlier_count</span><span class="o">+=</span><span class="mi">1</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Landsat outlier count: </span><span class="si">{</span><span class="n">oli_outlier_count</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">outlier</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">instrument</span> <span class="o">==</span> <span class="s2">&quot;POSEIDON-3B Altimeter&quot;</span><span class="p">:</span> <span class="c1"># TODO fix this hardcode</span>
+                    <span class="n">jason_outlier_count</span><span class="o">+=</span><span class="mi">1</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Jason outlier count: </span><span class="si">{</span><span class="n">jason_outlier_count</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">outlier</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">instrument</span> <span class="o">==</span> <span class="s2">&quot;OLI&quot;</span> <span class="ow">and</span> <span class="n">metadata</span><span class="p">:</span>
+                    <span class="n">coobs_outlier_count</span><span class="o">+=</span><span class="mi">1</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Co-obs outlier count: </span><span class="si">{</span><span class="n">coobs_outlier_count</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Received measurement with value </span><span class="si">{</span><span class="n">science_value</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">science_value_sum</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">science_value_sum</span> <span class="o">+</span> <span class="n">science_value</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sum of science values: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">science_value_sum</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sum of science values: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">science_value_sum</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">logger_type</span><span class="o">=</span><span class="n">LoggerTypes</span><span class="o">.</span><span class="n">RESULTS</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.compute_science_value"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.compute_science_value">[docs]</a>    <span class="k">def</span> <span class="nf">compute_science_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">obs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes science value of a particular observation. Currently 10 for outliers, 1 for anything else.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Computing science value...&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+        <span class="n">outlier</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">science_val</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="c1">#self.get_pop(lat, lon, points) TODO replace this?</span>
+        <span class="n">flood</span><span class="p">,</span> <span class="n">flood_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_altimetry_outlier</span><span class="p">(</span><span class="n">obs</span><span class="p">)</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">flood</span><span class="p">):</span>
+            <span class="n">science_val</span> <span class="o">=</span> <span class="n">science_val</span> <span class="o">*</span> <span class="mi">10</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Computed bonus science value: </span><span class="si">{</span><span class="n">science_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+            <span class="n">outlier</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Computed normal science value: </span><span class="si">{</span><span class="n">science_val</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">science_val</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">meas_perf</span><span class="p">(),</span> <span class="n">outlier</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.get_pop"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.get_pop">[docs]</a>    <span class="k">def</span> <span class="nf">get_pop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets population from CSV data (originally from hydroATLAS)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pop</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">-</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">-</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">):</span>
+                <span class="n">pop</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">pop</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.get_flood_chance"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.get_flood_chance">[docs]</a>    <span class="k">def</span> <span class="nf">get_flood_chance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets flood chance from CSV data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">flood_chance</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">-</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">-</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">):</span>
+                <span class="n">flood_chance</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="c1"># change this back to 5 for chlorophyll_baseline.csv</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">flood_chance</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.get_data_product"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.get_data_product">[docs]</a>    <span class="k">def</span> <span class="nf">get_data_product</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">product_type</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets data product from science database based on latitude, longitude and product type. TODO add time as a parameter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">exists</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sd</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">lat</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">lon</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;product_type&quot;</span><span class="p">]</span><span class="o">==</span><span class="n">product_type</span><span class="p">:</span>
+                <span class="k">if</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.csv&#39;</span><span class="p">)):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Found data product!&quot;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                    <span class="n">exists</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Found data product but file type not supported&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;Could not find data product&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">exists</span></div>
+
+
+<div class="viewcode-block" id="ScienceValueModule.check_tss_outlier"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.check_tss_outlier">[docs]</a>    <span class="k">def</span> <span class="nf">check_tss_outlier</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks TSS data for outliers. Currently hardcoded. TODO use real data source.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">outlier</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">mean</span><span class="p">,</span> <span class="n">stddev</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mean_sd</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">chl_points</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mean</span> <span class="o">&gt;</span> <span class="mi">30000</span><span class="p">:</span> <span class="c1"># TODO remove this hardcode</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;TSS outlier measured at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="n">outlier</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;No TSS outlier measured at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+        <span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">outlier</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.check_altimetry_outlier"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.check_altimetry_outlier">[docs]</a>    <span class="k">def</span> <span class="nf">check_altimetry_outlier</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks altimetry data for outliers. Currently hardcoded. TODO use real data source.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">outlier</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">outlier_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">flood_chance</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_flood_chance</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">chl_points</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">flood_chance</span> <span class="o">&gt;</span> <span class="mf">0.50</span><span class="p">:</span> <span class="c1"># TODO remove this hardcode</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">&quot;severity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flood_chance</span>
+                <span class="n">outlier</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">outlier_data</span> <span class="o">=</span> <span class="n">item</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Flood detected at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;No flood detected at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">outlier</span><span class="p">,</span> <span class="n">outlier_data</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.get_mean_sd"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.get_mean_sd">[docs]</a>    <span class="k">def</span> <span class="nf">get_mean_sd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes mean and standard deviation from CSV data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">-</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">-</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">):</span>
+                <span class="n">mean</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+                <span class="n">sd</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">mean</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span></div>
+
+<div class="viewcode-block" id="ScienceValueModule.meas_perf"><a class="viewcode-back" href="../science.html#science.ScienceValueModule.meas_perf">[docs]</a>    <span class="k">def</span> <span class="nf">meas_perf</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Evaluates the measurement performance based on the parameters of the satellite and payload.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Coefficients taken from Molly Stroud&#39;s work</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">8.94e-5</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="mf">1.45e-3</span>
+        <span class="n">c</span> <span class="o">=</span> <span class="mf">0.164</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="mf">1.03</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="mf">1.97e-6</span>
+        <span class="n">b1</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.007</span>
+        <span class="n">a2</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.42e-6</span>
+        <span class="n">b2</span> <span class="o">=</span> <span class="mf">3.08e-4</span>
+        <span class="n">c1</span> <span class="o">=</span> <span class="mf">13.14</span>
+        <span class="n">c2</span> <span class="o">=</span> <span class="o">-</span><span class="mf">2.81e-2</span>
+        <span class="n">d2</span> <span class="o">=</span> <span class="mf">1.03</span>
+        <span class="n">parent_agent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_top_module</span><span class="p">()</span>
+        <span class="n">instrument</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">instrument</span><span class="o">==</span><span class="s2">&quot;VIIRS&quot;</span> <span class="ow">or</span> <span class="n">instrument</span><span class="o">==</span><span class="s2">&quot;OLI&quot;</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;snr&quot;</span><span class="p">]</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;spatial_res&quot;</span><span class="p">]</span>
+            <span class="n">z</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;spectral_res&quot;</span><span class="p">]</span>
+            <span class="n">meas</span> <span class="o">=</span> <span class="n">a</span><span class="o">*</span><span class="n">x</span><span class="o">-</span><span class="n">b</span><span class="o">*</span><span class="n">y</span><span class="o">-</span><span class="n">c</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="o">+</span><span class="n">d</span>
+            <span class="n">spatial</span> <span class="o">=</span> <span class="n">a1</span><span class="o">*</span><span class="nb">pow</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">e</span><span class="p">,(</span><span class="n">b1</span><span class="o">*</span><span class="n">y</span><span class="o">+</span><span class="n">c1</span><span class="p">))</span>
+            <span class="n">perf</span> <span class="o">=</span> <span class="mf">0.75</span><span class="o">*</span><span class="n">meas</span><span class="o">+</span><span class="mf">0.25</span><span class="o">*</span><span class="n">spatial</span> <span class="c1"># modify to include temporal res at some point</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">perf</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Measurement performance: </span><span class="si">{</span><span class="n">perf</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">perf</span></div></div>
+
+
+<div class="viewcode-block" id="OnboardProcessingModule"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule">[docs]</a><span class="k">class</span> <span class="nc">OnboardProcessingModule</span><span class="p">(</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_module</span> <span class="p">:</span> <span class="n">Module</span><span class="p">,</span> <span class="n">sd</span> <span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sd</span> <span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="n">sd</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">parent_module</span><span class="p">,</span> <span class="n">submodules</span><span class="o">=</span><span class="p">[],</span>
+                         <span class="n">n_timed_coroutines</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">meas_results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_processing_requests</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">downlink_items</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tss_count</span> <span class="o">=</span> <span class="mi">0</span> <span class="c1"># TODO remove</span>
+
+<div class="viewcode-block" id="OnboardProcessingModule.activate"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.activate">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">activate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">activate</span><span class="p">()</span>
+
+        <span class="c1"># incoming message queues</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">incoming_results</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
+
+        <span class="c1"># events</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">updated</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">database_lock</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="OnboardProcessingModule.internal_message_handler"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.internal_message_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">internal_message_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles message intended for this module and performs actions accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">DataMessage</span><span class="p">):</span>
+                <span class="c1"># event-driven</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Received new observation data! Processing...&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>            
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">incoming_results</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.coroutines"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.coroutines">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">coroutines</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">coroutines</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1">## Internal coroutines</span>
+            <span class="n">process_meas_results</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">process_meas_results</span><span class="p">())</span>
+            <span class="n">process_meas_results</span><span class="o">.</span><span class="n">set_name</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">_process_meas_results&#39;</span><span class="p">)</span>
+            <span class="n">coroutines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">process_meas_results</span><span class="p">)</span>
+
+            <span class="c1"># wait for the first coroutine to complete</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">pending</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">coroutines</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">FIRST_COMPLETED</span><span class="p">)</span>
+            
+            <span class="n">done_name</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">coroutine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                    <span class="n">done_name</span> <span class="o">=</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+
+            <span class="c1"># cancel all other coroutine tasks</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">done_name</span><span class="si">}</span><span class="s1"> Coroutine ended. Terminating all other coroutines...&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">subroutine</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                <span class="n">subroutine</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                <span class="n">subroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                <span class="k">await</span> <span class="n">subroutine</span>
+            
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coroutines</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                    <span class="n">coroutine</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                        <span class="n">coroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                        <span class="k">await</span> <span class="n">coroutine</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.process_meas_results"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.process_meas_results">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">process_meas_results</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This function gets measurement results in the form of DataMessages from the engineering module and saves them in the onboard database</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="c1"># for i in range(len(self.meas_results)):</span>
+                <span class="c1">#     meas_result = self.meas_results[i].content</span>
+                <span class="c1">#     lat = meas_result.lat</span>
+                <span class="c1">#     lon = meas_result.lon</span>
+                <span class="c1">#     self.log(f&#39;Received measurement result from ({lat}°, {lon}°)!&#39;)</span>
+                <span class="c1">#     b4,b5,prefix,stored_data_filepath = self.store_measurement(meas_result.obs)</span>
+                <span class="c1">#     processed_data = self.compute_chlorophyll_obs_value(b4,b5)</span>
+                <span class="c1">#     self.sd = self.add_data_product(self.sd,lat,lon,0.01,&quot;chlorophyll-a&quot;,prefix+&quot;chla_&quot;+stored_data_filepath,processed_data)</span>
+                <span class="c1">#     self.meas_results.pop(i)</span>
+                <span class="c1"># await self.sim_wait(1.0)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">updated</span><span class="o">.</span><span class="n">is_set</span><span class="p">():</span>
+                   <span class="bp">self</span><span class="o">.</span><span class="n">updated</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span> 
+
+                <span class="c1"># wait for next measurement result to come in</span>
+                <span class="n">msg</span> <span class="p">:</span> <span class="n">DataMessage</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">incoming_results</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+                <span class="n">acquired</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">database_lock</span><span class="o">.</span><span class="n">acquire</span><span class="p">()</span>
+
+                <span class="c1"># unpackage result</span>
+                <span class="n">obs_str</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_data</span><span class="p">()</span>
+                <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_target</span><span class="p">()</span>
+                <span class="n">metadata</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Received measurement result from (</span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">°, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">°) taken at time </span><span class="si">{</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+
+
+                <span class="c1"># process result</span>
+                <span class="n">obs_process_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_current_time</span><span class="p">()</span>
+
+                <span class="n">parent_agent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_top_module</span><span class="p">()</span>
+                <span class="n">instrument</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+
+                <span class="k">if</span><span class="p">(</span><span class="n">instrument</span> <span class="o">==</span> <span class="s2">&quot;VIIRS&quot;</span> <span class="ow">or</span> <span class="n">instrument</span> <span class="o">==</span> <span class="s2">&quot;OLI&quot;</span><span class="p">):</span> <span class="c1"># TODO replace this hardcoding</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">tss_count</span><span class="o">+=</span><span class="mi">1</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;TSS count: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tss_count</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+                    <span class="n">data</span><span class="p">,</span><span class="n">raw_data_filename</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">store_raw_measurement</span><span class="p">(</span><span class="n">obs_str</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="n">obs_process_time</span><span class="p">)</span>
+                    <span class="n">processed_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_tss_obs_value</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_data_product</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sd</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="n">obs_process_time</span><span class="p">,</span><span class="s2">&quot;tss&quot;</span><span class="p">,</span><span class="n">raw_data_filename</span><span class="p">,</span><span class="n">processed_data</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;TSS measurement data successfully saved in on-board data-base.&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">updated</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+                    <span class="n">updated_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_REASONING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">updated</span><span class="p">)</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">updated_msg</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sd</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">lat</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">lon</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">obs_process_time</span><span class="p">:</span>
+                            <span class="n">item</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">metadata</span>
+                            <span class="n">value_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_VALUE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+                            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">value_msg</span><span class="p">)</span>
+                    <span class="n">metadata</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">()</span>
+                    <span class="n">downlink_item</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;lat&quot;</span><span class="p">:</span> <span class="n">lat</span><span class="p">,</span>
+                        <span class="s2">&quot;lon&quot;</span><span class="p">:</span> <span class="n">lon</span><span class="p">,</span>
+                        <span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+                        <span class="c1">#&quot;product_type&quot;: metadata[&quot;measuring_instrument&quot;]</span>
+                    <span class="p">}</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">downlink_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">downlink_item</span><span class="p">)</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_observations</span><span class="p">()</span>
+                <span class="k">elif</span><span class="p">(</span><span class="n">instrument</span> <span class="o">==</span> <span class="s2">&quot;POSEIDON-3B Altimeter&quot;</span><span class="p">):</span> <span class="c1"># TODO replace this hardcoding</span>
+                    <span class="n">data</span><span class="p">,</span><span class="n">raw_data_filename</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">store_raw_measurement</span><span class="p">(</span><span class="n">obs_str</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="n">obs_process_time</span><span class="p">)</span>
+                    <span class="n">processed_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_altimetry</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_data_product</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sd</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="n">obs_process_time</span><span class="p">,</span><span class="s2">&quot;altimetry&quot;</span><span class="p">,</span><span class="n">raw_data_filename</span><span class="p">,</span><span class="n">processed_data</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Altimetry measurement data successfully saved in on-board data-base.&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">updated</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+                    <span class="n">updated_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_REASONING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">updated</span><span class="p">)</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">updated_msg</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sd</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">lat</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">lon</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">obs_process_time</span><span class="p">:</span>
+                            <span class="n">item</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">metadata</span>
+                            <span class="n">value_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_VALUE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+                            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">value_msg</span><span class="p">)</span>
+                    <span class="n">metadata</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get_metadata</span><span class="p">()</span>
+                    <span class="n">downlink_item</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;lat&quot;</span><span class="p">:</span> <span class="n">lat</span><span class="p">,</span>
+                        <span class="s2">&quot;lon&quot;</span><span class="p">:</span> <span class="n">lon</span><span class="p">,</span>
+                        <span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">],</span>
+                        <span class="c1">#&quot;product_type&quot;: metadata[&quot;measuring_instrument&quot;] TODO add back for ground station</span>
+                    <span class="p">}</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">downlink_items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">downlink_item</span><span class="p">)</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">save_observations</span><span class="p">()</span>
+                <span class="c1"># elif(instrument == &quot;Ground Sensor&quot;):</span>
+                <span class="c1">#     #data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time) TODO commenting this out to improve runtime</span>
+                <span class="c1">#     metadata = msg.get_metadata()</span>
+                <span class="c1">#     # prefix = self.parent_module.scenario_dir+&quot;results/&quot;+str(self.parent_module.parent_module.name)+&quot;/sd/&quot;</span>
+                <span class="c1">#     # filename = prefix+str(lat)+&quot;_&quot;+str(lon)+&quot;_&quot;+str(obs_process_time)+&quot;_raw.csv&quot;</span>
+                <span class="c1">#     # self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,metadata[&quot;measuring_instrument&quot;],filename,None)</span>
+                <span class="c1">#     downlink_item = {</span>
+                <span class="c1">#         &quot;lat&quot;: lat,</span>
+                <span class="c1">#         &quot;lon&quot;: lon,</span>
+                <span class="c1">#         &quot;time&quot;: metadata[&quot;time&quot;],</span>
+                <span class="c1">#         &quot;product_type&quot;: metadata[&quot;measuring_instrument&quot;]</span>
+                <span class="c1">#     }</span>
+                <span class="c1">#     self.downlink_items.append(downlink_item)</span>
+                <span class="c1">#     await self.downlink_statistics()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Instrument not yet supported by science module!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                <span class="c1"># release database lock and inform other processes that the database has been updated</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">database_lock</span><span class="o">.</span><span class="n">release</span><span class="p">()</span>
+
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.store_raw_measurement"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.store_raw_measurement">[docs]</a>    <span class="k">def</span> <span class="nf">store_raw_measurement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">dataprod</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="n">obs_process_time</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This function stores the raw data from a DataMessage prior to any preprocessing.</span>
+<span class="sd">        It stores the raw message as a CSV identified by the lat, lon and time of the observation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># #im = PIL.Image.open(BytesIO(base64.b64decode(dataprod))) TODO uncomment</span>
+        
+
+        <span class="c1"># img_np = np.array(im)</span>
+        <span class="c1"># data = img_np[:,:,0]</span>
+        <span class="c1"># img_np = np.delete(img_np,3,2)</span>
+        <span class="c1"># # from https://stackoverflow.com/questions/67831382/obtaining-rgb-data-from-image-and-writing-it-to-csv-file-with-the-corresponding</span>
+        <span class="c1"># xy_coords = np.flip(np.column_stack(np.where(np.all(img_np &gt;= 0, axis=2))), axis=1)</span>
+        <span class="c1"># rgb = np.reshape(img_np, (np.prod(img_np.shape[:2]), 3))</span>
+
+        <span class="c1"># # Add pixel numbers in front</span>
+        <span class="c1"># pixel_numbers = np.expand_dims(np.arange(1, xy_coords.shape[0] + 1), axis=1)</span>
+        <span class="c1"># value = np.hstack([pixel_numbers, xy_coords, rgb])</span>
+
+        <span class="c1"># Properly save as CSV</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">)</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">)</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">scenario_dir</span><span class="o">+</span><span class="s2">&quot;results/&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">name</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;/sd/&quot;</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">prefix</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">obs_process_time</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_raw.csv&quot;</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%4d</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">data</span><span class="p">,</span> <span class="n">filename</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.compute_chlorophyll_obs_value"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.compute_chlorophyll_obs_value">[docs]</a>    <span class="k">def</span> <span class="nf">compute_chlorophyll_obs_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">b4</span><span class="p">,</span><span class="n">b5</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes chlorophyll concentration using the 2BDA algorithm.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">bda</span> <span class="o">=</span> <span class="n">b5</span> <span class="o">-</span> <span class="n">b5</span><span class="o">/</span><span class="n">b4</span> <span class="o">+</span> <span class="n">b4</span>
+        <span class="k">return</span> <span class="n">bda</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.compute_tss_obs_value"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.compute_tss_obs_value">[docs]</a>    <span class="k">def</span> <span class="nf">compute_tss_obs_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">b4</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes TSS from the paper that Molly sent me TODO add reference</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tss</span> <span class="o">=</span> <span class="mf">195.6</span> <span class="o">*</span> <span class="n">b4</span>
+        <span class="k">return</span> <span class="n">tss</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.compute_altimetry"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.compute_altimetry">[docs]</a>    <span class="k">def</span> <span class="nf">compute_altimetry</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates random altimetry data until we have an altimetry data source.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="mi">100</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.add_data_product"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.add_data_product">[docs]</a>    <span class="k">def</span> <span class="nf">add_data_product</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">sd</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="n">time</span><span class="p">,</span><span class="n">product_type</span><span class="p">,</span><span class="n">filename</span><span class="p">,</span><span class="n">data</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This function adds a data product to the science database (sd) and generates a .txt header file to represent the data product.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data_product_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lat</span>
+        <span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">lon</span>
+        <span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span>
+        <span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;product_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">product_type</span>
+        <span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span><span class="o">-</span><span class="mi">8</span><span class="p">]</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="n">product_type</span><span class="o">+</span><span class="s2">&quot;.csv&quot;</span>
+        <span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">data_product_dict</span><span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">],</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">sd</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data_product_dict</span><span class="p">)</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">scenario_dir</span><span class="o">+</span><span class="s2">&quot;results/&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">name</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;/sd/&quot;</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">prefix</span><span class="o">+</span><span class="s2">&quot;dataprod&quot;</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">time</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;_&quot;</span><span class="o">+</span><span class="n">product_type</span><span class="o">+</span><span class="s2">&quot;.txt&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;wt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">datafile</span><span class="p">:</span>
+            <span class="n">datafile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data_product_dict</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">sd</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.save_observations"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.save_observations">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">save_observations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This function saves the lat/lon/time of all observations and all outlier observations for analysis.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">all_coords</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">outlier_coords</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">parent_agent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_top_module</span><span class="p">()</span>
+        <span class="n">sat_name</span> <span class="o">=</span> <span class="n">parent_agent</span><span class="o">.</span><span class="n">name</span>
+        <span class="k">for</span> <span class="n">potential_outlier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlink_items</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_altimetry_outlier</span><span class="p">(</span><span class="n">potential_outlier</span><span class="p">):</span>
+                <span class="n">outlier_coords</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">potential_outlier</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span><span class="n">potential_outlier</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span><span class="n">potential_outlier</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]))</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">downlink_items</span><span class="p">:</span>
+            <span class="n">all_coords</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]))</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">scenario_dir</span><span class="o">+</span><span class="n">sat_name</span><span class="o">+</span><span class="s1">&#39;_outliers.csv&#39;</span><span class="p">,</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+            <span class="n">csv_out</span><span class="o">=</span><span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+            <span class="n">csv_out</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s1">&#39;lat&#39;</span><span class="p">,</span><span class="s1">&#39;lon&#39;</span><span class="p">,</span><span class="s1">&#39;time&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">outlier_coords</span><span class="p">:</span>
+                <span class="n">csv_out</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">scenario_dir</span><span class="o">+</span><span class="n">sat_name</span><span class="o">+</span><span class="s1">&#39;_all.csv&#39;</span><span class="p">,</span><span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+            <span class="n">csv_out</span><span class="o">=</span><span class="n">csv</span><span class="o">.</span><span class="n">writer</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+            <span class="n">csv_out</span><span class="o">.</span><span class="n">writerow</span><span class="p">([</span><span class="s1">&#39;lat&#39;</span><span class="p">,</span><span class="s1">&#39;lon&#39;</span><span class="p">,</span><span class="s1">&#39;time&#39;</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">all_coords</span><span class="p">:</span>
+                <span class="n">csv_out</span><span class="o">.</span><span class="n">writerow</span><span class="p">(</span><span class="n">row</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.check_altimetry_outlier"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.check_altimetry_outlier">[docs]</a>    <span class="k">def</span> <span class="nf">check_altimetry_outlier</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks an altimetry measurement for outliers. Currently hardcoded. TODO use actual flood thresholding</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">outlier</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">flood_chance</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_flood_chance</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">chl_points</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">flood_chance</span> <span class="o">&gt;</span> <span class="mf">0.50</span><span class="p">:</span> <span class="c1"># TODO remove this hardcode</span>
+            <span class="n">item</span><span class="p">[</span><span class="s2">&quot;severity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flood_chance</span>
+            <span class="n">outlier</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">outlier</span></div>
+
+<div class="viewcode-block" id="OnboardProcessingModule.get_flood_chance"><a class="viewcode-back" href="../science.html#science.OnboardProcessingModule.get_flood_chance">[docs]</a>    <span class="k">def</span> <span class="nf">get_flood_chance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets the flood chance from the csv file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">flood_chance</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">-</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">-</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">):</span>
+                <span class="n">flood_chance</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="c1"># change back to 5 for chlorophyll_baseline TODO</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">flood_chance</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span></div></div>
+
+
+
+
+<div class="viewcode-block" id="SciencePredictiveModelModule"><a class="viewcode-back" href="../science.html#science.SciencePredictiveModelModule">[docs]</a><span class="k">class</span> <span class="nc">SciencePredictiveModelModule</span><span class="p">(</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_module</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sd</span> <span class="o">=</span> <span class="n">sd</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_PREDICTIVE_MODEL</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">parent_module</span><span class="p">,</span> <span class="n">submodules</span><span class="o">=</span><span class="p">[],</span>
+                         <span class="n">n_timed_coroutines</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">model_reqs</span> <span class="o">=</span> <span class="p">[]</span>
+<div class="viewcode-block" id="SciencePredictiveModelModule.activate"><a class="viewcode-back" href="../science.html#science.SciencePredictiveModelModule.activate">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">activate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">activate</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="SciencePredictiveModelModule.internal_message_handler"><a class="viewcode-back" href="../science.html#science.SciencePredictiveModelModule.internal_message_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">internal_message_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles message intended for this module and performs actions accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dst_name</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;dst&#39;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">dst_name</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">put_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;@type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;PRINT&#39;</span><span class="p">:</span>
+                    <span class="n">content</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">]</span>
+                    <span class="c1">#self.log(content)</span>
+                <span class="k">if</span> <span class="n">msg</span><span class="p">[</span><span class="s1">&#39;@type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;MODEL_REQ&#39;</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">model_reqs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s1">&#39;content&#39;</span><span class="p">])</span>
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="SciencePredictiveModelModule.coroutines"><a class="viewcode-back" href="../science.html#science.SciencePredictiveModelModule.coroutines">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">coroutines</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">coroutines</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1">## Internal coroutines</span>
+            <span class="n">send_meas_req</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">send_meas_req</span><span class="p">())</span>
+            <span class="n">send_meas_req</span><span class="o">.</span><span class="n">set_name</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">_send_meas_req&#39;</span><span class="p">)</span>
+            <span class="n">coroutines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">send_meas_req</span><span class="p">)</span>
+
+            <span class="c1"># wait for the first coroutine to complete</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">pending</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">coroutines</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">FIRST_COMPLETED</span><span class="p">)</span>
+            
+            <span class="n">done_name</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">coroutine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                    <span class="n">done_name</span> <span class="o">=</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+
+            <span class="c1"># cancel all other coroutine tasks</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">done_name</span><span class="si">}</span><span class="s1"> Coroutine ended. Terminating all other coroutines...&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">subroutine</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                <span class="n">subroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                <span class="k">await</span> <span class="n">subroutine</span>
+        
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coroutines</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                    <span class="n">coroutine</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                        <span class="n">coroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                        <span class="k">await</span> <span class="n">coroutine</span></div>
+
+<div class="viewcode-block" id="SciencePredictiveModelModule.send_meas_req"><a class="viewcode-back" href="../science.html#science.SciencePredictiveModelModule.send_meas_req">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">send_meas_req</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">forecast_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">genfromtxt</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">scenario_dir</span><span class="o">+</span><span class="s1">&#39;ForecastWarnings-all.csv&#39;</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">forecast_data</span><span class="p">:</span>
+            <span class="n">measurement_request</span> <span class="o">=</span> <span class="n">MeasurementRequest</span><span class="p">(</span><span class="s2">&quot;tss&quot;</span><span class="p">,</span> <span class="n">row</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">row</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="mf">1.0</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">req_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">AgentModuleTypes</span><span class="o">.</span><span class="n">PLANNING_MODULE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">measurement_request</span><span class="p">)</span>
+            <span class="n">ext_msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ComponentNames</span><span class="o">.</span><span class="n">TRANSMITTER</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">measurement_request</span><span class="p">)</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">req_msg</span><span class="p">)</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">ext_msg</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Sent message from predictive model!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span></div></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule">[docs]</a><span class="k">class</span> <span class="nc">ScienceReasoningModule</span><span class="p">(</span><span class="n">Module</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent_module</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sd</span> <span class="o">=</span> <span class="n">sd</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_REASONING</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">parent_module</span><span class="p">,</span> <span class="n">submodules</span><span class="o">=</span><span class="p">[],</span>
+                         <span class="n">n_timed_coroutines</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="n">model_results</span> <span class="o">=</span> <span class="p">[]</span>
+<div class="viewcode-block" id="ScienceReasoningModule.activate"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.activate">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">activate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">activate</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">updated_queue</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.internal_message_handler"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.internal_message_handler">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">internal_message_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Handles message intended for this module and performs actions accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span> <span class="o">==</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_PREDICTIVE_MODEL</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">model_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+            <span class="k">elif</span><span class="p">(</span><span class="n">msg</span><span class="o">.</span><span class="n">src_module</span> <span class="o">==</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">ONBOARD_PROCESSING</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">updated_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unsupported message for this module.&#39;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.coroutines"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.coroutines">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">coroutines</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">coroutines</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1">## Internal coroutines</span>
+            <span class="n">check_sd</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">check_sd</span><span class="p">())</span>
+            <span class="n">check_sd</span><span class="o">.</span><span class="n">set_name</span> <span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s1">_check_sd&#39;</span><span class="p">)</span>
+            <span class="n">coroutines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">check_sd</span><span class="p">)</span>
+
+            <span class="c1"># wait for the first coroutine to complete</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">pending</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">wait</span><span class="p">(</span><span class="n">coroutines</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">FIRST_COMPLETED</span><span class="p">)</span>
+            
+            <span class="n">done_name</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">coroutine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                    <span class="n">done_name</span> <span class="o">=</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+
+            <span class="c1"># cancel all other coroutine tasks</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">done_name</span><span class="si">}</span><span class="s1"> Coroutine ended. Terminating all other coroutines...&#39;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">subroutine</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">:</span>
+                <span class="n">subroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                <span class="k">await</span> <span class="n">subroutine</span>
+        
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coroutines</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">coroutine</span> <span class="ow">in</span> <span class="n">coroutines</span><span class="p">:</span>
+                    <span class="n">coroutine</span> <span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Task</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">coroutine</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                        <span class="n">coroutine</span><span class="o">.</span><span class="n">cancel</span><span class="p">()</span>
+                        <span class="k">await</span> <span class="n">coroutine</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.get_mean_sd"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.get_mean_sd">[docs]</a>    <span class="k">def</span> <span class="nf">get_mean_sd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets the mean and standard deviation from the CSV data</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">-</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">-</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">):</span>
+                <span class="n">mean</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+                <span class="n">sd</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">mean</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.get_flood_chance"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.get_flood_chance">[docs]</a>    <span class="k">def</span> <span class="nf">get_flood_chance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Gets the flood chance from the csv file</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">flood_chance</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])):</span>
+            <span class="k">if</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lat</span><span class="p">)</span><span class="o">-</span><span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lon</span><span class="p">)</span> <span class="o">-</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">):</span>
+                <span class="n">flood_chance</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span> <span class="c1"># change back to 5 for chlorophyll_baseline.csv TODO</span>
+                <span class="n">lat</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+                <span class="n">lon</span> <span class="o">=</span> <span class="n">points</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">flood_chance</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.check_sd"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.check_sd">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">check_sd</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks the science database for the presence of outliers. Currently Scenario 1 only checks altimetry data for outliers.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">updated_queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+                <span class="n">outliers</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sd</span><span class="p">:</span>
+                    <span class="k">if</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;product_type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;tss&quot;</span><span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;TSS data not checked for outliers.&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                        <span class="c1">#outlier, outlier_data = self.check_tss_outliers(item)</span>
+                        <span class="c1">#if outlier is True:</span>
+                        <span class="c1">#    outliers.append(outlier_data)</span>
+                    <span class="k">elif</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;product_type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;altimetry&quot;</span><span class="p">):</span>
+                        <span class="n">outlier</span><span class="p">,</span> <span class="n">outlier_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_altimetry_outliers</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">outlier</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+                            <span class="n">outliers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">outlier_data</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Item in science database unsupported by science processing module.&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">outlier</span> <span class="ow">in</span> <span class="n">outliers</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Outliers: </span><span class="si">{</span><span class="n">outlier</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="n">InternalMessage</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">ScienceSubmoduleTypes</span><span class="o">.</span><span class="n">SCIENCE_VALUE</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">outlier</span><span class="p">)</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send_internal_message</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">CancelledError</span><span class="p">:</span>
+            <span class="k">return</span></div>
+    
+<div class="viewcode-block" id="ScienceReasoningModule.check_tss_outliers"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.check_tss_outliers">[docs]</a>    <span class="k">def</span> <span class="nf">check_tss_outliers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks the TSS data for outliers. Currently based on GEE script that pulled historical chlorophyll data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">outlier</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">outlier_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">mean</span><span class="p">,</span> <span class="n">stddev</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_mean_sd</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">chl_points</span><span class="p">)</span>
+            <span class="n">pixel_value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_pixel_value_from_image</span><span class="p">(</span><span class="n">item</span><span class="p">,</span><span class="n">lat</span><span class="p">,</span><span class="n">lon</span><span class="p">,</span><span class="mi">30</span><span class="p">)</span> <span class="c1"># 30 meters is landsat resolution</span>
+            <span class="k">if</span> <span class="n">mean</span> <span class="o">&gt;</span> <span class="mi">30000</span><span class="p">:</span> <span class="c1"># TODO remove this hardcode</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">&quot;severity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">pixel_value</span><span class="o">-</span><span class="n">mean</span><span class="p">)</span> <span class="o">/</span> <span class="n">stddev</span>
+                <span class="n">outlier_data</span> <span class="o">=</span> <span class="n">item</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;TSS outlier detected at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;No TSS outlier detected at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">outlier</span><span class="p">,</span> <span class="n">outlier_data</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.check_altimetry_outliers"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.check_altimetry_outliers">[docs]</a>    <span class="k">def</span> <span class="nf">check_altimetry_outliers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">item</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks altimetry data for outliers. Currently hardcoded. TODO update to use actual data source.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">outlier</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">outlier_data</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">flood_chance</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_flood_chance</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent_module</span><span class="o">.</span><span class="n">chl_points</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">flood_chance</span> <span class="o">&gt;</span> <span class="mf">0.50</span><span class="p">:</span> <span class="c1"># TODO remove this hardcode</span>
+                <span class="n">item</span><span class="p">[</span><span class="s2">&quot;severity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flood_chance</span>
+                <span class="n">outlier</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">outlier_data</span> <span class="o">=</span> <span class="n">item</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Flood detected at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">!&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;No flood detected at </span><span class="si">{</span><span class="n">lat</span><span class="si">}</span><span class="s1">, </span><span class="si">{</span><span class="n">lon</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+            <span class="n">item</span><span class="p">[</span><span class="s2">&quot;checked&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="n">outlier</span><span class="p">,</span> <span class="n">outlier_data</span></div>
+
+<div class="viewcode-block" id="ScienceReasoningModule.get_pixel_value_from_image"><a class="viewcode-back" href="../science.html#science.ScienceReasoningModule.get_pixel_value_from_image">[docs]</a>    <span class="k">def</span> <span class="nf">get_pixel_value_from_image</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">image</span><span class="p">,</span> <span class="n">lat</span><span class="p">,</span> <span class="n">lon</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Checks the image for the value of a specific pixel given by lat/lon inputs. Currently hardcoded for 30m landsat imagery.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">topleftlat</span> <span class="o">=</span> <span class="n">image</span><span class="p">[</span><span class="s2">&quot;lat&quot;</span><span class="p">]</span>
+        <span class="n">topleftlon</span> <span class="o">=</span> <span class="n">image</span><span class="p">[</span><span class="s2">&quot;lon&quot;</span><span class="p">]</span>
+        <span class="n">latdiff</span> <span class="o">=</span> <span class="n">lat</span><span class="o">-</span><span class="n">topleftlat</span>
+        <span class="n">londiff</span> <span class="o">=</span> <span class="n">lon</span><span class="o">-</span><span class="n">topleftlon</span>
+        <span class="n">row</span> <span class="o">=</span> <span class="p">(</span><span class="n">latdiff</span><span class="o">*</span><span class="mi">111139</span><span class="p">)</span><span class="o">//</span><span class="n">resolution</span> <span class="c1"># latitude to meters</span>
+        <span class="n">col</span> <span class="o">=</span> <span class="p">(</span><span class="n">londiff</span><span class="o">*</span><span class="mi">111139</span><span class="p">)</span><span class="o">//</span><span class="n">resolution</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">image</span><span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">])</span>
+        <span class="n">pixel_values</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">values</span>
+        <span class="n">pixel_value</span> <span class="o">=</span> <span class="n">pixel_values</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">),</span><span class="nb">int</span><span class="p">(</span><span class="n">col</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">pixel_value</span></div></div>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">3D-CHESS</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">dmas</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023, Alan Aguilar Jaramillo, Ben Gorr.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.2.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
