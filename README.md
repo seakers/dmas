@@ -3,10 +3,12 @@
 **DMAS** is a simulation platform for decentralized and distributed satellite systems.
 It is meant to test and showcase novel Earth-observing satellite mission concepts using higher levels of autonomy. This autonomy ranges from environment detection to autonomous operations planning.
 
-# Documentation
+---
+## Documentation
 For documentation please visit: https://dmas.readthedocs.io/
 
-# Installation 
+---
+## Installation 
 
 > NOTE: Installation instructions are only supported in Mac or Linux systems. For windows installation use a Windows Subsystem for Linux (WSL) to follow the instructions below.
 
@@ -25,8 +27,10 @@ conda activate ./.venv
 ```
 make install
 ```
+> Mac users have experienced issues installing the `orbitpy` dependency contained within the automated installation procedure. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy) for further details.
 
-# Contact 
+---
+## Contact 
 **Principal Investigator:** 
 - Daniel Selva Valero <dselva@tamu.edu>
 
