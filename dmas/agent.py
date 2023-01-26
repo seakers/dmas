@@ -22,11 +22,15 @@ class AbstractAgent(ABC):
         """
         super().__init__()
 
-        self._MNGR_PORT_NUMBER = None
-        self._ENV_PORT_NUMBER = None   
-        self._PEER_RECEIVER_PORT_NUMBER = None
-        self._PEER_BROADCAST_RECEIVER_PORT_NUMBER= None
-        self._MONITOR_PORT_NUMBER = None
+        # self._MNGR_PORT_NUMBER = None
+        # self._ENV_PORT_NUMBER = None   
+        # self._PEER_RECEIVER_PORT_NUMBER = None
+        # self._PEER_BROADCAST_RECEIVER_PORT_NUMBER= None
+        # self._MONITOR_PORT_NUMBER = None
+
+        self._MNGR_ADRESS = None
+        self._ENV_ADDRESS = None
+        self._MONITOR_ADDRESS = None
 
     async def _activate(self) -> None:
         """
@@ -77,10 +81,10 @@ class AbstractAgent(ABC):
             raise Exception("Network config failed. Simulation Monitor Port Number is required.")
 
         # Manager broadcast socket
-        self._mngr_socket = self._context.socket(zmq.SUB)
-        self._mngr_socket.connect(f"tcp://localhost:{self._MNGR_PORT_NUMBER}")
-        self._mngr_socket.setsockopt(zmq.SUBSCRIBE, b'')
-        self._mngr_socket.setsockopt(zmq.LINGER, 0)
+        self._mngr_broadcast_socket = self._context.socket(zmq.SUB)
+        self._mngr_broadcast_socket.connect(f"tcp://localhost:{self._MNGR_PORT_NUMBER}")
+        self._mngr_broadcast_socket.setsockopt(zmq.SUBSCRIBE, b'')
+        self._mngr_broadcast_socket.setsockopt(zmq.LINGER, 0)
 
         # give manager time to set up
         time.sleep(random.random())
@@ -117,6 +121,7 @@ class AbstractAgent(ABC):
         """
         Sends a synchronization request message to simulation manager server
         """
+        # connect to manager
         
         sync_req = SyncRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
         await self.environment_request_socket.send_json(sync_req.to_json())
