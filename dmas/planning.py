@@ -366,28 +366,37 @@ class ObservationPlanningModule(Module):
         """
         Based on the "greedy planner" from Lemaitre et al. Incorporates reward information and future options to decide observation plan.
         """
-        rule_based_plan = []
         estimated_reward = 100000.0
-        more_actions = True
-        curr_time = 0.0
-        while more_actions:
-            best_obs = None
-            maximum = 0.0
-            actions = self.get_action_space(curr_time,obs_list)
-            if(len(actions) == 0):
-                break
-            for action in actions:
-                rho = (86400.0 - action.end)/86400.0
-                e = pow(rho,0.99) * estimated_reward
-                adjusted_reward = action.science_val*self.meas_perf() + e
-                if(adjusted_reward > maximum):
-                    maximum = adjusted_reward
-                    best_obs = action
-            curr_time = best_obs.end
-            rule_based_plan.append(best_obs)
-            obs_list.remove(best_obs)
-            if(len(self.get_action_space(curr_time,obs_list)) == 0):
-                more_actions = False
+        rule_based_plan = []
+        i = 0
+        while i < 2:
+            rule_based_plan = []
+            more_actions = True
+            curr_time = 0.0
+            total_reward = 0.0
+            obs_list_copy = obs_list.copy()
+            while more_actions:
+                best_obs = None
+                maximum = 0.0
+                actions = self.get_action_space(curr_time,obs_list)
+                if(len(actions) == 0):
+                    break
+                for action in actions:
+                    rho = (86400.0 - action.end)/86400.0
+                    e = pow(rho,0.99) * estimated_reward
+                    adjusted_reward = action.science_val*self.meas_perf() + e
+                    if(adjusted_reward > maximum):
+                        maximum = adjusted_reward
+                        best_obs = action
+                curr_time = best_obs.end
+                total_reward += maximum
+                rule_based_plan.append(best_obs)
+                obs_list.remove(best_obs)
+                if(len(self.get_action_space(curr_time,obs_list)) == 0):
+                    more_actions = False
+            i += 1
+            estimated_reward = total_reward
+            obs_list = obs_list_copy
         return rule_based_plan
 
     def nadir_planner(self,obs_list):
@@ -621,7 +630,7 @@ class OperationsPlanningModule(Module):
         if(new_time==curr_time):
             return False, False
         slew_rate = abs(new_angle-curr_angle)/abs(new_time-curr_time)
-        max_slew_rate = 1.0 # deg / s
+        max_slew_rate = 0.1 # deg / s
         #slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
         #maxTorque = 4e-3
         moved = True

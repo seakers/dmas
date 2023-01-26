@@ -53,6 +53,7 @@
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7083.137, "ecc": 0.001, "inc": 98.2, "raan": 0, "aop": 0, "ta": 0}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
+            "notifier" : "True",
             "missionProfile" : "3D-CHESS",
             "preplan": "True"
         },
@@ -104,6 +105,7 @@
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 60}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
+            "notifier" : "True",
             "missionProfile" : "nadir"
         },
         {
@@ -153,6 +155,7 @@
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7268, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 120}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
+            "notifier" : "True",
             "missionProfile" : "nadir"
         },
         {
@@ -202,6 +205,7 @@
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 180}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
+            "notifier" : "True",
             "missionProfile" : "nadir"
         },
         {
@@ -251,6 +255,7 @@
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 240}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
+            "notifier" : "True",
             "missionProfile" : "nadir"
         },
         {
@@ -300,6 +305,7 @@
                             "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7000, "ecc": 0.001, "inc": 92, "raan": 180, "aop": 0, "ta": 300}
                             }, 
             "planner" : {"@type": "COMMS_TEST"},
+            "notifier" : "True",
             "missionProfile" : "nadir"
         },
         {

@@ -6,7 +6,7 @@ import numpy as np
 import csv
 
 # get water quality samples (qwdata)
-turbidity_df = nwis.get_record(stateCd='tx', parameterCd=['00060','63680'], service='dv', start='2020-01-01', end='2020-12-31')
+turbidity_df = nwis.get_record(stateCd='tx', parameterCd=['00060','63680'], service='dv', start='2020-01-01', end='2020-01-31')
 
 df, md = nwis.what_sites(stateCd='TX', parameterCd='63680')
 print(df)
@@ -19,6 +19,7 @@ for site, new_df in turbidity_df.groupby(level=0):
     times = []
     for date in new_df.index:
         times.append(date)
+    print(new_df.columns)
     water_levels = new_df['00060_Mean'].values
     turbidity_levels = new_df['63680_Mean'].values
     if(np.max(water_levels) > 1.0 and not np.isnan(turbidity_levels).all()):

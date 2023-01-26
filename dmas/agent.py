@@ -562,8 +562,11 @@ class IridiumTestAgent(AgentClient):
 class GroundTestAgent(AgentClient):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
+        request_generator = False
+        if "scenario1b" in scenario_dir:
+            request_generator = True
         self.submodules = [
-                            ScienceModule(self,scenario_dir,True),
+                            ScienceModule(self,scenario_dir,request_generator),
                             GroundEngineeringModule(self)
                           ]
 

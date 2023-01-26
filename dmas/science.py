@@ -21,19 +21,21 @@ class ScienceModule(Module):
         self.scenario_dir = scenario_dir
 
         parent_agent = self.get_top_module()
-        data = dict()
+        mission_profile_data = dict()
+        notifier_data = dict()
         spacecraft_list = parent_agent.mission_dict.get('spacecraft')
         for spacecraft in spacecraft_list:
             name = spacecraft.get('name')
             # land coverage data metrics data
             mission_profile = spacecraft.get('missionProfile')
             notifier = spacecraft.get('notifier')
-            data[name] = mission_profile
+            mission_profile_data[name] = mission_profile
+            notifier_data[name] = notifier
         if parent_agent.name == "Central Node":
-            self.mission_profile = None
+            self.mission_profile = "Request Generator"
         else:
-            self.mission_profile = data[parent_agent.name]
-        self.notifier = notifier
+            self.mission_profile = mission_profile_data[parent_agent.name]
+        self.notifier = notifier_data[parent_agent.name]
         # self.chl_points = np.zeros(shape=(2000, 6))
         # with open(self.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
         #     reader = csv.reader(csvfile)
@@ -214,10 +216,11 @@ class ScienceValueModule(Module):
                 metadata = {
                     "observation" : obs
                 }
-                measurement_request = MeasurementRequest(["tss","altimetry"], lat, lon, science_value, metadata)
+                measurement_request = MeasurementRequest(["tss"], lat, lon, science_value, metadata)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                print(self.parent_module.notifier)
                 if self.parent_module.notifier == "True":
                     await self.send_internal_message(req_msg)
                     await self.send_internal_message(ext_msg)
@@ -269,7 +272,7 @@ class ScienceValueModule(Module):
         science_val = 1.0 #self.get_pop(lat, lon, points) TODO replace this?
         flood, flood_data = self.check_altimetry_outlier(obs)
         if(flood):
-            science_val = science_val * 10
+            science_val = science_val * 2
             self.log(f'Computed bonus science value: {science_val}', level=logging.DEBUG)
             outlier = True
         else:
@@ -339,7 +342,7 @@ class ScienceValueModule(Module):
         outlier_data = None
         if(item["checked"] is False):
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.50: # TODO remove this hardcode
+            if flood_chance > 0.90: # TODO remove this hardcode
                 item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item
@@ -663,7 +666,7 @@ class OnboardProcessingModule(Module):
         """
         outlier = False
         flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-        if flood_chance > 0.50: # TODO remove this hardcode
+        if flood_chance > 0.90: # TODO remove this hardcode
             item["severity"] = flood_chance
             outlier = True
         return outlier
@@ -897,7 +900,7 @@ class ScienceReasoningModule(Module):
         outlier_data = None
         if(item["checked"] is False):
             flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.50: # TODO remove this hardcode
+            if flood_chance > 0.90: # TODO remove this hardcode
                 item["severity"] = flood_chance
                 outlier = True
                 outlier_data = item
