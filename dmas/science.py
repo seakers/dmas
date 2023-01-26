@@ -78,6 +78,35 @@ class ScienceModule(Module):
 
         return data_products
 
+    def check_altimetry_outliers(self,item):
+        """
+        Checks altimetry data for outliers. Currently hardcoded. TODO update to use actual data source.
+        """
+        outlier = False
+        outlier_data = None
+        flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.chl_points)
+        if flood_chance > 0.90: # TODO remove this hardcode
+            item["severity"] = flood_chance
+            outlier = True
+            outlier_data = item
+            self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
+        else:
+            self.log(f'No flood detected at {lat}, {lon}',level=logging.DEBUG)
+        return outlier, outlier_data
+
+    def get_flood_chance(self, lat, lon, points):
+        """
+        Gets flood chance from CSV data.
+        """
+        flood_chance = None
+        for i in range(len(points[:, 0])):
+            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
+                flood_chance = points[i, 3] # change this back to 5 for chlorophyll_baseline.csv
+                lat = points[i, 0]
+                lon = points[i, 1]
+                break
+        return flood_chance, lat, lon
+
     async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly.
@@ -212,7 +241,7 @@ class ScienceValueModule(Module):
                 lon = msg.content["lon"]
                 obs = msg.content
 
-                science_value, outlier = self.compute_science_value(lat, lon, obs)                
+                science_value, outlier = self.compute_science_value(lat, lon, obs)
                 metadata = {
                     "observation" : obs
                 }
@@ -220,7 +249,6 @@ class ScienceValueModule(Module):
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                print(self.parent_module.notifier)
                 if self.parent_module.notifier == "True":
                     await self.send_internal_message(req_msg)
                     await self.send_internal_message(ext_msg)
@@ -270,14 +298,15 @@ class ScienceValueModule(Module):
         outlier = False
 
         science_val = 1.0 #self.get_pop(lat, lon, points) TODO replace this?
-        flood, flood_data = self.check_altimetry_outlier(obs)
-        if(flood):
-            science_val = science_val * 2
+        flood, flood_data = self.parent_module.check_altimetry_outliers(obs)
+        if flood:
+            science_val = science_val * 50
             self.log(f'Computed bonus science value: {science_val}', level=logging.DEBUG)
             outlier = True
         else:
             self.log(f'Computed normal science value: {science_val}', level=logging.DEBUG)
-        return science_val*self.meas_perf(), outlier
+        resulting_value = science_val*self.meas_perf()
+        return resulting_value, outlier
 
     def get_pop(self, lat, lon, points):
         """
@@ -289,19 +318,6 @@ class ScienceValueModule(Module):
                 pop = points[i,4]
                 break
         return pop
-
-    def get_flood_chance(self, lat, lon, points):
-        """
-        Gets flood chance from CSV data.
-        """
-        flood_chance = None
-        for i in range(len(points[:, 0])):
-            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 3] # change this back to 5 for chlorophyll_baseline.csv
-                lat = points[i, 0]
-                lon = points[i, 1]
-                break
-        return flood_chance, lat, lon
 
     def get_data_product(self, lat, lon, product_type):
         """
@@ -333,24 +349,6 @@ class ScienceValueModule(Module):
             self.log(f'No TSS outlier measured at {lat}, {lon}',level=logging.INFO)
         item["checked"] = True
         return outlier
-
-    def check_altimetry_outlier(self,item):
-        """
-        Checks altimetry data for outliers. Currently hardcoded. TODO use real data source.
-        """
-        outlier = False
-        outlier_data = None
-        if(item["checked"] is False):
-            flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.90: # TODO remove this hardcode
-                item["severity"] = flood_chance
-                outlier = True
-                outlier_data = item
-                self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
-            else:
-                self.log(f'No flood detected at {lat}, {lon}',level=logging.INFO)
-            item["checked"] = True
-        return outlier, outlier_data
 
     def get_mean_sd(self, lat, lon, points):
         """
@@ -491,7 +489,7 @@ class OnboardProcessingModule(Module):
                 obs_str = msg.get_data()
                 lat, lon = msg.get_target()
                 metadata = msg.get_metadata()
-                self.log(f'Received measurement result from ({lat}°, {lon}°) taken at time {metadata["time"]}!', level=logging.INFO)
+                self.log(f'Received measurement result from ({lat}°, {lon}°) taken at time {metadata["time"]}!', level=logging.DEBUG)
 
 
 
@@ -645,7 +643,8 @@ class OnboardProcessingModule(Module):
         parent_agent = self.get_top_module()
         sat_name = parent_agent.name
         for potential_outlier in self.downlink_items:
-            if self.check_altimetry_outlier(potential_outlier):
+            outlier, outlier_data = self.parent_module.check_altimetry_outliers(potential_outlier)
+            if outlier:
                 outlier_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
         for item in self.downlink_items:
             all_coords.append((item["lat"],item["lon"],item["time"]))
@@ -659,31 +658,6 @@ class OnboardProcessingModule(Module):
             csv_out.writerow(['lat','lon','time'])
             for row in all_coords:
                 csv_out.writerow(row)
-
-    def check_altimetry_outlier(self,item):
-        """
-        Checks an altimetry measurement for outliers. Currently hardcoded. TODO use actual flood thresholding
-        """
-        outlier = False
-        flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-        if flood_chance > 0.90: # TODO remove this hardcode
-            item["severity"] = flood_chance
-            outlier = True
-        return outlier
-
-    def get_flood_chance(self, lat, lon, points):
-        """
-        Gets the flood chance from the csv file
-        """
-        flood_chance = 0.0
-        for i in range(len(points[:, 0])):
-            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 3] # change back to 5 for chlorophyll_baseline TODO
-                lat = points[i, 0]
-                lon = points[i, 1]
-                break
-        return flood_chance, lat, lon
-
 
 
 
@@ -834,19 +808,6 @@ class ScienceReasoningModule(Module):
                 break
         return mean, sd, lat, lon
 
-    def get_flood_chance(self, lat, lon, points):
-        """
-        Gets the flood chance from the csv file
-        """
-        flood_chance = 0.0
-        for i in range(len(points[:, 0])):
-            if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 3] # change back to 5 for chlorophyll_baseline.csv TODO
-                lat = points[i, 0]
-                lon = points[i, 1]
-                break
-        return flood_chance, lat, lon
-
     async def check_sd(self):
         """
         Checks the science database for the presence of outliers. Currently Scenario 1 only checks altimetry data for outliers.
@@ -862,9 +823,12 @@ class ScienceReasoningModule(Module):
                         #if outlier is True:
                         #    outliers.append(outlier_data)
                     elif(item["product_type"] == "altimetry"):
-                        outlier, outlier_data = self.check_altimetry_outliers(item)
-                        if outlier is True:
-                            outliers.append(outlier_data)
+                        if item["checked"] is False:
+                            outlier, outlier_data = self.parent_module.check_altimetry_outliers(item)
+                            if outlier is True:
+                                self.log(f'Altimetry outlier in check_sd',level=logging.INFO)
+                                outliers.append(outlier_data)
+                            item["checked"] = True
                     else:
                         self.log(f'Item in science database unsupported by science processing module.',level=logging.DEBUG)
                 for outlier in outliers:
@@ -889,24 +853,6 @@ class ScienceReasoningModule(Module):
                 self.log(f'TSS outlier detected at {lat}, {lon}!',level=logging.INFO)
             else:
                 self.log(f'No TSS outlier detected at {lat}, {lon}',level=logging.INFO)
-            item["checked"] = True
-        return outlier, outlier_data
-
-    def check_altimetry_outliers(self,item):
-        """
-        Checks altimetry data for outliers. Currently hardcoded. TODO update to use actual data source.
-        """
-        outlier = False
-        outlier_data = None
-        if(item["checked"] is False):
-            flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.parent_module.chl_points)
-            if flood_chance > 0.90: # TODO remove this hardcode
-                item["severity"] = flood_chance
-                outlier = True
-                outlier_data = item
-                self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
-            else:
-                self.log(f'No flood detected at {lat}, {lon}',level=logging.INFO)
             item["checked"] = True
         return outlier, outlier_data
 

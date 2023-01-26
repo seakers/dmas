@@ -1811,7 +1811,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
         if isinstance(task, ObservationTask):
             lat, lon = task.target
             self.log(f'Decompose observation platform-level task into subsystem-level tasks')
-            self.log(f'Received observation task!',level=logging.INFO)
+            self.log(f'Received observation task!',level=logging.DEBUG)
             return [ PerformMeasurement(lat, lon, task.instrument_list, task.durations, task.obs_info) ]
         elif isinstance(task, ManeuverTask):
             self.log(f'Received maneuver task!',level=logging.INFO)
@@ -2189,7 +2189,7 @@ class InstrumentComponent(ComponentModule):
                 # TODO consider real-time delays from environment server querying for the data being sensed
                 # await self.sim_wait(task.duration) TODO not sure if we want to block off the agent from doing things
 
-                self.log(f'Measurement complete! Sending data to internal memory.',level=logging.INFO)
+                self.log(f'Measurement complete! Sending data to internal memory.',level=logging.DEBUG)
                 # package data and send to memory
                 if response is not None:
                     response : ObservationSenseMessage

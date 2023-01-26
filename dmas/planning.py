@@ -92,7 +92,7 @@ class InstrumentCapabilityModule(Module):
         """
         try:
             capable = False
-            self.log(f'Querying knowledge graph...', level=logging.INFO)
+            self.log(f'Querying knowledge graph...', level=logging.DEBUG)
             driver = GraphDatabase.driver(uri, auth=(user, password))
             capable = self.can_observe(driver,instrument,event_msg)
             driver.close()
@@ -123,10 +123,10 @@ class InstrumentCapabilityModule(Module):
                     #self.log(f'Observer: {observer.get("name")}',level=logging.INFO)
                     #self.log(f'Instrument: {instrument}',level=logging.INFO)
                     if(observer.get("name") == instrument):
-                        self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
+                        self.log(f'Matching instrument in knowledge graph!', level=logging.DEBUG)
                         capable = True
             if capable is False:
-                self.log(f'The instruments onboard cannot observe the requested observables.',level=logging.INFO)
+                self.log(f'The instruments onboard cannot observe the requested observables.',level=logging.DEBUG)
         return capable
 
 
@@ -278,9 +278,9 @@ class ObservationPlanningModule(Module):
                     new_obs_list.append(new_obs)
                     await self.obs_list.put(new_obs_list)
                 elif self.parent_module.mission_profile=="agile":
-                    self.log(f'Mission cannot replan based on new events.',level=logging.INFO)
+                    self.log(f'Mission cannot replan based on new events.',level=logging.DEBUG)
                 else:
-                    self.log(f'Unsupported mission profile!',level=logging.INFO)
+                    self.log(f'Unsupported mission profile!',level=logging.DEBUG)
         except asyncio.CancelledError:
             return
 
@@ -334,16 +334,15 @@ class ObservationPlanningModule(Module):
                         gp_access_list.append(row)
                     #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
-                        self.log(f'Adding observation candidate!',level=logging.DEBUG)
                         obs.start = gp_access_list[0]['time index']
                         obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
-                        unique_location = True
-                        for obs_can in self.obs_candidates:
-                            if obs_can.target == obs.target:
-                                unique_location = False
-                        if unique_location:
-                            self.obs_candidates.append(obs)
+                        # unique_location = True
+                        # for obs_can in self.obs_candidates:
+                        #     if obs_can.target == obs.target:
+                        #         unique_location = False
+                        # if unique_location:
+                        self.obs_candidates.append(obs)
                 old_obs_plan = self.obs_plan.copy()
                 curr_time = self.get_current_time()
                 for obs_can in self.obs_candidates:
@@ -366,33 +365,38 @@ class ObservationPlanningModule(Module):
         """
         Based on the "greedy planner" from Lemaitre et al. Incorporates reward information and future options to decide observation plan.
         """
-        estimated_reward = 100000.0
+        estimated_reward = 100.0
         rule_based_plan = []
         i = 0
-        while i < 2:
+        while i < 4:
+            self.log(f'Estimated reward: {estimated_reward}',level=logging.DEBUG)
             rule_based_plan = []
             more_actions = True
             curr_time = 0.0
+            curr_angle = 0.0
             total_reward = 0.0
             obs_list_copy = obs_list.copy()
             while more_actions:
                 best_obs = None
                 maximum = 0.0
-                actions = self.get_action_space(curr_time,obs_list)
+                actions = self.get_action_space(curr_time,curr_angle,obs_list)
                 if(len(actions) == 0):
                     break
                 for action in actions:
                     rho = (86400.0 - action.end)/86400.0
-                    e = pow(rho,0.99) * estimated_reward
+                    e = rho * estimated_reward
                     adjusted_reward = action.science_val*self.meas_perf() + e
+                    # if action.science_val > 5.0:
+                    #     self.log(f'Science value greater than 5: {action.science_val} at {action.target} with angle {action.angle} and time {action.start} when curr_angle={curr_angle} and curr_time={curr_time}, adjusted_reward = {adjusted_reward} and maximum = {maximum}',level=logging.DEBUG)
                     if(adjusted_reward > maximum):
                         maximum = adjusted_reward
                         best_obs = action
                 curr_time = best_obs.end
-                total_reward += maximum
+                curr_angle = best_obs.angle
+                total_reward += best_obs.science_val*self.meas_perf()
                 rule_based_plan.append(best_obs)
                 obs_list.remove(best_obs)
-                if(len(self.get_action_space(curr_time,obs_list)) == 0):
+                if(len(self.get_action_space(curr_time,curr_angle,obs_list)) == 0):
                     more_actions = False
             i += 1
             estimated_reward = total_reward
@@ -409,7 +413,7 @@ class ObservationPlanningModule(Module):
         while more_actions:
             soonest = 100000
             soonest_action = None
-            actions = self.get_action_space(curr_time,obs_list)
+            actions = self.get_action_space_nadir(curr_time,obs_list)
             if(len(actions) == 0):
                 break
             for action in actions:
@@ -419,16 +423,40 @@ class ObservationPlanningModule(Module):
             nadir_plan.append(soonest_action)
             obs_list.remove(soonest_action)
             curr_time = soonest_action.start
-            if(len(self.get_action_space(curr_time,obs_list)) == 0):
+            if(len(self.get_action_space_nadir(curr_time,obs_list)) == 0):
                 more_actions = False
         return nadir_plan
 
-    def get_action_space(self,curr_time,obs_list):
+    def get_action_space_nadir(self,curr_time,obs_list):
         feasible_actions = []
         for obs in obs_list:
-            if(obs.start >= curr_time):
+            if obs.start >= curr_time:
                 feasible_actions.append(obs)
         return feasible_actions
+
+    def get_action_space(self,curr_time,curr_angle,obs_list):
+        feasible_actions = []
+        for obs in obs_list:
+            feasible, moved = self.check_maneuver_feasibility(curr_angle,obs.angle,curr_time,obs.start)
+            if obs.start >= curr_time and feasible:
+                feasible_actions.append(obs)
+        return feasible_actions
+
+    def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
+        """
+        Checks to see if the specified angle change violates the maximum slew rate constraint.
+        """
+        moved = False
+        if(abs(curr_angle-new_angle) < 7.5):
+            return True, False
+        if(new_time==curr_time):
+            return False, False
+        slew_rate = abs(new_angle-curr_angle)/abs(new_time-curr_time)
+        max_slew_rate = 0.1 # deg / s
+        #slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
+        #maxTorque = 4e-3
+        moved = True
+        return slew_rate < max_slew_rate, moved
 
 
     def meas_perf(self):
@@ -469,7 +497,7 @@ class OperationsPlanningModule(Module):
         """
         try:
             if(msg.src_module==PlanningSubmoduleTypes.OBSERVATION_PLANNER.value):
-                self.log(f'Received observation plan!',level=logging.INFO)
+                self.log(f'Received observation plan!',level=logging.DEBUG)
                 await self.obs_plan.put(msg.content)
             else:
                 self.log(f'Unsupported message type for this module.)')
@@ -560,7 +588,7 @@ class OperationsPlanningModule(Module):
                     #self.print_ops_plan()
                 elif self.parent_module.mission_profile=="nadir":
                     plan = await self.obs_plan.get()
-                    self.log(f'Creating operations plan!',level=logging.INFO)
+                    self.log(f'Creating operations plan!',level=logging.DEBUG)
                     plan_beginning = self.get_current_time()
                     starts = []
                     ends = []
@@ -599,8 +627,8 @@ class OperationsPlanningModule(Module):
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
                         if(task.start <= curr_time):
-                            await self.sim_wait(5.0)
-                            self.log(f'Sending observation task to engineering module!',level=logging.INFO)
+                            #await self.sim_wait(5.0)
+                            self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
                             self.log(f'Task metadata: {task.obs_info}',level=logging.DEBUG)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [0.0], task.obs_info)
                             msg = PlatformTaskMessage(self.name, AgentModuleTypes.ENGINEERING_MODULE.value, obs_task)
@@ -642,7 +670,7 @@ class OperationsPlanningModule(Module):
         """
         for op in self.ops_plan:
             if(isinstance(op,ObservationPlannerTask)):
-                self.log(f'Observation planned at {op.start} to observe {op.target}',level=logging.INFO)
+                self.log(f'Observation planned at {op.start} to observe {op.target}',level=logging.DEBUG)
 
 
 class PredictiveModelsModule(Module):
