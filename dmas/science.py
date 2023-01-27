@@ -85,11 +85,11 @@ class ScienceModule(Module):
         outlier = False
         outlier_data = None
         flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.chl_points)
-        if flood_chance > 0.90: # TODO remove this hardcode
+        if flood_chance > 0.50: # TODO remove this hardcode
             item["severity"] = flood_chance
             outlier = True
             outlier_data = item
-            self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
+            self.log(f'Flood detected at {lat}, {lon}!',level=logging.DEBUG)
         else:
             self.log(f'No flood detected at {lat}, {lon}',level=logging.DEBUG)
         return outlier, outlier_data
@@ -300,7 +300,7 @@ class ScienceValueModule(Module):
         science_val = 1.0 #self.get_pop(lat, lon, points) TODO replace this?
         flood, flood_data = self.parent_module.check_altimetry_outliers(obs)
         if flood:
-            science_val = science_val * 50
+            science_val = science_val * 10
             self.log(f'Computed bonus science value: {science_val}', level=logging.DEBUG)
             outlier = True
         else:

@@ -38,6 +38,22 @@ class PlanningModule(Module):
             #MeasurementPerformanceModule(self)
         ]
 
+    def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
+        """
+        Checks to see if the specified angle change violates the maximum slew rate constraint.
+        """
+        moved = False
+        if(abs(curr_angle-new_angle) < 7.5):
+            return True, False
+        if(new_time==curr_time):
+            return False, False
+        slew_rate = abs(new_angle-curr_angle)/abs(new_time-curr_time)
+        max_slew_rate = 1.0 # deg / s
+        #slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
+        #maxTorque = 4e-3
+        moved = True
+        return slew_rate < max_slew_rate, moved
+
     async def internal_message_handler(self, msg: InternalMessage):
         """
         Handles message intended for this module and performs actions accordingly.
@@ -368,7 +384,7 @@ class ObservationPlanningModule(Module):
         estimated_reward = 100.0
         rule_based_plan = []
         i = 0
-        while i < 4:
+        while i < 2:
             self.log(f'Estimated reward: {estimated_reward}',level=logging.DEBUG)
             rule_based_plan = []
             more_actions = True
@@ -437,27 +453,10 @@ class ObservationPlanningModule(Module):
     def get_action_space(self,curr_time,curr_angle,obs_list):
         feasible_actions = []
         for obs in obs_list:
-            feasible, moved = self.check_maneuver_feasibility(curr_angle,obs.angle,curr_time,obs.start)
+            feasible, moved = self.parent_module.check_maneuver_feasibility(curr_angle,obs.angle,curr_time,obs.start)
             if obs.start >= curr_time and feasible:
                 feasible_actions.append(obs)
         return feasible_actions
-
-    def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
-        """
-        Checks to see if the specified angle change violates the maximum slew rate constraint.
-        """
-        moved = False
-        if(abs(curr_angle-new_angle) < 7.5):
-            return True, False
-        if(new_time==curr_time):
-            return False, False
-        slew_rate = abs(new_angle-curr_angle)/abs(new_time-curr_time)
-        max_slew_rate = 0.1 # deg / s
-        #slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
-        #maxTorque = 4e-3
-        moved = True
-        return slew_rate < max_slew_rate, moved
-
 
     def meas_perf(self):
         """
@@ -568,9 +567,9 @@ class OperationsPlanningModule(Module):
                                 charge_task = ChargePlannerTask(ends[i],starts[i+1])
                                 #self.ops_plan.append(charge_task) TODO add back charge tasks
                             obs_task = plan[i]
-                            feasible, moved = self.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start)
+                            feasible, moved = self.parent_module.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start)
                             if curr_time <= obs_task.start and feasible:
-                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.DEBUG)
+                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.INFO)
                                 unique = True
                                 for ops in self.ops_plan:
                                     if(ops.start == obs_task.start and ops.target == obs_task.target):
@@ -627,7 +626,7 @@ class OperationsPlanningModule(Module):
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
                         if(task.start <= curr_time):
-                            #await self.sim_wait(5.0)
+                            await self.sim_wait(1.0)
                             self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
                             self.log(f'Task metadata: {task.obs_info}',level=logging.DEBUG)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [0.0], task.obs_info)
@@ -648,22 +647,6 @@ class OperationsPlanningModule(Module):
         except asyncio.CancelledError:
             return
     
-    def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
-        """
-        Checks to see if the specified angle change violates the maximum slew rate constraint.
-        """
-        moved = False
-        if(abs(curr_angle-new_angle) < 7.5):
-            return True, False
-        if(new_time==curr_time):
-            return False, False
-        slew_rate = abs(new_angle-curr_angle)/abs(new_time-curr_time)
-        max_slew_rate = 0.1 # deg / s
-        #slewTorque = 4 * abs(np.deg2rad(new_angle)-np.deg2rad(curr_angle))*0.05 / pow(abs(new_time-curr_time),2)
-        #maxTorque = 4e-3
-        moved = True
-        return slew_rate < max_slew_rate, moved
-
     def print_ops_plan(self):
         """
         Prints the operations plan.
