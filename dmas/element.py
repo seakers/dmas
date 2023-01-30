@@ -117,7 +117,7 @@ class AbstractSimulationElement(ABC):
         """
         pass
 
-    async def broadcast_message(self, msg : SimulationMessage) -> None:
+    async def _broadcast_message(self, msg : SimulationMessage) -> None:
         """
         Broadcasts a message to all elements subscribed to this element's publish socket
         """
@@ -125,8 +125,13 @@ class AbstractSimulationElement(ABC):
         await self._pub_socket.send_multipart([msg.get_dst(), msg.to_json()])
         self._pub_socket_lock.release()
 
-    async def push_message_to_monitor(self, msg : SimulationMessage) -> None:
-        pass
+    async def _push_message_to_monitor(self, msg : SimulationMessage) -> None:
+        """
+        Pushes a message to the simulation monitor
+        """
+        await self._monitor_push_socket_lock.acquire()
+        await self._monitor_push_socket.send_multipart([msg.get_dst(), msg.to_json()])
+        self._monitor_push_socket_lock.release()
 
     def __is_address_in_use(address : str) -> bool:
         """
