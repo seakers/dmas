@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import datetime
 import logging
+import time
 
 from .messages import *
 
@@ -33,7 +34,7 @@ class AbstractManager(AbstractSimulationElement):
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
-        self._address_map = dict()
+        self._address_ledger = dict()
         
         if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
             raise Exception('List of simulation elements must include the simulation environment.')
@@ -58,7 +59,7 @@ class AbstractManager(AbstractSimulationElement):
         The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports. 
         """
         
-        while len(self._address_map) < len(self._simulation_element_name_list):
+        while len(self._address_ledger) < len(self._simulation_element_name_list):
             msg_dict = await self._peer_in_socket.recv_json()
             msg_type = msg_dict['@type']
             
@@ -75,22 +76,28 @@ class AbstractManager(AbstractSimulationElement):
             # log subscriber confirmatoin
             src = sync_req.get_src()
             if src in self._simulation_element_name_list:
-                if src not in self._address_map:
+                if src not in self._address_ledger:
                     # node is a part of the simulation and has not yet been synchronized
 
                     # add node network information to address map
-                    self._address_map[src] = sync_req.get_network_config()
-                    logging.debug(f'Node {sync_req.get_src()} is now synchronized! Sync status: ({len(self._address_map)}/{len(self._simulation_element_name_list)})')
+                    self._address_ledger[src] = sync_req.get_network_config()
+                    logging.debug(f'Node {sync_req.get_src()} is now synchronized! Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
                 else:
                     # node is a part of the simulation but has already been synchronized
-                    logging.debug(f'Node {sync_req.get_src()} is already synchronized to the simulation manager. Sync status: ({len(self._address_map)}/{len(self._simulation_element_name_list)})')
+                    logging.debug(f'Node {sync_req.get_src()} is already synchronized to the simulation manager. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             else:
                     # node is not a part of the simulation
-                    logging.debug(f'Node {sync_req.get_src()} not part of this simulation. Sync status: ({len(self._address_map)}/{len(self._simulation_element_name_list)})')
+                    logging.debug(f'Node {sync_req.get_src()} not part of this simulation. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
             # send synchronization acknowledgement
             await self._peer_in_socket.send_string('ACK')                
-        
+
+    async def _broadcast_sim_start(self) -> None:
+        """
+        Broadcasts this manager's simulation element address ledger to all subscribed elements to signal the start of the simulation.
+        """
+        sim_start_msg = SimulationStartMessage(self._address_ledger, self._clock_config, time.perf_counter())
+        await self._broadcast_message(sim_start_msg)
 
     async def _shut_down(self) -> None:
         
