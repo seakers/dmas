@@ -3,18 +3,29 @@ from ctypes import Union
 from enum import Enum
 import json
 
+from dmas.utils import ClockConfig, SimulationElementTypes
+
 
 class SimulationMessage(ABC):
+    """
+    ## Abstract Simulation Message 
+
+    Describes a message to be sent between simulation elements
+
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`): name of the intended simulation element to receive this message
+        - _msg_type (`Enum`): type of message being sent
+    """
+
     def __init__(self, src: str, dst: str, msg_type: Enum) -> None:
         """
-        Abstract class for a message being sent between two elements in the simulation
+        Initiates an instance of a simulation message.
         
-        src:
-            name of the simulation member sending the message
-        dst:
-            name of the simulation member receiving the message
-        type:
-            type of message being sent
+        ### Args:
+            - src (`str`): name of the simulation element sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - msg_type (`str`): type of message being sent
         """
         self._src = src
         self._dst = dst
@@ -78,74 +89,79 @@ SIMULATION MANAGER MESSAGES
 class ManagerMessageTypes(Enum):
     """
     Types of broadcasts sent from the simulation manager to simulation members.
-        1- tic: informs simulation members of the simulation's current time
-        2- sim_start: notifies simulation membersthat the simulation has started
-        3- sim_end: notifies simulation members that the simulation has ended 
+        - tic: informs simulation members of the simulation's current time
+        - sim_start: notifies simulation membersthat the simulation has started
+        - sim_end: notifies simulation members that the simulation has ended 
     """
     TIC_EVENT = 'TIC_EVENT'
     SIM_START_EVENT = 'SIM_START_EVENT'
     SIM_END_EVENT = 'SIM_END_EVENT'
 
-class ManagerMessage(SimulationMessage): 
+class ManagerMessage(SimulationMessage, ABC): 
+    """
+    ## Manager Message
+
+    Describes a message being brodcasted from the simulation manager to all simulation elements.
+
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`): name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = : type of message being sent
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
     def __init__(self, type: ManagerMessageTypes, t : Union[int, float]) -> None:   
+        """        
+        Initialzies an instance of a Manager Message
         """
-        Message being sent from the simulation manager to all simulation elements
-        
-        msg_type:
-            type of messsage being sent
-        t:
-            server simulation clock at the time of transmission in [s]
-        """
-        super().__init__('manager', 'all', type)
+        super().__init__(SimulationElementTypes.MANAGER.name, SimulationElementTypes.ALL.name, type)
         self._t = t
 
     def to_dict(self) -> dict:
-        """
-        Crates a dictionary containing all information contained in this message object
-        """
         msg_dict = super().to_dict()
         msg_dict['t'] = self._t
         return msg_dict
 
-    def from_dict(d : dict):
-        """
-        Creates an instance of a message class object from a dictionary 
-        """
-        type_name = d.get('@type', None)
-        t = d.get('t', None)
+    # def from_dict(d : dict):
+        
+    #         raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
-        if type_name is None or t is None:
-            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+    #     msg_type = None
+    #     for name, member in ManagerMessageTypes.__members__.items():
+    #         if name == type_name:
+    #             msg_type = member
 
-        msg_type = None
-        for name, member in ManagerMessageTypes.__members__.items():
-            if name == type_name:
-                msg_type = member
+    #     if msg_type is None:
+    #         raise Exception(f'Could not recognize message of type {type_name}.')
 
-        if msg_type is None:
-            raise Exception(f'Could not recognize message of type {type_name}.')
+    #     return ManagerMessage(msg_type, t)
 
-        return ManagerMessage(msg_type, t)
-
-    
-    def from_json(j):
-        """
-        Creates an instance of a message class object from a json object 
-        """
-        return ManagerMessage.from_dict(json.loads(j))
 
 class SimulationStartMessage(ManagerMessage):
-    def __init__(self, address_ledger: dict, clock_info: dict) -> None:
-        """
-        Message from the simulation manager informing all memebers in the simulation that the simulation has started. 
-        It also gives the network general information about the simulation.
+    """
+    ## Simulation Start Message 
 
+    Message from the simulation manager informing all elements of the simulation that the simulation has started. 
+    It also gives the network general information about the simulation to all elements.
+    
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`): name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = : type of message being sent
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+        - _address_ledger (`dict`): dictionary mapping simulation element names to network addresses to be used for peer-to-peer communication or broadcast subscription
+    """
+
+    def __init__(self, address_ledger: dict, clock_info: ClockConfig, t: float) -> None:
+        """
+        Initiallizes and instance of a Simulation Start Message
+
+        ### Arguments:
         address_ledger:
             dictionary mapping agent node names to network addresses to be used for peer-to-peer communication
         clock_info:
             dictionary containing information about the clock being used in this simulation
         """
-        super().__init__(ManagerMessageTypes.SIM_START_EVENT, t=-1)
+        super().__init__(ManagerMessageTypes.SIM_START_EVENT, t)
         self._address_ledger = address_ledger
         self._clock_info = clock_info
 
@@ -163,10 +179,11 @@ class SimulationStartMessage(ManagerMessage):
 
     def from_dict(d : dict):
         type_name = d.get('@type', None)
+        t = d.get('t', None)
         port_ledger = d.get('port ledger', None)
         clock_info = d.get('clock info', None)
 
-        if type_name is None or port_ledger is None or clock_info is None:
+        if type_name is None or t is None or port_ledger is None or clock_info is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')
 
         msg_type = None

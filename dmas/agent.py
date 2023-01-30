@@ -159,7 +159,3 @@ class AbstractAgent(ABC):
     @abstractmethod
     def _publish_to_montor(self, msg) -> None:
         pass
-
-class Agent(AbstractAgent):
-    async def __init__(self) -> None:
-        super().__init__()

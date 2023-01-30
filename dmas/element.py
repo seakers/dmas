@@ -4,12 +4,13 @@ import logging
 import zmq
 import zmq.asyncio as azmq
 import socket
+from .utils import *
 
 logger = logging.getLogger(__name__)
 
-class SimulationElement(ABC):
+class AbstractSimulationElement(ABC):
     """
-    ## Simulation Element 
+    ## Abstract Simulation Element 
 
     Base class for all simulation elements. This including all agents, environment, and simulation manager.
 
@@ -30,7 +31,7 @@ class SimulationElement(ABC):
         - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`socket`)
     """
 
-    def __init__(self, name : str, response_address : str, broadcast_address : str, monitor_address : str) -> None:
+    def __init__(self, name : str, network_config : ManagerNetworkConfig) -> None:
         """
         Initiates a new simulation element
 
@@ -43,11 +44,7 @@ class SimulationElement(ABC):
         super().__init__()
 
         self.name = name
-        self._response_address = response_address
-        self._broadcast_address = broadcast_address
-        self._monitor_address = monitor_address
-
-        self._my_addresses = [self._response_address, self._broadcast_address]
+        self._network_config = network_config
 
     async def run(self) -> None:
         """
@@ -75,13 +72,13 @@ class SimulationElement(ABC):
         await self._base_network_config()
 
         # inititate any additional network connections 
-        await self._network_config()
+        await self._config_network()
 
     async def _base_network_config(self) -> None:
         """
         Initializes and connects essential network port sockets for this simulation element. 
         
-        ### Sockets Initialized:
+        #### Sockets Initialized:
             - _peer_in_socket (:obj:`Socket`): The entity name
             - _pub_socket (:obj:`Socket`): The entity's response port address
             - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
@@ -89,40 +86,40 @@ class SimulationElement(ABC):
         # initiate ports and connections
         self._context = azmq.Context()
 
-        for address in self._my_addresses:
-            if self.__is_port_in_use(address):
+        for address in self._network_config.get_my_addresses():
+            if self.__is_address_in_use(address):
                 raise Exception(f"{address} address is already in use.")
 
         # direct message response port
         self._peer_in_socket = self._context.socket(zmq.REP)
-        self._peer_in_socket.bind(self._response_address)
+        self._peer_in_socket.bind(self._network_config.get_response_address())
         self._peer_in_socket.setsockopt(zmq.LINGER, 0)
         self._peer_in_socket_lock = asyncio.Lock()
 
         # broadcast message publish port
         self._pub_socket = self._context.socket(zmq.PUB)                   
         self._pub_socket.sndhwm = 1100000                                 ## set SNDHWM, so we don't drop messages for slow subscribers
-        self._pub_socket.bind(self._broadcast_address)
+        self._pub_socket.bind(self._network_config.get_broadcast_address)
         self._pub_socket_lock = asyncio.Lock()
 
         # push to monitor port
         self._monitor_push_socket = self._context.socket(zmq.PUSH)
-        self._monitor_push_socket.connect(self._monitor_address)
+        self._monitor_push_socket.connect(self._network_config.get_monitor_address())
         self._monitor_push_socket.setsockopt(zmq.LINGER, 0)
         self._monitor_push_socket_lock = asyncio.Lock()
 
     @abstractmethod
-    async def _network_config(self):
+    async def _config_network(self):
         """
         Initializes and connects any aditional network port sockets for this simulation element. 
         """
         pass
 
-    def __is_port_in_use(address : str) -> bool:
+    def __is_address_in_use(address : str) -> bool:
         """
         Checks if an address is already bound to an existing port socket.
 
-        ### Args:
+        ### Arguments:
             - address (`str`): address being evaluated
 
         ### Returns:
