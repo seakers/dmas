@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import json
 
@@ -13,11 +13,13 @@ class SimulationElementTypes(Enum):
 NETWORK CONFIGS
 ------------------
 """
-class SimClocks(Enum):
-    # asynchronized clocks
-    # -Each node in the network carries their own clocks to base their waits on
-    REAL_TIME = 'REAL_TIME'                             # runs simulations in real-time. 
+class ClockTypes(Enum):
+    REAL_TIME = 'REAL_TIME'                             # runs simulations in real-time 
     ACCELERATED_REAL_TIME = 'ACCELERATED_REAL_TIME'     # each real time second represents a user-given amount of simulation seconds
+
+class NetworkConfigTypes(Enum):
+    MANAGER_NETWORK_CONFIG = 'MANAGER_NETWORK_CONFIG'
+    NODE_NETWORK_CONFIG = 'NODE_NETWORK_CONFIG'
 
 class NetworkConfig(ABC):
     """
@@ -82,6 +84,23 @@ class NetworkConfig(ABC):
         out['monitor address'] = self.get_monitor_address()
         return out
 
+    @abstractmethod
+    def from_dict(d : dict):
+        """
+        Creates an instance of this Configuration Class from a dictionary object
+        """
+        pass
+
+    @abstractmethod
+    def from_json(j):
+        """
+        Creates an instance of this Configuration Class from a json object
+        """
+        pass
+
+    def __str__(self):
+        return str(self.to_dict())
+
 class ManagerNetworkConfig(NetworkConfig):
     """
     ## Manager Network Config
@@ -95,6 +114,24 @@ class ManagerNetworkConfig(NetworkConfig):
     """
     def get_my_addresses(self) -> dict:
         return [self._response_address, self._broadcast_address]
+
+    def to_dict(self) -> dict:
+        out = super().to_dict()
+        out['@type'] = NetworkConfigTypes.MANAGER_NETWORK_CONFIG.name
+        return out
+
+    def from_dict(d: dict):
+        response_address = d.get('response address', None)
+        broadcast_address = d.get('broadcast address', None)
+        monitor_address = d.get('monitor address', None)
+
+        if response_address is None or broadcast_address is None or monitor_address is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
+
+        return ManagerNetworkConfig(response_address, broadcast_address, monitor_address)
+
+    def from_json(j):
+        return ManagerNetworkConfig.from_dict(json.loads(j))
 
 class NodeNetworkConfig(NetworkConfig):
     """
@@ -140,7 +177,23 @@ class NodeNetworkConfig(NetworkConfig):
         out = super().to_dict()
         out['request address'] = self.get_request_address()
         out['subscribe address'] = self.get_subscribe_address()
+        out['@type'] = NetworkConfigTypes.NODE_NETWORK_CONFIG.name
         return out
+
+    def from_dict(d: dict):
+        response_address = d.get('response address', None)
+        broadcast_address = d.get('broadcast address', None)
+        monitor_address = d.get('monitor address', None)
+        request_address = d.get('request address', None)
+        subscribe_address = d.get('subscribe address', None)
+
+        if response_address is None or broadcast_address is None or monitor_address is None or request_address is None or subscribe_address is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
+
+        return NodeNetworkConfig(request_address, response_address, broadcast_address, subscribe_address, monitor_address)
+
+    def from_json(j):
+        return NodeNetworkConfig.from_dict(json.loads(j))
 
 """
 ------------------
@@ -161,7 +214,7 @@ class ClockConfig(ABC):
     def __init__(self, 
                 start_date : datetime, 
                 end_date : datetime, 
-                clock_type : SimClocks
+                clock_type : ClockTypes
                 ) -> None:
         """
         Initializes an instance of a clock configuration object
@@ -182,8 +235,8 @@ class ClockConfig(ABC):
         Creates an instance of a dictionary containing information about this object
         """
         out = dict()
-        out['start date'] = self.start_date
-        out['end date'] = self.end_date
+        out['start date'] = str(self.start_date)
+        out['end date'] = str(self.end_date)
         out['@type'] = self.clock_type.name
         return out
 
@@ -194,20 +247,38 @@ class ClockConfig(ABC):
         return json.dumps(self.to_dict())
 
     @abstractmethod
-    def from_dict():
+    def from_dict(d : dict):
         """
         Creates an instance of a clock configuration object from a dictionary 
         """
         pass
 
     @abstractmethod
-    def from_json():
+    def from_json(j):
         """
         Creates an instance of a clock configuration object from a json object 
         """
         pass
 
-class RealTimeClock(ClockConfig):
+def datetime_from_str(date_str : str) -> datetime:
+    """
+    Reads a string repersenting a date and a time and returns a datetime object
+    """
+    date, time = date_str.split(' ')
+    year, month, day = date.split('-')
+    year, month, day = int(year), int(month), int(day)
+
+    time, delta = time.split('+')
+    hh, mm, ss = time.split(':')
+    hh, mm, ss = int(hh), int(mm), int(ss)
+
+    dmm, dss = delta.split(':')
+    dmm, dss = int(dmm), int(dss)
+    
+    # print(f'{year}-{month}-{day} {hh}:{mm}:{ss}+{dmm}:{dss}')
+    return datetime(year, month, day, hh, mm, ss, tzinfo=timezone.utc)
+
+class RealTimeClockConfig(ClockConfig):
     """
     ## Real Time Simulation Clock Configuration  
 
@@ -229,19 +300,38 @@ class RealTimeClock(ClockConfig):
             - start_date (:obj:`datetime`): simulation start date
             - end_date (:obj:`datetime`): simulation end date
         """
-        super().__init__(start_date, end_date, SimClocks.REAL_TIME)
+        super().__init__(start_date, end_date, ClockTypes.REAL_TIME)
 
-class AcceleratedRealTimeClock(ClockConfig):
+    def from_dict(d: dict):
+        start_date_str = d.get('start date', None)
+        end_date_str = d.get('end date', None)
+        type_name = d.get('@type', None)
+
+        if start_date_str is None or end_date_str is None or type_name is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this clock config object.')
+        
+        if type_name != ClockTypes.REAL_TIME.name:
+            raise AttributeError(f'Cannot load a Real time Clock Config from a dictionary request of type {type_name}.')
+            
+        start_date = datetime_from_str(start_date_str)
+        end_date = datetime_from_str(end_date_str)
+
+        return RealTimeClockConfig(start_date, end_date)
+
+    def from_json(j):
+        return RealTimeClockConfig.from_dict(json.loads(j))
+
+class AcceleratedRealTimeClockConfig(ClockConfig):
     """
     ## Real Time Simulation Clock Configuration  
 
     Describes a real-time clock to be used in the simulation.
 
     ### Attributes:
-        - start_date (:obj:`datetime`): simulation start date
-        - end_date (:obj:`datetime`): simulation end date
-        - clock_type (:obj:`SimClocks`) = `SimClocks.ACCELERATED_REAL_TIME`: type of clock to be used in the simulation
-        - sim_clock_freq (`float`): ratio of simulation-time seconds to real-time seconds [t_sim/t_real]
+        - _start_date (:obj:`datetime`): simulation start date
+        - _end_date (:obj:`datetime`): simulation end date
+        - _clock_type (:obj:`SimClocks`) = `SimClocks.ACCELERATED_REAL_TIME`: type of clock to be used in the simulation
+        - _sim_clock_freq (`float`): ratio of simulation-time seconds to real-time seconds [t_sim/t_real]
     """
 
     def __init__(self, 
@@ -258,10 +348,36 @@ class AcceleratedRealTimeClock(ClockConfig):
             - sim_clock_freq (`float`): ratio of simulation-time seconds to real-time seconds [t_sim/t_real]
         """        
         
-        super().__init__(start_date, end_date, SimClocks.ACCELERATED_REAL_TIME)
+        super().__init__(start_date, end_date, ClockTypes.ACCELERATED_REAL_TIME)
 
         if sim_clock_freq < 1:
             raise ValueError('`sim_clock_freq` must be a value greater or equal to 1.')
+        
+        self._sim_clock_freq = sim_clock_freq
+
+    def to_dict(self) -> dict:
+        out = super().to_dict()
+        out['clock freq'] = self._sim_clock_freq
+
+    def from_dict(d : dict):
+        start_date_str = d.get('start date', None)
+        end_date_str = d.get('end date', None)
+        clock_frequency = d.get('clock freq', None)
+        type_name = d.get('@type', None)
+
+        if start_date_str is None or end_date_str is None or clock_frequency is None or type_name is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this clock config object.')
+        
+        if type_name != ClockTypes.REAL_TIME.name:
+            raise AttributeError(f'Cannot load a Real time Clock Config from a dictionary request of type {type_name}.')
+            
+        start_date = datetime_from_str(start_date_str)
+        end_date = datetime_from_str(end_date_str)
+
+        return AcceleratedRealTimeClockConfig(start_date, end_date, clock_frequency)
+
+    def from_json(j):
+        return AcceleratedRealTimeClockConfig.from_dict(json.loads(j))
 
 class LoggerTypes(Enum):
     DEBUG = 'DEBUG'
