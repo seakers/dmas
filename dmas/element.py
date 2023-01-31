@@ -31,6 +31,19 @@ class AbstractSimulationElement(ABC):
         - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
         - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`socket`)
+
+
+    ### Communications diagram:
+    +----------+---------+       
+    |          | PUB     |------>
+    |          +---------+       
+    |          | PUSH    |------>
+    |          +---------+       
+    |          | REP     |<------
+    |          +---------+       
+    |                    |       
+    |ABSTRACT SIM ELEMENT|       
+    +--------------------+       
     """
 
     def __init__(self, name : str, network_config : ManagerNetworkConfig) -> None:
@@ -71,19 +84,21 @@ class AbstractSimulationElement(ABC):
         May be expanded if more capabilities are needed.
         """
         # inititate base network connections 
-        await self._base_network_config()
+        self._socket_list = await self._config_network()
 
-        # inititate any additional network connections 
-        await self._config_network()
-
-    async def _base_network_config(self) -> None:
+    async def _config_network(self) -> list:
         """
         Initializes and connects essential network port sockets for this simulation element. 
+
+        Must be expanded if more connections are needed.
         
         #### Sockets Initialized:
             - _peer_in_socket (:obj:`Socket`): The entity name
             - _pub_socket (:obj:`Socket`): The entity's response port address
             - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
+
+        #### Returns:
+            - `list` containing all sockets used by this simulation element
         """
         # initiate ports and connections
         self._context = azmq.Context()
@@ -110,12 +125,7 @@ class AbstractSimulationElement(ABC):
         self._monitor_push_socket.setsockopt(zmq.LINGER, 0)
         self._monitor_push_socket_lock = asyncio.Lock()
 
-    @abstractmethod
-    async def _config_network(self):
-        """
-        Initializes and connects any aditional network port sockets for this simulation element. 
-        """
-        pass
+        return [self._peer_in_socket, self._pub_socket, self._monitor_push_socket]
 
     async def _broadcast_message(self, msg : SimulationMessage) -> None:
         """
@@ -146,46 +156,32 @@ class AbstractSimulationElement(ABC):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             return s.connect_ex(address) == 0
 
-    @abstractmethod
-    async def _live(self):
-        """
-        Procedure to be executed by the simulation element during the simulation. 
-        
-        Element will shut down once this procedure is completed.
-        """
-        pass
-
     async def _shut_down(self) -> None:
         """
         Shut down procedure for this simulation entity. 
         Must close all socket connections.
         """
-
         # close connections
-        self.__close_base_sockets()
         self._close_sockets()
 
         # close network context
         if self._context is not None:
             self._context.term()
 
-    def __close_base_sockets(self) -> None:
+    def _close_sockets(self) -> None:
         """
         Closes all sockets present in the abstract class Entity
         """
-        if self._peer_in_socket is not None:
-            self._peer_in_socket.close()
-
-        if self._pub_socket is not None:
-            self._pub_socket.close()
-
-        if self._monitor_push_socket is not None:
-            self._monitor_push_socket.close()
+        for socket in self._socket_list:
+            socket : zmq.Socket
+            socket.close()
 
     @abstractmethod
-    def _close_sockets(self) -> None:
+    async def _live(self):
         """
-        Closes any additional sockets opened by a simulation Entity
+        Procedure to be executed by the simulation element during the simulation. 
+        
+        Element will shut down once this procedure is completed.
         """
         pass
 

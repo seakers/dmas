@@ -66,7 +66,7 @@ class SimulationMessage(ABC):
         return json.dumps(self.to_dict())
     
     @abstractmethod
-    def from_dict(d):
+    def from_dict(d : dict):
         """
         Creates an instance of a message class object from a dictionary 
         """
@@ -95,11 +95,13 @@ SIMULATION MANAGER MESSAGES
 class ManagerMessageTypes(Enum):
     """
     Types of broadcasts sent from the simulation manager to simulation members.
+        - sim_info: informs all simulation elements of general simulation information
         - sim_start: notifies simulation membersthat the simulation has started
         - sim_end: notifies simulation members that the simulation has ended 
     """
-    SIM_START_EVENT = 'SIM_START_EVENT'
-    SIM_END_EVENT = 'SIM_END_EVENT'
+    SIM_INFO = 'SIM_INFO'
+    SIM_START = 'SIM_START'
+    SIM_END = 'SIM_END'
 
 class ManagerMessage(SimulationMessage, ABC): 
     """
@@ -109,8 +111,8 @@ class ManagerMessage(SimulationMessage, ABC):
 
     ### Attributes:
         - _src (`str`): name of the simulation element sending this message
-        - _dst (`str`): name of the intended simulation element to receive this message
-        - _msg_type (`Enum`) = : type of message being sent
+        - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
+        - _msg_type (`Enum`): type of message being sent
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
     def __init__(self, type: ManagerMessageTypes, t : Union[int, float]) -> None:   
@@ -126,19 +128,102 @@ class ManagerMessage(SimulationMessage, ABC):
         return out
 
     def __str__(self) -> str:
-        return str(self.to_dict())
+        return f'{self._msg_type.name}, t={self._t}'
 
 class SimulationStartMessage(ManagerMessage):
     """
-    ## Simulation Start Message 
+    ## Simulation Start Message Message
 
-    Message from the simulation manager informing all elements of the simulation that the simulation has started. 
-    It also gives the network general information about the simulation to all elements.
+    Informs all simulation elements that the simulation has started 
+
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_START`: type of message being sent
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
+    def __init__(self, t: Union[int, float]) -> None:
+        """
+        Initializes an instance of a Simulaiton Start Message
+        """
+        super().__init__(ManagerMessageTypes.SIM_START, t)
+
+    def from_dict(d : dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        t = d.get('t', None)
+        type_name = d.get('@type', None)
+        
+        if src is None or dst is None or type_name is None or t is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in ManagerMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ManagerMessageTypes.SIM_START:
+            raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
+
+        return SimulationStartMessage(t)
+
+    def from_json(j):
+        return SimulationStartMessage.from_dict(json.loads(j))
+
+class SimulationEndMessage(ManagerMessage):
+    """
+    ## Simulation End Message Message
+
+    Informs all simulation elements that the simulation has ended 
+
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_END`: type of message being sent
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
+    def __init__(self, t: Union[int, float]) -> None:
+        """
+        Initializes an instance of a Simulaiton End Message
+        """
+        super().__init__(ManagerMessageTypes.SIM_END, t)
+
+    def from_dict(d : dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        t = d.get('t', None)
+        type_name = d.get('@type', None)
+        
+        if src is None or dst is None or type_name is None or t is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in ManagerMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ManagerMessageTypes.SIM_END:
+            raise Exception(f'Cannot load a Simulation End Message from a dictionary request of type {type_name}.')
+
+        return SimulationEndMessage(t)
+
+    def from_json(j):
+        return SimulationEndMessage.from_dict(json.loads(j))
+
+class SimulationInfoMessage(ManagerMessage):
+    """
+    ## Simulation Information Message 
+
+    Message from the simulation manager informing all elements of the simulation that informs them of general information about the simulation.
     
     ### Attributes:
         - _src (`str`) = `SimulationElementTypes.MANAGER.name`: name of the simulation element sending this message
         - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
-        - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_START_EVENT`: type of message being sent
+        - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_INFO`: type of message being sent
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
         - _address_ledger (`dict`): dictionary mapping simulation element names to network addresses to be used for peer-to-peer communication or broadcast subscription
         - _clock_config (:obj:`ClockConfig`): config object containing information about the clock being used in this simulation
@@ -152,7 +237,7 @@ class SimulationStartMessage(ManagerMessage):
             - _address_ledger (`dict`): dictionary mapping agent node names to network addresses to be used for peer-to-peer communication
             - _clock_config (:obj:`ClockConfig`): config object containing information about the clock being used in this simulation
         """
-        super().__init__(ManagerMessageTypes.SIM_START_EVENT, t)
+        super().__init__(ManagerMessageTypes.SIM_INFO, t)
 
         self._address_ledger = dict()
         for node_name in address_ledger:
@@ -201,8 +286,8 @@ class SimulationStartMessage(ManagerMessage):
         if msg_type is None:
             raise AttributeError(f'Could not recognize simulation manager message of type {type_name}.')
 
-        elif msg_type is not ManagerMessageTypes.SIM_START_EVENT:
-            raise AttributeError(f'Cannot load a Simulation Start Message from a dictionary of type {type_name}.')
+        elif msg_type is not ManagerMessageTypes.SIM_INFO:
+            raise AttributeError(f'Cannot load a Simulation Info Message from a dictionary of type {type_name}.')
 
         clock_type = clock_info['@type']
         if clock_type == ClockTypes.REAL_TIME.name:
@@ -217,71 +302,13 @@ class SimulationStartMessage(ManagerMessage):
             network_config_dict : dict = address_ledger[node_name]
             address_ledger_dict[node_name] = NodeNetworkConfig.from_dict(network_config_dict)
 
-        return SimulationStartMessage(address_ledger, clock_config, t)
+        return SimulationInfoMessage(address_ledger, clock_config, t)
 
     def from_json(j):
         """
         Creates an instance of a message class object from a json object 
         """
-        return SimulationStartMessage.from_dict(json.loads(j))
-
-    def __str__(self) -> str:
-        return f'{ManagerMessageTypes.SIM_START_EVENT.name}, t={self._t}'
-
-# class SimulationEndMessage(ManagerMessage):
-#     """
-#         ## Simulation End Mesage
-
-#         Message from the simulation manager informing all memebers in the simulation that the simulation has emded. 
-        
-#         ### Attributes:
-#             - _src (`str`): name of the simulation element sending this message
-#             - _dst (`str`): name of the intended simulation element to receive this message
-#             - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_END_EVENT`: type of message being sent
-#             - _t (`Union[int, float]`): manager's simulation clock at the time of transmission in [s]
-#         """
-#     def __init__(self, t: Union[int, float]) -> None:
-#         """
-#         Initiallizes and instance of a Simulation End Message
-
-#         ### Arguments:
-#             - t (`Union[int, float]`): manager's simulation clock at the time of transmission in [s]
-#         """
-#         super().__init__(type, t)
-
-#     def from_dict(d : dict):
-#         """
-#         Creates an instance of a Simulation End Broadcast Message class object from a dictionary
-#         """
-#         type_name = d.get('@type', None)
-#         t = d.get('t', None)
-
-#         if type_name is None or t is None:
-#             raise Exception('Dictionary does not contain necessary information to construct this message object.')
-
-#         msg_type = None
-#         for name, member in ManagerMessageTypes.__members__.items():
-#             if name == type_name:
-#                 msg_type = member
-
-#         if msg_type is None:
-#             raise AttributeError(f'Could not recognize simulation manager message of type {type_name}.')
-#         elif msg_type is not ManagerMessageTypes.SIM_END_EVENT:
-#             raise AttributeError(f'Cannot load a Simulation End Event Broadcast Message from a dictionary of type {type_name}.')
-
-#         return SimulationEndMessage(t)
-
-#     def to_json(self) -> str:
-#         """
-#         Creates a json file from this message 
-#         """
-#         return super().to_json()
-
-#     def from_json(j):
-#         """
-#         Creates an instance of a message class object from a json object 
-#         """
-#         return SimulationEndMessage.from_dict(json.loads(j))
+        return SimulationInfoMessage.from_dict(json.loads(j))
 
 """
 -----------------
@@ -294,6 +321,8 @@ class NodeMessageTypes(Enum):
         1- SimulationSyncRequest: agent notifies environment server that it is online and ready to start the simulation. Only used before the start of the simulation
     """
     SYNC_REQUEST = 'SYNC_REQUEST'
+    NODE_READY = 'NODE_READY'
+    NODE_DEACTIVATED = 'NODE_DEACTIVATED'
 
 class SyncRequestMessage(SimulationMessage):
     """
@@ -359,7 +388,6 @@ class SyncRequestMessage(SimulationMessage):
 
         return SyncRequestMessage(src, network_config)
 
-
     def from_json(d):
         """
         Creates an instance of a message class object from a json object 
@@ -368,6 +396,68 @@ class SyncRequestMessage(SimulationMessage):
 
     def __str__(self) -> str:
         return f'{NodeMessageTypes.SYNC_REQUEST.name}'
+
+class NodeReadyMessage(SimulationMessage):
+    def __init__(self, src: str) -> None:
+        super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.NODE_READY)
+    
+    def from_dict(d : dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+
+        
+        if src is None or dst is None or type_name is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in NodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not NodeMessageTypes.NODE_READY:
+            raise Exception(f'Cannot load a Node Ready Message from a dictionary request of type {type_name}.')
+
+        return NodeReadyMessage(src)
+
+    def from_json(j):
+        return NodeReadyMessage.from_dict(json.loads(j))
+
+    def __str__(self) -> str:
+        return f'{self._src} is ready!'
+
+class NodeDeactivatedMessage(SimulationMessage):
+    def __init__(self, src: str) -> None:
+        super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.NODE_DEACTIVATED)
+    
+    def from_dict(d : dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+
+        
+        if src is None or dst is None or type_name is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in NodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not NodeMessageTypes.NODE_DEACTIVATED:
+            raise Exception(f'Cannot load a Node Deactivated Message from a dictionary request of type {type_name}.')
+
+        return NodeDeactivatedMessage(src)
+
+    def from_json(j):
+        return NodeDeactivatedMessage.from_dict(json.loads(j))
+
+    def __str__(self) -> str:
+        return f'{self._src} is deactivated!'
 
 """
 -----------------
@@ -388,15 +478,34 @@ if __name__ == "__main__":
     address_ledger = dict()
     address_ledger['TEST'] = NodeNetworkConfig('0.0.0.0.1', '0.0.0.0.2', '0.0.0.0.3', '0.0.0.0.4', '0.0.0.0.5')
 
-    # msg = SimulationStartMessage(address_ledger, clock_config, 0.0)
+    ## Sim info message test
+    # msg = SimulationInfoMessage(address_ledger, clock_config, 0.0)
     # msg_json = msg.to_json()    
     # print(msg_json)
-    # msg_reconstructed = SimulationStartMessage.from_json(msg_json)
+    # msg_reconstructed = SimulationInfoMessage.from_json(msg_json)
     # print(msg_reconstructed.to_json())
 
-    msg = SyncRequestMessage('TEST', NodeNetworkConfig('0.0.0.0.1', '0.0.0.0.2', '0.0.0.0.3', '0.0.0.0.4', '0.0.0.0.5'))
-    msg_json = msg.to_json()
-    print(msg_json)
-    msg_reconstructed = SyncRequestMessage.from_json(msg_json)
-    print(msg_reconstructed.to_json())
+    ## Node sync request test
+    # msg = SyncRequestMessage('TEST', NodeNetworkConfig('0.0.0.0.1', '0.0.0.0.2', '0.0.0.0.3', '0.0.0.0.4', '0.0.0.0.5'))
+    # msg_json = msg.to_json()
+    # print(msg_json)
+    # msg_reconstructed = SyncRequestMessage.from_json(msg_json)
+    # print(msg_reconstructed.to_json())
 
+    ## Node ready message test
+    # msg = NodeReadyMessage('Test')
+    # msg_json = msg.to_json()
+    # print(msg)
+    # print(msg_json)
+    # msg_reconstructed = NodeReadyMessage.from_json(msg_json)
+    # print(msg_reconstructed)
+    # print(msg_reconstructed.to_json())
+
+    ## sim start message test
+    msg = SimulationStartMessage(0.0)
+    msg_json = msg.to_json()
+    print(msg)
+    print(msg_json)
+    msg_reconstructed = SimulationStartMessage.from_json(msg_json)
+    print(msg_reconstructed)
+    print(msg_reconstructed.to_json())
