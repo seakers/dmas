@@ -6,9 +6,7 @@ import zmq.asyncio as azmq
 import socket
 
 from dmas.messages import SimulationMessage
-from .utils import *
-
-logger = logging.getLogger(__name__)
+from utils import *
 
 class AbstractSimulationElement(ABC):
     """
@@ -18,11 +16,12 @@ class AbstractSimulationElement(ABC):
 
     ### Attributes:
         - _name (`str`): The name of this simulation element
+        - _network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
         - _response_address (`str`): This element's response port address
         - _broadcast_address (`str`): This element's broadcast port address
         - _monitor_address (`str`): This simulation's monitor port address
 
-        - _my_addresses (`list`): List of addresses pointing to this simulation element
+        - _my_addresses (`list`): List of addresses used by this simulation element
 
         - _peer_in_socket (:obj:`Socket`): The element's response port socket
         - _pub_socket (:obj:`Socket`): The element's broadcast port socket
@@ -46,7 +45,7 @@ class AbstractSimulationElement(ABC):
     +--------------------+       
     """
 
-    def __init__(self, name : str, network_config : ManagerNetworkConfig) -> None:
+    def __init__(self, name : str, network_config : NetworkConfig) -> None:
         """
         Initiates a new simulation element
 
@@ -61,20 +60,64 @@ class AbstractSimulationElement(ABC):
         self.name = name
         self._network_config = network_config
 
-    async def run(self) -> None:
+        self._logger : logging.Logger = self._set_up_logger(level=logging.INFO)
+    
+    def _set_up_logger(self, level=logging.DEBUG) -> logging.Logger:
+        """
+        Sets up a logger for this simulation element
+
+        TODO add save to file capabilities
+        """
+        logger = logging.getLogger()
+        logger.propagate = False
+        logger.setLevel(level)
+
+        c_handler = logging.StreamHandler()
+        c_handler.setLevel(level)
+        logger.addHandler(c_handler)
+
+        return logger 
+
+    def _log(self, msg : str, level=logging.DEBUG) -> None:
+        """
+        Logs a message to the desired level.
+        """
+        if level is logging.DEBUG:
+            self._logger.debug(f'{self.name}: {msg}')
+        elif level is logging.INFO:
+            self._logger.info(f'{self.name}: {msg}')
+        elif level is logging.WARNING:
+            self._logger.warning(f'{self.name}: {msg}')
+        elif level is logging.ERROR:
+            self._logger.error(f'{self.name}: {msg}')
+        elif level is logging.CRITICAL:
+            self._logger.critical(f'{self.name}: {msg}')
+    
+    def run(self) -> None:
+        """
+        Executes this similation element.
+        """
+        asyncio.run(self._excetute())
+
+    async def _excetute(self) -> None:
         """
         Main simulation element function. Activates and executes this similation element. 
         """
         try:
             # activate and initialize
+            self._log('activating...', level=logging.INFO)
             await self._activate()
+            self._log('activated!', level=logging.INFO)
 
             # execute 
+            self._log('starting life...', level=logging.INFO)
             await self._live()
+            self._log('i\'m now dead! Terminating processes...', level=logging.INFO)
 
         finally:
             # deactivate and clean up
             await self._shut_down()
+            self._log('shut down. Good night!', level=logging.INFO)
 
     async def _activate(self) -> None:
         """
@@ -109,19 +152,22 @@ class AbstractSimulationElement(ABC):
 
         # direct message response port
         self._peer_in_socket = self._context.socket(zmq.REP)
-        self._peer_in_socket.bind(self._network_config.get_response_address())
+        peer_in_address : str = self._network_config.get_response_address()
+        self._peer_in_socket.bind(peer_in_address)
         self._peer_in_socket.setsockopt(zmq.LINGER, 0)
         self._peer_in_socket_lock = asyncio.Lock()
 
         # broadcast message publish port
         self._pub_socket = self._context.socket(zmq.PUB)                   
         self._pub_socket.sndhwm = 1100000                                 ## set SNDHWM, so we don't drop messages for slow subscribers
-        self._pub_socket.bind(self._network_config.get_broadcast_address)
+        pub_address : str = self._network_config.get_broadcast_address()
+        self._pub_socket.bind(pub_address)
         self._pub_socket_lock = asyncio.Lock()
 
         # push to monitor port
         self._monitor_push_socket = self._context.socket(zmq.PUSH)
-        self._monitor_push_socket.connect(self._network_config.get_monitor_address())
+        monitor_address : str = self._network_config.get_monitor_address()
+        self._monitor_push_socket.connect(monitor_address)
         self._monitor_push_socket.setsockopt(zmq.LINGER, 0)
         self._monitor_push_socket_lock = asyncio.Lock()
 
@@ -131,19 +177,54 @@ class AbstractSimulationElement(ABC):
         """
         Broadcasts a message to all elements subscribed to this element's publish socket
         """
-        await self._pub_socket_lock.acquire()
-        await self._pub_socket.send_multipart([msg.get_dst(), msg.to_json()])
-        self._pub_socket_lock.release()
+        try:
+            self._log(f'acquiring broacasting lock for a message of type {type(msg)}...')
+            await self._pub_socket_lock.acquire()
+            self._log(f'broacasting lock acquired!')
+
+            self._log(f'broadcasting message of type {type(msg)}...')
+            dst : str = msg.get_dst()
+            content : str =  str(msg.to_json())
+            await self._pub_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            self._log(f'broacasting message sent successfully!')
+
+        except asyncio.CancelledError:
+            self._log(f'message broacast interrupted.')   
+        
+        except:
+            self._log(f'broacast failed.')
+        
+        finally:
+            self._pub_socket_lock.release()
+            self._log(f'broacasting lock released.')
+
 
     async def _push_message_to_monitor(self, msg : SimulationMessage) -> None:
         """
         Pushes a message to the simulation monitor
         """
-        await self._monitor_push_socket_lock.acquire()
-        await self._monitor_push_socket.send_multipart([msg.get_dst(), msg.to_json()])
-        self._monitor_push_socket_lock.release()
+        try:
+            self._log(f'acquiring monitor push lock for a message of type {type(msg)}...')
+            await self._monitor_push_socket_lock.acquire()
+            self._log(f'monitor push lock acquired!')
 
-    def __is_address_in_use(address : str) -> bool:
+            self._log(f'pushing message of type {type(msg)} to monitor...')
+            dst : str = msg.get_dst()
+            content : str =  str(msg.to_json())
+            await self._monitor_push_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            self._log(f'message pushed sucessfully!')
+
+        except asyncio.CancelledError:
+            self._log(f'message push interrupted.')
+            
+        except:
+            self._log(f'message push failed.')
+
+        finally:
+            self._monitor_push_socket_lock.release()
+            self._log(f'monitor push lock released.')
+
+    def __is_address_in_use(self, address : str) -> bool:
         """
         Checks if an address is already bound to an existing port socket.
 
@@ -154,7 +235,10 @@ class AbstractSimulationElement(ABC):
             - `bool`: True if port is already in use
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(address) == 0
+            address : str
+            _, _, port = address.split(':')
+            port = int(port)
+            return s.connect_ex(('localhost', port)) == 0
 
     async def _shut_down(self) -> None:
         """
@@ -183,7 +267,5 @@ class AbstractSimulationElement(ABC):
         
         Element will shut down once this procedure is completed.
         """
-        pass
-
-    
+        pass    
     
