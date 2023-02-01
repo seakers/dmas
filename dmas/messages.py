@@ -3,7 +3,7 @@ from typing import Union
 from enum import Enum
 import json
 
-from utils import *
+from dmas.utils import *
 
 
 class SimulationMessage(ABC):
