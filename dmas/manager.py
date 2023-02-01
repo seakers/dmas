@@ -3,6 +3,7 @@ import asyncio
 import datetime
 import logging
 import time
+import zmq
 
 from messages import *
 
@@ -40,16 +41,13 @@ class AbstractManager(AbstractSimulationElement):
         - _address_ledger (`dict`): ledger containing the addresses pointing to each node's connecting ports
 
     ### Communications diagram:
-    +----------+---------+                
-    |          | PUB     |------>
-    |          +---------+       
-    |          | PUSH    |------>
-    |          +---------+       
-    |          | REP     |<------
-    |          +---------+       
-    |                    |       
-    | SIMULATION MANAGER |       
-    +--------------------+           
+    +------------+---------+                
+    |            | PUB     |------>
+    | SIMULATION +---------+       
+    | MANAGER    | PUSH    |------>
+    |            +---------+       
+    |            | REP     |<------
+    +------------+---------+           
     """
 
     def __init__(self, 
@@ -194,6 +192,31 @@ class AbstractManager(AbstractSimulationElement):
         # TODO wait for confirmation from all simulation elements
         
         return await super()._shut_down()
+
+    async def _config_network(self) -> list:
+        """
+        Initializes and connects essential network port sockets for a simulation manager. 
+        
+        #### Sockets Initialized:
+            - _peer_in_socket (:obj:`Socket`): The entity name
+            - _pub_socket (:obj:`Socket`): The entity's response port address
+            - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
+
+        #### Returns:
+            - `list` containing all sockets used by this simulation element
+        """
+        l =  await super()._config_network()
+
+        # direct message response port
+        self._peer_in_socket = self._context.socket(zmq.REP)
+        peer_in_address : str = self._network_config.get_response_address()
+        self._peer_in_socket.bind(peer_in_address)
+        self._peer_in_socket.setsockopt(zmq.LINGER, 0)
+        self._peer_in_socket_lock = asyncio.Lock()
+
+        l.append(self._peer_in_socket)
+
+        return l
 
 class RealTimeSimulationManager(AbstractManager):
     """

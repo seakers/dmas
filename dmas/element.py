@@ -17,32 +17,21 @@ class AbstractSimulationElement(ABC):
     ### Attributes:
         - _name (`str`): The name of this simulation element
         - _network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
-        - _response_address (`str`): This element's response port address
-        - _broadcast_address (`str`): This element's broadcast port address
-        - _monitor_address (`str`): This simulation's monitor port address
-
         - _my_addresses (`list`): List of addresses used by this simulation element
+        - _logger (`Logger`): debug logger
 
-        - _peer_in_socket (:obj:`Socket`): The element's response port socket
         - _pub_socket (:obj:`Socket`): The element's broadcast port socket
+        - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`Socket`)
         - _monitor_push_socket (:obj:`Socket`): The element's monitor port socket
-
-        - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
-        - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
-        - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`socket`)
+        - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`Socket`)
 
 
     ### Communications diagram:
     +----------+---------+       
-    |          | PUB     |------>
-    |          +---------+       
-    |          | PUSH    |------>
-    |          +---------+       
-    |          | REP     |<------
-    |          +---------+       
-    |                    |       
-    |ABSTRACT SIM ELEMENT|       
-    +--------------------+       
+    | ABSTRACT | PUB     |------>
+    |   SIM    +---------+       
+    | ELEMENT  | PUSH    |------>
+    +----------+---------+       
     """
 
     def __init__(self, name : str, network_config : NetworkConfig) -> None:
@@ -51,17 +40,15 @@ class AbstractSimulationElement(ABC):
 
         ### Args:
             - name (`str`): The element's name
-            - response_address (`str`): The element's response port address
-            - broadcast_address (`str`): The element's broadcast port address
-            - monitor_address (`str`): The element's monitor port address
+            - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
         """
         super().__init__()
 
         self.name = name
         self._network_config = network_config
-
+        self._my_addresses = []
         self._logger : logging.Logger = self._set_up_logger(level=logging.INFO)
-    
+            
     def _set_up_logger(self, level=logging.DEBUG) -> logging.Logger:
         """
         Sets up a logger for this simulation element
@@ -136,7 +123,6 @@ class AbstractSimulationElement(ABC):
         Must be expanded if more connections are needed.
         
         #### Sockets Initialized:
-            - _peer_in_socket (:obj:`Socket`): The entity name
             - _pub_socket (:obj:`Socket`): The entity's response port address
             - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
 
@@ -149,13 +135,6 @@ class AbstractSimulationElement(ABC):
         for address in self._network_config.get_my_addresses():
             if self.__is_address_in_use(address):
                 raise Exception(f"{address} address is already in use.")
-
-        # direct message response port
-        self._peer_in_socket = self._context.socket(zmq.REP)
-        peer_in_address : str = self._network_config.get_response_address()
-        self._peer_in_socket.bind(peer_in_address)
-        self._peer_in_socket.setsockopt(zmq.LINGER, 0)
-        self._peer_in_socket_lock = asyncio.Lock()
 
         # broadcast message publish port
         self._pub_socket = self._context.socket(zmq.PUB)                   
@@ -171,7 +150,7 @@ class AbstractSimulationElement(ABC):
         self._monitor_push_socket.setsockopt(zmq.LINGER, 0)
         self._monitor_push_socket_lock = asyncio.Lock()
 
-        return [self._peer_in_socket, self._pub_socket, self._monitor_push_socket]
+        return [self._pub_socket, self._monitor_push_socket]
 
     async def _broadcast_message(self, msg : SimulationMessage) -> None:
         """
