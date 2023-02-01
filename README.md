@@ -10,8 +10,6 @@ For documentation please visit: https://dmas.readthedocs.io/
 ---
 ## Installation 
 
-> NOTE: Installation instructions are only supported in Mac or Linux systems. For windows installation use a Windows Subsystem for Linux (WSL) to follow the instructions below.
-
 1. Install [miniconda](https://docs.conda.io/en/latest/miniconda.html).
 
 2. Create and activate a virtual conda environment:
@@ -27,7 +25,10 @@ conda activate ./.venv
 ```
 make install
 ```
-> Mac users have experienced issues installing the `orbitpy` dependency contained within the automated installation procedure. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy) for further details.
+> ### NOTEs: 
+> - **Installation instructions above are only supported in Mac or Linux systems.** For windows installation, use a Windows Subsystem for Linux (WSL) and follow said instructions.
+> - Command line cloning of this repositioryt is recommended as Github Desktop client users may experience problems due to submodule dependencies.
+> - Mac users have experienced issues installing the `propcov` dependency contained within the `orbitpy` submodule during the automated installation procedure. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy/tree/master/propcov) for further details on fixes.
 
 ---
 ## Contact 
