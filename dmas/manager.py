@@ -23,8 +23,8 @@ class AbstractManager(AbstractSimulationElement):
         - _network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
         - _my_addresses (`list`): List of addresses used by this simulation manager
 
-        - _peer_in_socket (:obj:`Socket`): The manager's response port socket
-        - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
+        - _rep_socket (:obj:`Socket`): The manager's response port socket
+        - _rep_socket_lock (:obj:`Lock`): async lock for _rep_socket (:obj:`socket`)
         - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
         - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket        
@@ -36,12 +36,12 @@ class AbstractManager(AbstractSimulationElement):
 
     ### Communications diagram:
     +------------+---------+                
-    |            | PUB     |------>
+    |            | REP     |<---->>
     | SIMULATION +---------+       
-    |  MANAGER   | PUSH    |------>
+    |   MANAGER  | PUB     |------>
     |            +---------+       
-    |            | REP     |<------
-    +------------+---------+           
+    |            | PUSH    |------>
+    +------------+---------+             
     """
     @beartype
     def __init__(self, 
@@ -62,10 +62,11 @@ class AbstractManager(AbstractSimulationElement):
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
-        self._address_ledger = dict()
         
-        # if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
-        #     raise RuntimeError('List of simulation elements must include the simulation environment.')
+        if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
+            raise RuntimeError('List of simulation elements must include the simulation environment.')
+
+        # TODO check if there is more than one environment in the list 
 
     async def _activate(self) -> None:
         # initialzie network sockets
@@ -86,9 +87,9 @@ class AbstractManager(AbstractSimulationElement):
         Initializes and connects essential network port sockets for a simulation manager. 
         
         #### Sockets Initialized:
-            - _peer_in_socket (:obj:`Socket`): The entity name
-            - _pub_socket (:obj:`Socket`): The entity's response port address
-            - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
+            - _rep_socket (:obj:`Socket`): The manager's response port socket
+            - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
+            - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket
 
         #### Returns:
             - port_list (`list`): contains all sockets used by this simulation element
@@ -96,15 +97,15 @@ class AbstractManager(AbstractSimulationElement):
         port_list : list = await super()._config_network()
 
         # direct message response port
-        self._peer_in_socket = self._context.socket(zmq.REP)
+        self._rep_socket = self._context.socket(zmq.REP)
         self._network_config : ManagerNetworkConfig
 
         peer_in_address : str = self._network_config.get_response_address()
-        self._peer_in_socket.bind(peer_in_address)
-        self._peer_in_socket.setsockopt(zmq.LINGER, 0)
-        self._peer_in_socket_lock = asyncio.Lock()
+        self._rep_socket.bind(peer_in_address)
+        self._rep_socket.setsockopt(zmq.LINGER, 0)
+        self._rep_socket_lock = asyncio.Lock()
 
-        port_list.append(self._peer_in_socket)
+        port_list.append(self._rep_socket)
 
         return port_list
 
@@ -123,12 +124,12 @@ class AbstractManager(AbstractSimulationElement):
                 break 
             
             # wait for incoming messages
-            msg_dict = await self._peer_in_socket.recv_json()
+            msg_dict = await self._rep_socket.recv_json()
             msg_type = msg_dict['@type']
             
             if NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST:
                 # ignore all incoming messages that are not Sync Requests
-                await self._peer_in_socket.send_string('')
+                await self._rep_socket.send_string('')
                 continue
 
             # unpack and sync message
@@ -153,7 +154,7 @@ class AbstractManager(AbstractSimulationElement):
                     self._log(f'Node {sync_req.get_src()} is not part of this simulation. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
             # send synchronization acknowledgement
-            await self._peer_in_socket.send_string('ACK')     
+            await self._rep_socket.send_string('ACK')     
 
         self._log(f'sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})! Broadcasting sync info...', level=logging.INFO)
 
@@ -173,12 +174,12 @@ class AbstractManager(AbstractSimulationElement):
                 break 
 
             # wait for incoming messages
-            msg_dict = await self._peer_in_socket.recv_json()
+            msg_dict = await self._rep_socket.recv_json()
             msg_type = msg_dict['@type']
             
             if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_READY:
                 # ignore all incoming messages that are not Sync Requests
-                await self._peer_in_socket.send_string('')
+                await self._rep_socket.send_string('')
                 continue
 
             # unpack and sync message
@@ -203,7 +204,7 @@ class AbstractManager(AbstractSimulationElement):
                     logging.debug(f'Node {src} is not part of this simulation. Simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
             # send synchronization acknowledgement
-            await self._peer_in_socket.send_string('ACK')    
+            await self._rep_socket.send_string('ACK')    
         
         self._log(f'simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})! Broadcasting simlation start...', level=logging.INFO)
 
@@ -231,8 +232,8 @@ class RealTimeSimulationManager(AbstractManager):
         - _network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
         - _my_addresses (`list`): List of addresses used by this simulation manager
 
-        - _peer_in_socket (:obj:`Socket`): The manager's response port socket
-        - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
+        - _rep_socket (:obj:`Socket`): The manager's response port socket
+        - _rep_socket_lock (:obj:`Lock`): async lock for _rep_socket (:obj:`socket`)
         - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
         - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket        
@@ -244,13 +245,14 @@ class RealTimeSimulationManager(AbstractManager):
 
     ### Communications diagram:
     +------------+---------+                
-    |            | PUB     |------>
+    |            | REP     |<---->>
     | SIMULATION +---------+       
-    |   MANAGER  | PUSH    |------>
+    |   MANAGER  | PUB     |------>
     |            +---------+       
-    |            | REP     |<------
+    |            | PUSH    |------>
     +------------+---------+           
     """
+    @beartype
     def __init__(self, 
                 simulation_element_name_list: list, 
                 network_config: ManagerNetworkConfig, 
@@ -284,8 +286,8 @@ class AcceleratedRealTimeSimulationManager(AbstractManager):
         - _network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
         - _my_addresses (`list`): List of addresses used by this simulation manager
 
-        - _peer_in_socket (:obj:`Socket`): The manager's response port socket
-        - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
+        - _rep_socket (:obj:`Socket`): The manager's response port socket
+        - _rep_socket_lock (:obj:`Lock`): async lock for _rep_socket (:obj:`socket`)
         - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
         - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket        
@@ -297,13 +299,14 @@ class AcceleratedRealTimeSimulationManager(AbstractManager):
 
     ### Communications diagram:
     +------------+---------+                
-    |            | PUB     |------>
+    |            | REP     |<---->>
     | SIMULATION +---------+       
-    |   MANAGER  | PUSH    |------>
+    |   MANAGER  | PUB     |------>
     |            +---------+       
-    |            | REP     |<------
+    |            | PUSH    |------>
     +------------+---------+           
     """
+    @beartype
     def __init__(self, 
                 simulation_element_name_list: list, 
                 network_config: ManagerNetworkConfig, 
@@ -341,10 +344,9 @@ if __name__ == "__main__":
     manager = RealTimeSimulationManager([], network_config, clock_config)
 
     t_o = time.perf_counter()
-    print(f't_o = {t_o}')
-    
     manager.run()
-
     t_f = time.perf_counter()
+    
+    print(f't_o = {t_o}')
     print(f't_f = {t_f}')
     print(f'dt = {t_f - t_o}')

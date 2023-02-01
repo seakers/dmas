@@ -25,6 +25,8 @@ class AbstractSimulationElement(ABC):
         - _monitor_push_socket (:obj:`Socket`): The element's monitor port socket
         - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`Socket`)
 
+        - _clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
+        - _address_ledger (`dict`): ledger containing the addresses pointing to each node's connecting ports
 
     ### Communications diagram:
     +----------+---------+       
@@ -48,6 +50,9 @@ class AbstractSimulationElement(ABC):
         self._network_config = network_config
         self._my_addresses = []
         self._logger : logging.Logger = self._set_up_logger(level=logging.INFO)
+
+        self._clock_config = None
+        self._address_ledger = dict()
             
     def _set_up_logger(self, level=logging.DEBUG) -> logging.Logger:
         """
@@ -123,8 +128,8 @@ class AbstractSimulationElement(ABC):
         Must be expanded if more connections are needed.
         
         #### Sockets Initialized:
-            - _pub_socket (:obj:`Socket`): The entity's response port address
-            - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
+            - _pub_socket (:obj:`Socket`): The entity's broadcast port address
+            - _monitor_push_socket (:obj:`Socket`): The simulation's monitor port address
 
         #### Returns:
             - `list` containing all sockets used by this simulation element
@@ -157,25 +162,26 @@ class AbstractSimulationElement(ABC):
         Broadcasts a message to all elements subscribed to this element's publish socket
         """
         try:
-            self._log(f'acquiring broacasting lock for a message of type {type(msg)}...')
+            self._log(f'acquiring port lock for a message of type {type(msg)}...')
             await self._pub_socket_lock.acquire()
-            self._log(f'broacasting lock acquired!')
+            self._log(f'port lock acquired!')
 
-            self._log(f'broadcasting message of type {type(msg)}...')
+            self._log(f'sending message of type {type(msg)}...')
             dst : str = msg.get_dst()
-            content : str =  str(msg.to_json())
-            await self._pub_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
-            self._log(f'broacasting message sent successfully!')
+            content : str = str(msg.to_json())
+            await self._pub_socket.send_multipart([dst, content])
+            self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
-            self._log(f'message broacast interrupted.')   
-        
+            self._log(f'message transmission interrupted.')
+            
         except:
-            self._log(f'broacast failed.')
-        
+            self._log(f'message transmission failed.')
+            raise
+
         finally:
             self._pub_socket_lock.release()
-            self._log(f'broacasting lock released.')
+            self._log(f'port lock released.')
 
 
     async def _push_message_to_monitor(self, msg : SimulationMessage) -> None:
@@ -183,25 +189,29 @@ class AbstractSimulationElement(ABC):
         Pushes a message to the simulation monitor
         """
         try:
-            self._log(f'acquiring monitor push lock for a message of type {type(msg)}...')
+            self._log(f'acquiring port lock for a message of type {type(msg)}...')
             await self._monitor_push_socket_lock.acquire()
-            self._log(f'monitor push lock acquired!')
+            self._log(f'port lock acquired!')
 
-            self._log(f'pushing message of type {type(msg)} to monitor...')
+            self._log(f'sending message of type {type(msg)}...')
             dst : str = msg.get_dst()
-            content : str =  str(msg.to_json())
-            await self._monitor_push_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
-            self._log(f'message pushed sucessfully!')
+            if dst != SimulationElementTypes.MONITOR.value:
+                raise asyncio.CancelledError('attempted to send a non-monitor message to the simulation monitor.')
+
+            content : str = str(msg.to_json())
+            await self._monitor_push_socket.send_multipart([dst, content])
+            self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
-            self._log(f'message push interrupted.')
+            self._log(f'message transmission interrupted.')
             
         except:
-            self._log(f'message push failed.')
+            self._log(f'message transmission failed.')
+            raise
 
         finally:
             self._monitor_push_socket_lock.release()
-            self._log(f'monitor push lock released.')
+            self._log(f'port lock released.')
 
     def __is_address_in_use(self, address : str) -> bool:
         """
