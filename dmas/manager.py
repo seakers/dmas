@@ -1,15 +1,14 @@
 from abc import ABC, abstractmethod
+from beartype import beartype
 import asyncio
 import datetime
 import logging
 import time
 import zmq
 
-from messages import *
-
-from utils import *
-
-from element import AbstractSimulationElement
+from dmas.messages import *
+from dmas.utils import *
+from dmas.element import AbstractSimulationElement
 
 class AbstractManager(AbstractSimulationElement):
     """
@@ -22,18 +21,13 @@ class AbstractManager(AbstractSimulationElement):
     ### Attributes:
         - _name (`str`): The name of this simulation manager
         - _network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
-        - _response_address (`str`): This manager's response port address
-        - _broadcast_address (`str`): This manager's broadcast port address
-        - _monitor_address (`str`): This simulation's monitor port address
-
         - _my_addresses (`list`): List of addresses used by this simulation manager
 
         - _peer_in_socket (:obj:`Socket`): The manager's response port socket
-        - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
-        - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket
-
         - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
+        - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
+        - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket        
         - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`socket`)
 
         - _simulation_element_list (`list`): list of the names of all simulation elements
@@ -44,12 +38,12 @@ class AbstractManager(AbstractSimulationElement):
     +------------+---------+                
     |            | PUB     |------>
     | SIMULATION +---------+       
-    | MANAGER    | PUSH    |------>
+    |  MANAGER   | PUSH    |------>
     |            +---------+       
     |            | REP     |<------
     +------------+---------+           
     """
-
+    @beartype
     def __init__(self, 
             simulation_element_name_list : list,
             network_config : ManagerNetworkConfig,
@@ -57,6 +51,11 @@ class AbstractManager(AbstractSimulationElement):
             ) -> None:
         """
         Initializes and instance of a simulation manager
+
+        ### Arguments
+            - simulation_element_name_list (`list`): list of the names of all simulation elements
+            - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
+            - clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
         """
         super().__init__(SimulationElementTypes.MANAGER.name, network_config)
 
@@ -66,7 +65,7 @@ class AbstractManager(AbstractSimulationElement):
         self._address_ledger = dict()
         
         # if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
-        #     raise Exception('List of simulation elements must include the simulation environment.')
+        #     raise RuntimeError('List of simulation elements must include the simulation environment.')
 
     async def _activate(self) -> None:
         # initialzie network sockets
@@ -82,14 +81,42 @@ class AbstractManager(AbstractSimulationElement):
         await self._broadcast_sim_start()
         self._log('simlation started!', level=logging.INFO)
 
+    async def _config_network(self) -> list:
+        """
+        Initializes and connects essential network port sockets for a simulation manager. 
+        
+        #### Sockets Initialized:
+            - _peer_in_socket (:obj:`Socket`): The entity name
+            - _pub_socket (:obj:`Socket`): The entity's response port address
+            - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
+
+        #### Returns:
+            - port_list (`list`): contains all sockets used by this simulation element
+        """
+        port_list : list = await super()._config_network()
+
+        # direct message response port
+        self._peer_in_socket = self._context.socket(zmq.REP)
+        self._network_config : ManagerNetworkConfig
+
+        peer_in_address : str = self._network_config.get_response_address()
+        self._peer_in_socket.bind(peer_in_address)
+        self._peer_in_socket.setsockopt(zmq.LINGER, 0)
+        self._peer_in_socket_lock = asyncio.Lock()
+
+        port_list.append(self._peer_in_socket)
+
+        return port_list
+
     async def _sync_elements(self) -> None:
         """
-        Awaits for all other simulation elements to undergo their initialization and activation routines and to become online. 
+        Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
         
-        Once done, elements will reach out to the manager through its `_peer_in_socket` socket and subscribe to future broadcasts 
+        Elements will then reach out to the manager through its `_peer_in_socket` socket and subscribe to future broadcasts 
         from the manager's `_pub_socket` socket.
 
-        The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports. 
+        The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports
+        and broadcast it to all memebers of the simulation. 
         """
         while len(self._address_ledger) < len(self._simulation_element_name_list):
             if len(self._simulation_element_name_list) == 0:
@@ -193,31 +220,6 @@ class AbstractManager(AbstractSimulationElement):
         
         return await super()._shut_down()
 
-    async def _config_network(self) -> list:
-        """
-        Initializes and connects essential network port sockets for a simulation manager. 
-        
-        #### Sockets Initialized:
-            - _peer_in_socket (:obj:`Socket`): The entity name
-            - _pub_socket (:obj:`Socket`): The entity's response port address
-            - _monitor_push_socket (:obj:`Socket`): The entity's broadcast port address
-
-        #### Returns:
-            - `list` containing all sockets used by this simulation element
-        """
-        l =  await super()._config_network()
-
-        # direct message response port
-        self._peer_in_socket = self._context.socket(zmq.REP)
-        peer_in_address : str = self._network_config.get_response_address()
-        self._peer_in_socket.bind(peer_in_address)
-        self._peer_in_socket.setsockopt(zmq.LINGER, 0)
-        self._peer_in_socket_lock = asyncio.Lock()
-
-        l.append(self._peer_in_socket)
-
-        return l
-
 class RealTimeSimulationManager(AbstractManager):
     """
     ## Real Time Simulation Manager Class 
@@ -227,43 +229,44 @@ class RealTimeSimulationManager(AbstractManager):
     ### Attributes:
         - _name (`str`): The name of this simulation manager
         - _network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
-        - _response_address (`str`): This manager's response port address
-        - _broadcast_address (`str`): This manager's broadcast port address
-        - _monitor_address (`str`): This simulation's monitor port address
-
         - _my_addresses (`list`): List of addresses used by this simulation manager
 
         - _peer_in_socket (:obj:`Socket`): The manager's response port socket
-        - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
-        - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket
-
         - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
+        - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
+        - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket        
         - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`socket`)
 
         - _simulation_element_list (`list`): list of the names of all simulation elements
-        - _clock_config (:obj:`RealTimeClockConfig`): clock configuration 
+        - _clock_config (:obj:`RealTimeClockConfig`): description of this simulation's clock configuration
+        - _address_ledger (`dict`): ledger containing the addresses pointing to each node's connecting ports
 
     ### Communications diagram:
-    +----------+---------+       
-    |          | PUB     |------>
-    |          +---------+       
-    |          | PUSH    |------>
-    |          +---------+       
-    |          | REP     |<------
-    |          +---------+       
-    |                    |       
-    | SIMULATION MANAGER |       
-    +--------------------+           
+    +------------+---------+                
+    |            | PUB     |------>
+    | SIMULATION +---------+       
+    |   MANAGER  | PUSH    |------>
+    |            +---------+       
+    |            | REP     |<------
+    +------------+---------+           
     """
     def __init__(self, 
                 simulation_element_name_list: list, 
                 network_config: ManagerNetworkConfig, 
                 clock_config: RealTimeClockConfig) -> None:
+        """
+        Initializes and instance of a simulation manager
+
+        ### Arguments
+            - simulation_element_name_list (`list`): list of the names of all simulation elements
+            - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
+            - clock_config (:obj:`RealTimeClockConfig`): description of this simulation's clock configuration
+        """
         super().__init__(simulation_element_name_list, network_config, clock_config)
 
     async def _live(self):
-        # wait simulation time       
+        # wait for simulation duration to pass
         self._clock_config : RealTimeClockConfig
         delta = self._clock_config.end_date - self._clock_config.start_date
         delay = delta.seconds
@@ -271,49 +274,48 @@ class RealTimeSimulationManager(AbstractManager):
         await asyncio.sleep(delay)
 
 class AcceleratedRealTimeSimulationManager(AbstractManager):
-    
     """
-    ## Real Time Simulation Manager Class 
+    ## Accelerated Real Time Simulation Manager Class 
     
-    Regulates the start and end of a simulation. Runs a clock in accelerated real time where each real-world second 
-    represents a given number of simulation second.
+    Regulates the start and end of a simulation. Each real-time second represents a fixed number of simulation seconds.
 
     ### Attributes:
         - _name (`str`): The name of this simulation manager
         - _network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
-        - _response_address (`str`): This manager's response port address
-        - _broadcast_address (`str`): This manager's broadcast port address
-        - _monitor_address (`str`): This simulation's monitor port address
-
         - _my_addresses (`list`): List of addresses used by this simulation manager
 
         - _peer_in_socket (:obj:`Socket`): The manager's response port socket
-        - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
-        - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket
-
         - _peer_in_socket_lock (:obj:`Lock`): async lock for _peer_in_socket (:obj:`socket`)
+        - _pub_socket (:obj:`Socket`): The manager's broadcast port socket
         - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`socket`)
+        - _monitor_push_socket (:obj:`Socket`): The manager's monitor port socket        
         - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`socket`)
 
         - _simulation_element_list (`list`): list of the names of all simulation elements
-        - _clock_config (:obj:`AcceleratedRealTimeClockConfig`): clock configuration 
+        - _clock_config (:obj:`AcceleratedRealTimeClockConfig`): description of this simulation's clock configuration
+        - _address_ledger (`dict`): ledger containing the addresses pointing to each node's connecting ports
 
     ### Communications diagram:
-    +----------+---------+       
-    |          | PUB     |------>
-    |          +---------+       
-    |          | PUSH    |------>
-    |          +---------+       
-    |          | REP     |<------
-    |          +---------+       
-    |                    |       
-    | SIMULATION MANAGER |       
-    +--------------------+           
+    +------------+---------+                
+    |            | PUB     |------>
+    | SIMULATION +---------+       
+    |   MANAGER  | PUSH    |------>
+    |            +---------+       
+    |            | REP     |<------
+    +------------+---------+           
     """
     def __init__(self, 
                 simulation_element_name_list: list, 
                 network_config: ManagerNetworkConfig, 
                 clock_config: AcceleratedRealTimeClockConfig) -> None:
+        """
+        Initializes and instance of a simulation manager
+
+        ### Arguments
+            - simulation_element_name_list (`list`): list of the names of all simulation elements
+            - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
+            - clock_config (:obj:`AcceleratedRealTimeClockConfig`): description of this simulation's clock configuration
+        """
         super().__init__(simulation_element_name_list, network_config, clock_config)
 
     async def _live(self):

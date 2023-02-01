@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from beartype import beartype
 from typing import Union
 from enum import Enum
 import json
@@ -17,7 +18,7 @@ class SimulationMessage(ABC):
         - _dst (`str`): name of the intended simulation element to receive this message
         - _msg_type (`Enum`): type of message being sent
     """
-
+    @beartype
     def __init__(self, src: str, dst: str, msg_type: Enum) -> None:
         """
         Initiates an instance of a simulation message.
@@ -91,7 +92,6 @@ class SimulationMessage(ABC):
 SIMULATION MANAGER MESSAGES
 -----------------
 """
-
 class ManagerMessageTypes(Enum):
     """
     Types of broadcasts sent from the simulation manager to simulation members.
@@ -115,6 +115,7 @@ class ManagerMessage(SimulationMessage, ABC):
         - _msg_type (`Enum`): type of message being sent
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
+    @beartype
     def __init__(self, type: ManagerMessageTypes, t : Union[int, float]) -> None:   
         """        
         Initialzies an instance of a Manager Message
@@ -142,6 +143,7 @@ class SimulationStartMessage(ManagerMessage):
         - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_START`: type of message being sent
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
+    @beartype
     def __init__(self, t: Union[int, float]) -> None:
         """
         Initializes an instance of a Simulaiton Start Message
@@ -184,6 +186,7 @@ class SimulationEndMessage(ManagerMessage):
         - _msg_type (`Enum`) = `ManagerMessageTypes.SIM_END`: type of message being sent
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
+    @beartype
     def __init__(self, t: Union[int, float]) -> None:
         """
         Initializes an instance of a Simulaiton End Message
