@@ -55,6 +55,8 @@ class AbstractSimulationNode(AbstractSimulationElement):
         """
         super().__init__(name, network_config, level)
     
+    # TODO Sync with Manager
+
     async def _config_network(self) -> list:
         """
         Initializes and connects essential network port sockets for a simulation manager. 
@@ -124,3 +126,10 @@ class AbstractSimulationNode(AbstractSimulationElement):
             self._req_socket_lock.release()
             self._log(f'port lock released.')
     
+    @abstractmethod
+    async def _broadcast_handler(self, msg_dict : dict) -> None:
+        """
+        Reads and handles broadcast messages 
+        """
+
+        pass
