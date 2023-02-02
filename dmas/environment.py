@@ -1,7 +1,6 @@
 import asyncio
 from beartype import beartype
 import zmq
-from dmas.element import AbstractSimulationElement
 from dmas.node import AbstractSimulationNode
 from dmas.utils import *
 
