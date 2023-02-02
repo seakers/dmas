@@ -61,6 +61,7 @@ class AbstractManager(AbstractSimulationElement):
 
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
+        self._offline_simulation_element_list = []
         self._clock_config = clock_config
         
         if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
@@ -81,6 +82,36 @@ class AbstractManager(AbstractSimulationElement):
         self._log('broadcasting simulation start...', level=logging.INFO)
         await self._broadcast_sim_start()
         self._log('simlation started!', level=logging.INFO)
+
+    async def _excetute(self) -> None:
+        """
+        Main simulation element function. Activates and executes this similation element. 
+        """
+        try:
+            # activate and initialize
+            self._log('activating...', level=logging.INFO)
+            pending = None
+            await self._activate()
+            self._log('activated!', level=logging.INFO)
+
+            # execute 
+            self._log('starting life...', level=logging.INFO)
+            live_task = asyncio.create_task(self._live())
+            listen_task = asyncio.create_task(self._listen())
+
+            _, pending = await asyncio.wait([live_task, listen_task], return_when=asyncio.FIRST_COMPLETED)
+
+        finally:
+            self._log('i am now dead! Terminating processes...', level=logging.INFO)
+            if pending is not None:
+                for task in pending:
+                    task : asyncio.Task
+                    task.cancel()
+                    await task
+
+            # deactivate and clean up
+            await self._shut_down()
+            self._log('shut down. Good night!', level=logging.INFO)
 
     async def _config_network(self) -> list:
         """
@@ -150,8 +181,8 @@ class AbstractManager(AbstractSimulationElement):
                     # node is a part of the simulation but has already been synchronized
                     self._log(f'Node {sync_req.get_src()} is already synchronized to the simulation manager. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             else:
-                    # node is not a part of the simulation
-                    self._log(f'Node {sync_req.get_src()} is not part of this simulation. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
+                # node is not a part of the simulation
+                self._log(f'Node {sync_req.get_src()} is not part of this simulation. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
             # send synchronization acknowledgement
             await self._rep_socket.send_string('ACK')     
@@ -200,8 +231,8 @@ class AbstractManager(AbstractSimulationElement):
                     # node is a part of the simulation but has already been synchronized
                     logging.debug(f'Node {src} is already regsitered as ready for the simulation manager. simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             else:
-                    # node is not a part of the simulation
-                    logging.debug(f'Node {src} is not part of this simulation. Simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
+                # node is not a part of the simulation
+                logging.debug(f'Node {src} is not part of this simulation. Simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
             # send synchronization acknowledgement
             await self._rep_socket.send_string('ACK')    
@@ -211,6 +242,37 @@ class AbstractManager(AbstractSimulationElement):
         # broadcast sim start  message
         sim_start_msg = SimulationStartMessage(time.perf_counter())
         await self._broadcast_message(sim_start_msg)
+
+    async def _listen(self):
+        while len(self._offline_simulation_element_list) < len(self._simulation_element_name_list):
+            # wait for any incoming messages
+            msg_dict = await self._rep_socket.recv_json()
+            msg_type = msg_dict['@type']
+
+            if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_DEACTIVATED:
+                # ignore all incoming messages that are not of type Node Deactivated
+                await self._rep_socket.send_string('')
+                continue
+
+            # unpack and sync message
+            deactivated_message = NodeDeactivatedMessage.from_dict(msg_dict)
+
+            self._log(f'Received node deactivated message from node {deactivated_message.get_src()}!')
+
+            src = deactivated_message.get_src()
+            if src in self._simulation_element_name_list:
+                if src not in self._offline_simulation_element_list:
+                    # node is a part of the simulation, is now offline, and has not yet been registered
+
+                    # add to offline element list 
+                    self._offline_simulation_element_list.append(src)
+                    logging.debug(f'Node {src} is now regsitered as OFFLINE! Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')             
+                else:
+                    # node is a part of the simulation but has already been synchronized
+                    logging.debug(f'Node {src} is already regsitered as offline in this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
+            else:
+                # node is not a part of the simulation
+                logging.debug(f'Node {src} is not part of this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
 
     async def _shut_down(self) -> None:
         # broadcast sim end message

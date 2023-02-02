@@ -439,7 +439,6 @@ class NodeDeactivatedMessage(SimulationMessage):
         src = d.get('src', None)
         dst = d.get('dst', None)
         type_name = d.get('@type', None)
-
         
         if src is None or dst is None or type_name is None:
             raise Exception('Dictionary does not contain necessary information to construct this message object.')

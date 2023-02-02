@@ -98,15 +98,25 @@ class AbstractSimulationElement(ABC):
         try:
             # activate and initialize
             self._log('activating...', level=logging.INFO)
+            pending = None
             await self._activate()
             self._log('activated!', level=logging.INFO)
 
             # execute 
             self._log('starting life...', level=logging.INFO)
-            await self._live()
-            self._log('i\'m now dead! Terminating processes...', level=logging.INFO)
+            live_task = asyncio.create_task(self._live())
+            listen_task = asyncio.create_task(self._listen())
+
+            _, pending = await asyncio.wait([live_task, listen_task], return_when=asyncio.FIRST_COMPLETED)
 
         finally:
+            self._log('i am now dead! Terminating processes...', level=logging.INFO)
+            if pending is not None:
+                for task in pending:
+                    task : asyncio.Task
+                    task.cancel()
+                    await task
+
             # deactivate and clean up
             await self._shut_down()
             self._log('shut down. Good night!', level=logging.INFO)
@@ -250,7 +260,7 @@ class AbstractSimulationElement(ABC):
             socket.close()
 
     @abstractmethod
-    async def _live(self):
+    async def _live(self) -> None:
         """
         Procedure to be executed by the simulation element during the simulation. 
         
@@ -258,3 +268,11 @@ class AbstractSimulationElement(ABC):
         """
         pass    
     
+    @abstractmethod
+    async def _listen(self) -> None:
+        """
+        Procedure for listening for incoming messages from other elements during the simulation.
+
+        Element will deactivate if this method returns.
+        """
+        pass
