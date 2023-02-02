@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from beartype import beartype
 import zmq
 
@@ -39,15 +40,20 @@ class AbstractSimulationNode(AbstractSimulationElement):
     +----------+---------+       
     """
     @beartype
-    def __init__(self, name: str, network_config: NodeNetworkConfig) -> None:
+    def __init__(self, 
+                name : str, 
+                network_config : NodeNetworkConfig, 
+                level : int = logging.INFO
+                ) -> None:
         """
         Initiates a new instance of an abstract node object
 
         ### Args:
             - name (`str`): The object's name
             - network_config (:obj:`NodeNetworkConfig`): description of the addresses pointing to this simulation node
+            - level (`int`): logging level for this simulation element
         """
-        super().__init__(name, network_config)
+        super().__init__(name, network_config, level)
     
     async def _config_network(self) -> list:
         """
@@ -117,13 +123,4 @@ class AbstractSimulationNode(AbstractSimulationElement):
         finally:
             self._req_socket_lock.release()
             self._log(f'port lock released.')
-
-if __name__ == "__main__":
-    @beartype
-    @abstractmethod
-    def foo(x : int):
-        pass
-    
-    foo(1)
-    foo('x')
     

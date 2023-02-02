@@ -36,20 +36,21 @@ class AbstractSimulationElement(ABC):
     +----------+---------+       
     """
 
-    def __init__(self, name : str, network_config : NetworkConfig) -> None:
+    def __init__(self, name : str, network_config : NetworkConfig, level : int = logging.INFO) -> None:
         """
         Initiates a new simulation element
 
         ### Args:
             - name (`str`): The element's name
             - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
+            - level (`int`): logging level for this simulation element
         """
         super().__init__()
 
         self.name = name
         self._network_config = network_config
         self._my_addresses = []
-        self._logger : logging.Logger = self._set_up_logger(level=logging.INFO)
+        self._logger : logging.Logger = self._set_up_logger(level)
 
         self._clock_config = None
         self._address_ledger = dict()
@@ -105,21 +106,25 @@ class AbstractSimulationElement(ABC):
             # execute 
             self._log('starting life...', level=logging.INFO)
             live_task = asyncio.create_task(self._live())
+            live_task.set_name('live')
+
             listen_task = asyncio.create_task(self._listen())
+            listen_task.set_name('listen')
 
             _, pending = await asyncio.wait([live_task, listen_task], return_when=asyncio.FIRST_COMPLETED)
 
         finally:
-            self._log('i am now dead! Terminating processes...', level=logging.INFO)
-            if pending is not None:
-                for task in pending:
-                    task : asyncio.Task
-                    task.cancel()
-                    await task
+            self._log('i am now dead! Terminating all processes...', level=logging.INFO)
+            for task in pending:
+                task : asyncio.Task
+                self._log(f'terminting process `{task.get_name()}`...', level=logging.DEBUG)
+                task.cancel()
+                await task
+                self._log(f'`{task.get_name()}` process terminated.', level=logging.DEBUG)
 
             # deactivate and clean up
             await self._shut_down()
-            self._log('shut down. Good night!', level=logging.INFO)
+            self._log('all processes termated successfully. Good night!', level=logging.INFO)
 
     async def _activate(self) -> None:
         """
@@ -179,7 +184,7 @@ class AbstractSimulationElement(ABC):
             self._log(f'sending message of type {type(msg)}...')
             dst : str = msg.get_dst()
             content : str = str(msg.to_json())
-            await self._pub_socket.send_multipart([dst, content])
+            await self._pub_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
             self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
@@ -209,7 +214,7 @@ class AbstractSimulationElement(ABC):
                 raise asyncio.CancelledError('attempted to send a non-monitor message to the simulation monitor.')
 
             content : str = str(msg.to_json())
-            await self._monitor_push_socket.send_multipart([dst, content])
+            await self._monitor_push_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
             self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
@@ -263,8 +268,10 @@ class AbstractSimulationElement(ABC):
     async def _live(self) -> None:
         """
         Procedure to be executed by the simulation element during the simulation. 
-        
-        Element will shut down once this procedure is completed.
+
+        Element will deactivate if this method returns.
+
+        Procedure must include a handler for asyncio.CancelledError exceptions.
         """
         pass    
     
@@ -274,5 +281,7 @@ class AbstractSimulationElement(ABC):
         Procedure for listening for incoming messages from other elements during the simulation.
 
         Element will deactivate if this method returns.
+
+        Procedure must include a handler for asyncio.CancelledError exceptions.
         """
         pass

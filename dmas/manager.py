@@ -48,6 +48,7 @@ class AbstractManager(AbstractSimulationElement):
             simulation_element_name_list : list,
             network_config : ManagerNetworkConfig,
             clock_config : ClockConfig,
+            level : int = logging.INFO
             ) -> None:
         """
         Initializes and instance of a simulation manager
@@ -56,16 +57,17 @@ class AbstractManager(AbstractSimulationElement):
             - simulation_element_name_list (`list`): list of the names of all simulation elements
             - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
             - clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
+            - level (`int`): logging level for this simulation element
         """
-        super().__init__(SimulationElementTypes.MANAGER.name, network_config)
+        super().__init__(SimulationElementTypes.MANAGER.name, network_config, level)
 
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._offline_simulation_element_list = []
         self._clock_config = clock_config
         
-        if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
-            raise RuntimeError('List of simulation elements must include the simulation environment.')
+        # if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
+        #     raise RuntimeError('List of simulation elements must include the simulation environment.')
 
         # TODO check if there is more than one environment in the list 
 
@@ -82,36 +84,6 @@ class AbstractManager(AbstractSimulationElement):
         self._log('broadcasting simulation start...', level=logging.INFO)
         await self._broadcast_sim_start()
         self._log('simlation started!', level=logging.INFO)
-
-    async def _excetute(self) -> None:
-        """
-        Main simulation element function. Activates and executes this similation element. 
-        """
-        try:
-            # activate and initialize
-            self._log('activating...', level=logging.INFO)
-            pending = None
-            await self._activate()
-            self._log('activated!', level=logging.INFO)
-
-            # execute 
-            self._log('starting life...', level=logging.INFO)
-            live_task = asyncio.create_task(self._live())
-            listen_task = asyncio.create_task(self._listen())
-
-            _, pending = await asyncio.wait([live_task, listen_task], return_when=asyncio.FIRST_COMPLETED)
-
-        finally:
-            self._log('i am now dead! Terminating processes...', level=logging.INFO)
-            if pending is not None:
-                for task in pending:
-                    task : asyncio.Task
-                    task.cancel()
-                    await task
-
-            # deactivate and clean up
-            await self._shut_down()
-            self._log('shut down. Good night!', level=logging.INFO)
 
     async def _config_network(self) -> list:
         """
@@ -160,7 +132,7 @@ class AbstractManager(AbstractSimulationElement):
             
             if NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST:
                 # ignore all incoming messages that are not Sync Requests
-                await self._rep_socket.send_string('')
+                await self._rep_socket.send_string('IGNORED')
                 continue
 
             # unpack and sync message
@@ -210,7 +182,7 @@ class AbstractManager(AbstractSimulationElement):
             
             if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_READY:
                 # ignore all incoming messages that are not Sync Requests
-                await self._rep_socket.send_string('')
+                await self._rep_socket.send_string('IGNORED')
                 continue
 
             # unpack and sync message
@@ -243,44 +215,79 @@ class AbstractManager(AbstractSimulationElement):
         sim_start_msg = SimulationStartMessage(time.perf_counter())
         await self._broadcast_message(sim_start_msg)
 
-    async def _listen(self):
-        while len(self._offline_simulation_element_list) < len(self._simulation_element_name_list):
-            # wait for any incoming messages
-            msg_dict = await self._rep_socket.recv_json()
-            msg_type = msg_dict['@type']
+    async def _wait_for_offline_confirmations(self) -> None:
+        """
+        Listens for any incoming messages from other simulation elements. Counts how many simulation elements are offline.
 
-            if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_DEACTIVATED:
-                # ignore all incoming messages that are not of type Node Deactivated
-                await self._rep_socket.send_string('')
-                continue
+        Returns when all simulation elements are offline.
+        """
+        try:
+            await self._rep_socket_lock.acquire()
+            
+            while len(self._offline_simulation_element_list) < len(self._simulation_element_name_list):
+                # wait for any incoming messages
+                msg_dict = await self._rep_socket.recv_json()
+                msg_type = msg_dict['@type']
 
-            # unpack and sync message
-            deactivated_message = NodeDeactivatedMessage.from_dict(msg_dict)
+                if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_DEACTIVATED:
+                    # ignore all incoming messages that are not of type Node Deactivated
+                    await self._rep_socket.send_string('IGNORED')
+                    continue
 
-            self._log(f'Received node deactivated message from node {deactivated_message.get_src()}!')
+                # unpack and sync message
+                deactivated_message = NodeDeactivatedMessage.from_dict(msg_dict)
 
-            src = deactivated_message.get_src()
-            if src in self._simulation_element_name_list:
-                if src not in self._offline_simulation_element_list:
-                    # node is a part of the simulation, is now offline, and has not yet been registered
+                self._log(f'Received node deactivated message from node {deactivated_message.get_src()}!')
 
-                    # add to offline element list 
-                    self._offline_simulation_element_list.append(src)
-                    logging.debug(f'Node {src} is now regsitered as OFFLINE! Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')             
+                src = deactivated_message.get_src()
+                if src in self._simulation_element_name_list:
+                    if src not in self._offline_simulation_element_list:
+                        # node is a part of the simulation, is now offline, and has not yet been registered
+
+                        # add to offline element list 
+                        self._offline_simulation_element_list.append(src)
+                        logging.debug(f'Node {src} is now regsitered as OFFLINE! Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')             
+                    else:
+                        # node is a part of the simulation but has already been synchronized
+                        logging.debug(f'Node {src} is already regsitered as offline in this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
                 else:
-                    # node is a part of the simulation but has already been synchronized
-                    logging.debug(f'Node {src} is already regsitered as offline in this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
-            else:
-                # node is not a part of the simulation
-                logging.debug(f'Node {src} is not part of this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
+                    # node is not a part of the simulation
+                    logging.debug(f'Node {src} is not part of this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
+
+                # send synchronization acknowledgement
+                await self._rep_socket.send_string('ACK') 
+
+            self._log('all elements of the simulation are offline.')
+            
+        except asyncio.CancelledError:
+            if self._rep_socket_lock.locked():
+                self._rep_socket_lock.release()
+        finally:
+            if self._rep_socket_lock.locked():
+                self._rep_socket_lock.release()
+
+    async def _listen(self):
+        try:
+            wait_for_offline_task = None
+            wait_for_offline_task = asyncio.create_task(self._wait_for_offline_confirmations())
+            await wait_for_offline_task
+
+        except asyncio.CancelledError:
+            if wait_for_offline_task is not None:
+                wait_for_offline_task : asyncio.Task
+                wait_for_offline_task.cancel()
+                await wait_for_offline_task
 
     async def _shut_down(self) -> None:
         # broadcast sim end message
-        sim_end_msg = SimulationEndMessage(time.perf_counter())
-        await self._broadcast_message(sim_end_msg)
+        await self._broadcast_message( SimulationEndMessage(time.perf_counter()) )
 
-        # TODO wait for confirmation from all simulation elements
+        # wait for confirmation from all simulation elements
+        await self._wait_for_offline_confirmations()
+
+        # TODO send monitor sim end message 
         
+        # close all communication ports
         return await super()._shut_down()
 
 class RealTimeSimulationManager(AbstractManager):
@@ -318,7 +325,9 @@ class RealTimeSimulationManager(AbstractManager):
     def __init__(self, 
                 simulation_element_name_list: list, 
                 network_config: ManagerNetworkConfig, 
-                clock_config: RealTimeClockConfig) -> None:
+                clock_config: RealTimeClockConfig,
+                level:int = logging.INFO
+                ) -> None:
         """
         Initializes and instance of a simulation manager
 
@@ -326,16 +335,21 @@ class RealTimeSimulationManager(AbstractManager):
             - simulation_element_name_list (`list`): list of the names of all simulation elements
             - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
             - clock_config (:obj:`RealTimeClockConfig`): description of this simulation's clock configuration
+            - level (`int`): logging level for this simulation element
         """
-        super().__init__(simulation_element_name_list, network_config, clock_config)
+        super().__init__(simulation_element_name_list, network_config, clock_config, level)
 
     async def _live(self):
-        # wait for simulation duration to pass
-        self._clock_config : RealTimeClockConfig
-        delta = self._clock_config.end_date - self._clock_config.start_date
-        delay = delta.seconds
+        try:
+            # wait for simulation duration to pass
+            self._clock_config : RealTimeClockConfig
+            delta = self._clock_config.end_date - self._clock_config.start_date
+            delay = delta.seconds
 
-        await asyncio.sleep(delay)
+            await asyncio.sleep(delay)
+
+        except asyncio.CancelledError:
+            return
 
 class AcceleratedRealTimeSimulationManager(AbstractManager):
     """
@@ -372,7 +386,9 @@ class AcceleratedRealTimeSimulationManager(AbstractManager):
     def __init__(self, 
                 simulation_element_name_list: list, 
                 network_config: ManagerNetworkConfig, 
-                clock_config: AcceleratedRealTimeClockConfig) -> None:
+                clock_config: AcceleratedRealTimeClockConfig,
+                level:int = logging.INFO
+                ) -> None:
         """
         Initializes and instance of a simulation manager
 
@@ -380,16 +396,21 @@ class AcceleratedRealTimeSimulationManager(AbstractManager):
             - simulation_element_name_list (`list`): list of the names of all simulation elements
             - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
             - clock_config (:obj:`AcceleratedRealTimeClockConfig`): description of this simulation's clock configuration
+            - level (`int`): logging level for this simulation element
         """
-        super().__init__(simulation_element_name_list, network_config, clock_config)
+        super().__init__(simulation_element_name_list, network_config, clock_config, level)
 
     async def _live(self):
-        # wait simulation time       
-        self._clock_config : AcceleratedRealTimeClockConfig
-        delta = self._clock_config.end_date - self._clock_config.start_date
-        delay = delta.seconds / self._clock_config._sim_clock_freq
+        try:
+            # wait for simulation duration to pass
+            self._clock_config : AcceleratedRealTimeClockConfig
+            delta = self._clock_config.end_date - self._clock_config.start_date
+            delay = delta.seconds / self._clock_config._sim_clock_freq
 
-        await asyncio.sleep(delay)
+            await asyncio.sleep(delay)
+
+        except asyncio.CancelledError:
+            return
 
 from datetime import datetime, timezone
 
