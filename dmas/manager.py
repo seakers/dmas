@@ -77,7 +77,7 @@ class AbstractManager(AbstractSimulationElement):
 
         # sync with all simulation elements
         self._log('syncing simulation elements...', level=logging.INFO)
-        await self._sync_elements()
+        await self._sync()
         self._log('sync complete!', level=logging.INFO)
 
         # announce sim start
@@ -112,7 +112,7 @@ class AbstractManager(AbstractSimulationElement):
 
         return port_list
 
-    async def _sync_elements(self) -> None:
+    async def _sync(self) -> None:
         """
         Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
         
@@ -122,18 +122,25 @@ class AbstractManager(AbstractSimulationElement):
         The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports
         and broadcast it to all memebers of the simulation. 
         """
+        await self._rep_socket_lock.acquire()
+
         while len(self._address_ledger) < len(self._simulation_element_name_list):
             if len(self._simulation_element_name_list) == 0:
                 break 
             
             # wait for incoming messages
-            msg_dict = await self._rep_socket.recv_json()
+            src, msg_dict = await self._receive_from_socket(self._rep_socket, self._rep_socket_lock)
             msg_type = msg_dict['@type']
             
             if NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST:
                 # ignore all incoming messages that are not Sync Requests
-                await self._rep_socket.send_string('IGNORED')
-                continue
+                response = dict()
+                response['@type'] = 'IGNORED'
+
+                src : str
+                response_str : str = str(json.dumps(response))
+                await self._rep_socket.send_multipart([src.encode('ascii'), response_str.encode('ascii')])
+
 
             # unpack and sync message
             sync_req = SyncRequestMessage.from_dict(msg_dict)
@@ -141,7 +148,6 @@ class AbstractManager(AbstractSimulationElement):
             self._log(f'Received sync request from node {sync_req.get_src()}!')
 
             # log subscriber confirmatoin
-            src = sync_req.get_src()
             if src in self._simulation_element_name_list:
                 if src not in self._address_ledger:
                     # node is a part of the simulation and has not yet been synchronized
@@ -157,8 +163,14 @@ class AbstractManager(AbstractSimulationElement):
                 self._log(f'Node {sync_req.get_src()} is not part of this simulation. Sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
             # send synchronization acknowledgement
-            await self._rep_socket.send_string('ACK')     
+            response = dict()
+            response['@type'] = 'ACK'
 
+            src : str
+            response_str : str = str(json.dumps(response))
+            await self._rep_socket.send_multipart([src.encode('ascii'), response_str.encode('ascii')])
+
+        self._rep_socket_lock.release()
         self._log(f'sync status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})! Broadcasting sync info...', level=logging.INFO)
 
         # broadcast simulation information message
@@ -169,6 +181,7 @@ class AbstractManager(AbstractSimulationElement):
         """
         Broadcasts this manager's simulation element address ledger to all subscribed elements to signal the start of the simulation.
         """
+        await self._rep_socket_lock.acquire()
 
         # wait for every simulation node to be ready
         elements_ready = []
@@ -177,21 +190,26 @@ class AbstractManager(AbstractSimulationElement):
                 break 
 
             # wait for incoming messages
-            msg_dict = await self._rep_socket.recv_json()
+            src, msg_dict = await self._receive_from_socket(self._rep_socket, self._rep_socket_lock)
             msg_type = msg_dict['@type']
             
             if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_READY:
-                # ignore all incoming messages that are not Sync Requests
-                await self._rep_socket.send_string('IGNORED')
+                # ignore all incoming messages that are not Ready Status messages
+                response = dict()
+                response['@type'] = 'IGNORED'
+
+                src : str
+                response_str : str = str(json.dumps(response))
+                await self._rep_socket.send_multipart([src.encode('ascii'), response_str.encode('ascii')])
+
                 continue
 
-            # unpack and sync message
+            # unpack and node ready message
             ready_msg = NodeReadyMessage.from_dict(msg_dict)
 
             logging.debug(f'Received ready message from node {ready_msg.get_src()}!')
 
-            # log subscriber confirmatoin
-            src = ready_msg.get_src()
+            # log subscriber confirmation
             if src in self._simulation_element_name_list:
                 if src not in elements_ready:
                     # node is a part of the simulation, is ready, and has not yet been registered
@@ -206,9 +224,15 @@ class AbstractManager(AbstractSimulationElement):
                 # node is not a part of the simulation
                 logging.debug(f'Node {src} is not part of this simulation. Simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})')
             
-            # send synchronization acknowledgement
-            await self._rep_socket.send_string('ACK')    
+            # send acknowledgement
+            response = dict()
+            response['@type'] = 'ACK'
+
+            src : str
+            response_str : str = str(json.dumps(response))
+            await self._rep_socket.send_multipart([src.encode('ascii'), response_str.encode('ascii')])
         
+        self._rep_socket_lock.release()
         self._log(f'simulation ready status: ({len(self._address_ledger)}/{len(self._simulation_element_name_list)})! Broadcasting simlation start...', level=logging.INFO)
 
         # broadcast sim start  message
@@ -226,12 +250,18 @@ class AbstractManager(AbstractSimulationElement):
             
             while len(self._offline_simulation_element_list) < len(self._simulation_element_name_list):
                 # wait for any incoming messages
-                msg_dict = await self._rep_socket.recv_json()
+                src, msg_dict = await self._receive_from_socket(self._rep_socket, self._rep_socket_lock)
                 msg_type = msg_dict['@type']
 
                 if NodeMessageTypes[msg_type] != NodeMessageTypes.NODE_DEACTIVATED:
                     # ignore all incoming messages that are not of type Node Deactivated
-                    await self._rep_socket.send_string('IGNORED')
+                    response = dict()
+                    response['@type'] = 'IGNORED'
+
+                    src : str
+                    response_str : str = str(json.dumps(response))
+                    await self._rep_socket.send_multipart([src.encode('ascii'), response_str.encode('ascii')])
+
                     continue
 
                 # unpack and sync message
@@ -239,7 +269,6 @@ class AbstractManager(AbstractSimulationElement):
 
                 self._log(f'Received node deactivated message from node {deactivated_message.get_src()}!')
 
-                src = deactivated_message.get_src()
                 if src in self._simulation_element_name_list:
                     if src not in self._offline_simulation_element_list:
                         # node is a part of the simulation, is now offline, and has not yet been registered
@@ -255,8 +284,13 @@ class AbstractManager(AbstractSimulationElement):
                     logging.debug(f'Node {src} is not part of this simulation. Offline simulation elements: ({len(self._offline_simulation_element_list)}/{len(self._simulation_element_name_list)})')
 
                 # send synchronization acknowledgement
-                await self._rep_socket.send_string('ACK') 
+                response = dict()
+                response['@type'] = 'ACK'
 
+                src : str
+                response_str : str = str(json.dumps(response))
+                await self._rep_socket.send_multipart([src.encode('ascii'), response_str.encode('ascii')])
+            
             self._log('all elements of the simulation are offline.')
             
         except asyncio.CancelledError:

@@ -168,7 +168,10 @@ if __name__ == "__main__":
 
     async def client(socket : azmq.Socket):
         try:
-            print("Connecting to hello world server...")    
+            print("Connecting to hello world server...") 
+
+            # print(f'Client socket options: {socket.getsockopt_string(zmq.)}')   
+
             #  Do 10 requests, waiting each time for a response
             for request in range(10):
                 dst : str = 'SERVER'
@@ -196,6 +199,8 @@ if __name__ == "__main__":
 
         req_socket = context.socket(zmq.REQ)
         req_socket.connect("tcp://localhost:5555")
+
+        print(zmq.REQ.name)
 
         server_task = asyncio.create_task(server(rep_socket))
         client_task = asyncio.create_task(client(req_socket))

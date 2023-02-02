@@ -182,17 +182,15 @@ class AbstractSimulationElement(ABC):
             self._log(f'port lock acquired!')
 
             self._log(f'sending message of type {type(msg)}...')
-            dst : str = msg.get_dst()
-            content : str = str(msg.to_json())
-            await self._pub_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            await self._send_from_socket(self._pub_socket, self._pub_socket_lock)
             self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
             self._log(f'message transmission interrupted.')
             
-        except:
+        except Exception as e:
             self._log(f'message transmission failed.')
-            raise
+            raise e
 
         finally:
             self._pub_socket_lock.release()
@@ -213,20 +211,79 @@ class AbstractSimulationElement(ABC):
             if dst != SimulationElementTypes.MONITOR.value:
                 raise asyncio.CancelledError('attempted to send a non-monitor message to the simulation monitor.')
 
-            content : str = str(msg.to_json())
-            await self._monitor_push_socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            await self._send_from_socket(self._monitor_push_socket, self._monitor_push_socket_lock)
             self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
             self._log(f'message transmission interrupted.')
             
-        except:
+        except Exception as e:
             self._log(f'message transmission failed.')
-            raise
+            raise e
 
         finally:
             self._monitor_push_socket_lock.release()
             self._log(f'port lock released.')
+
+    async def _send_from_socket(self, msg : SimulationMessage, socket : zmq.Socket, socket_lock : asyncio.Lock) -> None:
+        """
+        Sends a multipart message to a given socket.
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+            - socket (:obj:`Socket`): socket being used to transmit messages
+            - socket_lock (:obj:`asyncio.Lock`): lock restricting access to socket
+        """
+        try:
+            if not socket_lock.locked():
+                raise RuntimeError(f'Socket lock for {socket} port must be acquired before sending messages.')
+
+            if socket.socket_type != zmq.REQ and socket.socket_type != zmq.PUB and socket.socket_type != zmq.PUSH:
+                raise RuntimeError(f'Cannot send messages from a port of type {socket.socket_type.name}.')
+
+            dst : str = msg.get_dst()
+            content : str = str(msg.to_json())
+            await socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+
+        except asyncio.CancelledError:
+            self._log(f'message reception interrupted.')
+            return None, None
+            
+        except Exception as e:
+            raise e
+
+    async def _receive_from_socket(self, socket : zmq.Socket, socket_lock : asyncio.Lock) -> list:
+        """
+        Receives a multipart message from a given socket.
+
+        ### Arguments:
+            - socket (:obj:`Socket`): socket being used to receive messages
+            - socket_lock (:obj:`asyncio.Lock`): lock restricting access to socket
+
+        ### Returns:
+            - dst (`str`) : name of intended destination
+            - content (`dict`) : message
+        """
+        try:
+            if not socket_lock.locked():
+                raise RuntimeError(f'Socket lock for {socket} port must be acquired before receiving messages.')
+
+            if socket.socket_type != zmq.REQ and socket.socket_type != zmq.REP and socket.socket_type != zmq.SUB:
+                raise RuntimeError(f'Cannot receive messages from a port of type {socket.socket_type.name}.')
+
+            dst, content = await socket.recv_multipart()
+            dst : str = dst.decode('ascii')
+            content : dict = json.loads(content.decode('ascii'))
+
+            return dst, content
+
+        except asyncio.CancelledError:
+            self._log(f'message reception interrupted.')
+            return None, None
+            
+        except Exception as e:
+            self._log(f'message reception failed.')
+            raise e
 
     def __is_address_in_use(self, address : str) -> bool:
         """

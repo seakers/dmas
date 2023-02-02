@@ -55,7 +55,19 @@ class AbstractSimulationNode(AbstractSimulationElement):
         """
         super().__init__(name, network_config, level)
     
-    # TODO Sync with Manager
+    async def _activate(self) -> None:
+        # inititate base network connections 
+        await super()._activate()
+
+        # sync with all simulation manager
+        self._log('syncing with simulation manager...', level=logging.INFO)
+        self._address_ledger = await self._sync()
+        self._log('sync complete!', level=logging.INFO)
+
+        # wait for sim start announcement
+        self._log('waiting for simulation start broadcast...', level=logging.INFO)
+        await self._wait_for_sim_start()
+        self._log('simlation started!', level=logging.INFO)
 
     async def _config_network(self) -> list:
         """
@@ -94,26 +106,47 @@ class AbstractSimulationNode(AbstractSimulationElement):
 
         return port_list
 
+    async def _sync(self) -> dict:
+        """
+        Announces to simulation manager that this node's network connections have become online.
+
+        Waits for manager's address ledger.
+
+        ### Returns:
+            - address_ledger (`dict`): ledger mapping simulation node names to port addresses
+        """
+        pass
+
+    async def _wait_for_sim_start() -> None:
+        """
+        Announces to simulation manager that this node has comlpeted its initialization routine 
+        and is ready to start the simulation.
+
+        Waits for manager's simulation start broadcast.
+        """
+        pass
+
     async def _send_manager_message(self, msg : SimulationMessage):
         try:
-            self._log(f'acquiring port lock for a message of type {type(msg)}...')
-            await self._req_socket_lock.acquire()
-            self._log(f'port lock acquired!')
+            # self._log(f'acquiring port lock for a message of type {type(msg)}...')
+            # await self._req_socket_lock.acquire()
+            # self._log(f'port lock acquired!')
             
-            self._log(f'connecting to simulation manager...')
-            self._network_config : NodeNetworkConfig
-            self._req_socket.connect(self._network_config.get_manager_address())
-            self._log(f'successfully connected to simulation manager!')
+            # self._log(f'connecting to simulation manager...')
+            # self._network_config : NodeNetworkConfig
+            # self._req_socket.connect(self._network_config.get_manager_address())
+            # self._log(f'successfully connected to simulation manager!')
 
-            self._log(f'sending message of type {type(msg)}...')
-            dst : str = msg.get_dst()
-            content : str = str(msg.to_json())
+            # self._log(f'sending message of type {type(msg)}...')
+            # dst : str = msg.get_dst()
+            # content : str = str(msg.to_json())
 
-            if dst != SimulationElementTypes.MANAGER.value:
-                raise asyncio.CancelledError('attempted to send a non-manager message to the simulation manager.')
+            # if dst != SimulationElementTypes.MANAGER.value:
+            #     raise asyncio.CancelledError('attempted to send a non-manager message to the simulation manager.')
             
-            await self._req_socket.send_multipart([dst, content])
-            self._log(f'message transmitted sucessfully!')
+            # await self._req_socket.send_multipart([dst, content])
+            # self._log(f'message transmitted sucessfully!')
+            pass
 
         except asyncio.CancelledError as e:
             self._log(f'message transmission interrupted. {e}')
