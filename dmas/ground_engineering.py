@@ -2336,7 +2336,8 @@ class PlatformSim(Module):
         
         # TODO create list of subsystems based on component list given to the platform
         self.submodules = [
-            CommsSubsystem(self, 1e6)
+            CommsSubsystem(self, 1e6),
+            PayloadSubsystem(self, 1e6)
         ]
 
     # TODO include internal state routing that kills the platform sim and the agent if a platform-level failure is detected    

@@ -36,26 +36,8 @@ class ScienceModule(Module):
         else:
             self.mission_profile = mission_profile_data[parent_agent.name]
         self.notifier = notifier_data[parent_agent.name]
-        # self.chl_points = np.zeros(shape=(2000, 6))
-        # with open(self.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
-        #     reader = csv.reader(csvfile)
-        #     count = 0
-        #     for row in reader:
-        #         if count == 0:
-        #             count = 1
-        #             continue
-        #         self.chl_points[count-1,:] = [row[0], row[1], row[2], row[3], row[4], row[5]]
-        #         count = count + 1
-        self.chl_points = np.zeros(shape=(1000, 4))
-        with open(self.scenario_dir+'resources/riverATLAS.csv') as csvfile:
-            reader = csv.reader(csvfile)
-            count = 0
-            for row in reader:
-                if count == 0:
-                    count = 1
-                    continue
-                self.chl_points[count-1,:] = [row[0], row[1], row[2], row[3]]
-                count = count + 1
+        self.points = self.load_points_scenario1b()
+        
 
         data_products = self.load_data_products()        
 
@@ -66,6 +48,33 @@ class ScienceModule(Module):
         ]
         if predictive_model:
             self.submodules.append(SciencePredictiveModelModule(self,data_products))
+
+    def load_points_scenario1b(self):
+        points = []
+        lats = []
+        with open(self.scenario_dir+'resources/one_year_floods.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                if len(points) > 0:
+                    if line["lat"] not in lats:
+                        lats.append(line["lat"])
+                        points.append((line["lat"],line["lon"],line["severity"],0,86400))
+                else:
+                    lats.append(line["lat"])
+                    points.append((line["lat"],line["lon"],line["severity"],0,86400))
+        with open(self.scenario_dir+'resources/flow_events_75.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                if len(points) > 0:
+                    if line["lat"] not in lats:
+                        lats.append(line["lat"])
+                        points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+60*60))
+                else:
+                    lats.append(line["lat"])
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+60*60))
+        points = np.asfarray(points)
+        self.log(f'Loaded scenario 1b points',level=logging.INFO)
+        return points
 
     def load_data_products(self) -> list:
         data_products = []
@@ -84,28 +93,34 @@ class ScienceModule(Module):
         """
         outlier = False
         outlier_data = None
-        flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.chl_points)
-        if flood_chance > 0.50: # TODO remove this hardcode
-            item["severity"] = flood_chance
+        severity, lat, lon = self.get_severity(item["lat"], item["lon"], self.points, self.get_current_time())
+        if severity >= 1.0: # TODO remove this hardcode
+            item["severity"] = severity
             outlier = True
             outlier_data = item
             self.log(f'Flood detected at {lat}, {lon}!',level=logging.DEBUG)
         else:
+            outlier_data = item
+            outlier_data["severity"] = 0.0
             self.log(f'No flood detected at {lat}, {lon}',level=logging.DEBUG)
         return outlier, outlier_data
 
-    def get_flood_chance(self, lat, lon, points):
+    def get_severity(self, lat, lon, points, curr_time):
         """
-        Gets flood chance from CSV data.
+        Gets severity from CSV data.
         """
-        flood_chance = None
+        severity = 0.0
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
-                flood_chance = points[i, 3] # change this back to 5 for chlorophyll_baseline.csv
+                 # change this back to 5 for chlorophyll_baseline.csv
                 lat = points[i, 0]
                 lon = points[i, 1]
+                if points[i,3] < curr_time < points[i,4]:
+                    severity = points[i, 2]
+                else:
+                    severity = 0.0
                 break
-        return flood_chance, lat, lon
+        return severity, lat, lon
 
     async def internal_message_handler(self, msg: InternalMessage):
         """
@@ -297,10 +312,9 @@ class ScienceValueModule(Module):
         self.log(f'Computing science value...', level=logging.DEBUG)
         outlier = False
 
-        science_val = 1.0 #self.get_pop(lat, lon, points) TODO replace this?
-        flood, flood_data = self.parent_module.check_altimetry_outliers(obs)
-        if flood:
-            science_val = science_val * 10
+        outlier, outlier_data = self.parent_module.check_altimetry_outliers(obs)
+        science_val = outlier_data["severity"]
+        if outlier:
             self.log(f'Computed bonus science value: {science_val}', level=logging.DEBUG)
             outlier = True
         else:
@@ -341,7 +355,7 @@ class ScienceValueModule(Module):
         Checks TSS data for outliers. Currently hardcoded. TODO use real data source.
         """
         outlier = False
-        mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], self.parent_module.chl_points)
+        mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], self.parent_module.points)
         if mean > 30000: # TODO remove this hardcode
             self.log(f'TSS outlier measured at {lat}, {lon}!',level=logging.INFO)
             outlier = True
@@ -525,7 +539,7 @@ class OnboardProcessingModule(Module):
                     await self.save_observations()
                 elif(instrument == "POSEIDON-3B Altimeter"): # TODO replace this hardcoding
                     data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
-                    processed_data = self.compute_altimetry()
+                    processed_data = self.generate_altimetry()
                     self.sd = self.add_data_product(self.sd,lat,lon,obs_process_time,"altimetry",raw_data_filename,processed_data)
                     self.log(f'Altimetry measurement data successfully saved in on-board data-base.', level=logging.DEBUG)
                     self.updated.set()
@@ -596,7 +610,7 @@ class OnboardProcessingModule(Module):
 
     def compute_chlorophyll_obs_value(self,b4,b5):
         """
-        Computes chlorophyll concentration using the 2BDA algorithm.
+        Computes chlorophyll concentration using the 2BDA algorithm. TODO add reference
         """
         bda = b5 - b5/b4 + b4
         return bda
@@ -608,7 +622,7 @@ class OnboardProcessingModule(Module):
         tss = 195.6 * b4
         return tss
 
-    def compute_altimetry(self):
+    def generate_altimetry(self):
         """
         Generates random altimetry data until we have an altimetry data source.
         """
@@ -662,11 +676,12 @@ class OnboardProcessingModule(Module):
 
 
 class SciencePredictiveModelModule(Module):
-    def __init__(self, parent_module, sd) -> None:
-        self.sd = sd
-        self.requests_sent = False
+    def __init__(self, parent_module : Module, sd) -> None:
         super().__init__(ScienceSubmoduleTypes.SCIENCE_PREDICTIVE_MODEL.value, parent_module, submodules=[],
                          n_timed_coroutines=0)
+        self.sd = sd
+        self.requests_sent = False
+        self.unsent_points = self.parent_module.points
 
     model_reqs = []
     async def activate(self):
@@ -723,17 +738,33 @@ class SciencePredictiveModelModule(Module):
     async def send_meas_req(self):
         try:
             while True:
-                if not self.requests_sent:
-                    forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'resources/ForecastWarnings-all.csv', delimiter=',')
-                    for row in forecast_data:
-                        measurement_request = MeasurementRequest(["tss","altimetry"], row[2], row[3], 1.0, {})
+                i = 0
+                self.log('In send_meas_req',level=logging.INFO)
+                print(len(self.unsent_points[:,0]))
+                while i < len(self.unsent_points[:,0]):
+                    if(self.unsent_points[i,3] <= self.get_current_time() <= self.unsent_points[i, 4]):
+                        measurement_request = MeasurementRequest(["tss", "altimetry"], self.unsent_points[i,0],self.unsent_points[i,1], self.unsent_points[i,2], {})
                         ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                        self.log(f'Sending message from predictive model!!!',level=logging.INFO)
                         await self.send_internal_message(ext_msg)
-                        self.log(f'Sent message from predictive model!',level=logging.INFO)
-                    self.requests_sent = True
+                        self.unsent_points = np.delete(self.unsent_points, i, 0)
+                    else:
+                        i = i+1
+                await self.sim_wait(60*60)
+                if len(self.unsent_points[:,0]) == 0:
                     await self.sim_wait(1e6)
-                else:
-                    await self.sim_wait(1e6)
+
+                # if not self.requests_sent:
+                #     forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'resources/ForecastWarnings-all.csv', delimiter=',')
+                #     for row in forecast_data:
+                #         measurement_request = MeasurementRequest(["tss","altimetry"], row[2], row[3], 1.0, {})
+                #         ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                #         await self.send_internal_message(ext_msg)
+                #         self.log(f'Sent message from predictive model!',level=logging.INFO)
+                #     self.requests_sent = True
+                #     await self.sim_wait(1e6)
+                # else:
+                #     await self.sim_wait(1e6)
         except asyncio.CancelledError:
             return
 
@@ -845,7 +876,7 @@ class ScienceReasoningModule(Module):
         outlier = False
         outlier_data = None
         if(item["checked"] is False):
-            mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], self.parent_module.chl_points)
+            mean, stddev, lat, lon = self.get_mean_sd(item["lat"], item["lon"], self.parent_module.points)
             pixel_value = self.get_pixel_value_from_image(item,lat,lon,30) # 30 meters is landsat resolution
             if mean > 30000: # TODO remove this hardcode
                 item["severity"] = (pixel_value-mean) / stddev
