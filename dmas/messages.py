@@ -19,7 +19,7 @@ class SimulationMessage(ABC):
         - _msg_type (`Enum`): type of message being sent
     """
     @beartype
-    def __init__(self, src: str, dst: str, msg_type: Enum) -> None:
+    def __init__(self, src: str, dst: str, msg_type: Enum):
         """
         Initiates an instance of a simulation message.
         
@@ -116,7 +116,7 @@ class ManagerMessage(SimulationMessage, ABC):
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
     @beartype
-    def __init__(self, type: ManagerMessageTypes, t : Union[int, float]) -> None:   
+    def __init__(self, type: ManagerMessageTypes, t : Union[int, float]):   
         """        
         Initialzies an instance of a Manager Message
         """
@@ -144,7 +144,7 @@ class SimulationStartMessage(ManagerMessage):
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
     @beartype
-    def __init__(self, t: Union[int, float]) -> None:
+    def __init__(self, t: Union[int, float]):
         """
         Initializes an instance of a Simulaiton Start Message
         """
@@ -232,7 +232,7 @@ class SimulationInfoMessage(ManagerMessage):
         - _clock_config (:obj:`ClockConfig`): config object containing information about the clock being used in this simulation
     """
 
-    def __init__(self, address_ledger: dict, clock_config: ClockConfig, t: float) -> None:
+    def __init__(self, address_ledger: dict, clock_config: ClockConfig, t: float):
         """
         Initiallizes and instance of a Simulation Start Message
 
@@ -340,7 +340,7 @@ class SyncRequestMessage(SimulationMessage):
         - _network_config (:obj:`NetworkConfig`): network configuration from sender node
     """
 
-    def __init__(self, src: str, network_config : NodeNetworkConfig) -> None:
+    def __init__(self, src: str, network_config : NodeNetworkConfig):
         """
         Initializes an instance of a Sync Request Message
 
@@ -401,7 +401,7 @@ class SyncRequestMessage(SimulationMessage):
         return f'{NodeMessageTypes.SYNC_REQUEST.name}'
 
 class NodeReadyMessage(SimulationMessage):
-    def __init__(self, src: str) -> None:
+    def __init__(self, src: str):
         super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.NODE_READY)
     
     def from_dict(d : dict):
@@ -432,7 +432,7 @@ class NodeReadyMessage(SimulationMessage):
         return f'{self._src} is ready!'
 
 class NodeDeactivatedMessage(SimulationMessage):
-    def __init__(self, src: str) -> None:
+    def __init__(self, src: str):
         super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.NODE_DEACTIVATED)
     
     def from_dict(d : dict):

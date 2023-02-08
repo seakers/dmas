@@ -8,9 +8,9 @@ import zmq
 
 from dmas.messages import *
 from dmas.utils import *
-from dmas.element import AbstractSimulationElement
+from dmas.element import SimulationElement
 
-class AbstractManager(AbstractSimulationElement):
+class AbstractManager(SimulationElement):
     """
     ## Simulation Manager Class 
     
@@ -312,6 +312,17 @@ class AbstractManager(AbstractSimulationElement):
                 wait_for_offline_task.cancel()
                 await wait_for_offline_task
 
+    async def _live(self):
+        try:
+            # wait for simulation duration to pass
+            self._clock_config : ClockConfig
+            delta = self._clock_config.end_date - self._clock_config.start_date
+
+            await self._sim_wait(delta.seconds)
+
+        except asyncio.CancelledError:
+            return
+
     async def _shut_down(self) -> None:
         # broadcast sim end message
         await self._broadcast_message( SimulationEndMessage(time.perf_counter()) )
@@ -373,17 +384,17 @@ class RealTimeSimulationManager(AbstractManager):
         """
         super().__init__(simulation_element_name_list, network_config, clock_config, level)
 
-    async def _live(self):
-        try:
-            # wait for simulation duration to pass
-            self._clock_config : RealTimeClockConfig
-            delta = self._clock_config.end_date - self._clock_config.start_date
-            delay = delta.seconds
+    # async def _live(self):
+    #     try:
+    #         # wait for simulation duration to pass
+    #         self._clock_config : RealTimeClockConfig
+    #         delta = self._clock_config.end_date - self._clock_config.start_date
+    #         delay = delta.seconds
 
-            await asyncio.sleep(delay)
+    #         await asyncio.sleep(delay)
 
-        except asyncio.CancelledError:
-            return
+    #     except asyncio.CancelledError:
+    #         return
 
 class AcceleratedRealTimeSimulationManager(AbstractManager):
     """
@@ -434,17 +445,17 @@ class AcceleratedRealTimeSimulationManager(AbstractManager):
         """
         super().__init__(simulation_element_name_list, network_config, clock_config, level)
 
-    async def _live(self):
-        try:
-            # wait for simulation duration to pass
-            self._clock_config : AcceleratedRealTimeClockConfig
-            delta = self._clock_config.end_date - self._clock_config.start_date
-            delay = delta.seconds / self._clock_config._sim_clock_freq
+    # async def _live(self):
+    #     try:
+    #         # wait for simulation duration to pass
+    #         self._clock_config : AcceleratedRealTimeClockConfig
+    #         delta = self._clock_config.end_date - self._clock_config.start_date
+    #         delay = delta.seconds / self._clock_config._sim_clock_freq
 
-            await asyncio.sleep(delay)
+    #         await asyncio.sleep(delay)
 
-        except asyncio.CancelledError:
-            return
+    #     except asyncio.CancelledError:
+    #         return
 
 from datetime import datetime, timezone
 

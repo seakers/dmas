@@ -6,9 +6,9 @@ import zmq.asyncio as azmq
 import socket
 
 from dmas.messages import SimulationMessage
-from utils import *
+from dmas.utils import *
 
-class AbstractSimulationElement(ABC):
+class SimulationElement(ABC):
     """
     ## Abstract Simulation Element 
 
@@ -95,26 +95,30 @@ class AbstractSimulationElement(ABC):
     async def _excetute(self) -> None:
         """
         Main simulation element function. Activates and executes this similation element. 
+
+        Simulation elements perform two element-specific concurrent processes:
+            1. _listen(): elements listen to incoming messages
+            2. _live(): elements perform a defined set of actions during the simulation
         """
         try:
             # activate and initialize
             self._log('activating...', level=logging.INFO)
-            pending = None
+            pending = []
             await self._activate()
             self._log('activated!', level=logging.INFO)
 
             # execute 
             self._log('starting life...', level=logging.INFO)
-            live_task = asyncio.create_task(self._live())
-            live_task.set_name('live')
-
             listen_task = asyncio.create_task(self._listen())
             listen_task.set_name('listen')
 
-            _, pending = await asyncio.wait([live_task, listen_task], return_when=asyncio.FIRST_COMPLETED)
+            live_task = asyncio.create_task(self._live())
+            live_task.set_name('live')            
+
+            _, pending = await asyncio.wait([listen_task, live_task], return_when=asyncio.FIRST_COMPLETED)
 
         finally:
-            self._log('i am now dead! Terminating all processes...', level=logging.INFO)
+            self._log('I am now dead! Terminating all processes...', level=logging.INFO)
             for task in pending:
                 task : asyncio.Task
                 self._log(f'terminting process `{task.get_name()}`...', level=logging.DEBUG)
@@ -182,7 +186,7 @@ class AbstractSimulationElement(ABC):
             self._log(f'port lock acquired!')
 
             self._log(f'sending message of type {type(msg)}...')
-            await self._send_from_socket(self._pub_socket, self._pub_socket_lock)
+            await self._send_from_socket(msg, self._pub_socket, self._pub_socket_lock)
             self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
@@ -211,7 +215,7 @@ class AbstractSimulationElement(ABC):
             if dst != SimulationElementTypes.MONITOR.value:
                 raise asyncio.CancelledError('attempted to send a non-monitor message to the simulation monitor.')
 
-            await self._send_from_socket(self._monitor_push_socket, self._monitor_push_socket_lock)
+            await self._send_from_socket(msg, self._monitor_push_socket, self._monitor_push_socket_lock)
             self._log(f'message transmitted sucessfully!')
 
         except asyncio.CancelledError:
@@ -247,9 +251,10 @@ class AbstractSimulationElement(ABC):
 
         except asyncio.CancelledError:
             self._log(f'message reception interrupted.')
-            return None, None
+            return
             
         except Exception as e:
+            self._log(f'message reception failed. {e}')
             raise e
 
     async def _receive_from_socket(self, socket : zmq.Socket, socket_lock : asyncio.Lock) -> list:
@@ -320,6 +325,45 @@ class AbstractSimulationElement(ABC):
         for socket in self._socket_list:
             socket : zmq.Socket
             socket.close()
+
+    async def _sim_wait(self, delay : float) -> None:
+        """
+        Waits for a given delay to occur according to the clock configuration being used
+
+        ### Arguments:
+            - delay (`float`): number of seconds to be waited
+        """
+        try:
+            async def cancellable_wait(delay : float, sim_clock_freq : float = 1.0):
+                try:
+                    await asyncio.sleep(delay / sim_clock_freq)
+                except asyncio.CancelledError:
+                    self._log(f'Cancelled sleep of delay {delay / sim_clock_freq} [s]')
+                    raise
+
+            wait_for_clock = None
+
+            if isinstance(self._clock_config, RealTimeClockConfig):
+                self._clock_config : RealTimeClockConfig
+                wait_for_clock = asyncio.create_task(cancellable_wait(delay))
+                await wait_for_clock
+
+            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                self._clock_config : AcceleratedRealTimeClockConfig
+                wait_for_clock = asyncio.create_task(cancellable_wait(delay, self._clock_config._sim_clock_freq))
+                await wait_for_clock
+
+            else:
+                raise NotImplementedError(f"Clock config of type {type(self._clock_config)} not yet implemented.")
+        
+        except asyncio.CancelledError:
+            if wait_for_clock is not None:
+                wait_for_clock : asyncio.Task
+                wait_for_clock.cancel()
+                await wait_for_clock
+
+        except Exception as e:
+            raise e
 
     @abstractmethod
     async def _live(self) -> None:

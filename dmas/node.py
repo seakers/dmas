@@ -3,11 +3,11 @@ import logging
 from beartype import beartype
 import zmq
 
-from dmas.element import AbstractSimulationElement
+from dmas.element import SimulationElement
 from dmas.messages import *
 from dmas.utils import *
 
-class AbstractSimulationNode(AbstractSimulationElement):
+class Node(SimulationElement):
     """
     ## Abstract Simulation Node 
 
@@ -87,12 +87,14 @@ class AbstractSimulationNode(AbstractSimulationElement):
         # broadcast reception port 
         self._sub_socket = self._context.socket(zmq.SUB)
         self._network_config : NodeNetworkConfig
+        self._sub_socket.connect(self._network_config.get_subscribe_address)
+
         self._name : str
         all_str : str = str(SimulationElementTypes.ALL.name)
-        self._sub_socket.connect(self._network_config.get_subscribe_address)
         self._sub_socket.setsockopt(zmq.SUBSCRIBE, self.name.encode('ascii'))
         self._sub_socket.setsockopt(zmq.SUBSCRIBE, all_str.encode('ascii'))
         self._sub_socket.setsockopt(zmq.LINGER, 0)
+
         self._sub_socket_lock = asyncio.Lock()
 
         port_list.append(self._sub_socket)
@@ -115,6 +117,67 @@ class AbstractSimulationNode(AbstractSimulationElement):
         ### Returns:
             - address_ledger (`dict`): ledger mapping simulation node names to port addresses
         """
+        try:
+            # create sync message
+            msg = SyncRequestMessage(self.name, self._network_config)
+
+            # connect to simulation manager
+            self._log(f'acquiring port lock for a message of type {type(msg)}...')
+            await self._req_socket_lock.acquire()
+            self._log(f'port lock acquired!')
+
+            self._log('connecting to simulation manager...')
+            self._req_socket.connect(self._network_config.get_manager_address())
+            self._log('connection to simulation manager established!')
+
+            while True:
+                # submit message to manager
+                await self._send_from_socket(msg, self._req_socket, self._req_socket_lock)
+
+                # wait for simulation manager to acknowledge msg
+                dst, response = await self._receive_from_socket(self._req_socket, self._req_socket_lock)
+                
+                response : dict
+                resp_type = response.get('@type', None)
+                if dst == self.name and resp_type == 'ACK':
+                    break
+        finally:
+            # disconnect from simulation manager
+            return
+
+        # self.log(f'Connecting to agent {msg.dst} through port number {port}...',level=logging.DEBUG)
+        # self.agent_socket_out.connect(f"tcp://localhost:{port}")
+        # self.log(f'Connected to agent {msg.dst}!',level=logging.DEBUG)
+
+        # # submit request
+        # self.log(f'Transmitting a message of type {type(msg)} (from {self.name} to {msg.dst})...',level=logging.INFO)
+        # await self.agent_socket_out_lock.acquire()
+        # self.log(f'Acquired lock.',level=logging.DEBUG)
+        # await self.agent_socket_out.send_json(msg_json)
+        # self.log(f'{type(msg)} message sent successfully. Awaiting response...',level=logging.DEBUG)
+                    
+        # # wait for server reply
+        # await self.agent_socket_out.recv_json()
+        # self.agent_socket_out_lock.release()
+        # self.log(f'Received message reception confirmation!',level=logging.DEBUG)      
+
+        # # disconnect socket from destination
+        # self.log(f'Disconnecting from agent {msg.dst}...',level=logging.DEBUG)
+        # self.agent_socket_out.disconnect(f"tcp://localhost:{port}")
+        # self.log(f'Disconnected from agent {msg.dst}!',level=logging.DEBUG)
+
+
+        # self._log('Connection to environment established!')
+        # await self.environment_request_lock.acquire()
+
+        # sync_req = SyncRequestMessage(self.name, EnvironmentModuleTypes.ENVIRONMENT_SERVER_NAME.value, self.agent_port_in, count_number_of_subroutines(self))
+        # await self.environment_request_socket.send_json(sync_req.to_json())
+
+        # self.log('Synchronization request sent. Awaiting environment response...')
+
+        # # wait for synchronization reply
+        # await self.environment_request_socket.recv()  
+        # self.environment_request_lock.release()
         pass
 
     async def _wait_for_sim_start() -> None:

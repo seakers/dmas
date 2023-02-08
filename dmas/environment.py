@@ -3,10 +3,10 @@ from beartype import beartype
 import zmq
 import zmq.asyncio as azmq
 from dmas.messages import *
-from dmas.node import AbstractSimulationNode
+from dmas.node import Node
 from dmas.utils import *
 
-class AbstractEnvironmentNode(AbstractSimulationNode):
+class AbstractEnvironmentNode(Node):
     """
     ## Abstract Environment Node 
 
