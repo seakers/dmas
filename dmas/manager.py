@@ -457,9 +457,9 @@ class AcceleratedRealTimeSimulationManager(AbstractManager):
     #     except asyncio.CancelledError:
     #         return
 
-from datetime import datetime, timezone
-
 if __name__ == "__main__":
+    from datetime import datetime, timezone
+    
     response_address = "tcp://*:5558"
     broadcast_address = "tcp://*:5559"
     monitor_address = "tcp://127.0.0.1:55"

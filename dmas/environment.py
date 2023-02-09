@@ -142,9 +142,9 @@ class AbstractEnvironmentNode(Node):
         """
         pass
 
-import time
 
 if __name__ == "__main__":
+    import time
 
     async def server(socket : azmq.Socket):
         try:
@@ -199,8 +199,6 @@ if __name__ == "__main__":
 
         req_socket = context.socket(zmq.REQ)
         req_socket.connect("tcp://localhost:5555")
-
-        print(zmq.REQ.name)
 
         server_task = asyncio.create_task(server(rep_socket))
         client_task = asyncio.create_task(client(req_socket))

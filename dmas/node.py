@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from beartype import beartype
 import zmq
 
@@ -229,3 +230,121 @@ class Node(SimulationElement):
         """
 
         pass
+
+
+import zmq.asyncio as azmq
+from multiprocessing import Pool, Process
+
+async def server():
+    try:
+        print('SERVER START')
+
+        context = azmq.Context()
+        socket = context.socket(zmq.REP)
+        socket.bind("tcp://*:5555")
+
+        m = 0
+        while m < 10:
+            #  Wait for next request from client
+            print('SERVER: waiting on message...')
+            src, content = await socket.recv_multipart()
+            src = src.decode('ascii')
+            content = json.loads(content.decode('ascii'))
+            print(f"Received request from {src}: {content}")
+
+            #  Do some 'work'
+            await asyncio.sleep(0.5)
+
+            #  Send reply back to client
+            src : str = content['src']
+            resp : str = 'hello!'
+            socket.send_multipart([src.encode('ascii'), resp.encode('ascii')])
+
+            m += 1
+        
+        print('SERVER DONE')
+
+    except asyncio.CancelledError:
+        return
+
+async def client():
+    try:
+        print("Connecting to hello world server...") 
+        context = azmq.Context()
+        socket = context.socket(zmq.REQ)
+        socket.connect("tcp://localhost:5555")
+
+        #  Do 10 requests, waiting each time for a response
+        for _ in range(10):
+            dst : str = 'SERVER'
+            content_dict = dict()
+            content_dict['src'] = 'CLIENT'
+            content_dict['dst'] = 'SERVER'
+            content_dict['@type'] = 'HELLO WORLD'
+            content : str = str(json.dumps(content_dict))
+
+            await socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+
+            #  Get the reply.
+            src, content = await socket.recv_multipart()
+            t = time.perf_counter()
+            src = src.decode('ascii')
+            content = content.decode('ascii')
+                            
+            print(f"Received reply from {dst} at {t} [s]: {content}")
+
+    except asyncio.CancelledError:
+        return
+
+async def multitough():
+
+    p1 = Process(target=tough_process, args=(10000000,))
+    p2 = Process(target=tough_process, args=(10000000,))
+
+    p1.start()
+    p2.start()
+
+def tough_process(n : int = 10000):
+    print(f'starting tough process with n={n}...')
+    nums = range(n)
+    out = []
+    for num in nums:
+        out.append(num ** 2)
+
+    print(f'tough process completed! {len(out)}')
+    return out
+
+async def client_main():
+    print('CLIENT START')
+
+    t1 = asyncio.create_task(client())
+    t2 = asyncio.create_task(multitough())
+
+    await asyncio.wait([t1, t2], return_when=asyncio.ALL_COMPLETED)
+
+    print('CLIENT DONE')
+
+def server_run():
+    asyncio.run(server())
+    # for i in range(5):
+    #     print(f'server: {i+1}')
+    #     time.sleep(0.5)
+
+def client_run():
+    asyncio.run(client_main())
+    # for i in range(5):
+    #     print(f'client: {i+1}')
+    #     time.sleep(0.5)
+
+if __name__ == "__main__":
+    # goal: show that listening and actions occur in parallel           
+    p1 = Process(target=client_run)
+    p2 = Process(target=server_run)  
+
+    p1.start()
+    p2.start()
+
+    p1.join()
+    p2.join()
+
+    
