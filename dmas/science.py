@@ -260,7 +260,7 @@ class ScienceValueModule(Module):
                 metadata = {
                     "observation" : obs
                 }
-                measurement_request = MeasurementRequest(["tss"], lat, lon, science_value, metadata)
+                measurement_request = MeasurementRequest(["tss","altimetry"], lat, lon, science_value, metadata)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
@@ -299,7 +299,7 @@ class ScienceValueModule(Module):
                 
                 self.log(f'Received measurement with value {science_value}!',level=logging.DEBUG)
                 self.science_value_sum = self.science_value_sum + science_value
-                self.log(f'Sum of science values: {self.science_value_sum}',level=logging.DEBUG)
+                self.log(f'Sum of science values: {self.science_value_sum}',level=logging.INFO)
                 self.log(f'Sum of science values: {self.science_value_sum}', logger_type=LoggerTypes.RESULTS, level=logging.DEBUG)
 
         except asyncio.CancelledError:
