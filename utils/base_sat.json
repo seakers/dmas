@@ -36,7 +36,7 @@
                         }
                     }
                     },
-    "instrument": {"name": "OLI", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
+    "instrument": {"name": "POSEIDON-3B Altimeter", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12,
                     "orientation": {"referenceFrame": "SC_BODY_FIXED", "convention": "REF_FRAME_ALIGNED"},
                     "fieldOfViewGeometry": {
                         "shape": "RECTANGULAR",

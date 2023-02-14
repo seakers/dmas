@@ -1240,11 +1240,20 @@ if __name__ == '__main__':
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
+    spacecraft_str_list = []
+    with open("./scenarios/scenario1"+sys.argv[1]+"/" +'MissionSpecs.json', 'r') as scenario_specs:
+        # load json file as dictionary
+        mission_dict = json.load(scenario_specs)
+
+        data = dict()
+        spacecraft_list = mission_dict.get('spacecraft')
+        for spacecraft in spacecraft_list:
+            spacecraft_str_list.append(spacecraft.get('name'))
 
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, ['Landsat 9', 'Jason-3', 'CryoSat-2', 'Sentinel-6A', 'Sentinel-6B', 'SWOT', 'Iridium', 'Central Node'], duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, spacecraft_str_list, duration, clock_type=SimClocks.SERVER_EVENTS)
     
     asyncio.run(environment.live())
     print('DONE')
