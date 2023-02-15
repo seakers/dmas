@@ -48,12 +48,7 @@
                 }
             },
             "instrument": {
-                "name": "OLI",
-                "mass": 10,
-                "volume": 12.45,
-                "dataRate": 40,
-                "bitsPerPixel": 8,
-                "power": 12,
+                "name": "OLI", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 33, "spatial_res": 50, "spectral_res": 7e-9,
                 "orientation": {
                     "referenceFrame": "SC_BODY_FIXED",
                     "convention": "REF_FRAME_ALIGNED"
@@ -78,12 +73,12 @@
                 },
                 "state": {
                     "@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL",
-                    "sma": 7378,
+                    "sma": 6878,
                     "ecc": 0.01,
-                    "inc": 75,
-                    "raan": 180.0,
+                    "inc": 67,
+                    "raan": 0.0,
                     "aop": 0.0,
-                    "ta": 270.0
+                    "ta": 0.0
                 }
             },
             "planner": {
@@ -138,12 +133,7 @@
                 }
             },
             "instrument": {
-                "name": "OLI",
-                "mass": 10,
-                "volume": 12.45,
-                "dataRate": 40,
-                "bitsPerPixel": 8,
-                "power": 12,
+                "name": "OLI", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 33, "spatial_res": 50, "spectral_res": 7e-9,
                 "orientation": {
                     "referenceFrame": "SC_BODY_FIXED",
                     "convention": "REF_FRAME_ALIGNED"
@@ -168,12 +158,12 @@
                 },
                 "state": {
                     "@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL",
-                    "sma": 7378,
+                    "sma": 6878,
                     "ecc": 0.01,
-                    "inc": 75,
-                    "raan": 180.0,
+                    "inc": 67,
+                    "raan": 0.0,
                     "aop": 0.0,
-                    "ta": 270.0
+                    "ta": 180.0
                 }
             },
             "planner": {
@@ -228,12 +218,7 @@
                 }
             },
             "instrument": {
-                "name": "OLI",
-                "mass": 10,
-                "volume": 12.45,
-                "dataRate": 40,
-                "bitsPerPixel": 8,
-                "power": 12,
+                "name": "OLI", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 33, "spatial_res": 50, "spectral_res": 7e-9,
                 "orientation": {
                     "referenceFrame": "SC_BODY_FIXED",
                     "convention": "REF_FRAME_ALIGNED"
@@ -258,12 +243,12 @@
                 },
                 "state": {
                     "@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL",
-                    "sma": 7378,
+                    "sma": 6878,
                     "ecc": 0.01,
-                    "inc": 75,
+                    "inc": 67,
                     "raan": 180.0,
                     "aop": 0.0,
-                    "ta": 270.0
+                    "ta": 90.0
                 }
             },
             "planner": {
@@ -318,12 +303,7 @@
                 }
             },
             "instrument": {
-                "name": "OLI",
-                "mass": 10,
-                "volume": 12.45,
-                "dataRate": 40,
-                "bitsPerPixel": 8,
-                "power": 12,
+                "name": "OLI", "mass":10, "volume":12.45, "dataRate": 40, "bitsPerPixel": 8, "power": 12, "snr": 33, "spatial_res": 50, "spectral_res": 7e-9,
                 "orientation": {
                     "referenceFrame": "SC_BODY_FIXED",
                     "convention": "REF_FRAME_ALIGNED"
@@ -348,9 +328,9 @@
                 },
                 "state": {
                     "@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL",
-                    "sma": 7378,
+                    "sma": 6878,
                     "ecc": 0.01,
-                    "inc": 75,
+                    "inc": 67,
                     "raan": 180.0,
                     "aop": 0.0,
                     "ta": 270.0

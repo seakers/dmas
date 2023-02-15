@@ -891,7 +891,7 @@ class EnvironmentServer(NodeModule):
                     self.log(F'RECEIVED, UNKNOWN, UNKNOWN, {self.name}', logger_type=LoggerTypes.AGENT_TO_ENV_MESSAGE, level=logging.INFO)
 
                     msg_type : NodeToEnvironmentMessageTypes
-                    self.log(f'Message of type {msg_type.value} not yet supported. Ignoring message...')
+                    self.log(f'Message of type {msg_type} not yet supported. Ignoring message...')
                     await self.send_blanc_response(dst=d.get('src', 'N/A'))
                     return
 

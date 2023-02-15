@@ -16,8 +16,8 @@ for m in range(r):
     for n in range(s):
         new_satellite = {}
         new_satellite = base_satellite.copy()
-        new_satellite["@id"] = "alt_sat_"+str(m)+"_"+str(n)
-        new_satellite["name"] = "alt_sat_"+str(m)+"_"+str(n)
+        new_satellite["@id"] = "imaging_sat_"+str(m)+"_"+str(n)
+        new_satellite["name"] = "imaging_sat_"+str(m)+"_"+str(n)
         pu = 360 / (r*s)
         delAnom = pu * r
         delRAAN = pu * s
@@ -26,8 +26,6 @@ for m in range(r):
         phasing = pu * f
         
         anom = (n * delAnom + phasing * m)
-        print(RAAN)
-        print(anom)
         new_satellite["orbitState"]["state"]["sma"] = altitude+re
         new_satellite["orbitState"]["state"]["ecc"] = ecc
         new_satellite["orbitState"]["state"]["inc"] = inc

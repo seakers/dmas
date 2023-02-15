@@ -831,7 +831,7 @@ class ComponentModule(Module):
             await self.update_properties(dt)
 
             # check component health
-            if (self.is_critical() or self.is_failed()) and crit_flag:
+            if self.is_critical() and crit_flag:
                 # component is in a critical or a potential failure state
                 self.health = ComponentHealth.CRITIAL                    
 
@@ -874,7 +874,7 @@ class ComponentModule(Module):
         if self.status is ComponentStatus.ON:
             self.power_consumed = self.average_power_consumption
         else:
-            self.power_consumed = 0
+            self.power_consumed = 0.0
 
         # update power differential tracker
         self.dp = self.power_supplied - self.power_consumed
@@ -1156,13 +1156,13 @@ class SubsystemModule(Module):
                     or self.is_subsystem_failure() or self.is_component_failure()):
 
                     if self.is_subsystem_critical():
-                        self.log(f'Subsystem is in a subsystem-level critical state!')
+                        self.log(f'Subsystem is in a subsystem-level critical state!',level=logging.DEBUG)
                     elif self.is_component_critical():
-                        self.log(f'Subsystem is in a component-level critical state!')
+                        self.log(f'Subsystem is in a component-level critical state!',level=logging.DEBUG)
                     elif self.is_subsystem_failure():
-                        self.log(f'Subsystem is in a subsystem-level failure state!')
+                        self.log(f'Subsystem is in a subsystem-level failure state!',level=logging.DEBUG)
                     elif self.is_component_failure():
-                        self.log(f'Subsystem is in a component-level failure state!')
+                        self.log(f'Subsystem is in a component-level failure state!',level=logging.DEBUG)
 
                     # set component health to critical
                     self.health = SubsystemHealth.CRITIAL
@@ -1239,6 +1239,7 @@ class SubsystemModule(Module):
                 
                 if self.health is SubsystemHealth.CRITIAL:
                     # subsystem is in critical state
+                    self.log(f'crit_monitor subsystemhealth is critial {self.name}',level=logging.INFO)
 
                     if not self.critical.is_set():
                         # release state lock
@@ -1374,16 +1375,16 @@ class SubsystemModule(Module):
     def is_subsystem_failure(self) -> bool:
         """
         Detects subsystem-level failure state using latest component states received by this subsystem. 
-        By default it fails only if all components are in a failure state.
+        By default it fails if any components are in a failure state.
         """
-        all_comp_failure = True
+        comp_failure = False
         for component in self.submodules:
             component : ComponentModule
-            if component.health is not ComponentHealth.FAILURE:
-                all_comp_failure = True
+            if component.health is ComponentHealth.FAILURE:
+                comp_failure = True
                 break
 
-        return all_comp_failure
+        return comp_failure
 
     def is_component_failure(self) -> bool:
         """
@@ -1774,7 +1775,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
                 health: ComponentHealth = ComponentHealth.NOMINAL, 
                 status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.CNDH.value, parent_platform_sim, CommandAndDataHandlingState, health, status)
-        self.submodules = [ OnboardComputerModule(self, 1, 1e9) ]
+        self.submodules = [ OnboardComputerModule(self, 1.0, 1e9) ]
 
         self.subsystem_states = dict()
     
@@ -1800,7 +1801,7 @@ class CommandAndDataHandlingSubsystem(SubsystemModule):
         out['subsystem_states'] = subsystem_states
 
         out = json.dumps(out)
-        self.log(f'{out}', logger_type=LoggerTypes.STATE, level=logging.INFO)
+        self.log(f'{out}', logger_type=LoggerTypes.STATE, level=logging.DEBUG)
 
 
     async def decompose_platform_task(self, task : PlatformTask) -> list:
@@ -1903,7 +1904,7 @@ class OnboardComputerModule(ComponentModule):
                         self.log(f'Sending data to {AgentModuleTypes.SCIENCE_MODULE} for processing...')
                         
                         self.memory_stored += data_vol
-                        self.log(f'Data successfully stored in internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).')
+                        self.log(f'Data successfully stored in internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).',level=logging.INFO)
                         
                         await self.send_internal_message(msg)
 
@@ -2268,8 +2269,8 @@ class AttitudeDeterminationAndControlSubsystem(SubsystemModule):
                 status: ComponentStatus = ComponentStatus.ON) -> None:
         super().__init__(SubsystemNames.ADCS.value, parent_platform_sim, AttitudeDeterminationAndControlState, health, status)
         self.submodules = [
-                            InertialMeasurementUnitModule(self, 1),
-                            ReactionWheelModule(self, 10)
+                            InertialMeasurementUnitModule(self, 1.0),
+                            ReactionWheelModule(self, 10.0)
                           ]
 
     async def decompose_subsystem_task(self, task : SubsystemTask) -> list:
@@ -2464,7 +2465,7 @@ class ElectricPowerSubsystem(SubsystemModule):
         # TODO add support for list of components/designer inputs 
         self.submodules = [
                             # BatteryModule(self, 100, 1000),
-                            PowerSupplyComponent(ComponentNames.POWER_SUPPLY.value, self, EPSComponentState, 100)
+                            PowerSupplyComponent(ComponentNames.POWER_SUPPLY.value, self, EPSComponentState, 100.0)
                           ]
 
     def is_subsystem_critical(self) -> bool:
@@ -2939,8 +2940,8 @@ class CommsSubsystem(SubsystemModule):
         """
         super().__init__(SubsystemNames.COMMS.value, parent_platform_sim, CommsSubsystemState, health, status)
         self.submodules = [
-                            TransmitterComponent(self, 1, buffer_size),
-                            ReceiverComponent(self, 1, buffer_size)
+                            TransmitterComponent(self, 1.0, buffer_size),
+                            ReceiverComponent(self, 1.0, buffer_size)
                             ]
 
     async def activate(self):
@@ -3426,7 +3427,7 @@ class ReceiverComponent(ComponentModule):
 
                         acquired = await self.state_lock.acquire()
                         self.buffer_allocated -= msg_length
-                        self.log(f'Incoming message of length {msg_length} now stored in incoming buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).')
+                        self.log(f'Incoming message of length {msg_length} deleted from buffer (current state: {self.buffer_allocated}/{self.buffer_capacity}).',level=logging.DEBUG)
                         self.state_lock.release()
                         acquired = None
 

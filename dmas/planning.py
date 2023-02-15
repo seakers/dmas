@@ -556,7 +556,7 @@ class OperationsPlanningModule(Module):
                     for obs in plan:
                         starts.append(obs.start)
                         ends.append(obs.end)
-                    self.log(f'List of starts: {starts}',level=logging.INFO)
+                    self.log(f'List of starts: {starts}',level=logging.DEBUG)
                     if len(starts) != 0:
                         charge_task = ChargePlannerTask(plan_beginning,starts[0])
                         #self.ops_plan.append(charge_task)
@@ -569,7 +569,7 @@ class OperationsPlanningModule(Module):
                             obs_task = plan[i]
                             feasible, moved = self.parent_module.check_maneuver_feasibility(curr_angle,obs_task.angle,curr_time,obs_task.start)
                             if curr_time <= obs_task.start and feasible:
-                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.INFO)
+                                self.log(f'Adding observation task at time {obs_task.start} to operations plan!',level=logging.DEBUG)
                                 unique = True
                                 for ops in self.ops_plan:
                                     if(ops.start == obs_task.start and ops.target == obs_task.target):
@@ -584,7 +584,7 @@ class OperationsPlanningModule(Module):
                                     curr_angle = obs_task.angle
                             else:
                                 self.log(f'Maneuver not feasible!',level=logging.DEBUG)
-                    #self.print_ops_plan()
+                    self.print_ops_plan()
                 elif self.parent_module.mission_profile=="nadir":
                     plan = await self.obs_plan.get()
                     self.log(f'Creating operations plan!',level=logging.DEBUG)

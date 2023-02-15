@@ -28,8 +28,6 @@ def get_curr_points(points, curr_time):
         if(float(points[i][2]) < curr_time < float(points[i][3])):
             lats.append(float(points[i][0]))
             lons.append(float(points[i][1]))
-        else:
-            break
         i = i+1
     return lats, lons
 
@@ -159,14 +157,14 @@ if __name__=="__main__":
         d_reader = csv.DictReader(f)
         for line in d_reader:
             if len(hf_points) > 0:
-                if line["lat"] not in hf_lats:
-                    hf_lats.append(line["lat"])
-                    hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
+                hf_lats.append(line["lat"])
+                hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
             else:
                 hf_lats.append(line["lat"])
                 hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
     flood_points = np.asfarray(flood_points)
     hf_points = np.asfarray(hf_points)
+    print(hf_points)
     all_outliers = []
     for alt in alt_outliers:
         all_outliers.append((alt[0],alt[1],alt[2],"alt"))
@@ -192,9 +190,9 @@ if __name__=="__main__":
     tss_lons = []
     coobs_lats = []
     coobs_lons = []    
-    for t in range(0,86400,100):
-        flood_lats, flood_lons = get_past_points(flood_points,t)
+    for t in range(0,86400,200):
         hf_lats,hf_lons = get_curr_points(hf_points,t)
+        flood_lats, flood_lons = get_past_points(flood_points,t)
         alt_lats, alt_lons = get_past_points(alt_outliers,t)
         tss_lats, tss_lons = get_past_points(tss_outliers,t)
         coobs_lats, coobs_lons = get_past_points(coobs_outliers,t)
@@ -209,8 +207,8 @@ if __name__=="__main__":
         if (t == 86400):
             for i in range(5):
                 filenames.append(filename)        # save img
-        m = Basemap(projection='merc',llcrnrlat=30,urcrnrlat=70,\
-                llcrnrlon=-140,urcrnrlon=-70,resolution='c')
+        m = Basemap(projection='merc',llcrnrlat=20,urcrnrlat=60,\
+                llcrnrlon=-140,urcrnrlon=-60,resolution='c')
         alt_x, alt_y = m(alt_lons,alt_lats)
         tss_x, tss_y = m(tss_lons,tss_lats)
         flood_x, flood_y = m(flood_lons,flood_lats)
@@ -237,7 +235,7 @@ if __name__=="__main__":
         plt.savefig(filename,dpi=200)
         plt.close()
     print('Charts saved\n')
-    gif_name = 'plot2D'
+    gif_name = 'plot2D_hf'
     # Build GIF
     print('Creating gif\n')
     with imageio.get_writer(f'{gif_name}.gif', mode='I') as writer:

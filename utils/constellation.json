@@ -1,7 +1,7 @@
 [
     {
-        "@id": "alt_sat_0_0",
-        "name": "alt_sat_0_0",
+        "@id": "imaging_sat_0_0",
+        "name": "imaging_sat_0_0",
         "spacecraftBus": {
             "name": "BlueCanyon",
             "mass": 20,
@@ -44,7 +44,7 @@
             }
         },
         "instrument": {
-            "name": "POSEIDON-3B Altimeter",
+            "name": "OLI",
             "mass": 10,
             "volume": 12.45,
             "dataRate": 40,
@@ -90,8 +90,8 @@
         "preplan": "False"
     },
     {
-        "@id": "alt_sat_0_1",
-        "name": "alt_sat_0_1",
+        "@id": "imaging_sat_0_1",
+        "name": "imaging_sat_0_1",
         "spacecraftBus": {
             "name": "BlueCanyon",
             "mass": 20,
@@ -134,7 +134,7 @@
             }
         },
         "instrument": {
-            "name": "POSEIDON-3B Altimeter",
+            "name": "OLI",
             "mass": 10,
             "volume": 12.45,
             "dataRate": 40,
@@ -180,8 +180,8 @@
         "preplan": "False"
     },
     {
-        "@id": "alt_sat_1_0",
-        "name": "alt_sat_1_0",
+        "@id": "imaging_sat_1_0",
+        "name": "imaging_sat_1_0",
         "spacecraftBus": {
             "name": "BlueCanyon",
             "mass": 20,
@@ -224,7 +224,7 @@
             }
         },
         "instrument": {
-            "name": "POSEIDON-3B Altimeter",
+            "name": "OLI",
             "mass": 10,
             "volume": 12.45,
             "dataRate": 40,
@@ -270,8 +270,8 @@
         "preplan": "False"
     },
     {
-        "@id": "alt_sat_1_1",
-        "name": "alt_sat_1_1",
+        "@id": "imaging_sat_1_1",
+        "name": "imaging_sat_1_1",
         "spacecraftBus": {
             "name": "BlueCanyon",
             "mass": 20,
@@ -314,7 +314,7 @@
             }
         },
         "instrument": {
-            "name": "POSEIDON-3B Altimeter",
+            "name": "OLI",
             "mass": 10,
             "volume": 12.45,
             "dataRate": 40,
