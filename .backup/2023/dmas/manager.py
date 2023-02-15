@@ -323,7 +323,7 @@ class AbstractManager(SimulationElement):
         except asyncio.CancelledError:
             return
 
-    async def _shut_down(self) -> None:
+    async def _deactivate(self) -> None:
         # broadcast sim end message
         await self._broadcast_message( SimulationEndMessage(time.perf_counter()) )
 
@@ -333,7 +333,7 @@ class AbstractManager(SimulationElement):
         # TODO send monitor sim end message 
         
         # close all communication ports
-        return await super()._shut_down()
+        return await super()._deactivate()
 
 class RealTimeSimulationManager(AbstractManager):
     """
