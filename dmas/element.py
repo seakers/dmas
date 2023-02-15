@@ -10,39 +10,36 @@ import threading
 from dmas.utils import *
 from dmas.messages import *
 
-class ElementStatus(Enum):
+class SimulationElementStatus(Enum):
     INIT = 'INITIALIZED'
     ACTIVATED = 'ACTIVATED'
     RUNNING = 'RUNNING'
     DEACTIVATED = 'DEACTIVATED'
 
+class SimulationElementRoles(Enum):
+    MANAGER = 'MANAGER'
+    MONITOR = 'MONITOR'
+    ENVIRONMENT = 'ENVIRONMENT'
+    NODE = 'NODE'
+    ALL = 'ALL'
+
 class SimulationElement(ABC):
     """
     ## Abstract Simulation Element 
 
-    Base class for all simulation elements. This including all agents, environment, and simulation manager.
+    Base class for all simulation elements. This including all agents, environments, simulation managers, and simulation monitors.
 
     ### Attributes:
         - _name (`str`): The name of this simulation element
         - _status (`Enum`) : Status of the element within the simulation
-        - _network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
-        - _my_addresses (`list`): List of addresses used by this simulation element
         - _logger (`Logger`): debug logger
 
-        - _pub_socket (:obj:`Socket`): The element's broadcast port socket
-        - _pub_socket_lock (:obj:`Lock`): async lock for _pub_socket (:obj:`Socket`)
-        - _monitor_push_socket (:obj:`Socket`): The element's monitor port socket
-        - _monitor_push_socket_lock (:obj:`Lock`): async lock for _monitor_push_socket (:obj:`Socket`)
-
         - _clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
-        - _address_ledger (`dict`): ledger containing the addresses pointing to each node's connecting ports
 
-    ### Communications diagram:
-    +----------+---------+       
-    | ABSTRACT | PUB     |------>
-    |   SIM    +---------+       
-    | ELEMENT  | PUSH    |------>
-    +----------+---------+       
+        - _context (:obj:`zmq.Context()`): network context used for TCP ports to be used by this simulation element
+        - _network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
+        - _external_socket_map (`dict`): Map of ports and port locks to be used by this simulation element to communicate with other simulation elements
+        - _external_address_ledger (`dict`): ledger mapping the addresses pointing to other simulation elements' connecting ports    
     """
     def __init__(self, name : str, network_config : NetworkConfig, level : int = logging.INFO) -> None:
         """
@@ -56,13 +53,214 @@ class SimulationElement(ABC):
         super().__init__()
 
         self.name = name
-        self._status = ElementStatus.INIT
+        self._status = SimulationElementStatus.INIT
+        self._logger : logging.Logger = self.__set_up_logger(level)
+
+        self._clock_config = None     
+
+        self._context = zmq.Context()
         self._network_config = network_config
-        self._logger : logging.Logger = self._set_up_logger(level)
+        self._external_socket_map = None
+        self._external_address_ledger = None
 
-        self._clock_config = None
-        self._address_ledger = dict()
+    """
+    ELEMENT OPERATION METHODS
+    """
+    def run(self) -> int:
+        """
+        Main function. Executes this similation element.
 
+        Procedure follows the sequence:
+        1. Initiates `activate()` sequence
+        2. `listen()` is excecuted concurrently during `live()` procedure. 
+        3. `deactivate()` procedure once either the `listen()` or `live()` procedures terminate.
+
+        Returns `1` if excecuted successfully or if `0` otherwise
+
+        Do NOT override
+        """
+        try:
+            # initiate successful completion flag
+            out = 0
+
+            # activate simulation element
+            self._log('activating...', level=logging.INFO)
+            self._activate()
+
+            if self._clock_config is None:
+                raise RuntimeError(f'{self.name}: Clock config not received during activation.')
+            elif self._external_socket_map is None:
+                raise AttributeError(f'{self.name}: Element communication sockets not activated during activation.')
+            elif self._external_address_ledger is None:
+                raise RuntimeError(f'{self.name}: Address Ledger not received during activation.')
+
+            ## update status to ACTIVATED
+            self._status = SimulationElementStatus.ACTIVATED
+            self._log('activated!', level=logging.INFO)
+
+            # start element life
+            self._log('living...', level=logging.INFO)
+            kill_switch = threading.Event()
+
+            with concurrent.futures.ThreadPoolExecutor(2) as pool:
+                ## start `live()` and `listen()` concurrently
+                listen_future = pool.submit(self._listen, *[kill_switch])
+                live_future = pool.submit(self._live, *[kill_switch])
+                futures = [listen_future, live_future]
+
+                ## update status to RUNNING
+                self._status = SimulationElementStatus.RUNNING
+
+                ## wait until either `live()` or `listen()` terminate
+                concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                
+                ## activate kill-switch to terminate the unfinished method
+                kill_switch.set()
+
+                ## wait for method to terminate
+                if listen_future.done():
+                    self._log('`listen()` method terminated. Terminating `live()` method...')
+                else:
+                    self._log('`live()` method terminated. Terminating `listen()` method...')
+
+            self._log('living completed!', level=logging.INFO)
+            out = 1
+
+        finally:
+            # deactivate element
+            self._log('deactivating...', level=logging.INFO)
+            self._deactivate()
+            self._log('deactivating completed!', level=logging.INFO)
+
+            # update status to DEACTIVATED
+            self._status = SimulationElementStatus.DEACTIVATED
+            self._log('`run()` executed properly.') if out == 1 else self._log('`run()` interrupted.')
+
+            #reguster simulation runtime end
+            self._clock_config.set_simulation_runtime_end( time.perf_counter() )
+            return out
+
+    def _activate(self) -> None:
+        """
+        Initiates and executes commands that are thread-sensitive but that must be performed before the simulation starts.
+        By default it only initializes network connectivity of the element.
+
+        May be expanded if more capabilities are needed.
+        """
+        # inititate base network connections 
+        self._external_socket_map = self._config_network()
+
+        # synchronize with other elements in the simulation
+        self._external_address_ledger = self._sync()
+
+        # register simulation runtime start
+        self._clock_config.set_simulation_runtime_start( time.perf_counter() )
+
+
+    @abstractmethod
+    def _live(self, kill_switch : threading.Event) -> None:
+        """
+        Procedure to be executed by the simulation element during the simulation. 
+
+        Element will deactivate if this method returns.
+        """
+        pass
+
+    @abstractmethod
+    def _listen(self, kill_switch : threading.Event) -> None:
+        """
+        Procedure for listening for incoming messages from other elements during the simulation.
+
+        Element will deactivate if this method returns.
+        """
+        pass
+    
+    def _deactivate(self) -> None:
+        """
+        Shut down procedure for this simulation entity. 
+        Must close all socket connections.
+        """
+        # inform others of deactivation
+        self._publish_deactivate()
+
+        # close connections
+        for socket in self._external_socket_map:
+            socket : zmq.Socket
+            socket.close()  
+
+        # close network context
+        if self._context is not None:
+            self._context : zmq.Context
+            self._context.term()  
+    
+    """
+    ELEMENT CAPABILITY METHODS
+    """
+    def _send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> None:
+        """
+        Sends a multipart message to a given socket type.
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+            - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
+        """
+        try:
+            # get appropriate socket and lock
+            socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
+            socket : zmq.Socket; socket_lock : threading.Lock
+            acquired_by_me = False
+            
+            if (socket is None 
+                or socket_lock is None):
+                raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
+            
+            if (socket_type != zmq.REQ 
+                and socket_type != zmq.PUB 
+                and socket_type != zmq.PUSH):
+                raise RuntimeError(f'Cannot send messages from a port of type {socket_type.name}.')
+
+            # acquire lock
+            self._log(f'acquiring port lock for socket of type {socket_type}...')
+            socket_lock.acquire()
+            acquired_by_me = True
+            self._log(f'port lock for socket of type {socket_type} acquired! Sending message...')
+
+            # send multi-part message
+            dst : str = msg.get_dst()
+            content : str = str(msg.to_json())
+
+            socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            self._log(f'message sent! Releasing lock...')
+        
+        finally:
+            if (
+                isinstance(socket_lock, threading.Lock) 
+                and socket_lock.locked() 
+                and acquired_by_me
+                ):
+
+                # if lock was acquired by this method and transmission failed, release it 
+                socket_lock.release()
+                self._log(f'lock released!')
+
+    def _sim_wait(self, delay : float) -> None:
+        """
+        Simulation element waits for a given delay to occur according to the clock configuration being used
+
+        ### Arguments:
+            - delay (`float`): number of seconds to be waited
+        """
+        if isinstance(self._clock_config, RealTimeClockConfig):
+            self._clock_config : RealTimeClockConfig
+            time.sleep(delay)
+
+        elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+            self._clock_config : AcceleratedRealTimeClockConfig
+            time.sleep(delay / self._clock_config._sim_clock_freq)
+
+    """
+    HELPING METHODS
+    """
     def __set_up_logger(self, level=logging.DEBUG) -> logging.Logger:
         """
         Sets up a logger for this simulation element
@@ -94,78 +292,7 @@ class SimulationElement(ABC):
         elif level is logging.CRITICAL:
             self._logger.critical(f'{self.name}: {msg}')
 
-    def run(self) -> None:
-        """
-        Executes this similation element.
-        """
-        try:
-            # activate simulation element
-            self._activate()
-            self._status = ElementStatus.ACTIVATED
-
-            kill_switch = threading.Event()
-            with concurrent.futures.ThreadPoolExecutor(2) as pool:
-                listen_future = pool.submit(self._listen, *[kill_switch])
-                live_future = pool.submit(self._live, *[kill_switch])
-                futures = [listen_future, live_future]
-
-                self._status = ElementStatus.RUNNING
-                _, pending = concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
-
-                kill_switch.set()
-
-        finally:
-            self._status = ElementStatus.DEACTIVATED
-            self._deactivate()
-
-    def _activate(self) -> None:
-        """
-        Initiates and executes commands that are thread-sensitive but that must be performed before the simulation starts.
-        By default it only initializes network connectivity of the element.
-
-        May be expanded if more capabilities are needed.
-        """
-        # inititate base network connections 
-        self._socket_list = self._config_network()
-
-        # synchronize with other elements in the simulation
-        self._sync()
-
-    def _config_network(self) -> list:
-        """
-        Initializes and connects essential network port sockets for this simulation element. 
-
-        Must be expanded if more connections are needed.
-        
-        #### Sockets Initialized:
-            - _pub_socket (:obj:`Socket`): The entity's broadcast port address
-            - _monitor_push_socket (:obj:`Socket`): The simulation's monitor port address
-
-        #### Returns:
-            - `list` containing all sockets used by this simulation element
-        """
-        # initiate ports and connections
-        self._context = zmq.Context()
-
-        for address in self._network_config.get_my_addresses():
-            if self.__is_address_in_use(address):
-                raise Exception(f"{address} address is already in use.")
-
-        # broadcast message publish port
-        self._pub_socket = self._context.socket(zmq.PUB)                   
-        self._pub_socket.sndhwm = 1100000                                 ## set SNDHWM, so we don't drop messages for slow subscribers
-        pub_address : str = self._network_config.get_broadcast_address()
-        self._pub_socket.bind(pub_address)
-
-        # push to monitor port
-        self._monitor_push_socket = self._context.socket(zmq.PUSH)
-        monitor_address : str = self._network_config.get_monitor_address()
-        self._monitor_push_socket.connect(monitor_address)
-        self._monitor_push_socket.setsockopt(zmq.LINGER, 0)
-
-        return [self._pub_socket, self._monitor_push_socket]
-
-    def __is_address_in_use(self, address : str) -> bool:
+    def _is_address_in_use(self, address : str) -> bool:
         """
         Checks if an address within `localhost` is already bound to an existing socket.
 
@@ -182,7 +309,20 @@ class SimulationElement(ABC):
             return s.connect_ex(('localhost', port)) == 0
 
     @abstractmethod
-    def _sync() -> None:
+    def _config_network(self) -> dict:
+        """
+        Initializes and connects essential network port sockets for this simulation element. 
+
+        Must be expanded if more connections are needed.
+        
+        #### Returns:
+            - `dict` mapping the types of sockets used by this simulation element to a dedicated 
+                port socket and multithreading lock pair
+        """
+        pass    
+
+    @abstractmethod
+    def _sync() -> dict:
         """
         Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
         
@@ -190,105 +330,15 @@ class SimulationElement(ABC):
 
         The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports
         and broadcast it to all memebers of the simulation. 
+
+        #### Returns:
+            - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
         """
         pass
 
     @abstractmethod
-    def _live(self, kill_switch : threading.Event) -> None:
+    def _publish_deactivate(self) -> None:
         """
-        Procedure to be executed by the simulation element during the simulation. 
-
-        Element will deactivate if this method returns.
+        Notifies other elements of the simulation that this element has deactivated and is no longer participating in the simulation.
         """
         pass
-
-    @abstractmethod
-    def _listen(self, kill_switch : threading.Event) -> None:
-        """
-        Procedure for listening for incoming messages from other elements during the simulation.
-
-        Element will deactivate if this method returns.
-        """
-        pass
-    
-    def _deactivate(self) -> None:
-        """
-        Shut down procedure for this simulation entity. 
-        Must close all socket connections.
-        """
-        # close connections
-        for socket in self._socket_list:
-            socket : zmq.Socket
-            socket.close()  
-
-        # close network context
-        if self._context is not None:
-            self._context.term()  
-
-    def _sim_wait(self, delay : float) -> None:
-        """
-        Waits for a given delay to occur according to the clock configuration being used
-
-        ### Arguments:
-            - delay (`float`): number of seconds to be waited
-        """
-        if isinstance(self._clock_config, RealTimeClockConfig):
-            self._clock_config : RealTimeClockConfig
-            time.sleep(delay)
-
-        elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-            self._clock_config : AcceleratedRealTimeClockConfig
-            time.sleep(delay / self._clock_config._sim_clock_freq)
-
-
-    def _send_from_socket(self, msg : SimulationMessage, socket : zmq.Socket, socket_lock : threading.Lock) -> None:
-        """
-        Sends a multipart message to a given socket.
-
-        ### Arguments:
-            - msg (:obj:`SimulationMessage`): message being sent
-            - socket (:obj:`Socket`): socket being used to transmit messages
-            - socket_lock (:obj:`asyncio.Lock`): lock restricting access to socket
-        """
-        try:
-            if not socket_lock.locked():
-                raise RuntimeError(f'Socket lock for {socket} port must be acquired before sending messages.')
-
-            if socket.socket_type != zmq.REQ and socket.socket_type != zmq.PUB and socket.socket_type != zmq.PUSH:
-                raise RuntimeError(f'Cannot send messages from a port of type {socket.socket_type.name}.')
-
-            dst : str = msg.get_dst()
-            content : str = str(msg.to_json())
-            socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
-            
-        except RuntimeError as e:
-            self._log(f'message reception failed. {e}')
-            raise e
-
-    # def _push_message_to_monitor(self, msg : SimulationMessage) -> None:
-    #     """
-    #     Pushes a message to the simulation monitor
-    #     """
-    #     try:
-    #         self._log(f'acquiring port lock for a message of type {type(msg)}...')
-    #         await self._monitor_push_socket_lock.acquire()
-    #         self._log(f'port lock acquired!')
-
-    #         self._log(f'sending message of type {type(msg)}...')
-    #         dst : str = msg.get_dst()
-    #         if dst != SimulationElementTypes.MONITOR.value:
-    #             raise asyncio.CancelledError('attempted to send a non-monitor message to the simulation monitor.')
-
-    #         await self._send_from_socket(msg, self._monitor_push_socket, self._monitor_push_socket_lock)
-    #         self._log(f'message transmitted sucessfully!')
-
-    #     except asyncio.CancelledError:
-    #         self._log(f'message transmission interrupted.')
-            
-    #     except Exception as e:
-    #         self._log(f'message transmission failed.')
-    #         raise e
-
-    #     finally:
-    #         self._monitor_push_socket_lock.release()
-    #         self._log(f'port lock released.')

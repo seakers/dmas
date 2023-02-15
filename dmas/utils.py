@@ -4,12 +4,6 @@ from datetime import datetime, timezone
 from enum import Enum
 import json
 
-class SimulationElementTypes(Enum):
-    MANAGER = 'MANAGER'
-    MONITOR = 'MONITOR'
-    ENVIRONMENT = 'ENVIRONMENT'
-    ALL = 'ALL'
-
 """
 ------------------
 NETWORK CONFIGS
@@ -30,40 +24,14 @@ class NetworkConfig(ABC):
 
     Describes the addresses assigned to a particular simulation element
 
-    ### Attributes:
-        - _broadcast_address (`str`): an element's broadcast port address
-        - _monitor_address (`str`): the simulation's monitor port address
-
     TODO: Add username and password support
     """
     @beartype
-    def __init__(self, 
-                broadcast_address : str, 
-                monitor_address : str
-                ) -> None:
+    def __init__(self) -> None:
         """
         Initializes an instance of a Network Config Object
-
-        ### Arguments:
-        - broadcast_address (`str`): an element's broadcast port address
-        - monitor_address (`str`): the simulation's monitor port address
         """
         super().__init__()
-        self._broadcast_address = broadcast_address
-        self._monitor_address = monitor_address
-
-
-    def get_broadcast_address(self) -> str:
-        """
-        Returns an element's broadcast port address
-        """
-        return self._broadcast_address
-
-    def get_monitor_address(self) -> str:
-        """
-        Returns an element's monitor port address 
-        """
-        return self._monitor_address
 
     @abstractmethod
     def get_my_addresses(self) -> dict:
@@ -72,14 +40,12 @@ class NetworkConfig(ABC):
         """
         pass
 
+    @abstractmethod
     def to_dict(self) -> dict:
         """
         Converts object into a dictionary
         """
-        out = dict()
-        out['broadcast address'] = self.get_broadcast_address()
-        out['monitor address'] = self.get_monitor_address()
-        return out
+        pass
 
     @beartype
     @abstractmethod
@@ -99,7 +65,51 @@ class NetworkConfig(ABC):
     def __str__(self):
         return str(self.to_dict())
 
-class ManagerNetworkConfig(NetworkConfig):
+class ParticipantNetworkConfig(ABC):
+    """
+    ## Abstract Simulation Participant Network Configuration
+
+    Describes the addresses assigned to a particular simulation element
+
+    ### Attributes:
+        - _broadcast_address (`str`): an element's broadcast port address
+        - _monitor_address (`str`): the simulation's monitor port address
+    """
+    @beartype
+    def __init__(self, 
+                broadcast_address : str, 
+                monitor_address : str
+                ) -> None:
+        """
+        Initializes an instance of a Network Config Object
+
+        ### Arguments:
+        - broadcast_address (`str`): an element's broadcast port address
+        - monitor_address (`str`): the simulation's monitor port address
+        """
+        super().__init__()
+        self._broadcast_address = broadcast_address
+        self._monitor_address = monitor_address
+
+    def get_broadcast_address(self) -> str:
+        """
+        Returns an element's broadcast port address
+        """
+        return self._broadcast_address
+
+    def get_monitor_address(self) -> str:
+        """
+        Returns an element's monitor port address 
+        """
+        return self._monitor_address
+    
+    def to_dict(self) -> dict:
+        out = dict()
+        out['broadcast address'] = self.get_broadcast_address()
+        out['monitor address'] = self.get_monitor_address()
+        return out
+
+class ManagerNetworkConfig(ParticipantNetworkConfig):
     """
     ## Manager Network Config
     
@@ -153,7 +163,7 @@ class ManagerNetworkConfig(NetworkConfig):
     def from_json(j):
         return ManagerNetworkConfig.from_dict(json.loads(j))
 
-class NodeNetworkConfig(NetworkConfig):
+class NodeNetworkConfig(ParticipantNetworkConfig):
     """
     ## Manager Network Config
     
@@ -324,6 +334,8 @@ class ClockConfig(ABC):
         - start_date (:obj:`datetime`): simulation start date
         - end_date (:obj:`datetime`): simulation end date
         - clock_type (:obj:`SimClocks`): type of clock to be used in the simulation
+        - simulation_runtime_start (`float`): real-clock start time of the simulation
+        - simulation_runtime_end (`float`): real-clock end time of the simulation
     """
     def __init__(self, 
                 start_date : datetime, 
@@ -343,6 +355,14 @@ class ClockConfig(ABC):
         self.start_date = start_date
         self.end_date = end_date
         self.clock_type = clock_type
+        self.simulation_runtime_start = -1
+        self.simulation_runtime_end = -1
+
+    def set_simulation_runtime_start(self, t : float) -> None:
+        self.simulation_runtime_start = t
+
+    def set_simulation_runtime_end(self, t : float) -> None:
+        self.simulation_runtime_end = t
 
     def to_dict(self) -> dict:
         """
@@ -402,6 +422,8 @@ class RealTimeClockConfig(ClockConfig):
         - start_date (:obj:`datetime`): simulation start date
         - end_date (:obj:`datetime`): simulation end date
         - clock_type (:obj:`SimClocks`) = `SimClocks.REAL_TIME`: type of clock to be used in the simulation
+        - simulation_runtime_start (`float`): real-clock start time of the simulation
+        - simulation_runtime_end (`float`): real-clock end time of the simulation
     """
     def __init__(self, 
                 start_date: datetime, 
@@ -446,6 +468,8 @@ class AcceleratedRealTimeClockConfig(ClockConfig):
         - _end_date (:obj:`datetime`): simulation end date
         - _clock_type (:obj:`SimClocks`) = `SimClocks.ACCELERATED_REAL_TIME`: type of clock to be used in the simulation
         - _sim_clock_freq (`float`): ratio of simulation-time seconds to real-time seconds [t_sim/t_real]
+        - simulation_runtime_start (`float`): real-clock start time of the simulation
+        - simulation_runtime_end (`float`): real-clock end time of the simulation
     """
 
     def __init__(self, 
