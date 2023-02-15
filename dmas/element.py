@@ -8,6 +8,7 @@ import concurrent.futures
 import threading
 
 from dmas.utils import *
+from dmas.messages import *
 
 class ElementStatus(Enum):
     INIT = 'INITIALIZED'
@@ -238,3 +239,56 @@ class SimulationElement(ABC):
         elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             self._clock_config : AcceleratedRealTimeClockConfig
             time.sleep(delay / self._clock_config._sim_clock_freq)
+
+
+    def _send_from_socket(self, msg : SimulationMessage, socket : zmq.Socket, socket_lock : threading.Lock) -> None:
+        """
+        Sends a multipart message to a given socket.
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+            - socket (:obj:`Socket`): socket being used to transmit messages
+            - socket_lock (:obj:`asyncio.Lock`): lock restricting access to socket
+        """
+        try:
+            if not socket_lock.locked():
+                raise RuntimeError(f'Socket lock for {socket} port must be acquired before sending messages.')
+
+            if socket.socket_type != zmq.REQ and socket.socket_type != zmq.PUB and socket.socket_type != zmq.PUSH:
+                raise RuntimeError(f'Cannot send messages from a port of type {socket.socket_type.name}.')
+
+            dst : str = msg.get_dst()
+            content : str = str(msg.to_json())
+            socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            
+        except RuntimeError as e:
+            self._log(f'message reception failed. {e}')
+            raise e
+
+    # def _push_message_to_monitor(self, msg : SimulationMessage) -> None:
+    #     """
+    #     Pushes a message to the simulation monitor
+    #     """
+    #     try:
+    #         self._log(f'acquiring port lock for a message of type {type(msg)}...')
+    #         await self._monitor_push_socket_lock.acquire()
+    #         self._log(f'port lock acquired!')
+
+    #         self._log(f'sending message of type {type(msg)}...')
+    #         dst : str = msg.get_dst()
+    #         if dst != SimulationElementTypes.MONITOR.value:
+    #             raise asyncio.CancelledError('attempted to send a non-monitor message to the simulation monitor.')
+
+    #         await self._send_from_socket(msg, self._monitor_push_socket, self._monitor_push_socket_lock)
+    #         self._log(f'message transmitted sucessfully!')
+
+    #     except asyncio.CancelledError:
+    #         self._log(f'message transmission interrupted.')
+            
+    #     except Exception as e:
+    #         self._log(f'message transmission failed.')
+    #         raise e
+
+    #     finally:
+    #         self._monitor_push_socket_lock.release()
+    #         self._log(f'port lock released.')
