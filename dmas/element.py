@@ -196,13 +196,16 @@ class SimulationElement(ABC):
     """
     ELEMENT CAPABILITY METHODS
     """
-    def _send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> None:
+    def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
         """
         Sends a multipart message to a given socket type.
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
             - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
+        
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
         """
         try:
             # get appropriate socket and lock
@@ -214,23 +217,98 @@ class SimulationElement(ABC):
                 or socket_lock is None):
                 raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
             
-            if (socket_type != zmq.REQ 
+            # check socket's message transmition capabilities
+            if (
+                socket_type != zmq.REQ 
+                and socket_type != zmq.REP 
                 and socket_type != zmq.PUB 
-                and socket_type != zmq.PUSH):
+                and socket_type != zmq.PUSH
+                ):
                 raise RuntimeError(f'Cannot send messages from a port of type {socket_type.name}.')
 
             # acquire lock
-            self._log(f'acquiring port lock for socket of type {socket_type}...')
+            self._log(f'acquiring port lock for socket of type {socket_type.name}...')
             socket_lock.acquire()
             acquired_by_me = True
-            self._log(f'port lock for socket of type {socket_type} acquired! Sending message...')
+            self._log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
 
             # send multi-part message
-            dst : str = msg.get_dst()
+            dst : str = self.name
             content : str = str(msg.to_json())
 
             socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
             self._log(f'message sent! Releasing lock...')
+            
+            # return sucessful transmission flag
+            return True
+
+        except Exception as e:
+            print(f'message transmission failed. {e}')
+            # return failed transmission flag
+            return False
+
+        finally:
+            if (
+                isinstance(socket_lock, threading.Lock) 
+                and socket_lock.locked() 
+                and acquired_by_me
+                ):
+
+                # if lock was acquired by this method and transmission failed, release it 
+                socket_lock.release()
+                self._log(f'lock released!')
+
+    def _receive_external_msg(self, socket_type : zmq.SocketType) -> list:
+        """
+        Reads a multipart message from a given socket.
+
+        ### Arguments:
+            - socket_type (`zmq.SocketType`): desired socket type to be used to receive a messages
+
+        ### Returns:
+            - `list` containing the received information:  name of the intended destination as `dst` (`str`) 
+                and the message contents `content` (`dict`)
+        """
+        try:
+             # get appropriate socket and lock
+            socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
+            socket : zmq.Socket; socket_lock : threading.Lock
+            acquired_by_me = False
+            
+            if (socket is None 
+                or socket_lock is None):
+                raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
+
+            # check socket's message transmition capabilities
+            if (
+                socket_type != zmq.REQ 
+                and socket_type != zmq.REP
+                and socket_type != zmq.SUB
+                and socket_type != zmq.PULL
+                ):
+                raise RuntimeError(f'Cannot receive a messages from a port of type {socket_type.name}.')
+
+            # acquire lock
+            self._log(f'acquiring port lock for socket of type {socket_type.name}...')
+            socket_lock.acquire()
+            acquired_by_me = True
+            self._log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
+
+
+            # send multi-part message
+            b_dst, b_content = socket.recv_multipart()
+            b_dst : bytes; b_content : bytes
+
+            dst : str = b_dst.decode('ascii')
+            content : dict = json.loads(b_content.decode('ascii'))
+            self._log(f'message received! Releasing lock...')
+
+            # return received message
+            return dst, content
+            
+        except Exception as e:
+            self._log(f'message reception failed. {e}')
+            raise e
         
         finally:
             if (
@@ -243,7 +321,8 @@ class SimulationElement(ABC):
                 socket_lock.release()
                 self._log(f'lock released!')
 
-    def _sim_wait(self, delay : float) -> None:
+
+    def _sim_wait(self, delay : float, kill_switch : threading.Event) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
 
@@ -252,11 +331,11 @@ class SimulationElement(ABC):
         """
         if isinstance(self._clock_config, RealTimeClockConfig):
             self._clock_config : RealTimeClockConfig
-            time.sleep(delay)
+            kill_switch.wait(delay)
 
         elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             self._clock_config : AcceleratedRealTimeClockConfig
-            time.sleep(delay / self._clock_config._sim_clock_freq)
+            kill_switch.wait(delay / self._clock_config._sim_clock_freq)
 
     """
     HELPING METHODS
@@ -329,7 +408,9 @@ class SimulationElement(ABC):
         Elements will then reach out to the manager subscribe to future broadcasts.
 
         The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports
-        and broadcast it to all memebers of the simulation. 
+        and broadcast it to all memebers of the simulation once they all become online. 
+
+        This will signal the beginning of the simulation.
 
         #### Returns:
             - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    

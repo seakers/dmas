@@ -3,6 +3,7 @@ from beartype import beartype
 from typing import Union
 from enum import Enum
 import json
+from dmas.element import SimulationElementRoles
 
 from dmas.utils import *
 
@@ -98,10 +99,14 @@ class ManagerMessageTypes(Enum):
         - sim_info: informs all simulation elements of general simulation information
         - sim_start: notifies simulation membersthat the simulation has started
         - sim_end: notifies simulation members that the simulation has ended 
+        - reception_ack: notifies a simulation member that its message request has been accepted by the manager
+        - reception_ignored: notifies a simulation member that its message request has been ignored by the manager
     """
     SIM_INFO = 'SIM_INFO'
     SIM_START = 'SIM_START'
     SIM_END = 'SIM_END'
+    RECEPTION_ACK = 'RECEPTION_ACKNOWLEDGED'
+    RECEPTION_IGNORED = 'RECEPTION_ACKNOWLEDGED'
 
 class ManagerMessage(SimulationMessage, ABC): 
     """
@@ -120,7 +125,7 @@ class ManagerMessage(SimulationMessage, ABC):
         """        
         Initialzies an instance of a Manager Message
         """
-        super().__init__(SimulationElementTypes.MANAGER.name, SimulationElementTypes.ALL.name, type)
+        super().__init__(SimulationElementRoles.MANAGER.name, SimulationElementRoles.ALL.name, type)
         self._t = t
 
     def to_dict(self) -> dict:
@@ -133,7 +138,7 @@ class ManagerMessage(SimulationMessage, ABC):
 
 class SimulationStartMessage(ManagerMessage):
     """
-    ## Simulation Start Message Message
+    ## Simulation Start Message
 
     Informs all simulation elements that the simulation has started 
 
@@ -176,7 +181,7 @@ class SimulationStartMessage(ManagerMessage):
 
 class SimulationEndMessage(ManagerMessage):
     """
-    ## Simulation End Message Message
+    ## Simulation End Message
 
     Informs all simulation elements that the simulation has ended 
 
@@ -313,6 +318,93 @@ class SimulationInfoMessage(ManagerMessage):
         """
         return SimulationInfoMessage.from_dict(json.loads(j))
 
+class ReceptionAckMessage(ManagerMessage):
+    """
+    ## Reception Accepted Message
+
+    Notifies a simulation member that its message request has been accepted by the manager
+        
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = `ManagerMessageTypes.SYNC_REQ_DENIED`: type of message being sent
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
+    def __init__(self, t : float):
+        """
+        Initializes an instance of a Reception Accepted Message
+
+        #### Arguments:
+            - _t (`float`): manager's simulation clock at the time of transmission in [s]
+        """
+        super().__init__(ManagerMessageTypes.RECEPTION_ACK, t)
+
+    def from_dict(d: dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        t = d.get('t', None)
+        type_name = d.get('@type', None)
+        
+        if src is None or dst is None or type_name is None or t is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in ManagerMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ManagerMessageTypes.RECEPTION_ACK:
+            raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
+
+        return ReceptionAckMessage(t)
+
+    def from_json(j):
+        return ReceptionAckMessage.from_dict(json.loads(j))
+
+class ReceptionIgnoredMessage(ManagerMessage):
+    """
+    ## Reception Ignored Message
+
+    Notifies a simulation member that its message request has been ignored by the manager
+
+    ### Attributes:
+        - _src (`str`): name of the simulation element sending this message
+        - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = `ManagerMessageTypes.SYNC_REQ_DENIED`: type of message being sent
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
+    def __init__(self, t : float):
+        """
+        Initializes an instance of a Sync Request Denied Message
+        """
+        super().__init__(ManagerMessageTypes.RECEPTION_IGNORED, t)
+
+    def from_dict(d: dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        t = d.get('t', None)
+        type_name = d.get('@type', None)
+        
+        if src is None or dst is None or type_name is None or t is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in ManagerMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ManagerMessageTypes.RECEPTION_IGNORED:
+            raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
+
+        return ReceptionIgnoredMessage(t)
+
+    def from_json(j):
+        return ReceptionIgnoredMessage.from_dict(json.loads(j))
+
 """
 -----------------
 AGENT MESSAGES
@@ -348,7 +440,7 @@ class SyncRequestMessage(SimulationMessage):
             - src (`str`): name of the simulation node sending this message
             - network_config (:obj:`NodeNetworkConfig`): network configuration from sender node
         """
-        super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.SYNC_REQUEST)
+        super().__init__(src, SimulationElementRoles.MANAGER.name, NodeMessageTypes.SYNC_REQUEST)
         self._network_config = network_config
 
     def get_network_config(self):
@@ -402,7 +494,7 @@ class SyncRequestMessage(SimulationMessage):
 
 class NodeReadyMessage(SimulationMessage):
     def __init__(self, src: str):
-        super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.NODE_READY)
+        super().__init__(src, SimulationElementRoles.MANAGER.name, NodeMessageTypes.NODE_READY)
     
     def from_dict(d : dict):
         src = d.get('src', None)
@@ -433,7 +525,7 @@ class NodeReadyMessage(SimulationMessage):
 
 class NodeDeactivatedMessage(SimulationMessage):
     def __init__(self, src: str):
-        super().__init__(src, SimulationElementTypes.MANAGER.name, NodeMessageTypes.NODE_DEACTIVATED)
+        super().__init__(src, SimulationElementRoles.MANAGER.name, NodeMessageTypes.NODE_DEACTIVATED)
     
     def from_dict(d : dict):
         src = d.get('src', None)

@@ -35,7 +35,10 @@ def exceptionTest():
         print('finally was executed')
 
 if __name__ == '__main__':
-    exceptionTest()
+    # exceptionTest()
+
+    sb = b'test'
+    print(type(sb))
 
     # test = Test()
     # test._foo()
