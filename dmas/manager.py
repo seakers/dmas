@@ -4,7 +4,7 @@ from dmas.participant import Participant
 from dmas.utils import *
 
 
-class AbstractManager(Participant):
+class Manager(Participant):
     """
     ## Simulation Manager Class 
     
@@ -51,8 +51,10 @@ class AbstractManager(Participant):
         self._clock_config = clock_config
         
         # check if an environment is contained in the simulation
-        if SimulationElementRoles.ENVIRONMENT.name not in self._simulation_element_name_list:
-            raise RuntimeError('List of simulation elements must include the simulation environment.')
+        if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
+            raise AttributeError('List of simulation elements must include the simulation environment.')
+        elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
+            raise AttributeError('List of simulation elements includes more than one simulation environment.')
 
         # TODO check if there is more than one environment in the list 
 
@@ -69,7 +71,7 @@ class AbstractManager(Participant):
         rep_socket.bind(peer_in_address)
         rep_socket.setsockopt(zmq.LINGER, 0)
         ## create threading lock
-        rep_socket_lock = threading.Lock()
+        rep_socket_lock = asyncio.Lock()
 
         port_list[zmq.REP] = (rep_socket, rep_socket_lock)
 
@@ -99,6 +101,7 @@ class AbstractManager(Participant):
     def _live(self) -> None:        
         async def subroutine():
             # broadcast simulation start to all simulation elements
+            self._log(f'Starging simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
             sim_start_msg = SimulationStartMessage(time.perf_counter())
             await self._broadcast_message(sim_start_msg)
 
@@ -107,16 +110,16 @@ class AbstractManager(Participant):
 
             # wait for simulation duration to pass
             self._clock_config : ClockConfig
-            delay = self._clock_config.end_date - self._clock_config.start_date
+            delta = self._clock_config.end_date - self._clock_config.start_date
 
-            timer_task = asyncio.create_task( self._sim_wait(delay) )
+            timer_task = asyncio.create_task( self._sim_wait(delta.seconds) )
             timer_task.set_name('Simulation timer')
 
             # wait for all nodes to report as deactivated
             listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
             listen_for_deactivated_task.set_name('Wait for deactivated nodes')
 
-            asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
+            await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
             
             # broadcast simulation end
             sim_end_msg = SimulationEndMessage(time.perf_counter())
@@ -129,7 +132,9 @@ class AbstractManager(Participant):
             else:                
                 # all noeds have already reported as deactivated. Cancel timer task
                 timer_task.cancel()
-                await timer_task()                
+                await timer_task     
+            
+            self._log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
 
         asyncio.run(subroutine())
 
@@ -150,6 +155,8 @@ class AbstractManager(Participant):
         """
         try:
             received_messages = dict()
+            read_task = None
+            send_task = None
 
             while (
                     len(received_messages) < len(self._simulation_element_name_list) 
@@ -266,3 +273,23 @@ class AbstractManager(Participant):
         self._log(f'Waiting for deactivation confirmation from simulation elements...')
         await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage)
         self._log(f'All elements deactivated!')
+
+if __name__ == '__main__':
+    from datetime import datetime, timezone
+    
+    response_address = "tcp://*:5558"
+    broadcast_address = "tcp://*:5559"
+    monitor_address = "tcp://127.0.0.1:55"
+    network_config = ManagerNetworkConfig(response_address, broadcast_address, monitor_address)
+
+    start = datetime(2020, 1, 1, 7, 20, 0, tzinfo=timezone.utc)
+    end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
+    clock_config = RealTimeClockConfig(start, end)
+
+    manager = Manager([], clock_config, network_config)
+
+    t_o = time.perf_counter()
+    manager.run()
+    t_f = time.perf_counter()
+    
+    print(f'RUNTIME = {t_f - t_o}[s]')

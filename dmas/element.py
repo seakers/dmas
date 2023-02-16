@@ -6,8 +6,6 @@ import time
 import zmq
 import zmq.asyncio as azmq
 import asyncio
-import concurrent.futures
-import threading
 
 from dmas.utils import *
 from dmas.messages import *
@@ -17,13 +15,6 @@ class SimulationElementStatus(Enum):
     ACTIVATED = 'ACTIVATED'
     RUNNING = 'RUNNING'
     DEACTIVATED = 'DEACTIVATED'
-
-class SimulationElementRoles(Enum):
-    MANAGER = 'MANAGER'
-    MONITOR = 'MONITOR'
-    ENVIRONMENT = 'ENVIRONMENT'
-    NODE = 'NODE'
-    ALL = 'ALL'
 
 class SimulationElement(ABC):
     """
@@ -196,7 +187,9 @@ class SimulationElement(ABC):
         self._publish_deactivate()
 
         # close connections
-        for socket in self._external_socket_map:
+        for socket_type in self._external_socket_map:
+            socket_type : zmq.SocketType
+            socket, _ = self._external_socket_map[socket_type]
             socket : zmq.Socket
             socket.close()  
 
@@ -221,6 +214,7 @@ class SimulationElement(ABC):
         """
         try:
             # get appropriate socket and lock
+            socket, socket_lock = None, None
             socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
@@ -265,7 +259,8 @@ class SimulationElement(ABC):
 
         finally:
             if (
-                isinstance(socket_lock, threading.Lock) 
+                socket_lock is not None
+                and isinstance(socket_lock, asyncio.Lock) 
                 and socket_lock.locked() 
                 and acquired_by_me
                 ):
@@ -289,6 +284,7 @@ class SimulationElement(ABC):
         """
         try:
              # get appropriate socket and lock
+            socket, socket_lock = None, None
             socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
@@ -335,7 +331,8 @@ class SimulationElement(ABC):
         
         finally:
             if (
-                isinstance(socket_lock, threading.Lock) 
+                socket_lock is not None
+                and isinstance(socket_lock, asyncio.Lock)
                 and socket_lock.locked() 
                 and acquired_by_me
                 ):
@@ -356,7 +353,7 @@ class SimulationElement(ABC):
             wait_for_clock = None
 
             if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-                async def cancellable_wait(delay, freq):
+                async def cancellable_wait(delay : float, freq : float):
                     try:
                         await asyncio.sleep(delay / freq)
                     except asyncio.CancelledError:
@@ -366,6 +363,7 @@ class SimulationElement(ABC):
                 self._clock_config : AcceleratedRealTimeClockConfig
                 freq = self._clock_config.sim_clock_freq
                 wait_for_clock = asyncio.create_task(cancellable_wait(delay, freq))
+                await wait_for_clock
 
             else:
                 raise NotImplementedError(f'clock type {type(self._clock_config)} is not yet supported.')

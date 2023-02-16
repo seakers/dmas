@@ -4,10 +4,15 @@ from beartype import beartype
 from typing import Union
 from enum import Enum
 import json
-from dmas.element import SimulationElementRoles
 
 from dmas.utils import *
 
+class SimulationElementRoles(Enum):
+    MANAGER = 'MANAGER'
+    MONITOR = 'MONITOR'
+    ENVIRONMENT = 'ENVIRONMENT'
+    NODE = 'NODE'
+    ALL = 'ALL'
 
 class SimulationMessage(ABC):
     """
@@ -21,7 +26,6 @@ class SimulationMessage(ABC):
         - _msg_type (`Enum`): type of message being sent
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
     """
-    @beartype
     def __init__(self, src: str, dst: str, msg_type: Enum, id : uuid.UUID = None):
         """
         Initiates an instance of a simulation message.
@@ -132,7 +136,6 @@ class ManagerMessage(SimulationMessage, ABC):
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
-    @beartype
     def __init__(self, type: ManagerMessageTypes, t : Union[int, float], id : uuid.UUID = None):   
         """        
         Initialzies an instance of a Manager Message
@@ -166,7 +169,6 @@ class SimulationStartMessage(ManagerMessage):
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
-    @beartype
     def __init__(self, t: Union[int, float], id : uuid.UUID = None):
         """
         Initializes an instance of a Simulaiton Start Message
@@ -215,7 +217,6 @@ class SimulationEndMessage(ManagerMessage):
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
-    @beartype
     def __init__(self, t: Union[int, float], id : uuid.UUID = None) -> None:
         """
         Initializes an instance of a Simulaiton End Message
