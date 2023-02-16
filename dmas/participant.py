@@ -18,16 +18,10 @@ class Participant(SimulationElement):
     +----------+---------+       +--------------+
     | ABSTRACT | PUB     |------>|              | 
     |   SIM    +---------+       | SIM ELEMENTS |
-    | ELEMENT  | PUSH    |------>|              |
+    |PARTICPANT| PUSH    |------>|              |
     +----------+---------+       +--------------+
     """
     __doc__ += SimulationElement.__doc__
-
-    def __init__(self, 
-                name: str, 
-                network_config: ParticipantNetworkConfig, 
-                level: int = logging.INFO) -> None:
-        super().__init__(name, network_config, level)
 
     @abstractmethod
     def _config_network(self) -> dict:
@@ -43,17 +37,15 @@ class Participant(SimulationElement):
         ## set SNDHWM, so we don't drop messages for slow subscribers
         pub_socket.sndhwm = 1100000                                 
         ## bind to address 
-        pub_address : str = self._network_config.get_broadcast_address()
-        pub_socket.bind(pub_address)
+        pub_socket.bind(self._network_config.get_broadcast_address())
         ## create threading lock
         pub_lock = asyncio.Lock()
 
         # message to monitor push (PUSH) port
         ## create socket from context
         push_socket : zmq.Socket = self._context.socket(zmq.PUSH)
-        ## connect to address 
-        monitor_address : str = self._network_config.get_monitor_address()                     
-        push_socket.connect(monitor_address)
+        ## connect to monitor address                  
+        push_socket.connect( self._network_config.get_monitor_address() )
         push_socket.setsockopt(zmq.LINGER, 0)
         ## create threading lock
         push_lock = asyncio.Lock()

@@ -37,13 +37,6 @@ class NetworkConfig(ABC):
         super().__init__()
 
     @abstractmethod
-    def get_my_addresses(self) -> dict:
-        """
-        Returns a dictionary of all addresses assigned to a simulation element
-        """
-        pass
-
-    @abstractmethod
     def to_dict(self) -> dict:
         """
         Converts object into a dictionary
@@ -140,9 +133,6 @@ class ManagerNetworkConfig(ParticipantNetworkConfig):
         """
         return self._response_address
 
-    def get_my_addresses(self) -> dict:
-        return [self._response_address, self._broadcast_address]
-
     def to_dict(self) -> dict:
         out = super().to_dict()
         out['response address'] = self.get_response_address()
@@ -173,20 +163,13 @@ class NodeNetworkConfig(ParticipantNetworkConfig):
     Describes the addresses assigned to a simulated node
 
     ### Attributes:
-        - _request_address (`str`): the simulatede node's request port address
         - _broadcast_address (`str`): the simulatede node's broadcast port address
-        - _subscribe_address (`str`): the simulatede node's subscribe port address
         - _monitor_address (`str`): the simulation's monitor port address
         - _manager_address (`str`): the simulation's manager port address
-
-        - _clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
-        - _address_ledger (`dict`): ledger containing the addresses pointing to each node's connecting ports
     """
     @beartype
     def __init__(self, 
-                request_address: str, 
                 broadcast_address: str, 
-                subscribe_address: str,
                 monitor_address: str,
                 manager_address: str
                 ) -> None:
@@ -194,32 +177,12 @@ class NodeNetworkConfig(ParticipantNetworkConfig):
         Initializes an instance of a Node Network Config Object
 
         ### Arguments:
-            - request_address (`str`): an simulated node's request port address
             - broadcast_address (`str`): an simulated node's broadcast port address
-            - subscribe_address (`str`): an simulated node's subscribe port address
             - monitor_address (`str`): an simulation's monitor port address
             - manager_address (`str`): the simulation's manager port address
         """
         super().__init__(broadcast_address, monitor_address)
-
-        self._request_address = request_address
-        self._subscribe_address = subscribe_address
         self._manager_address = manager_address
-
-    def get_my_addresses(self) -> dict:
-        return [self._request_address, self._broadcast_address, self._subscribe_address]
-
-    def get_request_address(self) -> str:
-        """
-        Returns a node's request port address 
-        """
-        return self._request_address
-
-    def get_subscribe_address(self) -> str:
-        """
-        Returns a node's subscribe port address 
-        """
-        return self._subscribe_address
 
     def get_manager_address(self) -> str:
         """
@@ -229,8 +192,6 @@ class NodeNetworkConfig(ParticipantNetworkConfig):
 
     def to_dict(self) -> dict:
         out = super().to_dict()
-        out['request address'] = self.get_request_address()
-        out['subscribe address'] = self.get_subscribe_address()
         out['manager address'] = self.get_manager_address()
         out['@type'] = NetworkConfigTypes.NODE_NETWORK_CONFIG.name
         return out
@@ -239,18 +200,16 @@ class NodeNetworkConfig(ParticipantNetworkConfig):
     def from_dict(d: dict):
         broadcast_address = d.get('broadcast address', None)
         monitor_address = d.get('monitor address', None)
-        request_address = d.get('request address', None)
-        subscribe_address = d.get('subscribe address', None)
         manager_address = d.get('manager address', None)
         config_type = d.get('@type', None)
 
-        if config_type is None or broadcast_address is None or monitor_address is None or request_address is None or subscribe_address is None or manager_address is None:
+        if config_type is None or broadcast_address is None or monitor_address is None or manager_address is None:
             raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
 
         if NetworkConfigTypes[config_type] is not NetworkConfigTypes.NODE_NETWORK_CONFIG:
             raise TypeError(f'Cannot load a {NetworkConfigTypes.NODE_NETWORK_CONFIG.name} type object from a dictionary describing a {config_type} object.')
 
-        return NodeNetworkConfig(request_address, broadcast_address, subscribe_address, monitor_address, manager_address)
+        return NodeNetworkConfig(broadcast_address, monitor_address, manager_address)
 
     def from_json(j):
         return NodeNetworkConfig.from_dict(json.loads(j))
@@ -262,34 +221,28 @@ class EnvironmentNetworkConfig(NodeNetworkConfig):
     Describes the addresses assigned to the simulated environment
 
     ### Attributes:
-        - _request_address (`str`): an environment's request port address
         - _response_address (`str`): an environment's response port address
         - _broadcast_address (`str`): an environment's broadcast port address
-        - _subscribe_address (`str`): an environment's subscribe port address
         - _monitor_address (`str`): the simulation's monitor port address
         - _manager_address (`str`): the simulation's manager port address
     """
     @beartype
     def __init__(self, 
-                request_address: str, 
                 response_address: str,
                 broadcast_address: str, 
-                subscribe_address: str, 
                 monitor_address: str,
-                manager_address: str) -> None:
+                manager_address: str
+                ) -> None:
         """
         Initiates an instance of a Environment Network Config Object
 
         ### Arguments:
-            - request_address (`str`): an environment's request port address
             - response_address (`str`): an environment's response port address
             - broadcast_address (`str`): an environment's broadcast port address
-            - subscribe_address (`str`): an environment's subscribe port address
             - monitor_address (`str`): the simulation's monitor port address
             - manager_address (`str`): the simulation's manager port address
         """
-        super().__init__(request_address, broadcast_address, subscribe_address, monitor_address, manager_address)
-        
+        super().__init__(broadcast_address, monitor_address, manager_address)
         self._response_address = response_address
 
     def get_response_address(self) -> str:
@@ -303,21 +256,19 @@ class EnvironmentNetworkConfig(NodeNetworkConfig):
 
     @beartype
     def from_dict(d: dict):
+        reponse_address = d.get('response address', None)
         broadcast_address = d.get('broadcast address', None)
         monitor_address = d.get('monitor address', None)
-        request_address = d.get('request address', None)
-        reponse_address = d.get('response address', None)
-        subscribe_address = d.get('subscribe address', None)
         manager_address = d.get('manager address', None)
         config_type = d.get('@type', None)
 
-        if config_type is None or reponse_address is None or broadcast_address is None or monitor_address is None or request_address is None or subscribe_address is None or manager_address is None:
+        if config_type is None or reponse_address is None or broadcast_address is None or monitor_address is None or manager_address is None:
             raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
 
         if NetworkConfigTypes[config_type] is not NetworkConfigTypes.ENVIRONMENT_NETWORK_CONFIG:
             raise TypeError(f'Cannot load a {NetworkConfigTypes.ENVIRONMENT_NETWORK_CONFIG.name} type object from a dictionary describing a {config_type} object.')
 
-        return EnvironmentNetworkConfig(request_address, reponse_address, broadcast_address, subscribe_address, monitor_address)
+        return EnvironmentNetworkConfig(reponse_address, broadcast_address, monitor_address, manager_address)
 
     def from_json(j):
         return EnvironmentNetworkConfig.from_dict(json.loads(j))

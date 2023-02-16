@@ -438,7 +438,7 @@ class SimulationElement(ABC):
         pass    
 
     @abstractmethod
-    def _sync() -> dict:
+    def _sync(self) -> dict:
         """
         Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
         

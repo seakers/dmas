@@ -485,7 +485,7 @@ class SyncRequestMessage(SimulationMessage):
             - network_config (:obj:`NodeNetworkConfig`): network configuration from sender node
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, SimulationElementRoles.MANAGER.name, NodeMessageTypes.SYNC_REQUEST, id)
+        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.SYNC_REQUEST, id)
         self._network_config = network_config
 
     def get_network_config(self):
@@ -559,7 +559,7 @@ class NodeReadyMessage(SimulationMessage):
             - src (`str`): name of the simulation node sending this message
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, SimulationElementRoles.MANAGER.name, NodeMessageTypes.NODE_READY, id)
+        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.NODE_READY, id)
     
     def from_dict(d : dict):
         src = d.get('src', None)
@@ -609,7 +609,7 @@ class NodeDeactivatedMessage(SimulationMessage):
             - src (`str`): name of the simulation node sending this message
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, SimulationElementRoles.MANAGER.name, NodeMessageTypes.NODE_DEACTIVATED, id)
+        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.NODE_DEACTIVATED, id)
     
     def from_dict(d : dict):
         src = d.get('src', None)

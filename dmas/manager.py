@@ -52,14 +52,14 @@ class Manager(Participant):
         
         # check if an environment is contained in the simulation
         if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
-            raise AttributeError('List of simulation elements must include the simulation environment.')
+            raise AttributeError('List of simulation elements must include one simulation environment.')
         elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
             raise AttributeError('List of simulation elements includes more than one simulation environment.')
 
         # TODO check if there is more than one environment in the list 
 
     def _config_network(self) -> list:
-        # inherit PUB and SUB ports
+        # inherit PUB and PUSH ports
         port_list : dict = super()._config_network()
 
         # direct message response (RES) port 
@@ -71,9 +71,9 @@ class Manager(Participant):
         rep_socket.bind(peer_in_address)
         rep_socket.setsockopt(zmq.LINGER, 0)
         ## create threading lock
-        rep_socket_lock = asyncio.Lock()
+        rep_lock = asyncio.Lock()
 
-        port_list[zmq.REP] = (rep_socket, rep_socket_lock)
+        port_list[zmq.REP] = (rep_socket, rep_lock)
 
         return port_list
 
