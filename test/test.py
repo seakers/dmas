@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import uuid
 import zmq
 
 
@@ -35,16 +36,9 @@ def exceptionTest():
         print('finally was executed')
 
 if __name__ == '__main__':
-    # exceptionTest()
-
-    sb = b'test'
-    print(type(sb))
-
-    # test = Test()
-    # test._foo()
-
-    # port_types = zmq.SocketType
-    # print(zmq.PUB)
-    # print(type(zmq.PUB))
-    # print(zmq.PUB.value)
-    # print(port_types[zmq.PUB])
+    n = 5
+    
+    for _ in range(n):
+        a = uuid.uuid4()
+        id = str(a)
+        print(f'ID: {id}')

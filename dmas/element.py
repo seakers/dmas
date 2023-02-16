@@ -4,6 +4,8 @@ from multiprocessing import Queue
 import socket
 import time
 import zmq
+import zmq.asyncio as azmq
+import asyncio
 import concurrent.futures
 import threading
 
@@ -38,8 +40,30 @@ class SimulationElement(ABC):
 
         - _context (:obj:`zmq.Context()`): network context used for TCP ports to be used by this simulation element
         - _network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
+        - _internal_socket_map (`dict`): Map of ports and port locks to be used by this simulation element to communicate with internal processes
+        - _internal_address_ledger (`dict`): ledger mapping the addresses pointing to this simulation element's internal communication ports    
         - _external_socket_map (`dict`): Map of ports and port locks to be used by this simulation element to communicate with other simulation elements
         - _external_address_ledger (`dict`): ledger mapping the addresses pointing to other simulation elements' connecting ports    
+
+    +--------------------+                                                                                          
+    |   SIM ELEMENTS     |                                                                                          
+    +--------------------+                                                                                          
+              ^                                                                                                     
+              |                                                                                                     
+              v                                                                                                     
+    +--------------------+                                                                                          
+    |   External Ports   |                                                                                          
+    |--------------------|                                                                                          
+    |ABSTRACT SIM ELEMENT|                                                                                          
+    |--------------------|                                                                                          
+    |   Internal Ports   |                                                                                          
+    +--------------------+                                                                                          
+              ^                                                                                                     
+              |                                                                                                     
+              v                                                                                                     
+    +--------------------+                                                                                          
+    | INTERNAL PROCESSES |                                                                                          
+    +--------------------+   
     """
     def __init__(self, name : str, network_config : NetworkConfig, level : int = logging.INFO) -> None:
         """
@@ -58,8 +82,10 @@ class SimulationElement(ABC):
 
         self._clock_config = None     
 
-        self._context = zmq.Context()
+        self._context = azmq.Context()
         self._network_config = network_config
+        self._internal_socket_map = None
+        self._internal_address_ledger = None
         self._external_socket_map = None
         self._external_address_ledger = None
 
@@ -87,43 +113,16 @@ class SimulationElement(ABC):
             self._log('activating...', level=logging.INFO)
             self._activate()
 
-            if self._clock_config is None:
-                raise RuntimeError(f'{self.name}: Clock config not received during activation.')
-            elif self._external_socket_map is None:
-                raise AttributeError(f'{self.name}: Element communication sockets not activated during activation.')
-            elif self._external_address_ledger is None:
-                raise RuntimeError(f'{self.name}: Address Ledger not received during activation.')
-
             ## update status to ACTIVATED
             self._status = SimulationElementStatus.ACTIVATED
             self._log('activated!', level=logging.INFO)
 
             # start element life
+            self._status = SimulationElementStatus.RUNNING
             self._log('living...', level=logging.INFO)
-            kill_switch = threading.Event()
-
-            with concurrent.futures.ThreadPoolExecutor(2) as pool:
-                ## start `live()` and `listen()` concurrently
-                listen_future = pool.submit(self._listen, *[kill_switch])
-                live_future = pool.submit(self._live, *[kill_switch])
-                futures = [listen_future, live_future]
-
-                ## update status to RUNNING
-                self._status = SimulationElementStatus.RUNNING
-
-                ## wait until either `live()` or `listen()` terminate
-                concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
-                
-                ## activate kill-switch to terminate the unfinished method
-                kill_switch.set()
-
-                ## wait for method to terminate
-                if listen_future.done():
-                    self._log('`listen()` method terminated. Terminating `live()` method...')
-                else:
-                    self._log('`live()` method terminated. Terminating `listen()` method...')
-
+            self._live()
             self._log('living completed!', level=logging.INFO)
+            
             out = 1
 
         finally:
@@ -151,25 +150,25 @@ class SimulationElement(ABC):
         self._external_socket_map = self._config_network()
 
         # synchronize with other elements in the simulation
-        self._external_address_ledger = self._sync()
+        self._external_address_ledger = self._sync()     
+
+        # check for correct element activation
+        if self._clock_config is None:
+            raise RuntimeError(f'{self.name}: Clock config not received during activation.')
+
+        if self._external_socket_map is None:
+            raise AttributeError(f'{self.name}: Element communication sockets not activated during activation.')
+
+        elif self._external_address_ledger is None:
+            raise RuntimeError(f'{self.name}: Address Ledger not received during activation.')
 
         # register simulation runtime start
         self._clock_config.set_simulation_runtime_start( time.perf_counter() )
 
-
     @abstractmethod
-    def _live(self, kill_switch : threading.Event) -> None:
+    def _live(self) -> None:
         """
         Procedure to be executed by the simulation element during the simulation. 
-
-        Element will deactivate if this method returns.
-        """
-        pass
-
-    @abstractmethod
-    def _listen(self, kill_switch : threading.Event) -> None:
-        """
-        Procedure for listening for incoming messages from other elements during the simulation.
 
         Element will deactivate if this method returns.
         """
@@ -196,7 +195,7 @@ class SimulationElement(ABC):
     """
     ELEMENT CAPABILITY METHODS
     """
-    def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
+    async def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
         """
         Sends a multipart message to a given socket type.
 
@@ -210,7 +209,7 @@ class SimulationElement(ABC):
         try:
             # get appropriate socket and lock
             socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
-            socket : zmq.Socket; socket_lock : threading.Lock
+            socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
             
             if (socket is None 
@@ -228,24 +227,28 @@ class SimulationElement(ABC):
 
             # acquire lock
             self._log(f'acquiring port lock for socket of type {socket_type.name}...')
-            socket_lock.acquire()
+            await socket_lock.acquire()
             acquired_by_me = True
             self._log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
 
             # send multi-part message
-            dst : str = self.name
+            dst : str = msg.get_dst()
+            src : str = self.name
             content : str = str(msg.to_json())
 
-            socket.send_multipart([dst.encode('ascii'), content.encode('ascii')])
+            await socket.send_multipart([dst.encode('ascii'), src.encode('ascii'), content.encode('ascii')])
             self._log(f'message sent! Releasing lock...')
             
             # return sucessful transmission flag
             return True
+        
+        except asyncio.CancelledError as e:
+            print(f'message transmission interrupted. {e}')
+            return False
 
         except Exception as e:
             print(f'message transmission failed. {e}')
-            # return failed transmission flag
-            return False
+            raise e
 
         finally:
             if (
@@ -258,7 +261,7 @@ class SimulationElement(ABC):
                 socket_lock.release()
                 self._log(f'lock released!')
 
-    def _receive_external_msg(self, socket_type : zmq.SocketType) -> list:
+    async def _receive_external_msg(self, socket_type : zmq.SocketType) -> list:
         """
         Reads a multipart message from a given socket.
 
@@ -266,13 +269,15 @@ class SimulationElement(ABC):
             - socket_type (`zmq.SocketType`): desired socket type to be used to receive a messages
 
         ### Returns:
-            - `list` containing the received information:  name of the intended destination as `dst` (`str`) 
+            - `list` containing the received information:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
         """
         try:
              # get appropriate socket and lock
             socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
-            socket : zmq.Socket; socket_lock : threading.Lock
+            socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
             
             if (socket is None 
@@ -290,21 +295,26 @@ class SimulationElement(ABC):
 
             # acquire lock
             self._log(f'acquiring port lock for socket of type {socket_type.name}...')
-            socket_lock.acquire()
+            await socket_lock.acquire()
             acquired_by_me = True
             self._log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
 
 
             # send multi-part message
-            b_dst, b_content = socket.recv_multipart()
-            b_dst : bytes; b_content : bytes
+            b_dst, b_src, b_content = await socket.recv_multipart()
+            b_dst : bytes; b_src : bytes; b_content : bytes
 
             dst : str = b_dst.decode('ascii')
+            src : str = b_src.decode('ascii')
             content : dict = json.loads(b_content.decode('ascii'))
-            self._log(f'message received! Releasing lock...')
+            self._log(f'message received from {src} intended for {dst}! Releasing lock...')
 
             # return received message
-            return dst, content
+            return dst, src, content
+
+        except asyncio.CancelledError as e:
+            print(f'message reception interrupted. {e}')
+            return
             
         except Exception as e:
             self._log(f'message reception failed. {e}')
@@ -322,20 +332,36 @@ class SimulationElement(ABC):
                 self._log(f'lock released!')
 
 
-    def _sim_wait(self, delay : float, interrupt : threading.Event) -> None:
+    async def _sim_wait(self, delay : float, interrupt : threading.Event) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
 
         ### Arguments:
             - delay (`float`): number of seconds to be waited
-        """
-        if isinstance(self._clock_config, RealTimeClockConfig):
-            self._clock_config : RealTimeClockConfig
-            interrupt.wait(delay)
+        # """
+        try:
+            wait_for_clock = None
 
-        elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-            self._clock_config : AcceleratedRealTimeClockConfig
-            interrupt.wait(delay / self._clock_config._sim_clock_freq)
+            if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                async def cancellable_wait(delay, freq):
+                    try:
+                        await asyncio.sleep(delay / freq)
+                    except asyncio.CancelledError:
+                        self._log(f'Cancelled sleep of delay {delay / freq} [s]')
+                        raise
+                    
+                self._clock_config : AcceleratedRealTimeClockConfig
+                freq = self._clock_config.sim_clock_freq
+                wait_for_clock = asyncio.create_task(cancellable_wait(delay, freq))
+
+            else:
+                raise NotImplementedError(f'clock type {type(self._clock_config)} is not yet supported.')
+        
+        except asyncio.CancelledError:
+            if wait_for_clock is not None and not wait_for_clock.done():
+                wait_for_clock : asyncio.Task
+                wait_for_clock.cancel()
+                await wait_for_clock
 
     """
     HELPING METHODS

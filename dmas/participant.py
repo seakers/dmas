@@ -15,11 +15,11 @@ class Participant(SimulationElement):
     Base class for all simulation participants. This including all agents, environment, and simulation manager.
 
     ### Communications diagram:
-    +----------+---------+       +   
-    | ABSTRACT | PUB     |------>| 
-    |   SIM    +---------+       | SIM ELEMENTS
-    | ELEMENT  | PUSH    |------>|
-    +----------+---------+       +
+    +----------+---------+       +--------------+
+    | ABSTRACT | PUB     |------>|              | 
+    |   SIM    +---------+       | SIM ELEMENTS |
+    | ELEMENT  | PUSH    |------>|              |
+    +----------+---------+       +--------------+
     """
     __doc__ += SimulationElement.__doc__
 

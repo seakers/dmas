@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
+import asyncio
 from beartype import beartype
 from datetime import datetime, timezone
 from enum import Enum
 import json
+
+import numpy
 
 """
 ------------------
@@ -412,51 +415,6 @@ def datetime_from_str(date_str : str) -> datetime:
     # print(f'{year}-{month}-{day} {hh}:{mm}:{ss}+{dmm}:{dss}')
     return datetime(year, month, day, hh, mm, ss, tzinfo=timezone.utc)
 
-class RealTimeClockConfig(ClockConfig):
-    """
-    ## Real Time Simulation Clock Configuration  
-
-    Describes a real-time clock to be used in the simulation.
-
-    ### Attributes:
-        - start_date (:obj:`datetime`): simulation start date
-        - end_date (:obj:`datetime`): simulation end date
-        - clock_type (:obj:`SimClocks`) = `SimClocks.REAL_TIME`: type of clock to be used in the simulation
-        - simulation_runtime_start (`float`): real-clock start time of the simulation
-        - simulation_runtime_end (`float`): real-clock end time of the simulation
-    """
-    def __init__(self, 
-                start_date: datetime, 
-                end_date: datetime
-                ) -> None:
-        """
-        Initializes and instance of a Real Time Simulation Clock Configuration  
-        
-        ### Attributes:
-            - start_date (:obj:`datetime`): simulation start date
-            - end_date (:obj:`datetime`): simulation end date
-        """
-        super().__init__(start_date, end_date, ClockTypes.REAL_TIME)
-
-    def from_dict(d: dict):
-        start_date_str = d.get('start date', None)
-        end_date_str = d.get('end date', None)
-        type_name = d.get('@type', None)
-
-        if start_date_str is None or end_date_str is None or type_name is None:
-            raise AttributeError('Dictionary does not contain necessary information to construct this clock config object.')
-        
-        if type_name != ClockTypes.REAL_TIME.name:
-            raise AttributeError(f'Cannot load a Real time Clock Config from a dictionary request of type {type_name}.')
-            
-        start_date = datetime_from_str(start_date_str)
-        end_date = datetime_from_str(end_date_str)
-
-        return RealTimeClockConfig(start_date, end_date)
-
-    def from_json(j):
-        return RealTimeClockConfig.from_dict(json.loads(j))
-
 class AcceleratedRealTimeClockConfig(ClockConfig):
     """
     ## Real Time Simulation Clock Configuration  
@@ -491,11 +449,11 @@ class AcceleratedRealTimeClockConfig(ClockConfig):
         if sim_clock_freq < 1:
             raise ValueError('`sim_clock_freq` must be a value greater or equal to 1.')
         
-        self._sim_clock_freq = sim_clock_freq
+        self.sim_clock_freq = sim_clock_freq
 
     def to_dict(self) -> dict:
         out = super().to_dict()
-        out['clock freq'] = self._sim_clock_freq
+        out['clock freq'] = self.sim_clock_freq
 
     def from_dict(d : dict):
         start_date_str = d.get('start date', None)
@@ -516,3 +474,153 @@ class AcceleratedRealTimeClockConfig(ClockConfig):
 
     def from_json(j):
         return AcceleratedRealTimeClockConfig.from_dict(json.loads(j))
+
+class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
+    """
+    ## Real Time Simulation Clock Configuration  
+
+    Describes a real-time clock to be used in the simulation.
+
+    ### Attributes:
+        - start_date (:obj:`datetime`): simulation start date
+        - end_date (:obj:`datetime`): simulation end date
+        - clock_type (:obj:`SimClocks`) = `SimClocks.REAL_TIME`: type of clock to be used in the simulation
+        - simulation_runtime_start (`float`): real-clock start time of the simulation
+        - simulation_runtime_end (`float`): real-clock end time of the simulation
+    """
+    def __init__(self, 
+                start_date: datetime, 
+                end_date: datetime
+                ) -> None:
+        """
+        Initializes and instance of a Real Time Simulation Clock Configuration  
+        
+        ### Attributes:
+            - start_date (:obj:`datetime`): simulation start date
+            - end_date (:obj:`datetime`): simulation end date
+        """
+        super().__init__(start_date, end_date, 1)
+        self.clock_type = ClockTypes.REAL_TIME
+
+    def from_dict(d: dict):
+        start_date_str = d.get('start date', None)
+        end_date_str = d.get('end date', None)
+        type_name = d.get('@type', None)
+
+        if start_date_str is None or end_date_str is None or type_name is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this clock config object.')
+        
+        if type_name != ClockTypes.REAL_TIME.name:
+            raise AttributeError(f'Cannot load a Real time Clock Config from a dictionary request of type {type_name}.')
+            
+        start_date = datetime_from_str(start_date_str)
+        end_date = datetime_from_str(end_date_str)
+
+        return RealTimeClockConfig(start_date, end_date)
+
+    def from_json(j):
+        return RealTimeClockConfig.from_dict(json.loads(j))
+
+"""
+------------------
+ASYNCHRONOUS CONTAINER
+------------------
+"""
+
+class Container:
+    def __init__(self, level: float =0, capacity: float =numpy.Infinity):
+        if level > capacity:
+            raise Exception('Initial level must be lower than maximum capacity.')
+
+        self.level = level
+        self.capacity = capacity
+        self.updated = None
+
+        self.updated = asyncio.Event()
+        self.lock = asyncio.Lock()
+
+    async def set_level(self, value):
+        self.level = 0
+        await self.put(value)
+
+    async def empty(self):
+        self.set_level(0)
+
+    async def put(self, value):
+        if self.updated is None:
+            raise Exception('Container not activated in event loop')
+
+        def accept():
+            return self.level + value <= self.capacity
+        
+        await self.lock.acquire()
+        while not accept():
+            self.lock.release()
+            self.updated.clear()
+            await self.updated.wait()
+            await self.lock.acquire()        
+        self.level += value
+        self.updated.set()
+        self.lock.release()
+
+    async def get(self, value):
+        if self.updated is None:
+            raise Exception('Container not activated in event loop')
+
+        def accept():
+            return self.level - value >= 0
+        
+        await self.lock.acquire()
+        while not accept():
+            self.lock.release()
+            self.updated.clear()
+            await self.updated.wait()
+            await self.lock.acquire()        
+        self.level -= value
+        self.updated.set()
+        self.lock.release()
+
+    async def when_cond(self, cond):
+        if self.updated is None:
+            raise Exception('Container not activated in event loop')
+             
+        while not cond():
+            self.updated.clear()
+            await self.updated.wait()
+        return True
+
+    async def when_not_empty(self):
+        def accept():
+            return self.level > 0
+        
+        await self.when_cond(accept)
+    
+    async def when_empty(self):
+        def accept():
+            return self.level == 0
+        
+        await self.when_cond(accept)
+
+    async def when_less_than(self, val):
+        def accept():
+            return self.level < val
+        
+        await self.when_cond(accept)
+    
+    async def when_leq_than(self, val):
+        def accept():
+            return self.level <= val
+        
+        await self.when_cond(accept)
+
+    async def when_greater_than(self, val):
+        def accept():
+            return self.level > val
+        
+        await self.when_cond(accept)
+    
+    async def when_geq_than(self, val):
+        def accept():
+            return self.level >= val
+        
+        await self.when_cond(accept)

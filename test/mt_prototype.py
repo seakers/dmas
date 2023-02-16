@@ -3,6 +3,30 @@ import concurrent.futures
 from threading import Event
 import time 
 
+            # kill_switch = threading.Event()
+
+            # with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            #     ## start `live()` and `listen()` concurrently
+            #     listen_future = pool.submit(self._listen, *[kill_switch])
+            #     live_future = pool.submit(self._live, *[kill_switch])
+            #     futures = [listen_future, live_future]
+
+            #     ## update status to RUNNING
+            #     self._status = SimulationElementStatus.RUNNING
+
+            #     ## wait until either `live()` or `listen()` terminate
+            #     concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+                
+            #     ## activate kill-switch to terminate the unfinished method
+            #     kill_switch.set()
+
+            #     ## wait for method to terminate
+            #     if listen_future.done():
+            #         self._log('`listen()` method terminated. Terminating `live()` method...')
+            #     else:
+            #         self._log('`live()` method terminated. Terminating `listen()` method...')
+
+
 if __name__ == "__main__":
     def g(x : float, kill_switch : Event):
         try:
