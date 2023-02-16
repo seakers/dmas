@@ -36,9 +36,12 @@ def exceptionTest():
         print('finally was executed')
 
 if __name__ == '__main__':
-    n = 5
+    n = 1
     
     for _ in range(n):
         a = uuid.uuid4()
         id = str(a)
         print(f'ID: {id}')
+
+        b = uuid.UUID(id)
+        print(f'ID: {str(b)}')
