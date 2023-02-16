@@ -322,7 +322,7 @@ class SimulationElement(ABC):
                 self._log(f'lock released!')
 
 
-    def _sim_wait(self, delay : float, kill_switch : threading.Event) -> None:
+    def _sim_wait(self, delay : float, interrupt : threading.Event) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
 
@@ -331,11 +331,11 @@ class SimulationElement(ABC):
         """
         if isinstance(self._clock_config, RealTimeClockConfig):
             self._clock_config : RealTimeClockConfig
-            kill_switch.wait(delay)
+            interrupt.wait(delay)
 
         elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             self._clock_config : AcceleratedRealTimeClockConfig
-            kill_switch.wait(delay / self._clock_config._sim_clock_freq)
+            interrupt.wait(delay / self._clock_config._sim_clock_freq)
 
     """
     HELPING METHODS
