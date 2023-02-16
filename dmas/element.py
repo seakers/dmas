@@ -115,10 +115,19 @@ class SimulationElement(ABC):
 
             ## update status to ACTIVATED
             self._status = SimulationElementStatus.ACTIVATED
-            self._log('activated!', level=logging.INFO)
+            self._log('activated! Waiting for simulation to start...', level=logging.INFO)
+
+            # wait for simulatio nstart
+            self._wait_sim_start()
+            self._log('simulation has started!', level=logging.INFO)
+
+            ## update status to RUNNING
+            self._status = SimulationElementStatus.RUNNING
+
+            ## register simulation runtime start
+            self._clock_config.set_simulation_runtime_start( time.perf_counter() )
 
             # start element life
-            self._status = SimulationElementStatus.RUNNING
             self._log('living...', level=logging.INFO)
             self._live()
             self._log('living completed!', level=logging.INFO)
@@ -162,8 +171,12 @@ class SimulationElement(ABC):
         elif self._external_address_ledger is None:
             raise RuntimeError(f'{self.name}: Address Ledger not received during activation.')
 
-        # register simulation runtime start
-        self._clock_config.set_simulation_runtime_start( time.perf_counter() )
+    @abstractmethod
+    def _wait_sim_start(self) -> None:
+        """
+        Waits for the simulation to start
+        """
+        pass
 
     @abstractmethod
     def _live(self) -> None:
@@ -332,7 +345,7 @@ class SimulationElement(ABC):
                 self._log(f'lock released!')
 
 
-    async def _sim_wait(self, delay : float, interrupt : threading.Event) -> None:
+    async def _sim_wait(self, delay : float) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
 

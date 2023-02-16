@@ -31,6 +31,7 @@ class Participant(SimulationElement):
 
     @abstractmethod
     def _config_network(self) -> dict:
+        self._network_config : ParticipantNetworkConfig
         for address in self._network_config.get_my_addresses():
             if self._is_address_in_use(address):
                 raise Exception(f"{address} address is already in use.")
@@ -45,7 +46,7 @@ class Participant(SimulationElement):
         pub_address : str = self._network_config.get_broadcast_address()
         pub_socket.bind(pub_address)
         ## create threading lock
-        pub_lock = threading.Lock()
+        pub_lock = asyncio.Lock()
 
         # message to monitor push (PUSH) port
         ## create socket from context
@@ -55,32 +56,44 @@ class Participant(SimulationElement):
         push_socket.connect(monitor_address)
         push_socket.setsockopt(zmq.LINGER, 0)
         ## create threading lock
-        push_lock = threading.Lock()
+        push_lock = asyncio.Lock()
 
         return {zmq.PUB: (pub_socket, pub_lock), zmq.PUSH: (push_socket, push_lock)}
 
-    def _broadcast_message(self, msg : SimulationMessage) -> None:
+    async def _broadcast_message(self, msg : SimulationMessage) -> None:
         """
         Broadcasts a message to all elements subscribed to this element's publish socket
         """
         try:
             self._log(f'broadcasting message of type {type(msg)}...')
-            self._send_external_msg(msg, zmq.PUB)
+            task = asyncio.create_task( self._send_external_msg(msg, zmq.PUB) )
+            await task
             self._log(f'message broadcasted sucessfully!')
-            
+        
+        except asyncio.CancelledError as e:
+            self._log(f'message broadcast interrupted.')
+            task.cancel()
+            await task
+
         except Exception as e:
             self._log(f'message broadcast failed.')
             raise e
     
-    def _push_message(self, msg : SimulationMessage) -> None:
+    async def _push_message(self, msg : SimulationMessage) -> None:
         """
         Pushes a message to the simulation monitor
         """
         try:
-            self._log(f'pushing message of type {type(msg)}...')
-            self._send_external_msg(msg, zmq.PUSH)
+            self._log(f'pushing message of type {type(msg)}...')            
+            task = asyncio.create_task( self._send_external_msg(msg, zmq.PUSH) )
+            await task
             self._log(f'message pushed sucessfully!')
             
+        except asyncio.CancelledError as e:
+            self._log(f'message broadcast interrupted.')
+            task.cancel()
+            await task
+
         except Exception as e:
             self._log(f'message push failed.')
             raise e

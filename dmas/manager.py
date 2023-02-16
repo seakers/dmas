@@ -50,8 +50,9 @@ class AbstractManager(Participant):
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
         
-        # if SimulationElementTypes.ENVIRONMENT.name not in self._simulation_element_name_list:
-        #     raise RuntimeError('List of simulation elements must include the simulation environment.')
+        # check if an environment is contained in the simulation
+        if SimulationElementRoles.ENVIRONMENT.name not in self._simulation_element_name_list:
+            raise RuntimeError('List of simulation elements must include the simulation environment.')
 
         # TODO check if there is more than one environment in the list 
 
@@ -75,81 +76,158 @@ class AbstractManager(Participant):
         return port_list
 
     def _sync(self) -> dict:
-        # wait for all simulation elements to initialize and connect to me
-        external_address_ledger = self.__wait_for_online_elements()
+        async def subroutine():
+            # wait for all simulation elements to initialize and connect to me
+            external_address_ledger = await self.__wait_for_online_elements()
 
-        # broadcast address ledger
-        sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
-        self._broadcast_message(sim_info_msg)
+            # broadcast address ledger
+            sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
+            await self._broadcast_message(sim_info_msg)
 
-        # await for all agents to report as ready
-        self.__wait_for_ready_elements()
+            # return external address ledger
+            return external_address_ledger
 
-        # broadcast start of simulation to all 
-        sim_start_msg = SimulationStartMessage(time.perf_counter())
-        self._broadcast_message(sim_start_msg)
+        return (asyncio.run(subroutine()))
 
-        # return external address ledger
-        return external_address_ledger
+    def _wait_sim_start(self) -> None:
+        async def subroutine():
+            # await for all agents to report as ready
+            await self.__wait_for_ready_elements()
 
-    def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : type):
+        asyncio.run(subroutine())
+
+    def _live(self) -> None:        
+        async def subroutine():
+            # broadcast simulation start to all simulation elements
+            sim_start_msg = SimulationStartMessage(time.perf_counter())
+            await self._broadcast_message(sim_start_msg)
+
+            # push simulation start to monitor
+            await self._push_message(sim_start_msg)
+
+            # wait for simulation duration to pass
+            self._clock_config : ClockConfig
+            delay = self._clock_config.end_date - self._clock_config.start_date
+
+            timer_task = asyncio.create_task( self._sim_wait(delay) )
+            timer_task.set_name('Simulation timer')
+
+            # wait for all nodes to report as deactivated
+            listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
+            listen_for_deactivated_task.set_name('Wait for deactivated nodes')
+
+            asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
+            
+            # broadcast simulation end
+            sim_end_msg = SimulationEndMessage(time.perf_counter())
+            await self._broadcast_message(sim_end_msg)
+
+            if timer_task.done():
+                # nodes may still be activated. wait for all simulation nodes to deactivate
+                await listen_for_deactivated_task
+
+            else:                
+                # all noeds have already reported as deactivated. Cancel timer task
+                timer_task.cancel()
+                await timer_task()                
+
+        asyncio.run(subroutine())
+
+    def _publish_deactivate(self) -> None:
+        async def subroutine():
+            # push simulation end to monitor
+            sim_end_msg = SimulationEndMessage(time.perf_counter())
+            await self._push_message(sim_end_msg)
+        
+        asyncio.run(subroutine())
+    
+    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : type):
         """
         Awaits for all simulation elements to share a specific type of message with the manager.
         
         #### Returns:
             - `dict` mapping simulation elements' names to the messages they sent.
         """
+        try:
+            received_messages = dict()
 
-        received_messages = dict()
+            while (
+                    len(received_messages) < len(self._simulation_element_name_list) 
+                    and len(self._simulation_element_name_list) > 0
+                    ):
+                # reset tasks
+                read_task = None
+                send_task = None
 
-        while (
-                len(received_messages) < len(self._simulation_element_name_list) 
-                and len(self._simulation_element_name_list) > 0
-                ):
+                # wait for incoming messages
+                read_task = asyncio.create_task( self._receive_external_msg(zmq.REP) )
+                await read_task
+                src, msg_dict = read_task.result()
+                msg_type = msg_dict['@type']
 
-            # wait for incoming messages
-            src, msg_dict = self._receive_external_msg(zmq.REP)
-            msg_type = msg_dict['@type']
+                if NodeMessageTypes[msg_type] != message_type:
+                    # ignore all incoming messages that are not of the desired type 
+                    self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
 
-            if NodeMessageTypes[msg_type] != message_type:
-                # ignore all incoming messages that are not of type Sync Request
-                response = dict()
-                response['@type'] = 'IGNORED'
+                    # inform node that its message request was not accepted
+                    msg_resp = ReceptionIgnoredMessage(-1)
+                    send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
+                    await send_task
 
-                # inform agent that its message request was not accepted
-                msg_resp = ReceptionIgnoredMessage(-1)
-                self._send_external_msg(msg_resp, zmq.REP)
+                    continue
 
-                continue
+                # unpack and message
+                self._log(f'Received {msg_type} message from node {src}! Message accepted!')
+                msg_req = message_class.from_dict(msg_dict)
+                msg_resp = None
 
-            # unpack and sync message
-            msg_req = message_class.from_dict(msg_dict)
-            self._log(f'Received sync request from node {src}!')
+                # log subscriber confirmation
+                if src not in self._simulation_element_name_list:
+                    # node is not a part of the simulation
+                    self._log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
-            # log subscriber confirmation
-            if src not in self._simulation_element_name_list:
-                # node is not a part of the simulation
-                self._log(f'Node {src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                    # inform agent that its message was not accepted
+                    msg_resp = ReceptionIgnoredMessage(-1)
 
-                # inform agent that its sync request was not accepted
-                msg_resp = ReceptionIgnoredMessage(-1)
-                self._send_external_msg(msg_resp, zmq.REP)
+                elif src in received_messages:
+                    # node is a part of the simulation but has already communicated with me
+                    self._log(f'Node {src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
-            elif src in received_messages:
-                # node is a part of the simulation but has already been synchronized
-                self._log(f'Node {src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                    # inform agent that its message request was not accepted
+                    msg_resp = ReceptionIgnoredMessage(-1)
+                else:
+                    # node is a part of the simulation and has not yet been synchronized
+                    received_messages[src] = msg_req
 
-                # inform agent that its sync request was not accepted
-                msg_resp = ReceptionIgnoredMessage(-1)
-                self._send_external_msg(msg_resp, zmq.REP)
-            else:
-                # node is a part of the simulation and has not yet been synchronized
-                received_messages[src] = msg_req
+                    # inform agent that its message request was not accepted
+                    msg_resp = ReceptionAckMessage(-1)
 
-        self._log(f'wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})!', level=logging.INFO)
-        return received_messages
+                # send response
+                send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
+                await send_task
 
-    def __wait_for_online_elements(self) -> dict:
+            self._log(f'wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})!', level=logging.INFO)
+            return received_messages
+        
+        except asyncio.CancelledError:            
+            return
+
+        except Exception as e:
+            self._log(f'wait failed. {e}', level=logging.ERROR)
+            raise e
+
+        finally: 
+            # cancel read message task in case it is still being performed
+            if read_task is not None and not read_task.done(): 
+                read_task.cancel()
+                await read_task
+
+            # cancel send message task in case it is still being performed
+            if send_task is not None and not send_task.done(): 
+                send_task.cancel()
+                await send_task
+
+    async def __wait_for_online_elements(self) -> dict:
         """
         Awaits for all simulation elements to become online and send their network configuration.
         
@@ -159,7 +237,7 @@ class AbstractManager(Participant):
             - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
         """
         self._log(f'Waiting for sync requests from simulation elements...')
-        received_sync_requests = self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, SyncRequestMessage)
+        received_sync_requests = await self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, SyncRequestMessage)
         
         external_address_ledger = dict()
         for src in received_sync_requests:
@@ -169,45 +247,22 @@ class AbstractManager(Participant):
         self._log(f'All elements online!')
         return external_address_ledger
 
-    def __wait_for_ready_elements(self) -> None:
+    async def __wait_for_ready_elements(self) -> None:
         """
         Awaits for all simulation elements to receive their copy of the address ledgers and process them accordingly.
 
         Once all elements have reported to the manager, the simulation will begin.
         """
         self._log(f'Waiting for ready messages from simulation elements...')
-        self.__wait_for_elements(NodeMessageTypes.NODE_READY, NodeReadyMessage)
+        await self.__wait_for_elements(NodeMessageTypes.NODE_READY, NodeReadyMessage)
         self._log(f'All elements ready!')
 
-    def _wait_for_deactivation_confirmations(self) -> None:
+    async def __wait_for_offline_elements(self) -> None:
         """
         Listens for any incoming messages from other simulation elements. Counts how many simulation elements are deactivated.
 
         Returns when all simulation elements are deactivated.
         """
         self._log(f'Waiting for deactivation confirmation from simulation elements...')
-        self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage)
+        await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage)
         self._log(f'All elements deactivated!')
-
-    def _listen(self, kill_switch : threading.Event) -> None:
-        if kill_switch.is_set():
-            return
-
-        self._wait_for_deactivation_confirmations(self)
-        kill_switch.set()
-    
-    def _live(self, kill_switch : threading.Event) -> None:
-        if kill_switch.is_set():
-            return
-
-        # wait for simulation duration to pass
-        self._clock_config : ClockConfig
-        delta = self._clock_config.end_date - self._clock_config.start_date
-
-        self._sim_wait(delta.seconds, kill_switch)
-        
-        # broadcast sim end message
-        if not kill_switch.is_set():
-            self._broadcast_message( SimulationEndMessage(time.perf_counter()) )
-        
-        kill_switch.set()
