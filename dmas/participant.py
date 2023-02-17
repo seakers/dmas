@@ -15,16 +15,18 @@ class Participant(SimulationElement):
     Base class for all simulation participants. This including all agents, environment, and simulation manager.
 
     ### Communications diagram:
-    +----------+---------+       +--------------+
-    | ABSTRACT | PUB     |------>|              | 
-    |   SIM    +---------+       | SIM ELEMENTS |
-    |PARTICPANT| PUSH    |------>|              |
-    +----------+---------+       +--------------+
+    +-----------+---------+       +--------------+
+    | ABSTRACT  | PUB     |------>| SIM ELEMENTS | 
+    |    SIM    +---------+       +==============+ 
+    |PARTICIPANT| PUSH    |------>|  SIM MONITOR |
+    +-----------+---------+       +--------------+
     """
     __doc__ += SimulationElement.__doc__
+    def __init__(self, name: str, network_config: ParticipantNetworkConfig, level: int = logging.INFO) -> None:
+        super().__init__(name, network_config, level)
 
     @abstractmethod
-    def _config_network(self) -> dict:
+    def _config_external_network(self) -> dict:
         self._network_config : ParticipantNetworkConfig
         for address in self._network_config.get_my_addresses():
             if self._is_address_in_use(address):
@@ -52,7 +54,7 @@ class Participant(SimulationElement):
 
         return {zmq.PUB: (pub_socket, pub_lock), zmq.PUSH: (push_socket, push_lock)}
 
-    async def _broadcast_message(self, msg : SimulationMessage) -> None:
+    async def _broadcast_external_message(self, msg : SimulationMessage) -> bool:
         """
         Broadcasts a message to all elements subscribed to this element's publish socket
         """
@@ -61,6 +63,7 @@ class Participant(SimulationElement):
             task = asyncio.create_task( self._send_external_msg(msg, zmq.PUB) )
             await task
             self._log(f'message broadcasted sucessfully!')
+            return task.result()
         
         except asyncio.CancelledError as e:
             self._log(f'message broadcast interrupted.')
@@ -71,7 +74,7 @@ class Participant(SimulationElement):
             self._log(f'message broadcast failed.')
             raise e
     
-    async def _push_message(self, msg : SimulationMessage) -> None:
+    async def _push_external_message(self, msg : SimulationMessage) -> bool:
         """
         Pushes a message to the simulation monitor
         """
@@ -80,6 +83,7 @@ class Participant(SimulationElement):
             task = asyncio.create_task( self._send_external_msg(msg, zmq.PUSH) )
             await task
             self._log(f'message pushed sucessfully!')
+            return task.result()
             
         except asyncio.CancelledError as e:
             self._log(f'message broadcast interrupted.')

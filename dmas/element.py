@@ -147,20 +147,21 @@ class SimulationElement(ABC):
         May be expanded if more capabilities are needed.
         """
         # inititate base network connections 
-        self._external_socket_map = self._config_network()
+        self._external_socket_map, self._internal_socket_map = self.__config_network()
+        
+        # check for correct socket initialization
+        if self._external_socket_map is None:
+            raise AttributeError(f'{self.name}: Inter-element communication sockets not activated during activation.')
 
-        # synchronize with other elements in the simulation
-        self._external_address_ledger = self._sync()     
+        # synchronize with other elements in the simulation or internal modules
+        self._external_address_ledger, self._internal_address_ledger = self.__sync()     
 
         # check for correct element activation
         if self._clock_config is None:
             raise RuntimeError(f'{self.name}: Clock config not received during activation.')
 
-        if self._external_socket_map is None:
-            raise AttributeError(f'{self.name}: Element communication sockets not activated during activation.')
-
         elif self._external_address_ledger is None:
-            raise RuntimeError(f'{self.name}: Address Ledger not received during activation.')
+            raise RuntimeError(f'{self.name}: External address ledger not received during activation.')
 
     @abstractmethod
     def _wait_sim_start(self) -> None:
@@ -201,21 +202,21 @@ class SimulationElement(ABC):
     """
     ELEMENT CAPABILITY METHODS
     """
-    async def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
+    async def _send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType, socket_map : dict):
         """
         Sends a multipart message to a given socket type.
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
             - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
-        
+            - socket_map (`dict`): map of socket types to socket objects and their respective locks
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
         try:
             # get appropriate socket and lock
             socket, socket_lock = None, None
-            socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
+            socket, socket_lock = socket_map.get(socket_type, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
             
@@ -269,7 +270,33 @@ class SimulationElement(ABC):
                 socket_lock.release()
                 self._log(f'lock released!')
 
-    async def _receive_external_msg(self, socket_type : zmq.SocketType) -> list:
+    async def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
+        """
+        Sends a multipart message to a given socket type for external communication.
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+            - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
+        
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        """
+        return await self._send_msg(msg, socket_type, self._external_socket_map)
+
+    async def _send_internal_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
+        """
+        Sends a multipart message to a given socket type for internal communcation.
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+            - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
+        
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        """
+        return await self._send_msg(msg, socket_type, self._internal_socket_map)
+
+    async def _receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
         """
         Reads a multipart message from a given socket.
 
@@ -285,7 +312,7 @@ class SimulationElement(ABC):
         try:
              # get appropriate socket and lock
             socket, socket_lock = None, None
-            socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
+            socket, socket_lock = socket_map.get(socket_type, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
             
@@ -341,6 +368,35 @@ class SimulationElement(ABC):
                 socket_lock.release()
                 self._log(f'lock released!')
 
+    async def _receive_external_msg(self, socket_type : zmq.SocketType) -> list:
+        """
+        Reads a multipart message from a given socket for external communication.
+
+        ### Arguments:
+            - socket_type (`zmq.SocketType`): desired socket type to be used to receive a messages
+
+        ### Returns:
+            - `list` containing the received information:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+        """
+        return await self._receive_msg(socket_type, self._external_socket_map)
+
+    async def _receive_internal_msg(self, socket_type : zmq.SocketType) -> list:
+        """
+        Reads a multipart message from a given socket for internal communication.
+
+        ### Arguments:
+            - socket_type (`zmq.SocketType`): desired socket type to be used to receive a messages
+
+        ### Returns:
+            - `list` containing the received information:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+        """
+        return await self._receive_msg(socket_type, self._internal_socket_map)
 
     async def _sim_wait(self, delay : float) -> None:
         """
@@ -424,21 +480,39 @@ class SimulationElement(ABC):
             port = int(port)
             return s.connect_ex(('localhost', port)) == 0
 
-    @abstractmethod
-    def _config_network(self) -> dict:
+    def __config_network(self) -> tuple:
         """
         Initializes and connects essential network port sockets for this simulation element. 
+        
+        #### Returns:
+            - `tuple` of two `dict`s mapping the types of sockets used by this simulation element to a dedicated 
+                port socket and asynchrnous lock pair
+        """
+        return self._config_external_network(), self._config_internal_network()
 
-        Must be expanded if more connections are needed.
+    @abstractmethod
+    def _config_external_network(self) -> dict:
+        """
+        Initializes and connects essential network port sockets for inter-element communication
         
         #### Returns:
             - `dict` mapping the types of sockets used by this simulation element to a dedicated 
-                port socket and multithreading lock pair
+                port socket and asynchronous lock pair
         """
-        pass    
+        pass
 
     @abstractmethod
-    def _sync(self) -> dict:
+    def _config_internal_network(self) -> dict:
+        """
+        Initializes and connects essential network port sockets for intra-element communication
+        
+        #### Returns:
+            - `dict` mapping the types of sockets used by this simulation element to a dedicated 
+                port socket and asynchronous lock pair
+        """
+        pass
+
+    def __sync(self) -> tuple:
         """
         Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
         
@@ -450,7 +524,63 @@ class SimulationElement(ABC):
         This will signal the beginning of the simulation.
 
         #### Returns:
+            - `tuple` of two `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
+        """
+        async def routine():
+            """
+            Synchronizes internal and external ports
+
+            ### Returns:
+                - `tuple` containing the external and internal address ledgers
+            """
+            try:
+                external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
+                internal_sync_task = asyncio.create_task(self._internal_sync(), name='Internal Sync Task')
+                timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
+                
+                pending = [external_sync_task, internal_sync_task, timeout_task]
+                
+                while timeout_task in pending and len(pending) > 1:
+                    _, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                                
+                if timeout_task.done():
+                    raise TimeoutError('Sync with simulation manager timed out.')
+
+                return (external_sync_task.result(), internal_sync_task.result())             
+                
+            except TimeoutError as e:
+                self._log(f'Sync aborted. {e}')
+                
+                # cancel sync subroutine
+                if not external_sync_task.done():
+                    external_sync_task.cancel()
+                    await external_sync_task
+
+                if not external_sync_task.done():
+                    external_sync_task.cancel()
+                    await external_sync_task
+
+                raise e
+
+        return (asyncio.run(routine()))
+
+    @abstractmethod
+    async def _external_sync(self) -> dict:
+        """
+        Synchronizes with other simulation elements
+
+        #### Returns:
             - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
+        """
+        pass
+
+    @abstractmethod
+    async def _internal_sync(self) -> dict:
+        """
+        Synchronizes with this element's internal components
+
+        #### Returns:
+            - `dict` mapping a simulation element's components' names to the addresses pointing to their respective connecting ports
         """
         pass
 

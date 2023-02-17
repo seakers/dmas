@@ -45,22 +45,25 @@ class Manager(Participant):
             - level (`int`): logging level for this simulation element
         """
         super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
-
-        # initialize constants and parameters
-        self._simulation_element_name_list = simulation_element_name_list.copy()
-        self._clock_config = clock_config
         
         # check if an environment is contained in the simulation
         if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
             raise AttributeError('List of simulation elements must include one simulation environment.')
         elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
             raise AttributeError('List of simulation elements includes more than one simulation environment.')
+            
+        # initialize constants and parameters
+        self._simulation_element_name_list = simulation_element_name_list.copy()
+        self._clock_config = clock_config
 
-        # TODO check if there is more than one environment in the list 
+    def _config_internal_network(self) -> dict:
+        # no internal ports to setup
+        return None
 
-    def _config_network(self) -> list:
+    def _config_external_network(self) -> dict:
         # inherit PUB and PUSH ports
-        port_list : dict = super()._config_network()
+        external_port_list = super()._config_external_network()
+        external_port_list : dict
 
         # direct message response (RES) port 
         ## create socket from context
@@ -73,23 +76,24 @@ class Manager(Participant):
         ## create threading lock
         rep_lock = asyncio.Lock()
 
-        port_list[zmq.REP] = (rep_socket, rep_lock)
+        external_port_list[zmq.REP] = (rep_socket, rep_lock)
 
-        return port_list
+        return external_port_list
 
-    def _sync(self) -> dict:
-        async def subroutine():
-            # wait for all simulation elements to initialize and connect to me
-            external_address_ledger = await self.__wait_for_online_elements()
+    async def _internal_sync(self) -> dict:
+        # no internal modules to sync with
+        return None
 
-            # broadcast address ledger
-            sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
-            await self._broadcast_message(sim_info_msg)
+    async def _external_sync(self) -> dict:
+        # wait for all simulation elements to initialize and connect to me
+        external_address_ledger = await self.__wait_for_online_elements()
 
-            # return external address ledger
-            return external_address_ledger
+        # broadcast address ledger
+        sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
+        await self._broadcast_external_message(sim_info_msg)
 
-        return (asyncio.run(subroutine()))
+        # return external address ledger
+        return external_address_ledger
 
     def _wait_sim_start(self) -> None:
         async def subroutine():
@@ -103,10 +107,10 @@ class Manager(Participant):
             # broadcast simulation start to all simulation elements
             self._log(f'Starging simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
             sim_start_msg = SimulationStartMessage(time.perf_counter())
-            await self._broadcast_message(sim_start_msg)
+            await self._broadcast_external_message(sim_start_msg)
 
             # push simulation start to monitor
-            await self._push_message(sim_start_msg)
+            await self._push_external_message(sim_start_msg)
 
             # wait for simulation duration to pass
             self._clock_config : ClockConfig
@@ -123,7 +127,7 @@ class Manager(Participant):
             
             # broadcast simulation end
             sim_end_msg = SimulationEndMessage(time.perf_counter())
-            await self._broadcast_message(sim_end_msg)
+            await self._broadcast_external_message(sim_end_msg)
 
             if timer_task.done():
                 # nodes may still be activated. wait for all simulation nodes to deactivate
@@ -142,7 +146,7 @@ class Manager(Participant):
         async def subroutine():
             # push simulation end to monitor
             sim_end_msg = SimulationEndMessage(time.perf_counter())
-            await self._push_message(sim_end_msg)
+            await self._push_external_message(sim_end_msg)
         
         asyncio.run(subroutine())
     

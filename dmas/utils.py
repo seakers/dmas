@@ -87,6 +87,13 @@ class ParticipantNetworkConfig(NetworkConfig):
         self._broadcast_address = broadcast_address
         self._monitor_address = monitor_address
 
+    @abstractmethod
+    def get_my_addresses(self) -> list:
+        """
+        Returns the list of addresses to be bound
+        """
+        pass
+
     def get_broadcast_address(self) -> str:
         """
         Returns an element's broadcast port address
@@ -132,6 +139,9 @@ class ManagerNetworkConfig(ParticipantNetworkConfig):
         Returns an manager's reponse port address
         """
         return self._response_address
+    
+    def get_my_addresses(self) -> list:
+        return [self._response_address, self._broadcast_address]
 
     def to_dict(self) -> dict:
         out = super().to_dict()
@@ -183,6 +193,9 @@ class NodeNetworkConfig(ParticipantNetworkConfig):
         """
         super().__init__(broadcast_address, monitor_address)
         self._manager_address = manager_address
+
+    def get_my_addresses(self) -> list:
+        return [self._broadcast_address]
 
     def get_manager_address(self) -> str:
         """
@@ -244,6 +257,9 @@ class EnvironmentNetworkConfig(NodeNetworkConfig):
         """
         super().__init__(broadcast_address, monitor_address, manager_address)
         self._response_address = response_address
+
+    def get_my_addresses(self) -> list:
+        return [self._broadcast_address, self._response_address]
 
     def get_response_address(self) -> str:
         return self._response_address
