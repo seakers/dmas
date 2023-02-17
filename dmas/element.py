@@ -490,10 +490,10 @@ class SimulationElement(ABC):
                 port socket and asynchronous lock pair
         """ 
         
-        external_socekt_map = self._config_external_network()
+        external_socket_map = self._config_external_network()
         internal_socket_map = self._config_internal_network()
 
-        return external_socekt_map, internal_socket_map
+        return external_socket_map, internal_socket_map
 
     def _config_external_network(self) -> dict:
         """
@@ -510,7 +510,7 @@ class SimulationElement(ABC):
             address = external_addresses[socket_type]
             socket_type : zmq.Socket; address : str
 
-            external_socket_map[socket_type] = self.socket_factory(self._context, socket_type, address)
+            external_socket_map[socket_type] = self.socket_factory(socket_type, address)
 
         return external_socket_map
 

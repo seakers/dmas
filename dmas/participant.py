@@ -22,10 +22,7 @@ class Participant(SimulationElement):
     +-----------+---------+       +--------------+
     """
     __doc__ += SimulationElement.__doc__
-    def __init__(self, name: str, network_config: ParticipantNetworkConfig, level: int = logging.INFO) -> None:
-        super().__init__(name, network_config, level)
-
-
+    
     async def _broadcast_external_message(self, msg : SimulationMessage) -> bool:
         """
         Broadcasts a message to all elements subscribed to this element's publish socket

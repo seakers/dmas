@@ -476,7 +476,7 @@ class SyncRequestMessage(SimulationMessage):
         - _network_config (:obj:`NetworkConfig`): network configuration from sender node
     """
 
-    def __init__(self, src: str, network_config : NodeNetworkConfig, id : uuid.UUID = None):
+    def __init__(self, src: str, network_config : NetworkConfig, id : uuid.UUID = None):
         """
         Initializes an instance of a Sync Request Message
 
@@ -525,7 +525,7 @@ class SyncRequestMessage(SimulationMessage):
         elif _type is not NodeMessageTypes.SYNC_REQUEST:
             raise Exception(f'Cannot load a Sync Request from a dictionary request of type {type_name}.')
 
-        network_config = NodeNetworkConfig.from_dict(network_config)
+        network_config = NetworkConfig.from_dict(network_config)
 
         return SyncRequestMessage(src, network_config, uuid.UUID(id_str))
 

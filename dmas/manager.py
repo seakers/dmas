@@ -47,15 +47,14 @@ class Manager(Participant):
         super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
         
         # check if an environment is contained in the simulation
-        if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
-            raise AttributeError('List of simulation elements must include one simulation environment.')
-        elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
-            raise AttributeError('List of simulation elements includes more than one simulation environment.')
+        # if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
+        #     raise AttributeError('List of simulation elements must include one simulation environment.')
+        # elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
+        #     raise AttributeError('List of simulation elements includes more than one simulation environment.')
             
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
-
 
     async def _internal_sync(self) -> dict:
         # no internal modules to sync with

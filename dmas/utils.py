@@ -23,7 +23,7 @@ class NetworkConfigTypes(Enum):
     ENVIRONMENT_NETWORK_CONFIG = 'NODE_NETWORK_CONFIG'
 
 class NetworkConfig(ABC):
-    def __init__(self, internal_address_map : dict, external_address_map : dict) -> None:
+    def __init__(self, internal_address_map : dict = dict(), external_address_map : dict = dict()) -> None:
         super().__init__()  
         # check map format
         for map in [internal_address_map, external_address_map]:
@@ -32,9 +32,9 @@ class NetworkConfig(ABC):
 
                 if not isinstance(addresses, list):
                     if map == internal_address_map:
-                        raise TypeError(f'Internal Address Map must be comprised of elements of type {type(list)}. Is of type {type(addresses)}')
+                        raise TypeError(f'Internal Address Map must be comprised of elements of type {list}. Is of type {type(addresses)}')
                     else:
-                        raise TypeError(f'External Address Map must be comprised of elements of type {type(list)}. Is of type {type(addresses)}')
+                        raise TypeError(f'External Address Map must be comprised of elements of type {list}. Is of type {type(addresses)}')
 
                 for address in addresses:   
                     if not isinstance(socket_type, zmq.SocketType):
@@ -98,7 +98,9 @@ class ManagerNetworkConfig(NetworkConfig):
         - broadcast_address (`str`): a manager's broadcast port address
         - monitor_address (`str`): the simulation's monitor port address
         """
-        external_address_map = {zmq.REP: [response_address], zmq.PUB: [broadcast_address], zmq.PUSH: monitor_address}
+        external_address_map = {zmq.REP: [response_address], 
+                                zmq.PUB: [broadcast_address], 
+                                zmq.PUSH: [monitor_address]}
         super().__init__(external_address_map=external_address_map)
 
 class AgentNetworkConfig(NetworkConfig):
