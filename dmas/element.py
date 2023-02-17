@@ -56,20 +56,21 @@ class SimulationElement(ABC):
     | INTERNAL PROCESSES |                                                                                          
     +--------------------+   
     """
-    def __init__(self, name : str, network_config : NetworkConfig, level : int = logging.INFO) -> None:
+    def __init__(self, name : str, network_config : NetworkConfig, level : int = logging.INFO, logger : logging.Logger = None) -> None:
         """
         Initiates a new simulation element
 
         ### Args:
             - name (`str`): The element's name
             - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation element
-            - level (`int`): logging level for this simulation element
+            - level (`int`): logging level for this simulation element. Level set to INFO by defauly
+            - logger (`logging.Logger`) : logger for this simulation element. If none is given, a new one will be generated
         """
         super().__init__()
 
         self.name = name
         self._status = SimulationElementStatus.INIT
-        self._logger : logging.Logger = self.__set_up_logger(level)
+        self._logger : logging.Logger = logger if logger is not None else self.__set_up_logger(level)
 
         self._clock_config = None     
 
@@ -486,11 +487,14 @@ class SimulationElement(ABC):
         
         #### Returns:
             - `tuple` of two `dict`s mapping the types of sockets used by this simulation element to a dedicated 
-                port socket and asynchrnous lock pair
-        """
-        return self._config_external_network(), self._config_internal_network()
+                port socket and asynchronous lock pair
+        """ 
+        
+        external_socekt_map = self._config_external_network()
+        internal_socket_map = self._config_internal_network()
 
-    @abstractmethod
+        return external_socekt_map, internal_socket_map
+
     def _config_external_network(self) -> dict:
         """
         Initializes and connects essential network port sockets for inter-element communication
@@ -499,9 +503,17 @@ class SimulationElement(ABC):
             - `dict` mapping the types of sockets used by this simulation element to a dedicated 
                 port socket and asynchronous lock pair
         """
-        pass
+        external_addresses = self._network_config.get_external_addresses()
+        external_socket_map = dict()
 
-    @abstractmethod
+        for socket_type in external_addresses:
+            address = external_addresses[socket_type]
+            socket_type : zmq.Socket; address : str
+
+            external_socket_map[socket_type] = self.socket_factory(self._context, socket_type, address)
+
+        return external_socket_map
+
     def _config_internal_network(self) -> dict:
         """
         Initializes and connects essential network port sockets for intra-element communication
@@ -510,7 +522,96 @@ class SimulationElement(ABC):
             - `dict` mapping the types of sockets used by this simulation element to a dedicated 
                 port socket and asynchronous lock pair
         """
-        pass
+        internal_addresses = self._network_config.get_internal_addresse()
+        internal_socket_map = dict()
+
+        for socket_type in internal_addresses:
+            address = internal_addresses[socket_type]
+            socket_type : zmq.Socket; address : str
+
+            internal_socket_map[socket_type] = self.socket_factory(socket_type, address)
+
+        return internal_socket_map
+
+    def socket_factory(self, socket_type : zmq.SocketType, addresses : list) -> tuple:
+        """
+        Creates a ZMQ socket of a given type and binds it or connects it to a given address .
+
+        ### Attributes:
+            - context (`azmq.Context`): asynchronous network context to be used
+            - socket_type (`zmq.SocketType`): type of socket to be generated
+            - addresses (`list`): desired addresses to be bound or connected to the socket being generated
+
+        ### Returns:
+            - socket (`zmq.Socket`): socket of the desired type and address
+            - lock (`asyncio.Lock`): socket lock for asynchronous access
+
+        ### Usage
+            socket, lock = socket_factory(context, socket_type, address)
+        """
+        asyncio.wait
+        if socket_type is zmq.PUB:
+            # create PUB socket
+            socket : zmq.Socket = self._context.socket(zmq.PUB)  
+            socket.sndhwm = 1100000
+
+            # bind to desired addresses
+            for address in addresses:
+                socket.bind(address)  
+
+        elif socket_type is zmq.SUB:
+            # create SUB socket
+            socket : zmq.Socket = self._context.socket(zmq.SUB)
+            
+            # connect to desired addresses
+            for address in addresses:
+                socket.connect(address)
+
+            # subscribe to messages addressed to this or all elements
+            socket.setsockopt(zmq.SUBSCRIBE, self.name.encode('ascii'))
+            socket.setsockopt(zmq.SUBSCRIBE, SimulationElementRoles.ALL.value.encode('ascii'))
+            
+        elif socket_type is zmq.REQ:
+            # create REQ socket
+            socket : zmq.Socket = self._context.socket(zmq.REQ)
+            socket.setsockopt(zmq.LINGER, 0)
+
+            # no initial connection. Socket is to be connected to its destination on demand
+
+        elif socket_type is zmq.REP:
+            # create REP socket
+            socket : zmq.Socket = self._context.socket(zmq.REP)
+            
+            # bind to desired addresses
+            for address in addresses:
+                socket.bind(address)
+
+            socket.setsockopt(zmq.LINGER, 0)
+            
+        elif socket_type is zmq.PUSH:
+            # create PUSH socket
+            socket : zmq.Socket = self._context.socket(zmq.PUSH)
+
+            # connect to desired addresses
+            for address in addresses:
+                socket.connect(address)
+
+            socket.setsockopt(zmq.LINGER, 0)
+        
+        elif socket_type is zmq.PULL:
+            # create PULL socket
+            socket : zmq.Socket = self._context.socket(zmq.PULL)
+            
+            # conent to desired addresses
+            for address in addresses:
+                socket.bind(address)
+
+            socket.setsockopt(zmq.LINGER, 0)
+
+        else:
+            raise NotImplementedError(f'Socket of type {socket_type} not yet supported.')
+        
+        return (socket, asyncio.Lock())
 
     def __sync(self) -> tuple:
         """

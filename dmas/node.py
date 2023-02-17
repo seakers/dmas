@@ -14,6 +14,7 @@ class Node(Participant):
 
     Base class for all simulation participants. This including all agents, environment, and simulation manager.
 
+    
     ### Communications diagram:
     +-----------+---------+       +--------------+
     |           | REQ     |------>|              | 

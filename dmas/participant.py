@@ -25,34 +25,6 @@ class Participant(SimulationElement):
     def __init__(self, name: str, network_config: ParticipantNetworkConfig, level: int = logging.INFO) -> None:
         super().__init__(name, network_config, level)
 
-    @abstractmethod
-    def _config_external_network(self) -> dict:
-        self._network_config : ParticipantNetworkConfig
-        for address in self._network_config.get_my_addresses():
-            if self._is_address_in_use(address):
-                raise Exception(f"{address} address is already in use.")
-
-        # broadcast message publish (PUB) port
-        ## create socket from context
-        self._network_config : ParticipantNetworkConfig
-        pub_socket : zmq.Socket = self._context.socket(zmq.PUB)                   
-        ## set SNDHWM, so we don't drop messages for slow subscribers
-        pub_socket.sndhwm = 1100000                                 
-        ## bind to address 
-        pub_socket.bind(self._network_config.get_broadcast_address())
-        ## create threading lock
-        pub_lock = asyncio.Lock()
-
-        # message to monitor push (PUSH) port
-        ## create socket from context
-        push_socket : zmq.Socket = self._context.socket(zmq.PUSH)
-        ## connect to monitor address                  
-        push_socket.connect( self._network_config.get_monitor_address() )
-        push_socket.setsockopt(zmq.LINGER, 0)
-        ## create threading lock
-        push_lock = asyncio.Lock()
-
-        return {zmq.PUB: (pub_socket, pub_lock), zmq.PUSH: (push_socket, push_lock)}
 
     async def _broadcast_external_message(self, msg : SimulationMessage) -> bool:
         """

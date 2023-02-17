@@ -56,29 +56,6 @@ class Manager(Participant):
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
 
-    def _config_internal_network(self) -> dict:
-        # no internal ports to setup
-        return None
-
-    def _config_external_network(self) -> dict:
-        # inherit PUB and PUSH ports
-        external_port_list = super()._config_external_network()
-        external_port_list : dict
-
-        # direct message response (RES) port 
-        ## create socket from context
-        self._network_config : ManagerNetworkConfig
-        rep_socket : zmq.Socket = self._context.socket(zmq.REP)
-        ## bind to address
-        peer_in_address : str = self._network_config.get_response_address()
-        rep_socket.bind(peer_in_address)
-        rep_socket.setsockopt(zmq.LINGER, 0)
-        ## create threading lock
-        rep_lock = asyncio.Lock()
-
-        external_port_list[zmq.REP] = (rep_socket, rep_lock)
-
-        return external_port_list
 
     async def _internal_sync(self) -> dict:
         # no internal modules to sync with

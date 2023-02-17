@@ -6,6 +6,7 @@ from enum import Enum
 import json
 
 import numpy
+import zmq
 
 """
 ------------------
@@ -22,272 +23,192 @@ class NetworkConfigTypes(Enum):
     ENVIRONMENT_NETWORK_CONFIG = 'NODE_NETWORK_CONFIG'
 
 class NetworkConfig(ABC):
-    """
-    ## Abstract Simulation Element Network Configuration
+    def __init__(self, internal_address_map : dict, external_address_map : dict) -> None:
+        super().__init__()  
+        # check map format
+        for map in [internal_address_map, external_address_map]:
+            for socket_type in map:
+                addresses = map[socket_type]
 
-    Describes the addresses assigned to a particular simulation element
+                if not isinstance(addresses, list):
+                    if map == internal_address_map:
+                        raise TypeError(f'Internal Address Map must be comprised of elements of type {type(list)}. Is of type {type(addresses)}')
+                    else:
+                        raise TypeError(f'External Address Map must be comprised of elements of type {type(list)}. Is of type {type(addresses)}')
 
-    TODO: Add username and password support
-    """
-    @beartype
-    def __init__(self) -> None:
-        """
-        Initializes an instance of a Network Config Object
-        """
-        super().__init__()
+                for address in addresses:   
+                    if not isinstance(socket_type, zmq.SocketType):
+                        if map == internal_address_map:
+                            raise TypeError(f'{socket_type} in Internal Address Map must be of type {type(zmq.SocketType)}. Is of type {type(socket_type)}')
+                        else:
+                            raise TypeError(f'{socket_type} in External Address Map must be of type {type(zmq.SocketType)}. Is of type {type(socket_type)}')
+                    elif not isinstance(address, str):
+                        if map == internal_address_map:
+                            raise TypeError(f'{address} in Internal Address Map must be of type {type(str)}. Is of type {type(address)}')
+                        else:
+                            raise TypeError(f'{address} in External Address Map must be of type {type(str)}. Is of type {type(address)}')
 
-    @abstractmethod
-    def to_dict(self) -> dict:
-        """
-        Converts object into a dictionary
-        """
-        pass
+        # save addresses
+        self._internal_address_map = internal_address_map.copy()
+        self._external_address_map = external_address_map.copy()
 
-    @beartype
-    @abstractmethod
-    def from_dict(d : dict):
-        """
-        Creates an instance of this Configuration Class from a dictionary object
-        """
-        pass
+    def get_internal_addresse(self) -> dict:
+        return self._internal_address_map
 
-    @abstractmethod
-    def from_json(j):
-        """
-        Creates an instance of this Configuration Class from a json object
-        """
-        pass
+    def get_external_addresses(self) -> dict:
+        return self._external_address_map
 
-    def __str__(self):
-        return str(self.to_dict())
-
-class ParticipantNetworkConfig(NetworkConfig):
-    """
-    ## Abstract Simulation Participant Network Configuration
-
-    Describes the addresses assigned to a particular simulation element
-
-    ### Attributes:
-        - _broadcast_address (`str`): an element's broadcast port address
-        - _monitor_address (`str`): the simulation's monitor port address
-    """
-    @beartype
-    def __init__(self, 
-                broadcast_address : str, 
-                monitor_address : str
-                ) -> None:
-        """
-        Initializes an instance of a Network Config Object
-
-        ### Arguments:
-        - broadcast_address (`str`): an element's broadcast port address
-        - monitor_address (`str`): the simulation's monitor port address
-        """
-        super().__init__()
-        self._broadcast_address = broadcast_address
-        self._monitor_address = monitor_address
-
-    @abstractmethod
-    def get_my_addresses(self) -> list:
-        """
-        Returns the list of addresses to be bound
-        """
-        pass
-
-    def get_broadcast_address(self) -> str:
-        """
-        Returns an element's broadcast port address
-        """
-        return self._broadcast_address
-
-    def get_monitor_address(self) -> str:
-        """
-        Returns an element's monitor port address 
-        """
-        return self._monitor_address
-    
     def to_dict(self) -> dict:
         out = dict()
-        out['broadcast address'] = self.get_broadcast_address()
-        out['monitor address'] = self.get_monitor_address()
+        # out['internal addresses'] = str(self._internal_address_map) # internal addresses are NOT to be shared
+        out['external addresses'] = str(self._internal_address_map)
         return out
 
-class ManagerNetworkConfig(ParticipantNetworkConfig):
+    def from_dict(d : dict):
+        # internal_addresses = d.get('internal addresses', None)
+        external_addresses = d.get('external addresses', None)
+
+        if external_addresses is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
+        
+        return NetworkConfig(external_addresses=external_addresses)
+    
+    def to_json(self) -> str:
+        return json.dump(self.to_dict())
+
+    def from_json(j : str):
+        return NetworkConfig.from_dict(json.loads(j))
+
+class ManagerNetworkConfig(NetworkConfig):
     """
     ## Manager Network Config
     
     Describes the addresses assigned to the simulation manager
-
-    ### Attributes:
-        - _response_address (`str`): an element's response port address
-        - _broadcast_address (`str`): an element's broadcast port address
-        - _monitor_address (`str`): the simulation's monitor port address
     """
-    def __init__(self, response_address : str, broadcast_address: str, monitor_address: str) -> None:
+    def __init__(self, 
+                response_address : str,
+                broadcast_address: str,
+                monitor_address: str
+                ) -> None:
         """
         Initializes an instance of a Manager Network Config Object
         
         ### Arguments:
-        - broadcast_address (`str`): an element's broadcast port address
+        - response_address (`str`): a manager's response port address
+        - broadcast_address (`str`): a manager's broadcast port address
         - monitor_address (`str`): the simulation's monitor port address
         """
-        super().__init__(broadcast_address, monitor_address)
-        self._response_address = response_address
-    
-    def get_response_address(self) -> str:
-        """
-        Returns an manager's reponse port address
-        """
-        return self._response_address
-    
-    def get_my_addresses(self) -> list:
-        return [self._response_address, self._broadcast_address]
+        external_address_map = {zmq.REP: [response_address], zmq.PUB: [broadcast_address], zmq.PUSH: monitor_address}
+        super().__init__(external_address_map=external_address_map)
 
-    def to_dict(self) -> dict:
-        out = super().to_dict()
-        out['response address'] = self.get_response_address()
-        out['@type'] = NetworkConfigTypes.MANAGER_NETWORK_CONFIG.name
-        return out
-
-    def from_dict(d: dict):
-        response_address = d.get('response address', None)
-        broadcast_address = d.get('broadcast address', None)
-        monitor_address = d.get('monitor address', None)
-        config_type = d.get('@type', None)
-
-        if response_address is None or broadcast_address is None or monitor_address is None or config_type is None:
-            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
-
-        if NetworkConfigTypes[config_type] is not NetworkConfigTypes.MANAGER_NETWORK_CONFIG:
-            raise TypeError(f'Cannot load a {NetworkConfigTypes.MANAGER_NETWORK_CONFIG.name} type object from a dictionary describing a {config_type} object.')
-
-        return ManagerNetworkConfig(response_address, broadcast_address, monitor_address)
-
-    def from_json(j):
-        return ManagerNetworkConfig.from_dict(json.loads(j))
-
-class NodeNetworkConfig(ParticipantNetworkConfig):
+class AgentNetworkConfig(NetworkConfig):
     """
-    ## Manager Network Config
+    ## Agent Network Config
     
-    Describes the addresses assigned to a simulated node
-
-    ### Attributes:
-        - _broadcast_address (`str`): the simulatede node's broadcast port address
-        - _monitor_address (`str`): the simulation's monitor port address
-        - _manager_address (`str`): the simulation's manager port address
+    Describes the addresses assigned to a simulation agent node
     """
-    @beartype
     def __init__(self, 
+                internal_send_address: str,
+                internal_recv_addresses : list,
                 broadcast_address: str, 
-                monitor_address: str,
-                manager_address: str
+                manager_address : str,
+                monitor_address: str
                 ) -> None:
         """
-        Initializes an instance of a Node Network Config Object
-
+        Initializes an instance of an Agent Network Config Object
+        
         ### Arguments:
-            - broadcast_address (`str`): an simulated node's broadcast port address
-            - monitor_address (`str`): an simulation's monitor port address
-            - manager_address (`str`): the simulation's manager port address
+        - internal_send_address (`str`): an agent's internal bradcast port address
+        - internal_recv_addresses (`list`): list of an agent's modules' publish port addresses
+        - broadcast_address (`str`): an agent's broadcast port address
+        - manager_address (`str`): the simulation manager's broadcast port address
+        - monitor_address (`str`): the simulation's monitor port address
         """
-        super().__init__(broadcast_address, monitor_address)
-        self._manager_address = manager_address
+        internal_address_map = {zmq.PUB:  [internal_send_address],
+                                zmq.SUB:  internal_recv_addresses}
+        external_address_map = {zmq.REQ:  [],
+                                zmq.PUB:  [broadcast_address],
+                                zmq.SUB:  [manager_address],
+                                zmq.PUSH: [monitor_address]}
 
-    def get_my_addresses(self) -> list:
-        return [self._broadcast_address]
+        super().__init__(internal_address_map, external_address_map)
 
-    def get_manager_address(self) -> str:
+class InternalModuleNetworkConfig(NetworkConfig):
+    """
+    ## Internal Module Network Config
+    
+    Describes the addresses assigned to a node's internal module 
+    """
+    def __init__(self, 
+                module_send_address: str, 
+                module_recv_address: str
+                ) -> None:
         """
-        Returns a node's simulation manager port address
+        Initializes an instance of an Internal Module Network Config Object
+        
+        ### Arguments:
+        - module_recv_address (`str`): an internal module's parent agent node's broadcast address
+        - module_send_address (`str`): the internal module's broadcast address
         """
-        return self._manager_address
+        external_address_map = {zmq.SUB: [module_recv_address],
+                                zmq.PUB: [module_send_address]}       
+        super().__init__(external_address_map=external_address_map)
 
-    def to_dict(self) -> dict:
-        out = super().to_dict()
-        out['manager address'] = self.get_manager_address()
-        out['@type'] = NetworkConfigTypes.NODE_NETWORK_CONFIG.name
-        return out
-
-    @beartype
-    def from_dict(d: dict):
-        broadcast_address = d.get('broadcast address', None)
-        monitor_address = d.get('monitor address', None)
-        manager_address = d.get('manager address', None)
-        config_type = d.get('@type', None)
-
-        if config_type is None or broadcast_address is None or monitor_address is None or manager_address is None:
-            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
-
-        if NetworkConfigTypes[config_type] is not NetworkConfigTypes.NODE_NETWORK_CONFIG:
-            raise TypeError(f'Cannot load a {NetworkConfigTypes.NODE_NETWORK_CONFIG.name} type object from a dictionary describing a {config_type} object.')
-
-        return NodeNetworkConfig(broadcast_address, monitor_address, manager_address)
-
-    def from_json(j):
-        return NodeNetworkConfig.from_dict(json.loads(j))
-
-class EnvironmentNetworkConfig(NodeNetworkConfig):
+class EnvironmentNetworkConfig(NetworkConfig):
     """
     ## Environment Network Config
     
-    Describes the addresses assigned to the simulated environment
-
-    ### Attributes:
-        - _response_address (`str`): an environment's response port address
-        - _broadcast_address (`str`): an environment's broadcast port address
-        - _monitor_address (`str`): the simulation's monitor port address
-        - _manager_address (`str`): the simulation's manager port address
+    Describes the addresses assigned to a simulation environment node
     """
-    @beartype
     def __init__(self, 
-                response_address: str,
+                internal_send_addresses: list,
+                internal_recv_address : str,
+                response_address : str,
                 broadcast_address: str, 
-                monitor_address: str,
-                manager_address: str
+                manager_address : str,
+                monitor_address: str
                 ) -> None:
         """
-        Initiates an instance of a Environment Network Config Object
-
+        Initializes an instance of an Agent Network Config Object
+        
         ### Arguments:
-            - response_address (`str`): an environment's response port address
-            - broadcast_address (`str`): an environment's broadcast port address
-            - monitor_address (`str`): the simulation's monitor port address
-            - manager_address (`str`): the simulation's manager port address
+        - internal_send_addresses (`list`): list of the environment's workers' port addresses
+        - internal_recv_address (`str`): the environment's internal listening port address
+        - response_address (`str`): the environment's response port address
+        - broadcast_address (`str`): the environment's broadcast port address
+        - manager_address (`str`): the simulation manager's broadcast port address
+        - monitor_address (`str`): the simulation's monitor port address
         """
-        super().__init__(broadcast_address, monitor_address, manager_address)
-        self._response_address = response_address
+        internal_address_map = {zmq.PUB:  internal_send_addresses,
+                                zmq.SUB:  [internal_recv_address]}
+        external_address_map = {zmq.REQ:  [],
+                                zmq.REP:  [response_address],
+                                zmq.PUB:  [broadcast_address],
+                                zmq.SUB:  [manager_address],
+                                zmq.PUSH: [monitor_address]}
 
-    def get_my_addresses(self) -> list:
-        return [self._broadcast_address, self._response_address]
+        super().__init__(internal_address_map, external_address_map)
 
-    def get_response_address(self) -> str:
-        return self._response_address
-
-    def to_dict(self) -> dict:
-        out = super().to_dict()
-        out['response address'] = self.get_response_address()
-        out['@type'] = NetworkConfigTypes.ENVIRONMENT_NETWORK_CONFIG.name
-        return out
-
-    @beartype
-    def from_dict(d: dict):
-        reponse_address = d.get('response address', None)
-        broadcast_address = d.get('broadcast address', None)
-        monitor_address = d.get('monitor address', None)
-        manager_address = d.get('manager address', None)
-        config_type = d.get('@type', None)
-
-        if config_type is None or reponse_address is None or broadcast_address is None or monitor_address is None or manager_address is None:
-            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
-
-        if NetworkConfigTypes[config_type] is not NetworkConfigTypes.ENVIRONMENT_NETWORK_CONFIG:
-            raise TypeError(f'Cannot load a {NetworkConfigTypes.ENVIRONMENT_NETWORK_CONFIG.name} type object from a dictionary describing a {config_type} object.')
-
-        return EnvironmentNetworkConfig(reponse_address, broadcast_address, monitor_address, manager_address)
-
-    def from_json(j):
-        return EnvironmentNetworkConfig.from_dict(json.loads(j))
+class EnvironmentWorkerModuleNetworkConfig(NetworkConfig):
+    """
+    ## Environment Worker Module Network Config
+    
+    Describes the addresses assigned to an environment's internal worker module 
+    """
+    def __init__(self, 
+                module_send_address: str, 
+                module_recv_address: str
+                ) -> None:
+        """
+        Initializes an instance of an Environemtn Worker Module Network Config Object
+        
+        ### Arguments:
+        - module_send_address (`str`): an internal module's parent agent node's broadcast address
+        - module_recv_address (`str`): the internal module's broadcast address
+        """
+        external_address_map = {zmq.PUSH: [module_send_address],
+                                zmq.PULL: [module_recv_address]}       
+        super().__init__(external_address_map=external_address_map)
 
 """
 ------------------
