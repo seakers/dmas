@@ -230,6 +230,8 @@ class Manager(Participant):
         for src in received_sync_requests:
             msg : SyncRequestMessage = received_sync_requests[src]
             external_address_ledger[src] = msg.get_network_config()
+
+        external_address_ledger[self.name] = self._network_config
         
         self._log(f'All elements online!')
         return external_address_ledger

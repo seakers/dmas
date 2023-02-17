@@ -3,8 +3,10 @@ import asyncio
 import logging
 import random
 import zmq
+import concurrent.futures
 from dmas.element import SimulationElement
 from dmas.messages import *
+from dmas.modules import InternalModule
 from dmas.participant import Participant
 from dmas.utils import *
 
@@ -14,7 +16,7 @@ class Node(Participant):
 
     Base class for all simulation participants. This including all agents, environment, and simulation manager.
 
-    
+
     ### Communications diagram:
     +-----------+---------+       +--------------+
     |           | REQ     |------>|              | 
@@ -28,8 +30,13 @@ class Node(Participant):
     
     """
     __doc__ += SimulationElement.__doc__
-    def __init__(self, name: str, network_config: NodeNetworkConfig, level: int = logging.INFO) -> None:
-        super().__init__(name, network_config, level)      
+    def __init__(self, name: str, network_config: NetworkConfig, modules : list = [], level: int = logging.INFO) -> None:
+        super().__init__(name, network_config, level)   
+        
+        for module in modules:
+            if not isinstance(InternalModule):
+                raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
+        self._modules = modules.copy()
 
     def _activate(self) -> None:
         super()._activate()
@@ -39,38 +46,16 @@ class Node(Participant):
             raise AttributeError(f'{self.name}: Intra-element communication sockets not activated during activation.')
 
         if self._internal_address_ledger is None:
-            raise RuntimeError(f'{self.name}: Internal address ledger not received during activation.')
+            raise RuntimeError(f'{self.name}: Internal address ledger not created during activation.')
 
-    def _config_external_network(self) -> tuple:
-        # inherit existing ports
-        external_port_list = super()._config_external_network()
-        external_port_list : dict
+    def _config_internal_network(self) -> dict:
+        super()._config_internal_network()
 
-        # direct message response (REQ) port 
-        ## create socket from context
-        req_socket : zmq.Socket = self._context.socket(zmq.REQ)
-        req_socket.setsockopt(zmq.LINGER, 0)
-        ## create threading lock
-        req_lock = asyncio.Lock()
-
-        external_port_list[zmq.REQ] = (req_socket, req_lock)
-
-        # broadcast message reception (SUB) port
-        ## create socket from context
-        self._network_config : NodeNetworkConfig
-        sub_socket : zmq.Socket = self._context.socket(zmq.SUB)
-        ## connect to manager address 
-        sub_socket.connect(self._network_config.get_manager_address())
-        sub_socket.setsockopt(zmq.LINGER, 0)
-        ## subscribe to all messages addressed to this node or to all memebers of the simulation
-        sub_socket.setsockopt(zmq.SUBSCRIBE, self.name.encode('ascii'))
-        sub_socket.setsockopt(zmq.SUBSCRIBE, SimulationElementRoles.ALL.value.encode('ascii'))
-        ## create threading lock
-        sub_lock = asyncio.Lock()
-
-        external_port_list[zmq.SUB] = (sub_socket, sub_lock)
-
-        return external_port_list
+        if len(self._modules) > 0:
+            with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
+                for module in self._modules:
+                    module : InternalModule
+                    pool.submit(module.config_network, *[])
 
     async def _external_sync(self):
         # request to sync with the simulation manager
@@ -211,10 +196,7 @@ class Node(Participant):
             receive_task = None
 
             # get destination's socket address
-            if msg.get_dst() == SimulationElementRoles.MANAGER.name:
-                dst_address = self._network_config.get_manager_address()
-            else:
-                dst_address = address_ledger.get(msg.get_dst(), None)
+            dst_address = address_ledger.get(msg.get_dst(), None)
             
             if dst_address is None:
                 raise RuntimeError(f'Could not find address for simulation element of name {msg.get_dst()}.')

@@ -60,12 +60,10 @@ class NetworkConfig(ABC):
 
     def to_dict(self) -> dict:
         out = dict()
-        # out['internal addresses'] = str(self._internal_address_map) # internal addresses are NOT to be shared
         out['external addresses'] = str(self._internal_address_map)
         return out
 
     def from_dict(d : dict):
-        # internal_addresses = d.get('internal addresses', None)
         external_addresses = d.get('external addresses', None)
 
         if external_addresses is None:

@@ -2,9 +2,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import logging
-from dmas.element import SimulationElement
 
-from dmas.utils import NetworkConfig
+from dmas.utils import *
 
 class InternalModuleStatus(Enum):
     INIT = 'INITIALIZED'
@@ -12,7 +11,7 @@ class InternalModuleStatus(Enum):
     RUNNING = 'RUNNING'
     DEACTIVATED = 'DEACTIVATED'
 
-class InternalModule(SimulationElement):
+class InternalModule(ABC):
     """
     ## Internal Module
 
@@ -23,24 +22,45 @@ class InternalModule(SimulationElement):
     
     ####
     """
-    def __init__(self, name: str, network_config: NetworkConfig, logger: logging.Logger) -> None:
-        super().__init__(name, network_config, logger=logger)
+    def __init__(self, module_name: str, parent_name : str, network_config: InternalModuleNetworkConfig, logger: logging.Logger) -> None:
+        super().__init__()
+        self.name = module_name + '/' + parent_name
+        self._network_config = network_config
+
+    def get_name(self) -> str:
+        """
+        Returns full name of this module
+        """
+        return self.name
+
+    def get_module_name(self) -> str:
+        """
+        Returns the name of this module
+        """
+        name, _ = self.name.split('/')
+        return name
+
+    def get_parent_name(self) -> str:
+        _, parent = self.name.split('/')
+        return parent
 
     @abstractmethod
-    def activate(self) -> None:
+    def config_network(self) -> None:
         pass
 
     @abstractmethod
-    def _config_network(self) -> None:
+    def sync(self) -> None:
         pass
 
     @abstractmethod
-    def _sync(self) -> None:
+    async def _routine(self) -> None:
         pass
 
-    @abstractmethod
-    def _routine(self) -> None:
-        pass
+    def run(self) -> None:
+        try:
+            asyncio.run(self._routine())
+        finally:
+            self._deactivate()
 
     @abstractmethod
     def _deactivate(self) -> None:
