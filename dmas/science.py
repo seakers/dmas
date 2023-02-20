@@ -8,6 +8,7 @@ import csv
 import base64
 import random
 import PIL.Image
+import requests
 from io import BytesIO
 from modules import Module
 from messages import *
@@ -58,20 +59,20 @@ class ScienceModule(Module):
                 if len(points) > 0:
                     if line["lat"] not in lats:
                         lats.append(line["lat"])
-                        points.append((line["lat"],line["lon"],line["severity"],0,86400))
+                        points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60))
                 else:
                     lats.append(line["lat"])
-                    points.append((line["lat"],line["lon"],line["severity"],0,86400))
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60))
         with open(self.scenario_dir+'resources/flow_events_75.csv', 'r') as f:
             d_reader = csv.DictReader(f)
             for line in d_reader:
                 if len(points) > 0:
                     if line["lat"] not in lats:
                         lats.append(line["lat"])
-                        points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+60*60))
+                        points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400))
                 else:
                     lats.append(line["lat"])
-                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+60*60))
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400))
         points = np.asfarray(points)
         self.log(f'Loaded scenario 1b points',level=logging.INFO)
         return points
@@ -735,24 +736,42 @@ class SciencePredictiveModelModule(Module):
                         coroutine.cancel()
                         await coroutine
 
+    def query_points(self,time):
+        data = {
+            "time": time
+        }
+        url = "http://localhost:5000"
+        response = requests.post(url,data)
+        self.log(f'Query points response: {response}',level=logging.INFO)
+        floods = response[0]
+        hfs = response[1]
+        return hfs
+
     async def send_meas_req(self):
         try:
             while True:
                 i = 0
-                self.log('In send_meas_req',level=logging.INFO)
-                print(len(self.unsent_points[:,0]))
-                while i < len(self.unsent_points[:,0]):
-                    if(self.unsent_points[i,3] <= self.get_current_time() <= self.unsent_points[i, 4]):
-                        measurement_request = MeasurementRequest(["tss", "altimetry"], self.unsent_points[i,0],self.unsent_points[i,1], self.unsent_points[i,2], {})
-                        ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                        self.log(f'Sending message from predictive model!!!',level=logging.INFO)
-                        await self.send_internal_message(ext_msg)
-                        self.unsent_points = np.delete(self.unsent_points, i, 0)
-                    else:
-                        i = i+1
+                points = self.query_points(i)
+                points = np.asfarray(points)
+                for i in range(len(points)):
+                    measurement_request = MeasurementRequest(["tss", "altimetry"], points[i,0], points[i,1], points[i,2], {})
+                    ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                    self.log(f'Sending message from predictive model!!!',level=logging.DEBUG)
+                    await self.send_internal_message(ext_msg)
                 await self.sim_wait(60*60)
-                if len(self.unsent_points[:,0]) == 0:
-                    await self.sim_wait(1e6)
+                # i = 0
+                # while i < len(self.unsent_points[:,0]):
+                #     if(self.unsent_points[i,3] <= self.get_current_time() <= self.unsent_points[i, 4]):
+                #         measurement_request = MeasurementRequest(["tss", "altimetry"], self.unsent_points[i,0],self.unsent_points[i,1], self.unsent_points[i,2], {})
+                #         ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                #         self.log(f'Sending message from predictive model!!!',level=logging.DEBUG)
+                #         await self.send_internal_message(ext_msg)
+                #         self.unsent_points = np.delete(self.unsent_points, i, 0)
+                #     else:
+                #         i = i+1
+                # await self.sim_wait(60*60)
+                # if len(self.unsent_points[:,0]) == 0:
+                #     await self.sim_wait(1e6)
 
                 # if not self.requests_sent:
                 #     forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'resources/ForecastWarnings-all.csv', delimiter=',')
@@ -857,7 +876,7 @@ class ScienceReasoningModule(Module):
                         if item["checked"] is False:
                             outlier, outlier_data = self.parent_module.check_altimetry_outliers(item)
                             if outlier is True:
-                                self.log(f'Altimetry outlier in check_sd',level=logging.INFO)
+                                self.log(f'Altimetry outlier in check_sd',level=logging.DEBUG)
                                 outliers.append(outlier_data)
                             item["checked"] = True
                     else:

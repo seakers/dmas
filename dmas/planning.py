@@ -399,7 +399,8 @@ class ObservationPlanningModule(Module):
                 if(len(actions) == 0):
                     break
                 for action in actions:
-                    rho = (86400.0 - action.end)/86400.0
+                    duration = 86400.0*16.0
+                    rho = (duration - action.end)/duration
                     e = rho * estimated_reward
                     adjusted_reward = action.science_val*self.meas_perf() + e
                     # if action.science_val > 5.0:
@@ -619,14 +620,10 @@ class OperationsPlanningModule(Module):
             while True:
                 # Replace with basic module that adds charging to plan
                 curr_time = self.get_current_time()
-                starts = []
-                for ops in self.ops_plan:
-                    if(isinstance(ops,ObservationPlannerTask)):
-                        starts.append(ops.start)
                 for task in self.ops_plan:
                     if(isinstance(task,ObservationPlannerTask)):
                         if(task.start <= curr_time):
-                            await self.sim_wait(1.0)
+                            #await self.sim_wait(1.0)
                             self.log(f'Sending observation task to engineering module!',level=logging.DEBUG)
                             self.log(f'Task metadata: {task.obs_info}',level=logging.DEBUG)
                             obs_task = ObservationTask(task.target[0], task.target[1], [InstrumentNames.TEST.value], [0.0], task.obs_info)
@@ -643,7 +640,7 @@ class OperationsPlanningModule(Module):
                             await self.send_internal_message(msg)
                     else:
                         self.log(f'Currently unsupported task type!')
-                await self.sim_wait(1.0)
+                await self.sim_wait(10.0)
         except asyncio.CancelledError:
             return
     

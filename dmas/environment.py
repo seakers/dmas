@@ -1233,15 +1233,15 @@ MAIN
 """
 if __name__ == '__main__':
     print('Initializing environment...')
-    scenario_dir = "./scenarios/scenario1"+sys.argv[1]+"/"
+    scenario_dir = "./scenarios/"+sys.argv[1]+"/"
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 86400
+    duration = 86400*16
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
     spacecraft_str_list = []
-    with open("./scenarios/scenario1"+sys.argv[1]+"/" +'MissionSpecs.json', 'r') as scenario_specs:
+    with open("./scenarios/"+sys.argv[1]+"/" +'MissionSpecs.json', 'r') as scenario_specs:
         # load json file as dictionary
         mission_dict = json.load(scenario_specs)
 
@@ -1253,7 +1253,7 @@ if __name__ == '__main__':
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)
-    environment = EnvironmentServer(scenario_dir, spacecraft_str_list, duration, clock_type=SimClocks.SERVER_EVENTS)
+    environment = EnvironmentServer(scenario_dir, spacecraft_str_list, duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency = 100*16)
     
     asyncio.run(environment.live())
     print('DONE')
