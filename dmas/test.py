@@ -58,12 +58,12 @@ if __name__ == '__main__':
     #signal.signal(signal.SIGALRM,handler_function)
     signal.alarm(3600*3)
     print('Initializing agents...')
-    directory = "./scenarios/scenario1"+sys.argv[1]+"/",
+    directory = "./scenarios/"+sys.argv[1]+"/",
 
     n_agents = 3
     processes = []
     print('Creating agent run processes...')
-    with open("./scenarios/scenario1"+sys.argv[1]+"/" +'MissionSpecs.json', 'r') as scenario_specs:
+    with open("./scenarios/"+sys.argv[1]+"/" +'MissionSpecs.json', 'r') as scenario_specs:
         # load json file as dictionary
         mission_dict = json.load(scenario_specs)
 

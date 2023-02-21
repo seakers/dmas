@@ -30,16 +30,20 @@ if __name__=="__main__":
         # checking if it is a file
         if os.path.isfile(f):
             if "outliers" in f:
-                if "Landsat" in f:
+                if "imaging" in f:
+                    print(f)
                     with open(f) as csv_file:
                         csv_reader = csv.reader(csv_file, delimiter=',')
                         for row in csv_reader:
                             tss_outliers.append((row[0],row[1]))
                 else:
+                    print(f)
                     with open(f) as csv_file:
                         csv_reader = csv.reader(csv_file, delimiter=',')
                         for row in csv_reader:
+                            print(row)
                             alt_outliers.append((row[0],row[1]))
+    print(alt_outliers)
     tss_unique = unique(tss_outliers)
     alt_unique = unique(alt_outliers)
     print(f'Number of tss outliers: {len(tss_outliers)}')

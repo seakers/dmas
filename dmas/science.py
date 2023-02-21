@@ -53,7 +53,7 @@ class ScienceModule(Module):
     def load_points_scenario1b(self):
         points = []
         lats = []
-        with open(self.scenario_dir+'resources/one_year_floods.csv', 'r') as f:
+        with open(self.scenario_dir+'resources/one_year_floods_multiday.csv', 'r') as f:
             d_reader = csv.DictReader(f)
             for line in d_reader:
                 if len(points) > 0:
@@ -63,7 +63,7 @@ class ScienceModule(Module):
                 else:
                     lats.append(line["lat"])
                     points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60))
-        with open(self.scenario_dir+'resources/flow_events_75.csv', 'r') as f:
+        with open(self.scenario_dir+'resources/flow_events_75_multiday.csv', 'r') as f:
             d_reader = csv.DictReader(f)
             for line in d_reader:
                 if len(points) > 0:
@@ -742,36 +742,38 @@ class SciencePredictiveModelModule(Module):
         }
         url = "http://localhost:5000"
         response = requests.post(url,data)
-        self.log(f'Query points response: {response}',level=logging.INFO)
-        floods = response[0]
-        hfs = response[1]
+        self.log(f'Query points response: {response.json()}',level=logging.INFO)
+        response_json = response.json()
+        hfs = response_json["flow_event_75"]
         return hfs
 
     async def send_meas_req(self):
         try:
             while True:
-                i = 0
-                points = self.query_points(i)
-                points = np.asfarray(points)
-                for i in range(len(points)):
-                    measurement_request = MeasurementRequest(["tss", "altimetry"], points[i,0], points[i,1], points[i,2], {})
-                    ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                    self.log(f'Sending message from predictive model!!!',level=logging.DEBUG)
-                    await self.send_internal_message(ext_msg)
-                await self.sim_wait(60*60)
                 # i = 0
-                # while i < len(self.unsent_points[:,0]):
-                #     if(self.unsent_points[i,3] <= self.get_current_time() <= self.unsent_points[i, 4]):
-                #         measurement_request = MeasurementRequest(["tss", "altimetry"], self.unsent_points[i,0],self.unsent_points[i,1], self.unsent_points[i,2], {})
-                #         ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                #         self.log(f'Sending message from predictive model!!!',level=logging.DEBUG)
-                #         await self.send_internal_message(ext_msg)
-                #         self.unsent_points = np.delete(self.unsent_points, i, 0)
-                #     else:
-                #         i = i+1
+                # points = self.query_points(i)
+                # points = np.asfarray(points)
+                # self.log(f'Points: {points}',level=logging.INFO)
+                # for i in range(len(points)):
+                #     self.parent_module.points = np.append(self.parent_module.points,points[i])
+                #     measurement_request = MeasurementRequest(["tss", "altimetry"], points[i,0], points[i,1], points[i,2], {})
+                #     ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                #     self.log(f'Sending message from predictive model!!!',level=logging.INFO)
+                #     await self.send_internal_message(ext_msg)
                 # await self.sim_wait(60*60)
-                # if len(self.unsent_points[:,0]) == 0:
-                #     await self.sim_wait(1e6)
+                i = 0
+                while i < len(self.unsent_points[:,0]):
+                    if(self.unsent_points[i,3] <= self.get_current_time() <= self.unsent_points[i, 4]):
+                        measurement_request = MeasurementRequest(["tss", "altimetry"], self.unsent_points[i,0],self.unsent_points[i,1], self.unsent_points[i,2], {})
+                        ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
+                        self.log(f'Sending message from predictive model!!!',level=logging.DEBUG)
+                        await self.send_internal_message(ext_msg)
+                        self.unsent_points = np.delete(self.unsent_points, i, 0)
+                    else:
+                        i = i+1
+                await self.sim_wait(60*60)
+                if len(self.unsent_points[:,0]) == 0:
+                    await self.sim_wait(1e6)
 
                 # if not self.requests_sent:
                 #     forecast_data = np.genfromtxt(self.parent_module.scenario_dir+'resources/ForecastWarnings-all.csv', delimiter=',')

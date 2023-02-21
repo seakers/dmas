@@ -1,6 +1,6 @@
 {   
     "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
-    "duration": 0.1,
+    "duration": 16.0,
     "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR", "stepSize": 1},
     "spacecraft": [
         {
@@ -459,6 +459,6 @@
         }
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
-    "scenario": {"@type": "TEST", "duration": 0.1},
+    "scenario": {"@type": "TEST", "duration": 16.0},
     "settings": {"coverageType": "GRID COVERAGE"}
 }
