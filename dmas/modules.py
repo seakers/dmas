@@ -234,7 +234,7 @@ class Module:
             raise TypeError('Attepmting to send a message of an unknown type')
 
         self.log(f'Sending internal message of type {type(msg)} to module \'{msg.dst_module}\'...')
-        self.log(f'{str(msg)}', logger_type=LoggerTypes.INTERNAL_MESSAGE, level=logging.INFO)
+        self.log(f'{str(msg)}', logger_type=LoggerTypes.INTERNAL_MESSAGE, level=logging.DEBUG)
         await self.inbox.put(msg)
 
     async def put_in_inbox(self, msg: InternalMessage):

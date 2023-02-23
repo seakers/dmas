@@ -52,27 +52,20 @@ class ScienceModule(Module):
 
     def load_points_scenario1b(self):
         points = []
-        lats = []
         with open(self.scenario_dir+'resources/one_year_floods_multiday.csv', 'r') as f:
             d_reader = csv.DictReader(f)
             for line in d_reader:
                 if len(points) > 0:
-                    if line["lat"] not in lats:
-                        lats.append(line["lat"])
-                        points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60))
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60,1))
                 else:
-                    lats.append(line["lat"])
-                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60))
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60,1))
         with open(self.scenario_dir+'resources/flow_events_75_multiday.csv', 'r') as f:
             d_reader = csv.DictReader(f)
             for line in d_reader:
                 if len(points) > 0:
-                    if line["lat"] not in lats:
-                        lats.append(line["lat"])
-                        points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400))
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400,0))
                 else:
-                    lats.append(line["lat"])
-                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400))
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400,0))
         points = np.asfarray(points)
         self.log(f'Loaded scenario 1b points',level=logging.INFO)
         return points
@@ -94,11 +87,12 @@ class ScienceModule(Module):
         """
         outlier = False
         outlier_data = None
-        severity, lat, lon = self.get_severity(item["lat"], item["lon"], self.points, self.get_current_time())
-        if severity >= 0.0: # TODO remove this hardcode
+        severity, lat, lon, event_type = self.get_severity(item["lat"], item["lon"], self.points, self.get_current_time())
+        if severity > 0.0: # TODO remove this hardcode
             item["severity"] = severity
             outlier = True
             outlier_data = item
+            outlier_data["event_type"] = event_type
             self.log(f'Flood detected at {lat}, {lon}!',level=logging.DEBUG)
         else:
             outlier_data = item
@@ -111,6 +105,7 @@ class ScienceModule(Module):
         Gets severity from CSV data.
         """
         severity = 0.0
+        event_type = ""
         self.log(f'Getting severity for {lat}, {lon} at {curr_time}',level=logging.INFO)
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
@@ -120,8 +115,12 @@ class ScienceModule(Module):
                 self.log(f'Point at {curr_time} has time interval {points[i,3]}, {points[i,4]}',level=logging.INFO)
                 if points[i,3] < curr_time < points[i,4]:
                     severity = points[i, 2]
+                    if points[i,5] > 0.5:
+                        event_type = "flood"
+                    else:
+                        event_type = "hf"
                     break
-        return severity, lat, lon
+        return severity, lat, lon, event_type
 
     async def internal_message_handler(self, msg: InternalMessage):
         """
@@ -653,25 +652,27 @@ class OnboardProcessingModule(Module):
         """
         This function saves the lat/lon/time of all observations and all outlier observations for analysis.
         """
-        all_coords = []
-        outlier_coords = []
+        hfs_coords = []
+        floods_coords = []
         parent_agent = self.get_top_module()
         sat_name = parent_agent.name
         for potential_outlier in self.downlink_items:
             outlier, outlier_data = self.parent_module.check_altimetry_outliers(potential_outlier)
-            if outlier:
-                outlier_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
-        for item in self.downlink_items:
-            all_coords.append((item["lat"],item["lon"],item["time"]))
-        with open(self.parent_module.scenario_dir+sat_name+'_outliers.csv','w') as out:
+            if outlier_data["event_type"] == "flood":
+                floods_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
+            elif outlier_data["event_type"] == "hf":
+                hfs_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
+        # for item in self.downlink_items:
+        #     all_coords.append((item["lat"],item["lon"],item["time"]))
+        with open(self.parent_module.scenario_dir+sat_name+'_floods.csv','w') as out:
             csv_out=csv.writer(out)
             csv_out.writerow(['lat','lon','time'])
-            for row in outlier_coords:
+            for row in floods_coords:
                 csv_out.writerow(row)
-        with open(self.parent_module.scenario_dir+sat_name+'_all.csv','w') as out:
+        with open(self.parent_module.scenario_dir+sat_name+'_hfs.csv','w') as out:
             csv_out=csv.writer(out)
             csv_out.writerow(['lat','lon','time'])
-            for row in all_coords:
+            for row in hfs_coords:
                 csv_out.writerow(row)
 
 

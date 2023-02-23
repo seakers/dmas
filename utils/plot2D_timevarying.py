@@ -93,14 +93,14 @@ if __name__=="__main__":
                                 i = 1
                                 continue
                             alt_all.append((row[0],row[1],row[2]))
-    ground_track_dir = './utils/ground_tracks/'
+    ground_track_dir = './utils/ground_tracks/arbitrary'
     alt_ground_tracks = []
     tss_ground_tracks = []
     for filename in os.listdir(ground_track_dir):
         f = os.path.join(ground_track_dir, filename)
         # checking if it is a file
         if os.path.isfile(f):
-            if "landsat" in f:
+            if "imaging" in f:
                 with open(f) as csv_file:
                     csv_reader = csv.reader(csv_file, delimiter=',')
                     i = 0
@@ -136,32 +136,43 @@ if __name__=="__main__":
                 alt_outliers.remove(alt)
         if(coobs):
             tss_outliers.remove(tss)
+    coobs_all = []
+    for tss in tss_all:
+        coobs = False
+        for alt in alt_all:
+            if tss[0] == alt[0] and tss[1] == alt[1]:
+                coobs_all.append(tss)
+                coobs = True
+                alt_all.remove(alt)
+        if(coobs):
+            tss_all.remove(tss)
+    
     
 
 
     flood_points = []
     flood_lats = []
-    with open('./scenarios/scenario1b/resources/one_year_floods.csv', 'r') as f:
+    with open('./scenarios/scenario1b/resources/one_year_floods_multiday.csv', 'r') as f:
         d_reader = csv.DictReader(f)
         for line in d_reader:
             if len(flood_points) > 0:
                 if line["lat"] not in flood_lats:
                     flood_lats.append(line["lat"])
-                    flood_points.append((line["lat"],line["lon"],0,86400))
+                    flood_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
             else:
                 flood_lats.append(line["lat"])
-                flood_points.append((line["lat"],line["lon"],0,86400))
+                flood_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
     hf_points = []
     hf_lats = []
-    with open('./scenarios/scenario1b/resources/flow_events_75.csv', 'r') as f:
+    with open('./scenarios/scenario1b/resources/flow_events_75_multiday.csv', 'r') as f:
         d_reader = csv.DictReader(f)
         for line in d_reader:
             if len(hf_points) > 0:
                 hf_lats.append(line["lat"])
-                hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
+                hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+86400))
             else:
                 hf_lats.append(line["lat"])
-                hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+60*60))
+                hf_points.append((line["lat"],line["lon"],line["time"],float(line["time"])+86400))
     flood_points = np.asfarray(flood_points)
     hf_points = np.asfarray(hf_points)
     print(hf_points)
@@ -178,10 +189,10 @@ if __name__=="__main__":
     filenames = []
     alt_lats = []
     alt_lons = []
-    # all_alt_lats = []
-    # all_alt_lons = []
-    # all_tss_lats = []
-    # all_tss_lons = []
+    all_alt_lats = []
+    all_alt_lons = []
+    all_tss_lats = []
+    all_tss_lons = []
     tss_gts_lats = []
     tss_gts_lons = []
     alt_gts_lats = []
@@ -190,21 +201,21 @@ if __name__=="__main__":
     tss_lons = []
     coobs_lats = []
     coobs_lons = []    
-    for t in range(0,86400,200):
+    for t in range(0,86400*16,3600):
         hf_lats,hf_lons = get_curr_points(hf_points,t)
-        flood_lats, flood_lons = get_past_points(flood_points,t)
+        flood_lats, flood_lons = get_curr_points(flood_points,t)
         alt_lats, alt_lons = get_past_points(alt_outliers,t)
         tss_lats, tss_lons = get_past_points(tss_outliers,t)
-        coobs_lats, coobs_lons = get_past_points(coobs_outliers,t)
-        # all_alt_lats, all_alt_lons = get_past_points(alt_all,t)
-        # all_tss_lats, all_tss_lons = get_past_points(tss_all,t)
+        coobs_lats, coobs_lons = get_past_points(coobs_all,t)
+        all_alt_lats, all_alt_lons = get_past_points(alt_all,t)
+        all_tss_lats, all_tss_lons = get_past_points(tss_all,t)
         alt_gts_lats, alt_gts_lons = get_ground_track(alt_ground_tracks,t,3600.0)
         tss_gts_lats, tss_gts_lons = get_ground_track(tss_ground_tracks,t,3600.0)
         
         filename = f'/home/ben/repos/dmaspy/utils/images/frame_{t}.png'
         filenames.append(filename)
         # last frame of each viz stays longer
-        if (t == 86400):
+        if (t == 86400*16):
             for i in range(5):
                 filenames.append(filename)        # save img
         m = Basemap(projection='merc',llcrnrlat=20,urcrnrlat=60,\
@@ -213,8 +224,8 @@ if __name__=="__main__":
         tss_x, tss_y = m(tss_lons,tss_lats)
         flood_x, flood_y = m(flood_lons,flood_lats)
         hf_x, hf_y = m(hf_lons,hf_lats)
-        # all_alt_x, all_alt_y = m(all_alt_lons,all_alt_lats)
-        # all_tss_x, all_tss_y = m(all_tss_lons,all_tss_lats)
+        all_alt_x, all_alt_y = m(all_alt_lons,all_alt_lats)
+        all_tss_x, all_tss_y = m(all_tss_lons,all_tss_lats)
         tss_x, tss_y = m(tss_lons,tss_lats)
         coobs_x, coobs_y = m(coobs_lons,coobs_lats)
         alt_gts_x, alt_gts_y = m(alt_gts_lons,alt_gts_lats)
@@ -223,13 +234,13 @@ if __name__=="__main__":
         m.fillcontinents(color='#cc9966',lake_color='#99ffff')
         m.scatter(alt_gts_x,alt_gts_y,2,marker='o',color='#000000', label='Altimeter ground track')
         m.scatter(tss_gts_x,tss_gts_y,2,marker='o',color='#ffffff', label='Imager ground track')
-        m.scatter(alt_x,alt_y,5,marker='^',color='b', label='Altimetry floods')
-        m.scatter(tss_x,tss_y,5,marker='^',color='g', label='Imagery floods')
+        # m.scatter(alt_x,alt_y,5,marker='^',color='b', label='Altimetry floods')
+        # m.scatter(tss_x,tss_y,5,marker='^',color='g', label='Imagery floods')
         m.scatter(flood_x,flood_y,5,marker='o',color='b', label='Flood events')
         m.scatter(hf_x,hf_y,5,marker='o',color='g', label='High flow events')
-        # m.scatter(all_alt_x,all_alt_y,1,marker='o',color='b', label='Normal altimetry obs')
-        # m.scatter(all_tss_x,all_tss_y,1,marker='o',color='g', label= 'Normal imagery obs')
-        m.scatter(coobs_x,coobs_y,4,marker='^',color='r', label='Coobservation')
+        m.scatter(all_alt_x,all_alt_y,1,marker='o',color='b', label='Altimetry observations')
+        m.scatter(all_tss_x,all_tss_y,1,marker='o',color='g', label= 'Imagery observations')
+        m.scatter(coobs_x,coobs_y,4,marker='^',color='r', label='Coobservations')
         plt.legend(fontsize=5)
         plt.title('3D-CHESS observations at time t='+str(t)+' s')
         plt.savefig(filename,dpi=200)
