@@ -95,7 +95,7 @@ class ScienceModule(Module):
         outlier = False
         outlier_data = None
         severity, lat, lon = self.get_severity(item["lat"], item["lon"], self.points, self.get_current_time())
-        if severity >= 1.0: # TODO remove this hardcode
+        if severity >= 0.0: # TODO remove this hardcode
             item["severity"] = severity
             outlier = True
             outlier_data = item
@@ -111,16 +111,16 @@ class ScienceModule(Module):
         Gets severity from CSV data.
         """
         severity = 0.0
+        self.log(f'Getting severity for {lat}, {lon} at {curr_time}',level=logging.INFO)
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
                  # change this back to 5 for chlorophyll_baseline.csv
                 lat = points[i, 0]
                 lon = points[i, 1]
+                self.log(f'Point at {curr_time} has time interval {points[i,3]}, {points[i,4]}',level=logging.INFO)
                 if points[i,3] < curr_time < points[i,4]:
                     severity = points[i, 2]
-                else:
-                    severity = 0.0
-                break
+                    break
         return severity, lat, lon
 
     async def internal_message_handler(self, msg: InternalMessage):
