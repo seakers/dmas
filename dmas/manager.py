@@ -1,10 +1,9 @@
 import logging
 from dmas.element import *
-from dmas.participant import Participant
 from dmas.utils import *
 
 
-class Manager(Participant):
+class Manager(SimulationElement):
     """
     ## Simulation Manager Class 
     
@@ -66,7 +65,7 @@ class Manager(Participant):
 
         # broadcast address ledger
         sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
-        await self._broadcast_external_message(sim_info_msg)
+        await self._send_external_msg(sim_info_msg, zmq.PUB)
 
         # return external address ledger
         return external_address_ledger
@@ -83,10 +82,10 @@ class Manager(Participant):
             # broadcast simulation start to all simulation elements
             self._log(f'Starging simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
             sim_start_msg = SimulationStartMessage(time.perf_counter())
-            await self._broadcast_external_message(sim_start_msg)
+            await self._send_external_msg(sim_start_msg, zmq.PUB)
 
             # push simulation start to monitor
-            await self._push_external_message(sim_start_msg)
+            await self._send_external_msg(sim_start_msg, zmq.PUSH)
 
             # wait for simulation duration to pass
             self._clock_config : ClockConfig
@@ -103,7 +102,7 @@ class Manager(Participant):
             
             # broadcast simulation end
             sim_end_msg = SimulationEndMessage(time.perf_counter())
-            await self._broadcast_external_message(sim_end_msg)
+            await self._send_external_msg(sim_end_msg, zmq.PUB)
 
             if timer_task.done():
                 # nodes may still be activated. wait for all simulation nodes to deactivate
@@ -122,7 +121,7 @@ class Manager(Participant):
         async def subroutine():
             # push simulation end to monitor
             sim_end_msg = SimulationEndMessage(time.perf_counter())
-            await self._push_external_message(sim_end_msg)
+            await self._send_external_msg(sim_end_msg, zmq.PUSH)
         
         asyncio.run(subroutine())
     

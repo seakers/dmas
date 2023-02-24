@@ -49,8 +49,10 @@ class Node(Participant):
             raise RuntimeError(f'{self.name}: Internal address ledger not created during activation.')
 
     def _config_internal_network(self) -> dict:
+        # condfigure own internal ports
         super()._config_internal_network()
 
+        # configure intenral module ports
         if len(self._modules) > 0:
             with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
                 for module in self._modules:
@@ -209,7 +211,7 @@ class Node(Participant):
             self._log(f'connection to {msg.get_dst()} established! Transmitting a message of type {type(msg)}...')
 
             # transmit message
-            send_task = asyncio.create_task( self._send_msg(msg, zmq.REQ, socket_map) )
+            send_task = asyncio.create_task( self.__send_msg(msg, zmq.REQ, socket_map) )
             await send_task
             self._log(f'message of type {type(msg)} transmitted sucessfully! Waiting for response from {msg.get_dst()}...')
 
