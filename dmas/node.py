@@ -7,10 +7,9 @@ import concurrent.futures
 from dmas.element import SimulationElement
 from dmas.messages import *
 from dmas.modules import InternalModule
-from dmas.participant import Participant
 from dmas.utils import *
 
-class Node(Participant):
+class Node(SimulationElement):
     """
     ## Abstract Simulation Participant 
 
@@ -48,9 +47,13 @@ class Node(Participant):
         if self._internal_address_ledger is None:
             raise RuntimeError(f'{self.name}: Internal address ledger not created during activation.')
 
-    def _config_internal_network(self) -> dict:
+    def config_network(self) -> tuple:
+        if self.__network_activated:
+            raise PermissionError('Attempted to configure network after it has already been configurated.')
+
         # condfigure own internal ports
-        super()._config_internal_network()
+        external_socket_map = self.__config_external_network()
+        internal_socket_map = self.__config_internal_network()
 
         # configure intenral module ports
         if len(self._modules) > 0:
@@ -58,6 +61,38 @@ class Node(Participant):
                 for module in self._modules:
                     module : InternalModule
                     pool.submit(module.config_network, *[])
+
+        self.__network_activated = True
+
+        return external_socket_map, internal_socket_map
+
+    async def _internal_sync(self) -> dict:
+        # TODO define internal module sync routine
+
+        def routine():
+            # # configure intenral module ports
+            # # wait for all modules to initialize and connect to me
+            # external_address_ledger = await self.__wait_for_online_modules()
+
+            # # broadcast address ledger
+            # sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
+            # await self._send_external_msg(sim_info_msg, zmq.PUB)
+
+            # # return external address ledger
+            # return external_address_ledger
+
+            return
+        
+        if len(self._modules) > 0:
+            with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
+                pool.submit(routine, *[])
+                
+                # configure intenral module ports
+                for module in self._modules:
+                    module : InternalModule
+                    pool.submit(module.sync, *[])
+
+        # gather responses
 
     async def _external_sync(self):
         # request to sync with the simulation manager

@@ -269,7 +269,7 @@ class NetworkElement(ABC):
             port = int(port)
             return s.connect_ex(('localhost', port)) == 0
 
-    def _deactivate(self) -> None:
+    def _deactivate_network(self) -> None:
         """
         Shut down all activated network ports
         """
@@ -563,4 +563,3 @@ class NetworkElement(ABC):
                 and the message contents `content` (`dict`)
         """
         return await self._receive_msg(socket_type, self._internal_socket_map)
-        

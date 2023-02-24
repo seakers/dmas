@@ -172,7 +172,7 @@ class SimulationElement(NetworkElement):
         self._publish_deactivate()
 
         # close connections
-        super()._deactivate()
+        self._deactivate_network()
     
     @abstractmethod
     def _publish_deactivate(self) -> None:

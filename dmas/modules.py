@@ -4,6 +4,7 @@ from enum import Enum
 import logging
 
 from dmas.utils import *
+from dmas.network import NetworkElement
 
 class InternalModuleStatus(Enum):
     INIT = 'INITIALIZED'
@@ -11,7 +12,7 @@ class InternalModuleStatus(Enum):
     RUNNING = 'RUNNING'
     DEACTIVATED = 'DEACTIVATED'
 
-class InternalModule(ABC):
+class InternalModule(NetworkElement):
     """
     ## Internal Module
 
@@ -22,10 +23,15 @@ class InternalModule(ABC):
     
     ####
     """
-    def __init__(self, module_name: str, parent_name : str, network_config: InternalModuleNetworkConfig, logger: logging.Logger) -> None:
-        super().__init__()
-        self.name = module_name + '/' + parent_name
-        self._network_config = network_config
+    def __init__(self, module_name: str, parent_name : str, network_config: InternalModuleNetworkConfig, logger: logging.Logger, submodules : list = []) -> None:
+        super().__init__(parent_name + '/' + module_name, network_config, logger.getEffectiveLevel(), logger)
+
+        self._submodules = []
+        for submodule in submodules:
+            if isinstance(submodule, InternalSubmodule):
+                self._submodules.append(submodule)
+            else:
+                raise AttributeError(f'contents of `submodules` list given to module {self.name} must be of type `SubModule`. Contains elements of type `{type(submodule)}`.')
 
     def get_name(self) -> str:
         """
@@ -37,32 +43,44 @@ class InternalModule(ABC):
         """
         Returns the name of this module
         """
-        name, _ = self.name.split('/')
+        _, name = self.name.split('/')
         return name
 
     def get_parent_name(self) -> str:
-        _, parent = self.name.split('/')
+        parent, _ = self.name.split('/')
         return parent
 
-    @abstractmethod
-    def config_network(self) -> None:
-        pass
-
-    @abstractmethod
-    def sync(self) -> None:
-        pass
-
-    @abstractmethod
-    async def _routine(self) -> None:
-        pass
-
-    def run(self) -> None:
-        try:
-            asyncio.run(self._routine())
-        finally:
-            self._deactivate()
-
-    @abstractmethod
-    def _deactivate(self) -> None:
+    async def _external_sync(self) -> dict:
         pass
     
+    async def _internal_sync(self) -> dict:
+        # no internal modules to sync with. Sumodule communication performed by 
+        return None
+    
+    def run(self):
+        async def main():
+            tasks = [asyncio.create_task(self.routine())]
+
+            for submodule in self._submodules:
+                submodule : InternalSubmodule
+                tasks.append(submodule.routine())
+
+            _, pending = asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+            for task in pending:
+                task : asyncio.Task
+                task.cancel()
+                await task
+        
+        asyncio.run(main())
+
+    async def routine():
+        pass
+
+class InternalSubmodule(ABC):
+    def __init__(self, name : str, parent_name : str) -> None:
+        super().__init__()
+        self.name = parent_name + '/' + name
+    
+    async def routine() -> None:
+        pass

@@ -125,7 +125,7 @@ class Manager(SimulationElement):
         
         asyncio.run(subroutine())
     
-    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : type):
+    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : SimulationMessage = SimulationMessage):
         """
         Awaits for all simulation elements to share a specific type of message with the manager.
         
