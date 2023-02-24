@@ -22,7 +22,7 @@ class Node(SimulationElement):
     |           +---------+       |              |
     | ABSTRACT  | PUB     |------>| SIM ELEMENTS |
     |   SIM     +---------+       |              |
-    |PARTICIPANT| SUB     |<------|              |
+    |   NODE    | SUB     |<------|              |
     |           +---------+       +==============+ 
     |           | PUSH    |------>|  SIM MONITOR |
     +-----------+---------+       +--------------+
@@ -68,31 +68,37 @@ class Node(SimulationElement):
 
     async def _internal_sync(self) -> dict:
         # TODO define internal module sync routine
+        # async def routine():
+        #     # wait for all modules to initialize and connect to me
+        #     modules_synced = []
+        #     while len(modules_synced) < len(self._modules):
+        #         dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
+        #         dst : str; src : str; msg_dict : dict
 
-        def routine():
-            # # configure intenral module ports
-            # # wait for all modules to initialize and connect to me
-            # external_address_ledger = await self.__wait_for_online_modules()
+        #         msg_type = msg_dict['@type']
+        #         if dst != self.name:
+        #             pass
+        #         elif modules_synced in modules_synced:
+        #             pass
+        #         elif NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST:
+        #             # ignore all incoming messages that are not of the desired type 
+        #             self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
+            
+        #     # announce 
 
-            # # broadcast address ledger
-            # sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
-            # await self._send_external_msg(sim_info_msg, zmq.PUB)
-
-            # # return external address ledger
-            # return external_address_ledger
-
-            return
+        #     return
         
-        if len(self._modules) > 0:
-            with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
-                pool.submit(routine, *[])
+        # if len(self._modules) > 0:
+        #     with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
+        #         pool.submit(asyncio.run, *[routine()])
                 
-                # configure intenral module ports
-                for module in self._modules:
-                    module : InternalModule
-                    pool.submit(module.sync, *[])
+        #         # start all modules' sync procedure
+        #         for module in self._modules:
+        #             module : InternalModule
+        #             pool.submit(module.sync, *[])
 
-        # gather responses
+        # due to internal network being static, no internal ledger is needed
+        return dict()
 
     async def _external_sync(self):
         # request to sync with the simulation manager
@@ -168,8 +174,6 @@ class Node(SimulationElement):
                     # if the manager did not acknowledge the sync request, try again later
                     return
 
-        # TODO ADD INTERNAL ANNOUNCEMENT 
-
         async def routine():
             try:
                 task = asyncio.create_task(subroutine())
@@ -188,6 +192,9 @@ class Node(SimulationElement):
 
     def _publish_deactivate(self) -> None:
         async def routine():
+            # inform modules that I am deactivated
+            # TODO terminate modules
+
             # inform manager that I am deactivated
             while True:
                 # send ready announcement from REQ socket
@@ -208,7 +215,7 @@ class Node(SimulationElement):
 
             # push deactivate message to monitor
             msg = NodeDeactivatedMessage(self.name)
-            dst, src, content = await self._push_external_message(msg)
+            dst, src, content = await self._send_external_msg(msg, zmq.PUSH)
 
         return asyncio.run(routine())
 
@@ -233,7 +240,8 @@ class Node(SimulationElement):
             receive_task = None
 
             # get destination's socket address
-            dst_address = address_ledger.get(msg.get_dst(), None)
+            dst_network_config : NetworkConfig = address_ledger.get(msg.get_dst(), None)
+            dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)
             
             if dst_address is None:
                 raise RuntimeError(f'Could not find address for simulation element of name {msg.get_dst()}.')
@@ -288,3 +296,21 @@ class Node(SimulationElement):
                 and the message contents `content` (`dict`)
         """
         return await self._send_request_message(msg, self._external_address_ledger, self._external_socket_map)
+    
+    def _live(self) -> None:
+        with concurrent.futures.ProcessPoolExecutor(len(self._modules) + 1) as pool:
+            pool.submit(asyncio.run, *[self._live_routine()])
+            
+            # start all modules' sync procedure
+            for module in self._modules:
+                module : InternalModule
+                pool.submit(module.run, *[])
+
+            # TODO: terminate processes when one finishes
+
+    @abstractmethod
+    async def _live_routine(self) -> None:
+        """
+        Routine to be performed by simulation node during when alive
+        """
+        pass

@@ -51,10 +51,11 @@ class InternalModule(NetworkElement):
         return parent
 
     async def _external_sync(self) -> dict:
-        pass
+        # no need to sync with parent node
+        return dict()
     
     async def _internal_sync(self) -> dict:
-        # no internal modules to sync with. Sumodule communication performed by 
+        # no internal modules to sync with.  
         return None
     
     def run(self):

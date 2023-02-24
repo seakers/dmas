@@ -52,7 +52,7 @@ class NetworkConfig(ABC):
         self._internal_address_map = internal_address_map.copy()
         self._external_address_map = external_address_map.copy()
 
-    def get_internal_addresse(self) -> dict:
+    def get_internal_addresses(self) -> dict:
         return self._internal_address_map
 
     def get_external_addresses(self) -> dict:
@@ -140,18 +140,17 @@ class InternalModuleNetworkConfig(NetworkConfig):
     Describes the addresses assigned to a node's internal module 
     """
     def __init__(self, 
-                module_send_address: str, 
+                
                 module_recv_address: str
                 ) -> None:
         """
         Initializes an instance of an Internal Module Network Config Object
         
         ### Arguments:
-        - module_recv_address (`str`): an internal module's parent agent node's broadcast address
+        - module_recv_address (`str`): a module's parent node's broadcast address
         - module_send_address (`str`): the internal module's broadcast address
         """
-        external_address_map = {zmq.SUB: [module_recv_address],
-                                zmq.PUB: [module_send_address]}       
+        external_address_map = {zmq.SUB: [module_recv_address]}       
         super().__init__(external_address_map=external_address_map)
 
 class EnvironmentNetworkConfig(NetworkConfig):

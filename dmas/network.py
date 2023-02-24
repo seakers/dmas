@@ -157,7 +157,7 @@ class NetworkElement(ABC):
             - `dict` mapping the types of sockets used by this simulation element to a dedicated 
                 port socket and asynchronous lock pair
         """
-        internal_addresses = self._network_config.get_internal_addresse()
+        internal_addresses = self._network_config.get_internal_addresses()
         internal_socket_map = dict()
 
         for socket_type in internal_addresses:
