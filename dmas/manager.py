@@ -1,7 +1,31 @@
 import logging
+from dmas.clocks import ClockConfig
 from dmas.element import *
 from dmas.utils import *
 
+class ManagerNetworkConfig(NetworkConfig):
+    """
+    ## Manager Network Config
+    
+    Describes the addresses assigned to the simulation manager
+    """
+    def __init__(self, 
+                response_address : str,
+                broadcast_address: str,
+                monitor_address: str
+                ) -> None:
+        """
+        Initializes an instance of a Manager Network Config Object
+        
+        ### Arguments:
+        - response_address (`str`): a manager's response port address
+        - broadcast_address (`str`): a manager's broadcast port address
+        - monitor_address (`str`): the simulation's monitor port address
+        """
+        external_address_map = {zmq.REP: [response_address], 
+                                zmq.PUB: [broadcast_address], 
+                                zmq.PUSH: [monitor_address]}
+        super().__init__(external_address_map=external_address_map)
 
 class Manager(SimulationElement):
     """
@@ -27,7 +51,6 @@ class Manager(SimulationElement):
     """
     __doc__ += SimulationElement.__doc__
     
-    @beartype
     def __init__(self, 
             simulation_element_name_list : list,
             clock_config : ClockConfig,

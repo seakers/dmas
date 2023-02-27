@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 import uuid
-from beartype import beartype
 from typing import Union
 from enum import Enum
 import json
 
+from dmas.clocks import *
 from dmas.utils import *
 
 class SimulationElementRoles(Enum):
@@ -265,10 +265,10 @@ class SimulationInfoMessage(ManagerMessage):
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
         - _address_ledger (`dict`): dictionary mapping simulation element names to network addresses to be used for peer-to-peer communication or broadcast subscription
-        - _clock_config (:obj:`ClockConfig`): config object containing information about the clock being used in this simulation
+        - _clock_config (:obj:`dict`): dictionary discribing a config object containing information about the clock being used in this simulation
     """
 
-    def __init__(self, address_ledger: dict, clock_config: ClockConfig, t: float, id : uuid.UUID = None):
+    def __init__(self, address_ledger: dict, clock_config: dict, t: float, id : uuid.UUID = None):
         """
         Initiallizes and instance of a Simulation Start Message
 
@@ -282,11 +282,7 @@ class SimulationInfoMessage(ManagerMessage):
 
         self._address_ledger = dict()
         for node_name in address_ledger:
-            address_config = address_ledger[node_name]
-            if isinstance(address_config, dict):
-                address_config = NetworkConfig.from_dict(address_config)
-            
-            self._address_ledger[node_name] = address_config
+            self._address_ledger[node_name] = address_ledger[node_name]
         self._clock_config = clock_config        
 
     def get_address_ledger(self):
@@ -303,8 +299,7 @@ class SimulationInfoMessage(ManagerMessage):
 
         address_ledger = dict()
         for node_name in self._address_ledger:
-            network_config : NetworkConfig = self._address_ledger[node_name]
-            address_ledger[node_name] = network_config.to_dict()
+            address_ledger[node_name] = self._address_ledger[node_name]
 
         msg_dict['address ledger'] = address_ledger
         msg_dict['clock info'] = self._clock_config.to_dict()
@@ -338,11 +333,6 @@ class SimulationInfoMessage(ManagerMessage):
             clock_info = AcceleratedRealTimeClockConfig.from_dict(clock_info)
         else:
             raise AttributeError(f'Could not recognize clock config of type {clock_type}.')
-
-        address_ledger_dict = dict()
-        for node_name in address_ledger:
-            network_config_dict : dict = address_ledger[node_name]
-            address_ledger_dict[node_name] = NetworkConfig.from_dict(network_config_dict)
 
         return SimulationInfoMessage(address_ledger, clock_config, t, uuid.UUID(id_str))
 
@@ -528,10 +518,10 @@ class NodeSyncRequestMessage(SimulationMessage):
         - _dst (`str`): name of the intended simulation element to receive this message
         - _msg_type (`Enum`): type of message being sent
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
-        - _network_config (:obj:`NetworkConfig`): network configuration from sender node
+        - _network_config (`dict`): dictiory discribing a network configuration from sender node
     """
 
-    def __init__(self, src: str, network_config : NetworkConfig, id : uuid.UUID = None):
+    def __init__(self, src: str, network_config : dict, id : uuid.UUID = None):
         """
         Initializes an instance of a Sync Request Message
 
@@ -543,9 +533,9 @@ class NodeSyncRequestMessage(SimulationMessage):
         super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.SYNC_REQUEST, id)
         self._network_config = network_config
 
-    def get_network_config(self):
+    def get_network_config(self) -> dict:
         """
-        Returns the network configuration from the sender of this message
+        Returns a dictionary describing the network configuration from the sender of this message
         """
         return self._network_config
 
@@ -579,8 +569,6 @@ class NodeSyncRequestMessage(SimulationMessage):
             raise Exception(f'Could not recognize message of type {type_name}.')
         elif _type is not NodeMessageTypes.SYNC_REQUEST:
             raise Exception(f'Cannot load a Sync Request from a dictionary request of type {type_name}.')
-
-        network_config = NetworkConfig.from_dict(network_config)
 
         return NodeSyncRequestMessage(src, network_config, uuid.UUID(id_str))
 
@@ -875,8 +863,8 @@ if __name__ == "__main__":
 
     clock_config = RealTimeClockConfig(start, end)
 
-    address_ledger = dict()
-    address_ledger['TEST'] = NodeNetworkConfig('0.0.0.0.1', '0.0.0.0.2', '0.0.0.0.3', '0.0.0.0.4', '0.0.0.0.5')
+    # address_ledger = dict()
+    # address_ledger['TEST'] = NodeNetworkConfig('0.0.0.0.1', '0.0.0.0.2', '0.0.0.0.3', '0.0.0.0.4', '0.0.0.0.5')
 
     ## Sim info message test
     # msg = SimulationInfoMessage(address_ledger, clock_config, 0.0)

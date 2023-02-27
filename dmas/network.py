@@ -6,9 +6,71 @@ import zmq.asyncio as azmq
 import asyncio
 from dmas.messages import *
 
-from dmas.utils import NetworkConfig
+"""
+------------------
+NETWORK CONFIG
+------------------
+"""
+class NetworkConfig(ABC):
+    def __init__(self, internal_address_map : dict = dict(), external_address_map : dict = dict()) -> None:
+        super().__init__()  
+        # check map format
+        for map in [internal_address_map, external_address_map]:
+            for socket_type in map:
+                addresses = map[socket_type]
 
+                if not isinstance(addresses, list):
+                    if map == internal_address_map:
+                        raise TypeError(f'Internal Address Map must be comprised of elements of type {list}. Is of type {type(addresses)}')
+                    else:
+                        raise TypeError(f'External Address Map must be comprised of elements of type {list}. Is of type {type(addresses)}')
 
+                for address in addresses:   
+                    if not isinstance(socket_type, zmq.SocketType):
+                        if map == internal_address_map:
+                            raise TypeError(f'{socket_type} in Internal Address Map must be of type {type(zmq.SocketType)}. Is of type {type(socket_type)}')
+                        else:
+                            raise TypeError(f'{socket_type} in External Address Map must be of type {type(zmq.SocketType)}. Is of type {type(socket_type)}')
+                    elif not isinstance(address, str):
+                        if map == internal_address_map:
+                            raise TypeError(f'{address} in Internal Address Map must be of type {type(str)}. Is of type {type(address)}')
+                        else:
+                            raise TypeError(f'{address} in External Address Map must be of type {type(str)}. Is of type {type(address)}')
+
+        # save addresses
+        self._internal_address_map = internal_address_map.copy()
+        self._external_address_map = external_address_map.copy()
+
+    def get_internal_addresses(self) -> dict:
+        return self._internal_address_map
+
+    def get_external_addresses(self) -> dict:
+        return self._external_address_map
+
+    def to_dict(self) -> dict:
+        out = dict()
+        out['external addresses'] = str(self._internal_address_map)
+        return out
+
+    def from_dict(d : dict):
+        external_addresses = d.get('external addresses', None)
+
+        if external_addresses is None:
+            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
+        
+        return NetworkConfig(external_addresses=external_addresses)
+    
+    def to_json(self) -> str:
+        return json.dump(self.to_dict())
+
+    def from_json(j : str):
+        return NetworkConfig.from_dict(json.loads(j))
+
+"""
+------------------
+NETWORK ELEMENT
+------------------
+"""
 class NetworkElement(ABC):
     """
     ## Abstract Network Element 

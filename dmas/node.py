@@ -7,6 +7,7 @@ import concurrent.futures
 from dmas.element import SimulationElement
 from dmas.messages import *
 from dmas.modules import InternalModule
+from dmas.network import NetworkConfig
 from dmas.utils import *
 
 class Node(SimulationElement):
@@ -37,6 +38,11 @@ class Node(SimulationElement):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
         
         self.__modules = modules.copy()
+        
+        # initiate ledger with just manager's addresses
+        external_addresses : dict = network_config.get_external_addresses()
+        publish_addresses = external_addresses[zmq.REQ]
+        self._external_address_ledger[SimulationElementRoles.MANAGER.name] = publish_addresses[-1]
 
     def _activate(self) -> None:
         super()._activate()
@@ -101,7 +107,7 @@ class Node(SimulationElement):
             
             msg_type = msg_dict.get('@type', None)
             if msg_type is not None and ModuleMessageTypes[msg_type] != ModuleMessageTypes.SYNC_REQUEST:
-                # eceived a message that is not a sync request from an internal module. Ignoring message
+                # received a message that is not a sync request from an internal module. Ignoring message
                 continue
 
             if src not in responses:
@@ -147,7 +153,12 @@ class Node(SimulationElement):
             else:
                 # if the manager did not acknowledge the sync request, try again later
                 msg : SimulationInfoMessage = SimulationInfoMessage.from_dict(content)
-                return msg.get_address_ledger()
+                
+                external_ledger = dict()
+                ledger_dicts : dict = msg.get_address_ledger()
+                for node in ledger_dicts:
+                    external_ledger[node] = NetworkConfig.from_dict(ledger_dicts[node])
+                return external_ledger
 
     def _wait_sim_start(self) -> None:
         async def subroutine():
