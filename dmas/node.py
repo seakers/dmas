@@ -35,7 +35,8 @@ class Node(SimulationElement):
         for module in modules:
             if not isinstance(InternalModule):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
-        self._modules = modules.copy()
+        
+        self.__modules = modules.copy()
 
     def _activate(self) -> None:
         super()._activate()
@@ -52,72 +53,64 @@ class Node(SimulationElement):
         external_socket_map, internal_socket_map = super().config_network()
 
         # instruct internal modules to configure their own network ports
-        if len(self._modules) > 0:
-            with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
-                for module in self._modules:
+        if len(self.__modules) > 0:
+            with concurrent.futures.ThreadPoolExecutor(len(self.__modules)) as pool:
+                for module in self.__modules:
                     module : InternalModule
                     pool.submit(module.config_network, *[])
 
         return external_socket_map, internal_socket_map
 
-    def __wait_for_online_modules(self) -> None:
-        """
-        Waits for all internal modules to become online
-        """
-        async def routine():
-            responses = []
-            module_names = [m.name for m in self._modules]
-
-            while len(responses) < len(self._modules):
-                # listen for messages from internal nodes
-                dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
-                dst : str; src : str; msg_dict : dict
-
-                if dst != self.name:
-                    # received a message intended for someone else. Ignoring message
-                    continue
-
-                if src not in module_names:
-                    # received a message from an unrecognized sender. Ignoring message
-                    continue
-                
-                msg_type = msg_dict.get('@type', None)
-                if msg_type is not None and ModuleMessageTypes[msg_type] != ModuleMessageTypes.SYNC_REQUEST:
-                    # eceived a message that is not a sync request from an internal module. Ignoring message
-                    continue
-
-                if src not in responses:
-                    # Add to list of synced modules if it hasn't been synched before
-                    responses.append(src)
-
-            # inform all internal nodes that they are now synched with their parent simulation node
-            for module in self._modules:
-                module : InternalModule
-                synced_msg = NodeReceptionAckMessage(self.name, module.name)
-                
-                sent = False
-                while not sent:
-                    sent = await self._send_internal_msg(synced_msg, zmq.PUB)
-
-        asyncio.run(routine())
-
     async def _internal_sync(self) -> dict:
         # instruct internal modules to sync their networks with me
-        with concurrent.futures.ThreadPoolExecutor(len(self._modules) + 1) as pool:
-            for module in self._modules:
+        with concurrent.futures.ThreadPoolExecutor(len(self.__modules) + 1) as pool:
+            pool.submit(asyncio.run, *[self.__wait_for_online_modules()])    
+
+            for module in self.__modules:
                 module : InternalModule
-                pool.submit(module.sync, *[])
-            
-            if len(self._modules) > 0:
-                pool.submit(self.__wait_for_online_modules, *[])                
+                pool.submit(module.sync, *[])                       
 
         # create internal ledger
         internal_address_ledger = dict()
-        for module in self._modules:
+        for module in self.__modules:
             module : InternalModule
             internal_address_ledger[module.name] = module.get_network_config()
 
+        # return ledger
         return internal_address_ledger
+    
+    async def __wait_for_online_modules(self) -> None:
+        """
+        Waits for all internal modules to become online
+        """
+        responses = []
+        module_names = [m.name for m in self.__modules]
+
+        while len(responses) < len(self.__modules):
+            # listen for messages from internal nodes
+            dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
+            dst : str; src : str; msg_dict : dict
+
+            if dst != self.name:
+                # received a message intended for someone else. Ignoring message
+                continue
+
+            if src not in module_names:
+                # received a message from an unrecognized sender. Ignoring message
+                continue
+            
+            msg_type = msg_dict.get('@type', None)
+            if msg_type is not None and ModuleMessageTypes[msg_type] != ModuleMessageTypes.SYNC_REQUEST:
+                # eceived a message that is not a sync request from an internal module. Ignoring message
+                continue
+
+            if src not in responses:
+                # Add to list of synced modules if it hasn't been synched before
+                responses.append(src)
+
+        # inform all internal nodes that they are now synched with their parent simulation node
+        synced_msg = NodeReceptionAckMessage(self.name, self.name)
+        await self._send_internal_msg(synced_msg, zmq.PUB)
 
     async def _external_sync(self):
         # request to sync with the simulation manager
@@ -209,11 +202,71 @@ class Node(SimulationElement):
 
         return (asyncio.run(routine()))
 
+    def _execute(self) -> None:
+        with concurrent.futures.ProcessPoolExecutor(len(self.__modules) + 1) as pool:
+            # perform live routine
+            pool.submit(asyncio.run, *[self.__live_routine()])
+            
+            # start all modules' run routines
+            for module in self.__modules:
+                module : InternalModule
+                pool.submit(module.run, *[])
+
+    async def __live_routine(self):
+        """
+        Wrapper method for node's `live` method. 
+
+        This method terminates all internal modules' processes after their parent node fulfills
+        its `live` routine.
+        """
+        try:
+            await self._live()
+        finally:
+            # await for confirmation from modules
+            await self.__wait_for_offline_modules()
+
+    @abstractmethod
+    async def _live(self) -> None:
+        """
+        Routine to be performed by simulation node during when the node is executing
+        """
+        pass
+
+    async def __wait_for_offline_modules(self) -> None:
+        """
+        Waits for all internal modules to become offline
+        """
+        # send terminate message to all modules
+        terminate_msg = TerminateInternalModuleMessage(self.name, self.name)
+        await self._send_internal_msg(terminate_msg, zmq.PUB)
+
+        responses = []
+        module_names = [m.name for m in self.__modules]
+
+        while len(responses) < len(self.__modules):
+            # listen for messages from internal nodes
+            dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
+            dst : str; src : str; msg_dict : dict
+
+            if dst != self.name:
+                # received an internal message intended for someone else. Ignoring message
+                continue
+
+            if src not in module_names:
+                # received an internal message from an unrecognized sender. Ignoring message
+                continue
+            
+            msg_type = msg_dict.get('@type', None)
+            if msg_type is not None and ModuleMessageTypes[msg_type] != ModuleMessageTypes.MODULE_DEACTIVATED:
+                # received a message that is not a sync request from an internal module. Ignoring message
+                continue
+
+            if src not in responses:
+                # add to list of synced modules if it hasn't been synched before
+                responses.append(src)
+
     def _publish_deactivate(self) -> None:
         async def routine():
-            # inform modules that I am deactivated
-            # TODO terminate modules
-
             # inform manager that I am deactivated
             while True:
                 # send ready announcement from REQ socket
@@ -316,20 +369,3 @@ class Node(SimulationElement):
         """
         return await self._send_request_message(msg, self._external_address_ledger, self._external_socket_map)
     
-    def _live(self) -> None:
-        with concurrent.futures.ProcessPoolExecutor(len(self._modules) + 1) as pool:
-            pool.submit(asyncio.run, *[self._live_routine()])
-            
-            # start all modules' sync procedure
-            for module in self._modules:
-                module : InternalModule
-                pool.submit(module.run, *[])
-
-            # TODO: terminate processes when one finishes
-
-    @abstractmethod
-    async def _live_routine(self) -> None:
-        """
-        Routine to be performed by simulation node during when alive
-        """
-        pass

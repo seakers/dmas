@@ -467,6 +467,55 @@ class NodeMessageTypes(Enum):
     NODE_DEACTIVATED = 'NODE_DEACTIVATED'
     RECEPTION_ACK = 'RECEPTION_ACK'
     RECEPTION_IGNORED = 'RECEPTION_IGNORED'
+    MODULE_DEACTIVATE = 'MODULE_DEACTIVATE'
+
+class TerminateInternalModuleMessage(SimulationMessage):
+    """
+    ## Terminate Internal Module Message
+
+    Insturcts an internal module to terminate its processes.
+
+    ### Attributes:
+        - _src (`str`): name of the simulation node sending this message
+        - _dst (`str`): name of the intended simulation element to receive this message
+        - _msg_type (`Enum`) = NodeMessageTypes.MODULE_DEACTIVATE: type of message being sent
+        - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
+    """
+
+    def __init__(self, src: str, dst: str, id: uuid.UUID = None):
+        """
+        Initializes an instance of a Terminate Internal Module Message
+
+        ### Arguments:
+            - src (`str`): name of the simulation node sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, NodeMessageTypes.MODULE_DEACTIVATE, id)
+    
+    def from_dict(d: dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        id_str = d.get('@id', None)
+
+        if src is None or dst is None or type_name is None or id_str is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in NodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not NodeMessageTypes.MODULE_DEACTIVATE:
+            raise Exception(f'Cannot load a module terminate message from a dictionary request of type {type_name}.')
+
+        return TerminateInternalModuleMessage(src, dst, uuid.UUID(id_str))
+    
+    def from_json(j):
+        return TerminateInternalModuleMessage.from_dict(json.loads(j))
 
 class NodeSyncRequestMessage(SimulationMessage):
     """

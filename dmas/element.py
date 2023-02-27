@@ -74,7 +74,7 @@ class SimulationElement(NetworkElement):
 
         Procedure follows the sequence:
         1. `activate()`
-        2. `live()`
+        2. `execute()`
         3. `deactivate()`.
 
         Returns `1` if excecuted successfully or if `0` otherwise
@@ -105,7 +105,7 @@ class SimulationElement(NetworkElement):
 
             # start element life
             self._log('living...', level=logging.INFO)
-            self._live()
+            self._execute()
             self._log('living completed!', level=logging.INFO)
             
             out = 1
@@ -156,7 +156,7 @@ class SimulationElement(NetworkElement):
         pass
 
     @abstractmethod
-    def _live(self) -> None:
+    def _execute(self) -> None:
         """
         Procedure to be executed by the simulation element during the simulation. 
 

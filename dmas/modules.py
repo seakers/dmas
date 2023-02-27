@@ -32,6 +32,8 @@ class InternalModule(NetworkElement):
                 self._submodules.append(submodule)
             else:
                 raise AttributeError(f'contents of `submodules` list given to module {self.name} must be of type `SubModule`. Contains elements of type `{type(submodule)}`.')
+            
+        # TODO add parent module name topic subscription to sub port
 
     def get_name(self) -> str:
         """

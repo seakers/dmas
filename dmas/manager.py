@@ -77,7 +77,7 @@ class Manager(SimulationElement):
 
         asyncio.run(subroutine())
 
-    def _live(self) -> None:        
+    def _execute(self) -> None:        
         async def subroutine():
             # broadcast simulation start to all simulation elements
             self._log(f'Starging simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
