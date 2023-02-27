@@ -65,6 +65,17 @@ class EnvironmentWorkerModuleNetworkConfig(NetworkConfig):
                                 zmq.PULL: [module_recv_address]}       
         super().__init__(external_address_map=external_address_map)
 
+    def config_factory(env_network_config : EnvironmentNetworkConfig) -> InternalModuleNetworkConfig:
+        """
+        Generates an internal module network config object 
+        """
+        parent_pub_addresses : dict = env_network_config.get_internal_addresses()
+        parent_pub_address : list = parent_pub_addresses.get(zmq.PUB)
+        module_pub_address = NetworkConfig.get_next_available_local_address()
+        module_recv_address = NetworkConfig.get_next_available_local_address()
+
+        return EnvironmentWorkerModuleNetworkConfig(parent_pub_address[-1], module_pub_address, module_recv_address)
+
 class EnvironmentWorker(InternalModule):
     def __init__(self, parent_name: str, worker_id : int, network_config: InternalModuleNetworkConfig, logger: logging.Logger) -> None:
         super().__init__(f'worker_{worker_id}', parent_name, network_config, logger)
@@ -90,24 +101,9 @@ class EnvironentNode(Node):
     def __init__(self, name: str, network_config: NetworkConfig, n_workers : int = 1, level: int = logging.INFO) -> None:
         modules = []
         for i in range(n_workers):
-            worker_network_config : InternalModuleNetworkConfig = self.worker_network_config_factory()
+            worker_network_config : InternalModuleNetworkConfig = EnvironmentWorkerModuleNetworkConfig.config_factory()
             modules.append(EnvironmentWorker(name, i, worker_network_config))
         
         super().__init__(name, network_config, modules, level)
 
-    def worker_network_config_factory(self) -> InternalModuleNetworkConfig:
-        """
-        Generates an internal module network config object 
-        """
-        return InternalModuleNetworkConfig()
-
-    def is_port_in_use(self, port: int) -> bool:
-        import socket
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            return s.connect_ex(('localhost', port)) == 0
-
-    def get_next_available_port(self):
-        port = 5555
-        while self.is_port_in_use(port):
-            port += 1
-        return port
+    

@@ -1,0 +1,82 @@
+# To edit, use the following online sequence diagram generator:
+# https://sequencediagram.org/
+title Simulation Execution Sequence
+
+actor User
+
+participant Manager
+
+participantgroup Simulation Node
+participant Main Process
+participant Internal Module
+end
+
+User -> Manager: \run()
+activate Manager
+
+User ->Main Process: \run()
+activate Main Process
+
+# Network Config
+Manager -> Manager :\configNetwork()
+activate Manager
+deactivateafter Manager
+
+Main Process->Main Process:\configNetwork()
+activate Main Process
+deactivateafter Main Process
+
+Main Process-->Internal Module:\configNetwork()
+activate Internal Module
+deactivateafter Internal Module
+
+Main Process->Main Process:\syncNetwork()
+activate Main Process
+
+Main Process-->Internal Module:\syncNetwork()
+activate Internal Module
+
+Internal Module ->Main Process: Sync \nRequest
+Main Process --> Internal Module : Sync Req\nAcknowledged
+
+deactivate Internal Module
+
+# Network Sync
+Manager -> Manager :\syncNetwork()
+activate Manager
+
+Main Process->Manager: Sync \nRequest
+Manager -->Main Process: Sync Req\nAcknowledged!
+deactivate Main Process
+
+Manager -->Main Process: Network \nLedger
+activate Main Process
+Main Process ->Manager: Ready!
+deactivate Main Process
+deactivate Manager
+
+Manager -->Main Process: Sim Start!
+activate Manager
+activate Main Process
+Main Process -->Internal Module: \run()
+activate Main Process
+activate Internal Module
+
+Main Process <-> Internal Module: Inter-process \ncommunication
+
+Manager ->Manager: \waitSimEnd()
+Manager -->Main Process: Sim End!
+deactivate Manager
+Main Process ->Internal Module : Terminate!
+Internal Module -> Internal Module: \deactivateNetwork()
+Internal Module -->Main Process: Terminated!
+deactivate Main Process
+deactivate Internal Module
+
+Main Process -> Manager: Node \nDeactivated!
+deactivate Main Process
+
+Manager -> Manager: \deactivateNetwork()
+deactivate Manager
+Main Process ->Main Process: \deactivateNetwork()
+deactivate Main Process

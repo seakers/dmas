@@ -69,10 +69,10 @@ class Manager(SimulationElement):
         super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
         
         # check if an environment is contained in the simulation
-        if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
-            raise AttributeError('List of simulation elements must include one simulation environment.')
-        elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
-            raise AttributeError('List of simulation elements includes more than one simulation environment.')
+        # if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
+        #     raise AttributeError('List of simulation elements must include one simulation environment.')
+        # elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
+        #     raise AttributeError('List of simulation elements includes more than one simulation environment.')
             
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
@@ -253,7 +253,7 @@ class Manager(SimulationElement):
             msg : NodeSyncRequestMessage = received_sync_requests[src]
             external_address_ledger[src] = msg.get_network_config()
 
-        external_address_ledger[self.name] = self._network_config
+        external_address_ledger[self.name] = self._network_config.to_dict()
         
         self._log(f'All elements online!')
         return external_address_ledger
@@ -280,6 +280,9 @@ class Manager(SimulationElement):
 
 if __name__ == '__main__':
     from datetime import datetime, timezone
+    import sys
+
+    print(sys.argv)
     
     response_address = "tcp://*:5558"
     broadcast_address = "tcp://*:5559"
@@ -290,7 +293,7 @@ if __name__ == '__main__':
     end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
     clock_config = RealTimeClockConfig(start, end)
 
-    manager = Manager([], clock_config, network_config)
+    manager = Manager([], clock_config, network_config, level=logging.DEBUG)
 
     t_o = time.perf_counter()
     manager.run()

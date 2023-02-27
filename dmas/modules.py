@@ -138,12 +138,13 @@ class InternalModule(NetworkElement):
             """
             try:
                 # perform this module's routine
-                tasks = [asyncio.create_task(self.routine(), name=f'{self.name}_live')]
+                tasks = [asyncio.create_task(self.routine(), name=f'{self.name}_routine'),
+                         asyncio.create_task(self._listen(), name=f'{self.name}_listen'),]
 
                 # instruct all submodules to perform their own routines
                 for submodule in self._submodules:
                     submodule : InternalSubmodule
-                    tasks.append(submodule.routine(), name=f'{submodule.name}_live')
+                    tasks.append(submodule.run(), name=f'{submodule.name}_run')
 
                 # wait for a process to terminate
                 _, pending = asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -189,7 +190,7 @@ class InternalSubmodule(ABC):
         super().__init__()
         self.name = parent_name + '/' + name
     
-    async def routine() -> None:
+    async def run() -> None:
         try:
             pass
         except asyncio.CancelledError:

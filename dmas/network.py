@@ -65,7 +65,28 @@ class NetworkConfig(ABC):
 
     def from_json(j : str):
         return NetworkConfig.from_dict(json.loads(j))
+    
+    def is_port_in_use(self, port: int) -> bool:
+        """
+        Checks if a port is currently being used by a socket
+        """
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
 
+    def get_next_available_port(self):
+        """
+        Searches to find the next available port in the `localhost` network
+        """
+        port = 5555
+        while self.is_port_in_use(port):
+            port += 1
+        return port
+    
+    def get_next_available_local_address(self):
+        port = self.get_next_available_port()
+        return f'tcp://localhost:{port}'
+    
 """
 ------------------
 NETWORK ELEMENT

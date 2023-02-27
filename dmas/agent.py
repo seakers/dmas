@@ -1,7 +1,7 @@
 from yaml import Node
 import zmq
 
-from dmas.utils import NetworkConfig
+from dmas.network import NetworkConfig
 
 class AgentNetworkConfig(NetworkConfig):
     """
@@ -12,8 +12,9 @@ class AgentNetworkConfig(NetworkConfig):
     def __init__(self, 
                 internal_send_address: str,
                 internal_recv_addresses : list,
-                broadcast_address: str, 
-                manager_address : str,
+                manager_request_address : str,
+                agent_broadcast_address: str, 
+                manager_broadcast_address : str,
                 monitor_address: str
                 ) -> None:
         """
@@ -28,9 +29,9 @@ class AgentNetworkConfig(NetworkConfig):
         """
         internal_address_map = {zmq.PUB:  [internal_send_address],
                                 zmq.SUB:  internal_recv_addresses}
-        external_address_map = {zmq.REQ:  [],
-                                zmq.PUB:  [broadcast_address],
-                                zmq.SUB:  [manager_address],
+        external_address_map = {zmq.REQ:  [manager_request_address],
+                                zmq.PUB:  [agent_broadcast_address],
+                                zmq.SUB:  [manager_broadcast_address],
                                 zmq.PUSH: [monitor_address]}
 
         super().__init__(internal_address_map, external_address_map)
