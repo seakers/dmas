@@ -46,10 +46,10 @@ class Manager(SimulationElement):
         super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
         
         # check if an environment is contained in the simulation
-        # if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
-        #     raise AttributeError('List of simulation elements must include one simulation environment.')
-        # elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
-        #     raise AttributeError('List of simulation elements includes more than one simulation environment.')
+        if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
+            raise AttributeError('List of simulation elements must include one simulation environment.')
+        elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
+            raise AttributeError('List of simulation elements includes more than one simulation environment.')
             
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
@@ -109,7 +109,7 @@ class Manager(SimulationElement):
                 await listen_for_deactivated_task
 
             else:                
-                # all noeds have already reported as deactivated. Cancel timer task
+                # all nodes have already reported as deactivated before the timer ran out. Cancel timer task
                 timer_task.cancel()
                 await timer_task     
             
@@ -156,7 +156,7 @@ class Manager(SimulationElement):
                     self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
 
                     # inform node that its message request was not accepted
-                    msg_resp = ReceptionIgnoredMessage(-1)
+                    msg_resp = ManagerReceptionIgnoredMessage(-1)
                     send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
                     await send_task
 
@@ -173,20 +173,20 @@ class Manager(SimulationElement):
                     self._log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
                     # inform agent that its message was not accepted
-                    msg_resp = ReceptionIgnoredMessage(-1)
+                    msg_resp = ManagerReceptionIgnoredMessage(-1)
 
                 elif src in received_messages:
                     # node is a part of the simulation but has already communicated with me
                     self._log(f'Node {src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
                     # inform agent that its message request was not accepted
-                    msg_resp = ReceptionIgnoredMessage(-1)
+                    msg_resp = ManagerReceptionIgnoredMessage(-1)
                 else:
                     # node is a part of the simulation and has not yet been synchronized
                     received_messages[src] = msg_req
 
                     # inform agent that its message request was not accepted
-                    msg_resp = ReceptionAckMessage(-1)
+                    msg_resp = ManagerReceptionAckMessage(-1)
 
                 # send response
                 send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
@@ -223,11 +223,11 @@ class Manager(SimulationElement):
             - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
         """
         self._log(f'Waiting for sync requests from simulation elements...')
-        received_sync_requests = await self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, SyncRequestMessage)
+        received_sync_requests = await self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, NodeSyncRequestMessage)
         
         external_address_ledger = dict()
         for src in received_sync_requests:
-            msg : SyncRequestMessage = received_sync_requests[src]
+            msg : NodeSyncRequestMessage = received_sync_requests[src]
             external_address_ledger[src] = msg.get_network_config()
 
         external_address_ledger[self.name] = self._network_config

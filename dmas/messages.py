@@ -284,7 +284,7 @@ class SimulationInfoMessage(ManagerMessage):
         for node_name in address_ledger:
             address_config = address_ledger[node_name]
             if isinstance(address_config, dict):
-                address_config = NodeNetworkConfig.from_dict(address_config)
+                address_config = NetworkConfig.from_dict(address_config)
             
             self._address_ledger[node_name] = address_config
         self._clock_config = clock_config        
@@ -342,7 +342,7 @@ class SimulationInfoMessage(ManagerMessage):
         address_ledger_dict = dict()
         for node_name in address_ledger:
             network_config_dict : dict = address_ledger[node_name]
-            address_ledger_dict[node_name] = NodeNetworkConfig.from_dict(network_config_dict)
+            address_ledger_dict[node_name] = NetworkConfig.from_dict(network_config_dict)
 
         return SimulationInfoMessage(address_ledger, clock_config, t, uuid.UUID(id_str))
 
@@ -352,7 +352,7 @@ class SimulationInfoMessage(ManagerMessage):
         """
         return SimulationInfoMessage.from_dict(json.loads(j))
 
-class ReceptionAckMessage(ManagerMessage):
+class ManagerReceptionAckMessage(ManagerMessage):
     """
     ## Reception Accepted Message
 
@@ -361,7 +361,7 @@ class ReceptionAckMessage(ManagerMessage):
     ### Attributes:
         - _src (`str`): name of the simulation element sending this message
         - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
-        - _msg_type (`Enum`) = `ManagerMessageTypes.SYNC_REQ_DENIED`: type of message being sent
+        - _msg_type (`Enum`) = `ManagerMessageTypes.RECEPTION_ACK`: type of message being sent
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
@@ -395,12 +395,12 @@ class ReceptionAckMessage(ManagerMessage):
         elif _type is not ManagerMessageTypes.RECEPTION_ACK:
             raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
 
-        return ReceptionAckMessage(t, uuid.UUID(id_str))
+        return ManagerReceptionAckMessage(t, uuid.UUID(id_str))
 
     def from_json(j):
-        return ReceptionAckMessage.from_dict(json.loads(j))
+        return ManagerReceptionAckMessage.from_dict(json.loads(j))
 
-class ReceptionIgnoredMessage(ManagerMessage):
+class ManagerReceptionIgnoredMessage(ManagerMessage):
     """
     ## Reception Ignored Message
 
@@ -409,7 +409,7 @@ class ReceptionIgnoredMessage(ManagerMessage):
     ### Attributes:
         - _src (`str`): name of the simulation element sending this message
         - _dst (`str`) = `SimulationElementTypes.ALL.name`: name of the intended simulation element to receive this message
-        - _msg_type (`Enum`) = `ManagerMessageTypes.SYNC_REQ_DENIED`: type of message being sent
+        - _msg_type (`Enum`) = `ManagerMessageTypes.RECEPTION_IGNORED`: type of message being sent
         - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
         - _t (`float`): manager's simulation clock at the time of transmission in [s]
     """
@@ -443,26 +443,32 @@ class ReceptionIgnoredMessage(ManagerMessage):
         elif _type is not ManagerMessageTypes.RECEPTION_IGNORED:
             raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
 
-        return ReceptionIgnoredMessage(t, uuid.UUID(id_str))
+        return ManagerReceptionIgnoredMessage(t, uuid.UUID(id_str))
 
     def from_json(j):
-        return ReceptionIgnoredMessage.from_dict(json.loads(j))
+        return ManagerReceptionIgnoredMessage.from_dict(json.loads(j))
 
 """
 -----------------
-AGENT MESSAGES
+NODE MESSAGES
 -----------------
 """
 class NodeMessageTypes(Enum):
     """
     Types of messages to be sent from a simulated agent
-        1- SimulationSyncRequest: agent notifies environment server that it is online and ready to start the simulation. Only used before the start of the simulation
+        1- SimulationSyncRequest: notifies the simulation manager that the sending node is online.
+        2- NodeReady:  notifies the simulation manager that the sending node is ready to start the simulation
+        3- NodeDeactivated:  notifies the simulation manager that the sending node is offline.
+        4- ReceptionAck: notifies a network element that a message has been received and accepted by the sending simulation node
+        4- ReceptionIgnored: notifies a network element that a message has been received but not accepted by ther sending simulation node
     """
     SYNC_REQUEST = 'SYNC_REQUEST'
     NODE_READY = 'NODE_READY'
     NODE_DEACTIVATED = 'NODE_DEACTIVATED'
+    RECEPTION_ACK = 'RECEPTION_ACK'
+    RECEPTION_IGNORED = 'RECEPTION_IGNORED'
 
-class SyncRequestMessage(SimulationMessage):
+class NodeSyncRequestMessage(SimulationMessage):
     """
     ## Sync Request Message
 
@@ -527,13 +533,13 @@ class SyncRequestMessage(SimulationMessage):
 
         network_config = NetworkConfig.from_dict(network_config)
 
-        return SyncRequestMessage(src, network_config, uuid.UUID(id_str))
+        return NodeSyncRequestMessage(src, network_config, uuid.UUID(id_str))
 
     def from_json(d):
         """
         Creates an instance of a message class object from a json object 
         """
-        return SyncRequestMessage.from_dict(json.loads(d))
+        return NodeSyncRequestMessage.from_dict(json.loads(d))
 
     def __str__(self) -> str:
         return f'{NodeMessageTypes.SYNC_REQUEST.name}'
@@ -637,6 +643,172 @@ class NodeDeactivatedMessage(SimulationMessage):
 
     def __str__(self) -> str:
         return f'{self._src} is deactivated!'
+
+class NodeReceptionAckMessage(SimulationMessage):
+    """
+    ## Reception Accepted Message
+
+    Notifies an network element that that its message has been accepted by the sending simulation node
+        
+    ### Attributes:
+        - _src (`str`): name of the simulation node sending this message
+        - _dst (`str`): name of the network element set to receive this message
+        - _msg_type (`Enum`) = `ManagerMessageTypes.RECEPTION_ACK`: type of message being sent
+        - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
+    def __init__(self, src : str, dst : str, id : uuid.UUID = None):
+        """
+        Initializes an instance of a Reception Accepted Message
+
+        #### Arguments:
+            - t (`float`): manager's simulation clock at the time of transmission in [s]
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, NodeMessageTypes.RECEPTION_ACK, id)
+
+    def from_dict(d: dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        id_str = d.get('@id', None)
+        
+        if src is None or dst is None or type_name is None or id_str is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in NodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ManagerMessageTypes.RECEPTION_ACK:
+            raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
+
+        return NodeReceptionAckMessage(src, dst, uuid.UUID(id_str))
+
+    def from_json(j):
+        return NodeReceptionAckMessage.from_dict(json.loads(j))
+
+class NodeReceptionIgnoredMessage(ManagerMessage):
+    """
+    ## Reception Rejected Message
+
+    Notifies an network element that that its message has been accepted by the sending simulation node
+        
+    ### Attributes:
+        - _src (`str`): name of the simulation node sending this message
+        - _dst (`str`): name of the network element set to receive this message
+        - _msg_type (`Enum`) = `ManagerMessageTypes.RECEPTION_IGNORED`: type of message being sent
+        - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        - _t (`float`): manager's simulation clock at the time of transmission in [s]
+    """
+    def __init__(self, src : str, dst : str, id : uuid.UUID = None):
+        """
+        Initializes an instance of a Reception Accepted Message
+
+        #### Arguments:
+            - t (`float`): manager's simulation clock at the time of transmission in [s]
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, NodeMessageTypes.RECEPTION_IGNORED, id)
+
+    def from_dict(d: dict):
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        id_str = d.get('@id', None)
+        
+        if src is None or dst is None or type_name is None or id_str is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in NodeMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ManagerMessageTypes.RECEPTION_IGNORED:
+            raise Exception(f'Cannot load a Node Simulation Message from a dictionary request of type {type_name}.')
+
+        return NodeReceptionIgnoredMessage(src, dst, uuid.UUID(id_str))
+
+    def from_json(j):
+        return NodeReceptionIgnoredMessage.from_dict(json.loads(j))
+"""
+-----------------
+INTERNAL MODULE MESSAGES
+-----------------
+"""
+class ModuleMessageTypes(Enum):
+    """
+    Types of messages to be sent from a simulated agent
+        1- SimulationSyncRequest: notifies the parent node that the sending module is online.
+        2- ModuleReady: notifies the parent node that the sending module is ready to start the simulation
+        2- ModuleDeactivated: notifies the parent node that the sending module is offline.
+    """
+    SYNC_REQUEST = 'SYNC_REQUEST'
+    MODULE_READY = 'MODULE_READY'
+    MODULE_DEACTIVATED = 'MODULE_DEACTIVATED'
+
+class ModuleSyncRequestMessage(SimulationMessage):
+    """
+    ## Module Sync Request Message
+
+    Notifies the parent node that the sending module is online
+
+    ### Attributes:
+        - src (`str`): name of the internal module sending this message
+        - dst (`str`): name of the simulation node to receive this message
+        - _msg_type (`Enum`): type of message being sent
+        - _id (`uuid.UUID`) : Universally Unique IDentifier for this message
+    """
+
+    def __init__(self, src: str, dst: str, id : uuid.UUID = None):
+        """
+        Initializes an instance of a Sync Request Message
+
+        ### Arguments:
+            - src (`str`): name of the internal module sending this message
+            - dst (`str`): name of the simulation node to receive this message
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, ModuleMessageTypes.SYNC_REQUEST, id)
+
+    def from_dict(d : dict):
+        """
+        Creates an instance of a message class object from a dictionary
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        type_name = d.get('@type', None)
+        id_str = d.get('@id', None)
+
+        if src is None or dst is None or type_name is None or id_str is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        _type = None
+        for name, member in ModuleMessageTypes.__members__.items():
+            if name == type_name:
+                _type = member
+
+        if _type is None:
+            raise Exception(f'Could not recognize message of type {type_name}.')
+        elif _type is not ModuleMessageTypes.SYNC_REQUEST:
+            raise Exception(f'Cannot load a Sync Request from a dictionary request of type {type_name}.')
+
+        return ModuleSyncRequestMessage(src, uuid.UUID(id_str))
+
+    def from_json(d):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return ModuleSyncRequestMessage.from_dict(json.loads(d))
+
+    def __str__(self) -> str:
+        return f'{ModuleMessageTypes.SYNC_REQUEST.name}'
 
 """
 -----------------

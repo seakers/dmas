@@ -48,63 +48,82 @@ class Node(SimulationElement):
             raise RuntimeError(f'{self.name}: Internal address ledger not created during activation.')
 
     def config_network(self) -> tuple:
-        if self.__network_activated:
-            raise PermissionError('Attempted to configure network after it has already been configurated.')
+        # configure own network ports
+        external_socket_map, internal_socket_map = super().config_network()
 
-        # condfigure own internal ports
-        external_socket_map = self.__config_external_network()
-        internal_socket_map = self.__config_internal_network()
-
-        # configure intenral module ports
+        # instruct internal modules to configure their own network ports
         if len(self._modules) > 0:
             with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
                 for module in self._modules:
                     module : InternalModule
                     pool.submit(module.config_network, *[])
 
-        self.__network_activated = True
-
         return external_socket_map, internal_socket_map
 
-    async def _internal_sync(self) -> dict:
-        # TODO define internal module sync routine
-        # async def routine():
-        #     # wait for all modules to initialize and connect to me
-        #     modules_synced = []
-        #     while len(modules_synced) < len(self._modules):
-        #         dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
-        #         dst : str; src : str; msg_dict : dict
+    def __wait_for_online_modules(self) -> None:
+        """
+        Waits for all internal modules to become online
+        """
+        async def routine():
+            responses = []
+            module_names = [m.name for m in self._modules]
 
-        #         msg_type = msg_dict['@type']
-        #         if dst != self.name:
-        #             pass
-        #         elif modules_synced in modules_synced:
-        #             pass
-        #         elif NodeMessageTypes[msg_type] != NodeMessageTypes.SYNC_REQUEST:
-        #             # ignore all incoming messages that are not of the desired type 
-        #             self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
-            
-        #     # announce 
+            while len(responses) < len(self._modules):
+                # listen for messages from internal nodes
+                dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
+                dst : str; src : str; msg_dict : dict
 
-        #     return
-        
-        # if len(self._modules) > 0:
-        #     with concurrent.futures.ThreadPoolExecutor(len(self._modules)) as pool:
-        #         pool.submit(asyncio.run, *[routine()])
+                if dst != self.name:
+                    # received a message intended for someone else. Ignoring message
+                    continue
+
+                if src not in module_names:
+                    # received a message from an unrecognized sender. Ignoring message
+                    continue
                 
-        #         # start all modules' sync procedure
-        #         for module in self._modules:
-        #             module : InternalModule
-        #             pool.submit(module.sync, *[])
+                msg_type = msg_dict.get('@type', None)
+                if msg_type is not None and ModuleMessageTypes[msg_type] != ModuleMessageTypes.SYNC_REQUEST:
+                    # eceived a message that is not a sync request from an internal module. Ignoring message
+                    continue
 
-        # due to internal network being static, no internal ledger is needed
-        return dict()
+                if src not in responses:
+                    # Add to list of synced modules if it hasn't been synched before
+                    responses.append(src)
+
+            # inform all internal nodes that they are now synched with their parent simulation node
+            for module in self._modules:
+                module : InternalModule
+                synced_msg = NodeReceptionAckMessage(self.name, module.name)
+                
+                sent = False
+                while not sent:
+                    sent = await self._send_internal_msg(synced_msg, zmq.PUB)
+
+        asyncio.run(routine())
+
+    async def _internal_sync(self) -> dict:
+        # instruct internal modules to sync their networks with me
+        with concurrent.futures.ThreadPoolExecutor(len(self._modules) + 1) as pool:
+            for module in self._modules:
+                module : InternalModule
+                pool.submit(module.sync, *[])
+            
+            if len(self._modules) > 0:
+                pool.submit(self.__wait_for_online_modules, *[])                
+
+        # create internal ledger
+        internal_address_ledger = dict()
+        for module in self._modules:
+            module : InternalModule
+            internal_address_ledger[module.name] = module.get_network_config()
+
+        return internal_address_ledger
 
     async def _external_sync(self):
         # request to sync with the simulation manager
         while True:
             # send sync request from REQ socket
-            msg = SyncRequestMessage(self.name, self._network_config)
+            msg = NodeSyncRequestMessage(self.name, self._network_config)
             dst, src, content = await self._send_external_request_message(msg)
             dst : str; src : str; content : dict
             msg_type = content['@type']

@@ -109,6 +109,12 @@ class NetworkElement(ABC):
         """
         pass
 
+    def get_network_config(self) -> NetworkConfig:
+        """
+        Returns network configuration for this network element
+        """
+        return self._network_config
+
     """
     NETWORK PORT CONFIG
     """
@@ -313,20 +319,31 @@ class NetworkElement(ABC):
                 if self.__network_synced:
                     raise PermissionError('Attempted to sync with network after it has already been synced.')
 
-                external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
+                # sync internal network
                 internal_sync_task = asyncio.create_task(self._internal_sync(), name='Internal Sync Task')
                 timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
-                
-                pending = [external_sync_task, internal_sync_task, timeout_task]
-                
-                while timeout_task in pending and len(pending) > 1:
-                    _, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+
+                await asyncio.wait([internal_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
                                 
                 if timeout_task.done():
-                    raise TimeoutError('Sync with simulation manager timed out.')
+                    internal_sync_task.cancel()
+                    await internal_sync_task
+                    raise TimeoutError('Sync with internal network elements timed out.')
+                
+                # sync external network
+                external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
+                
+                await asyncio.wait([external_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
+                
+                if timeout_task.done():
+                    external_sync_task.cancel()
+                    await external_sync_task
+                    raise TimeoutError('Sync with external network elements timed out.')
 
+                # log as synced
                 self.__network_synced = True
 
+                # return external and internal address ledgers
                 return (external_sync_task.result(), internal_sync_task.result())             
                 
             except TimeoutError as e:
@@ -462,7 +479,7 @@ class NetworkElement(ABC):
         """
         return await self.__send_msg(msg, socket_type, self._internal_socket_map)
 
-    async def _receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
+    async def __receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
         """
         Reads a multipart message from a given socket.
 
@@ -546,8 +563,11 @@ class NetworkElement(ABC):
                 name of the intended destination as `dst` (`str`) 
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
+
+        ### Usage:
+            - dst, src, content = await self._receive_external_msg(socket_type)
         """
-        return await self._receive_msg(socket_type, self._external_socket_map)
+        return await self.__receive_msg(socket_type, self._external_socket_map)
 
     async def _receive_internal_msg(self, socket_type : zmq.SocketType) -> list:
         """
@@ -561,5 +581,8 @@ class NetworkElement(ABC):
                 name of the intended destination as `dst` (`str`) 
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
+
+        ### Usage:
+            - dst, src, content = await self._receive_internal_msg(socket_type)
         """
-        return await self._receive_msg(socket_type, self._internal_socket_map)
+        return await self.__receive_msg(socket_type, self._internal_socket_map)

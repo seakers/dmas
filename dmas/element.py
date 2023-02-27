@@ -73,9 +73,9 @@ class SimulationElement(NetworkElement):
         Main function. Executes this similation element.
 
         Procedure follows the sequence:
-        1. Initiates `activate()` sequence
-        2. `listen()` is excecuted concurrently during `live()` procedure. 
-        3. `deactivate()` procedure once either the `listen()` or `live()` procedures terminate.
+        1. `activate()`
+        2. `live()`
+        3. `deactivate()`.
 
         Returns `1` if excecuted successfully or if `0` otherwise
 
