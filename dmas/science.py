@@ -97,6 +97,7 @@ class ScienceModule(Module):
         else:
             outlier_data = item
             outlier_data["severity"] = 0.0
+            outlier_data["event_type"] = ""
             self.log(f'No flood detected at {lat}, {lon}',level=logging.DEBUG)
         return outlier, outlier_data
 
@@ -106,13 +107,13 @@ class ScienceModule(Module):
         """
         severity = 0.0
         event_type = ""
-        self.log(f'Getting severity for {lat}, {lon} at {curr_time}',level=logging.INFO)
+        #self.log(f'Getting severity for {lat}, {lon} at {curr_time}',level=logging.INFO)
         for i in range(len(points[:, 0])):
             if (abs(float(lat)-points[i, 0]) < 0.01) and (abs(float(lon) - points[i, 1]) < 0.01):
                  # change this back to 5 for chlorophyll_baseline.csv
                 lat = points[i, 0]
                 lon = points[i, 1]
-                self.log(f'Point at {curr_time} has time interval {points[i,3]}, {points[i,4]}',level=logging.INFO)
+                #self.log(f'Point at {curr_time} has time interval {points[i,3]}, {points[i,4]}',level=logging.INFO)
                 if points[i,3] < curr_time < points[i,4]:
                     severity = points[i, 2]
                     if points[i,5] > 0.5:
