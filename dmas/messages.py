@@ -474,8 +474,7 @@ class ModuleSyncRequestMessage(SimulationMessage):
         super().__init__(src, dst, ModuleMessageTypes.SYNC_REQUEST.value, id)
 
 if __name__ == "__main__":
-    from datetime import datetime, timezone
-    
+        
     src = 'TEST_SENDER'
     dst = 'TEST_RECEIVER'
     address_ledger = dict() ; clock_config = dict()
