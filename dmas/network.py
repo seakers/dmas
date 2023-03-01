@@ -235,6 +235,9 @@ class NetworkElement(ABC):
         """
         return self._element_name
     
+    def get_socket_maps(self) -> tuple:
+        return self._external_socket_map, self._internal_socket_map
+    
     def __set_up_logger(self, level=logging.DEBUG) -> logging.Logger:
         """
         Sets up a logger for this simulation element
@@ -438,8 +441,9 @@ class NetworkElement(ABC):
         """
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             address : str
-            _, _, port = address.split(':')
-            port = int(port)
+            address_components = address.split(':')
+            port = int(address_components[-1])
+
             return s.connect_ex(('localhost', port)) == 0
 
     def _deactivate_network(self) -> None:
