@@ -10,6 +10,7 @@ CLOCK CONFIGS
 ------------------
 """
 class ClockTypes(Enum):
+    TEST = 'TEST'
     REAL_TIME = 'REAL_TIME'                             # runs simulations in real-time 
     ACCELERATED_REAL_TIME = 'ACCELERATED_REAL_TIME'     # each real time second represents a user-given amount of simulation seconds
 
@@ -31,7 +32,8 @@ class ClockConfig(ABC):
                 end_date : str, 
                 clock_type : str,
                 simulation_runtime_start : float = -1.0,
-                simulation_runtime_end : float = -1.0
+                simulation_runtime_end : float = -1.0,
+                **kwargs
                 ) -> None:
         """
         Initializes an instance of a clock configuration object
@@ -43,25 +45,31 @@ class ClockConfig(ABC):
         """
         super().__init__()
 
+        # check types 
+        if not isinstance(start_date , str):
+            raise TypeError(f'Attribute `start_date` must be of type `str`. Is of type {type(start_date)}')
+        if not isinstance(end_date , str):
+            raise TypeError(f'Attribute `end_date` must be of type `str`. Is of type {type(end_date)}')
+        if not isinstance(clock_type , str):
+            raise TypeError(f'Attribute `clock_type` must be of type `str`. Is of type {type(clock_type)}')
+        if not isinstance(simulation_runtime_start , float) and not isinstance(simulation_runtime_start , int):
+            raise TypeError(f'Attribute `simulation_runtime_start` must be of type `float` or `int`. Is of type {type(simulation_runtime_start)}')
+        if not isinstance(simulation_runtime_end , float) and not isinstance(simulation_runtime_end , int):
+            raise TypeError(f'Attribute `simulation_runtime_end` must be of type `float` or `int`. Is of type {type(simulation_runtime_end)}')
+        
         # load attributes from arguments
-        self.start_date = start_date
-        self.end_date = end_date
+        self.start_date = str(ClockConfig.str_to_datetime(start_date))
+        self.end_date = str(ClockConfig.str_to_datetime(end_date))
         self.clock_type = clock_type
         self.simulation_runtime_start = simulation_runtime_start
-        self.simulation_runtime_end = simulation_runtime_end
-
-        # check types 
-        if not isinstance(self.start_date , str):
-            raise TypeError(f'Attribute `start_date` must be of type `str`. Is of type {type(self.start_date)}')
-        if not isinstance(self.end_date , str):
-            raise TypeError(f'Attribute `end_date` must be of type `str`. Is of type {type(self.end_date)}')
-        if not isinstance(self.clock_type , str):
-            raise TypeError(f'Attribute `clock_type` must be of type `str`. Is of type {type(self.clock_type)}')
-        if not isinstance(self.simulation_runtime_start , float):
-            raise TypeError(f'Attribute `simulation_runtime_start` must be of type `float`. Is of type {type(self.simulation_runtime_start)}')
-        if not isinstance(self.simulation_runtime_end , float):
-            raise TypeError(f'Attribute `simulation_runtime_end` must be of type `float`. Is of type {type(self.simulation_runtime_end)}')
-        
+        self.simulation_runtime_end = simulation_runtime_end    
+ 
+    def __eq__(self, other) -> bool:
+        """
+        Compares two instances of a clock configuration. Returns True if they represent the same configuration
+        """
+        other : ClockConfig
+        return self.to_dict() == other.to_dict()
 
     def set_simulation_runtime_start(self, t : float) -> None:
         self.simulation_runtime_start = t
@@ -85,15 +93,15 @@ class ClockConfig(ABC):
         """
         Returns the start date for this clock
         """
-        return self.__datetime_from_str(self.start_date)
+        return self.str_to_datetime(self.start_date)
 
     def get_start_time(self) -> datetime:
         """
         Returns the end date for this clock
         """
-        return self.__datetime_from_str(self.end_date)
+        return self.str_to_datetime(self.end_date)
 
-    def __datetime_from_str(date_str : str) -> datetime:
+    def str_to_datetime(date_str : str) -> datetime:
         """
         Reads a string repersenting a date and a time and returns a datetime object
         """
@@ -147,6 +155,8 @@ class AcceleratedRealTimeClockConfig(ClockConfig):
         
         super().__init__(start_date, end_date, ClockTypes.ACCELERATED_REAL_TIME.value)
 
+        if not isinstance(sim_clock_freq, int) and not isinstance(sim_clock_freq, float):
+            raise TypeError(f'Attribute `sim_clock_freq` must be of type `float` or `int`. Is of type {type(sim_clock_freq)}')
         if sim_clock_freq < 1:
             raise ValueError('`sim_clock_freq` must be a value greater or equal to 1.')
         
@@ -179,19 +189,3 @@ class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
         """
         super().__init__(start_date, end_date, 1.0)
         
-
-if __name__ == '__main__':
-    year = 2023
-    month = 1
-    day = 1
-    hh = 12
-    mm = 00
-    ss = 00
-    startdate = datetime(year, month, day, hh, mm, ss)
-    enddate = datetime(year, month, day+1, hh, mm, ss)
-
-    clock = RealTimeClockConfig(str(startdate), str(enddate))
-    print(clock.to_dict())
-
-    clock_reconstructed = RealTimeClockConfig(**json.loads(clock.to_json()))
-    print(clock_reconstructed.to_dict())

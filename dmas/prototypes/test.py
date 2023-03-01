@@ -26,19 +26,3 @@ if __name__ == '__main__':
     print(network_config_reconstructed.to_dict())
 
     assert network_config == network_config
-
-    # Test Simulation Message
-    print('SIMULATION MESSAGE TEST')
-    src = 'TEST_SENDER'
-    dst = 'TEST_RECEIVER'
-    msg_type = ExampleMessageTypes.TEST
-
-    print(type(msg_type))
-
-    msg = SimulationMessage(src, dst, ExampleMessageTypes.TEST)
-    print(msg)
-
-    msg_reconstructed = SimulationMessage(**msg.to_dict())
-    print(msg_reconstructed)
-
-    assert msg == msg_reconstructed

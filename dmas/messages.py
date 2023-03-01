@@ -26,7 +26,7 @@ class SimulationMessage(object):
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
     """
-    def __init__(self, src : str, dst : str, msg_type : Enum, id : uuid.UUID=None):
+    def __init__(self, src : str, dst : str, msg_type : str, id : str = None):
         """
         Initiates an instance of a simulation message.
         
@@ -34,7 +34,7 @@ class SimulationMessage(object):
             - src (`str`): name of the simulation element sending this message
             - dst (`str`): name of the intended simulation element to receive this message
             - msg_type (`str`): type of message being sent
-            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+            - id (`str`) : Universally Unique IDentifier for this message
         """
         super().__init__()
 
@@ -42,29 +42,30 @@ class SimulationMessage(object):
         self.src = src
         self.dst = dst
         self.msg_type = msg_type
-        self.id = str(id) if id is not None else str(uuid.uuid1())
+        self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
 
         # check types 
         if not isinstance(self.src , str):
             raise TypeError(f'Message sender `src` must be of type `str`. Is of type {type(self.src)}')
         if not isinstance(self.dst , str):
             raise TypeError(f'Message receiver `dst` must be of type `str`. Is of type {type(self.dst)}')
-        if not isinstance(self.msg_type , Enum):
-            raise TypeError(f'Message type `msg_type` must be of type `Enum`. Is of type {type(self.msg_type)}')
+        if not isinstance(self.msg_type , str):
+            raise TypeError(f'Message type `msg_type` must be of type `str`. Is of type {type(self.msg_type)}')
         if not isinstance(self.id , str):
             raise TypeError(f'Message id `id` must be of type `str`. Is of type {type(self.id)}')
-
+        
     def __eq__(self, other) -> bool:
         """
         Compares two instances of a simulation message. Returns True if they represent the same message.
         """
+        other : SimulationMessage
         return self.to_dict() == other.to_dict()
 
     def to_dict(self) -> dict:
         """
         Crates a dictionary containing all information contained in this message object
         """
-        return self.__dict__
+        return dict(self.__dict__)
 
     def to_json(self) -> str:
         """
@@ -284,6 +285,7 @@ class NodeMessageTypes(Enum):
         5- ReceptionIgnored: notifies a network element that a message has been received but not accepted by ther sending simulation node
         6- ModuleDeactivate: instructs an internal module to terminate its process
     """
+    TEST = 'TEST'
     SYNC_REQUEST = 'SYNC_REQUEST'
     NODE_READY = 'NODE_READY'
     NODE_DEACTIVATED = 'NODE_DEACTIVATED'
@@ -367,9 +369,9 @@ class NodeDeactivatedMessage(SimulationMessage):
         """
         super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.NODE_DEACTIVATED.value, id)
 
-class NodeReceptionAceptedMessage(SimulationMessage):
+class NodeReceptionAckMessage(SimulationMessage):
     """
-    ## Reception Accepted Message
+    ## Reception Acknowledged Message
 
     Notifies an network element that that its message has been accepted by the sending simulation node
         
@@ -478,17 +480,3 @@ class ModuleSyncRequestMessage(SimulationMessage):
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
         super().__init__(src, dst, ModuleMessageTypes.SYNC_REQUEST.value, id)
-
-if __name__ == "__main__":
-        
-    src = 'TEST_SENDER'
-    dst = 'TEST_RECEIVER'
-    address_ledger = dict() ; clock_config = dict()
-    address_ledger['NODE1'] = dict()
-    network_config = dict()
-    
-    msg = ModuleSyncRequestMessage(src,dst)
-    print(msg.to_dict())
-
-    msg_reconstructed = ModuleSyncRequestMessage(**json.loads(msg.to_json()))
-    print(msg_reconstructed.to_dict())
