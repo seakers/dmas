@@ -12,8 +12,11 @@ NETWORK CONFIG
 ------------------
 """
 class NetworkConfig(ABC):
-    def __init__(self, internal_address_map : dict = dict(), external_address_map : dict = dict()) -> None:
+    def __init__(self, network_name : str, internal_address_map : dict = dict(), external_address_map : dict = dict()) -> None:
         super().__init__()  
+        # save network name 
+        self.network_name = network_name
+
         # check map format
         for map in [internal_address_map, external_address_map]:
             for socket_type in map:
@@ -99,7 +102,9 @@ class NetworkElement(ABC):
     Abstract class for all DMAS network elements.
 
     ### Attributes:
-        - _name (`str`): The name of this simulation element
+        - _network_name (`str`): The name of the network that the element belongs to
+        - _element_name (`str`): The element's name
+        - _name (`str`): The name of this simulation element with it's network name as a prefix
 
         - _network_config (:obj:`NetworkConfig`): description of the addresses pointing to this network element
         - _network_context (:obj:`zmq.Context()`): network context used for TCP ports to be used by this network element
@@ -129,17 +134,20 @@ class NetworkElement(ABC):
     | INTERNAL PROCESSES |                                                                                               
     +--------------------+   
     """
-    def __init__(self, name : str, network_config : NetworkConfig, level : int = logging.INFO, logger : logging.Logger = None) -> None:
+    def __init__(self, element_name : str, network_config : NetworkConfig, level : int = logging.INFO, logger : logging.Logger = None) -> None:
         """
         Initiates a new network element
 
         ### Args:
-            - name (`str`): The element's name
+            - network_name (`str`): The name of the network that the element belongs to
+            - element_name (`str`): The element's name
             - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this nmetwork element
         """
         super().__init__()
-
-        self.name = name
+        
+        self._network_name = network_config.network_name
+        self._element_name = element_name
+        self.name = network_config.network_name + '/' + element_name
         self._logger : logging.Logger = self.__set_up_logger(level) if logger is None else logger
 
         self._network_context = azmq.Context()
@@ -151,6 +159,18 @@ class NetworkElement(ABC):
 
         self.__network_activated = False
         self.__network_synced = False
+
+    def get_network_name(self) -> str:
+        """
+        Returns the name of the network that this element belongs to
+        """
+        return self._network_config.network_name
+    
+    def get_element_name(self) -> str:
+        """
+        Returns the name this network element
+        """
+        return self._element_name
     
     def __set_up_logger(self, level=logging.DEBUG) -> logging.Logger:
         """
@@ -292,9 +312,10 @@ class NetworkElement(ABC):
             for address in addresses:
                 socket.connect(address)
 
-            # subscribe to messages addressed to this or all elements
-            socket.setsockopt(zmq.SUBSCRIBE, self.name.encode('ascii'))
-            socket.setsockopt(zmq.SUBSCRIBE, SimulationElementRoles.ALL.value.encode('ascii'))
+            # subscribe to messages addressed to this element or to all elements in the network
+            socket.setsockopt(zmq.SUBSCRIBE, self._network_name.encode('ascii'))
+            socket.setsockopt(zmq.SUBSCRIBE, self._element_name.encode('ascii'))
+            # socket.setsockopt(zmq.SUBSCRIBE, SimulationElementRoles.ALL.value.encode('ascii'))
             
         elif socket_type is zmq.REQ:
             # create REQ socket

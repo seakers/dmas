@@ -22,6 +22,7 @@ class InternalModuleNetworkConfig(NetworkConfig):
     Describes the addresses assigned to a node's internal module 
     """
     def __init__(self, 
+                network_name : str,
                 parent_pub_address: str,
                 module_pub_address : str
                 ) -> None:
@@ -33,7 +34,7 @@ class InternalModuleNetworkConfig(NetworkConfig):
         - module_pub_address (`str`): the internal module's broadcast address
         """
         external_address_map = {zmq.SUB: [parent_pub_address], zmq.PUB: [module_pub_address]}       
-        super().__init__(external_address_map=external_address_map)
+        super().__init__(network_name, external_address_map=external_address_map)
 
 class InternalModule(NetworkElement):
     """
@@ -47,8 +48,8 @@ class InternalModule(NetworkElement):
         - _external_inbox (`asyncio.Queue()`):
     ####
     """
-    def __init__(self, module_name: str, parent_name : str, network_config: InternalModuleNetworkConfig, logger: logging.Logger, submodules : list = []) -> None:
-        super().__init__(parent_name + '/' + module_name, network_config, logger.getEffectiveLevel(), logger)
+    def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, logger: logging.Logger, submodules : list = []) -> None:
+        super().__init__(module_name, network_config, logger.getEffectiveLevel(), logger)
 
         # copy submodule list
         self._submodules = []
@@ -74,31 +75,13 @@ class InternalModule(NetworkElement):
         """
         Returns the name of this module
         """
-        _, name = self.name.split('/')
-        return name
+        return self._element_name
 
     def get_parent_name(self) -> str:
-        parent, _ = self.name.split('/')
-        return parent
-
-    def config_network(self) -> tuple:
-        # configure own network ports
-        self._external_socket_map, self._internal_socket_map = super().config_network()
-
-        socket_maps = [self._external_socket_map, self._internal_socket_map]
-
-        # Add parent module name as a topic subscription for all sub ports
-        for map in socket_maps:
-            for port_type in map:
-                port_type : zmq.SocketType
-                
-                if port_type == zmq.SUB:
-                    socket : zmq.Socket = self._external_address_ledger[port_type]
-                    parent_module_name : str= self.get_parent_name()
-                    socket.setsockopt(zmq.SUBSCRIBE, parent_module_name.encode('ascii'))          
-                    self._external_address_ledger[port_type] = socket
-
-        return self._external_socket_map, self._internal_socket_map
+        """
+        Returns the name of this module's parent network node
+        """
+        return self._network_name
 
     async def _internal_sync(self) -> dict:
         # send a sync request to parent node

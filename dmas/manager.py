@@ -52,6 +52,7 @@ class Manager(SimulationElement):
     __doc__ += SimulationElement.__doc__
     
     def __init__(self, 
+            network_name : str,
             simulation_element_name_list : list,
             clock_config : ClockConfig,
             network_config : ManagerNetworkConfig,
@@ -66,7 +67,7 @@ class Manager(SimulationElement):
             - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
             - level (`int`): logging level for this simulation element
         """
-        super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
+        super().__init__(network_name, SimulationElementRoles.MANAGER.name, network_config, level)
         
         # check if an environment is contained in the simulation
         # if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
@@ -104,7 +105,7 @@ class Manager(SimulationElement):
         async def subroutine():
             # broadcast simulation start to all simulation elements
             self._log(f'Starging simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
-            sim_start_msg = SimulationStartMessage(time.perf_counter())
+            sim_start_msg = SimulationStartMessage(self._network_name, time.perf_counter())
             await self._send_external_msg(sim_start_msg, zmq.PUB)
 
             # push simulation start to monitor
@@ -124,7 +125,7 @@ class Manager(SimulationElement):
             await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
             
             # broadcast simulation end
-            sim_end_msg = SimulationEndMessage(time.perf_counter())
+            sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
             await self._send_external_msg(sim_end_msg, zmq.PUB)
 
             if timer_task.done():
@@ -293,7 +294,7 @@ if __name__ == '__main__':
     end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
     clock_config = RealTimeClockConfig(start, end)
 
-    manager = Manager([], clock_config, network_config, level=logging.DEBUG)
+    manager = Manager('TEST_NETWORK', [], clock_config, network_config, level=logging.DEBUG)
 
     t_o = time.perf_counter()
     manager.run()
