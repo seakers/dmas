@@ -12,33 +12,81 @@ NETWORK CONFIG
 ------------------
 """
 class NetworkConfig(ABC):
+    """
+    ## Network Configuration Object
+
+    Describes the internal and external network ports assigned to a network element.
+
+    #### Attributes:
+        - network_name (`str`): name of the network this configuration belongs to
+        - internal_address_map (`dict`): dictionary mapping types of network ports to their internal network addresses to be bound or connected to
+        - external_address_map (`dict`): dictionary mapping types of network ports to their internal network addresses to be bound or connected to
+
+    """
     def __init__(self, network_name : str, internal_address_map : dict = dict(), external_address_map : dict = dict()) -> None:
+        """
+        Creates an instance of a Network Config Object
+
+        ### Arguments:
+            - network_name (`str`): name of the network this configuration belongs to
+            - internal_address_map (`dict`): dictionary mapping types of network ports to their internal network addresses to be bound or connected to
+            - external_address_map (`dict`): dictionary mapping types of network ports to their internal network addresses to be bound or connected to
+        """
         super().__init__()  
         # save network name 
+        if not isinstance(network_name, str):
+            raise TypeError(f'Expected `network_name` to be of type `str`. Is of type {type(network_name)}')
         self.network_name = network_name
 
         # check map format
         for map in [internal_address_map, external_address_map]:
+
+            sockets_to_delete = []
+            sockets_to_add = []
+
             for socket_type in map:
                 addresses = map[socket_type]
 
-                if not isinstance(addresses, list):
+                if not isinstance(socket_type, type(zmq.PUB)):
+                    # if socket type was serialized into an `int` when turned into a dictionaty, fin equivalent zmq socket type
+                    new_socket_type = None
+                    
+                    for socketType in zmq.SocketType:
+                        if socketType.value == int(socket_type):
+                            new_socket_type = socketType
+                            break
+
+                    if new_socket_type is not None:
+                        # if an equivalent socket type is found, remove dictionary entry and replace with equivalent socket
+                        sockets_to_add.append((new_socket_type, map[socket_type]))
+                        sockets_to_delete.append(socket_type)
+                        
+                    else:
+                        # if not equivalent socket type is found, raise an exception
+                        if map == internal_address_map:
+                            raise TypeError(f'Socket of type {socket_type} in Internal Address Map must be of type {type(zmq.PUB)}. Is of type {type(socket_type)}')
+                        else:
+                            raise TypeError(f'Socket of type {socket_type} in External Address Map must be of type {type(zmq.PUB)}. Is of type {type(socket_type)}')
+
+                
+                if len(addresses) > 0 and not isinstance(addresses, list):
                     if map == internal_address_map:
                         raise TypeError(f'Internal Address Map must be comprised of elements of type {list}. Is of type {type(addresses)}')
                     else:
                         raise TypeError(f'External Address Map must be comprised of elements of type {list}. Is of type {type(addresses)}')
 
                 for address in addresses:   
-                    if not isinstance(socket_type, zmq.SocketType):
-                        if map == internal_address_map:
-                            raise TypeError(f'{socket_type} in Internal Address Map must be of type {type(zmq.SocketType)}. Is of type {type(socket_type)}')
-                        else:
-                            raise TypeError(f'{socket_type} in External Address Map must be of type {type(zmq.SocketType)}. Is of type {type(socket_type)}')
-                    elif not isinstance(address, str):
+                    if not isinstance(address, str):
                         if map == internal_address_map:
                             raise TypeError(f'{address} in Internal Address Map must be of type {type(str)}. Is of type {type(address)}')
                         else:
                             raise TypeError(f'{address} in External Address Map must be of type {type(str)}. Is of type {type(address)}')
+
+            for socket_type in sockets_to_delete:
+                map.pop(socket_type)
+            
+            for socket_type, addresses in sockets_to_add:
+                map[socket_type] = addresses
 
         # save addresses
         self.internal_address_map = internal_address_map.copy()
@@ -51,16 +99,28 @@ class NetworkConfig(ABC):
         return self.to_dict() == other.to_dict()
 
     def get_internal_addresses(self) -> dict:
+        """
+        Returns the configuration's internal socket addresses 
+        """
         return self.internal_address_map
 
     def get_external_addresses(self) -> dict:
+        """
+        Returns the configuration's external socket addresses 
+        """
         return self.external_address_map
 
     def to_dict(self) -> dict:
+        """
+        Creates a dictionary containig all attributes of this object
+        """
         return self.__dict__
     
     def to_json(self) -> str:
-        return json.dump(self.to_dict())
+        """
+        Creates a json serializable string containig all attributes of this object
+        """
+        return json.dumps(self.to_dict())
     
     def is_port_in_use(self, port: int) -> bool:
         """
@@ -80,6 +140,10 @@ class NetworkConfig(ABC):
         return port
     
     def get_next_available_local_address(self):
+        
+        """
+        Searches to find the next available network address in the `localhost` network
+        """
         port = self.get_next_available_port()
         return f'tcp://localhost:{port}'
 
