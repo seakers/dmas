@@ -41,33 +41,26 @@ class NetworkConfig(ABC):
                             raise TypeError(f'{address} in External Address Map must be of type {type(str)}. Is of type {type(address)}')
 
         # save addresses
-        self._internal_address_map = internal_address_map.copy()
-        self._external_address_map = external_address_map.copy()
+        self.internal_address_map = internal_address_map.copy()
+        self.external_address_map = external_address_map.copy()
+
+    def __eq__(self, other) -> bool:
+        """
+        Compares two instances of a network configuration. Returns True if they represent the same configuration.
+        """
+        return self.to_dict() == other.to_dict()
 
     def get_internal_addresses(self) -> dict:
-        return self._internal_address_map
+        return self.internal_address_map
 
     def get_external_addresses(self) -> dict:
-        return self._external_address_map
+        return self.external_address_map
 
     def to_dict(self) -> dict:
-        out = dict()
-        out['external addresses'] = str(self._internal_address_map)
-        return out
-
-    def from_dict(d : dict):
-        external_addresses = d.get('external addresses', None)
-
-        if external_addresses is None:
-            raise AttributeError('Dictionary does not contain necessary information to construct this network config object.')
-        
-        return NetworkConfig(external_addresses=external_addresses)
+        return self.__dict__
     
     def to_json(self) -> str:
         return json.dump(self.to_dict())
-
-    def from_json(j : str):
-        return NetworkConfig.from_dict(json.loads(j))
     
     def is_port_in_use(self, port: int) -> bool:
         """
@@ -89,7 +82,7 @@ class NetworkConfig(ABC):
     def get_next_available_local_address(self):
         port = self.get_next_available_port()
         return f'tcp://localhost:{port}'
-    
+
 """
 ------------------
 NETWORK ELEMENT
@@ -159,6 +152,12 @@ class NetworkElement(ABC):
 
         self.__network_activated = False
         self.__network_synced = False
+
+    def __del__(self):
+        """
+        Closes all open netowrk connections in case any are open when deleting an instance of this class
+        """
+        self._deactivate_network() if self.__network_activated else None
 
     def get_network_name(self) -> str:
         """
@@ -395,6 +394,8 @@ class NetworkElement(ABC):
             self._network_context : zmq.Context
             self._network_context.term()  
 
+        self.__network_activated = False
+
     """
     NETWORK SYNC
     """
@@ -527,11 +528,13 @@ class NetworkElement(ABC):
             self._log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
 
             # send multi-part message
-            dst : str = msg.get_dst()
+            dst : str = msg.dst
             src : str = self.name
             content : str = str(msg.to_json())
 
-            await socket.send_multipart([dst.encode('ascii'), src.encode('ascii'), content.encode('ascii')])
+            await socket.send_multipart([dst.encode('ascii'), 
+                                         src.encode('ascii'), 
+                                         content.encode('ascii')])
             self._log(f'message sent! Releasing lock...')
             
             # return sucessful transmission flag
@@ -594,7 +597,7 @@ class NetworkElement(ABC):
             - `list` containing the received information:  
                 name of the intended destination as `dst` (`str`) 
                 name of sender as `src` (`str`) 
-                and the message contents `content` (`dict`)
+                and the body of the message as `content` (`dict`)
         """
         try:
              # get appropriate socket and lock
@@ -666,7 +669,7 @@ class NetworkElement(ABC):
             - `list` containing the received information:  
                 name of the intended destination as `dst` (`str`) 
                 name of sender as `src` (`str`) 
-                and the message contents `content` (`dict`)
+                and the body of the message as `content` (`dict`)
 
         ### Usage:
             - dst, src, content = await self._receive_external_msg(socket_type)
@@ -684,7 +687,7 @@ class NetworkElement(ABC):
             - `list` containing the received information:  
                 name of the intended destination as `dst` (`str`) 
                 name of sender as `src` (`str`) 
-                and the message contents `content` (`dict`)
+                and the body of the message as `content` (`dict`)
 
         ### Usage:
             - dst, src, content = await self._receive_internal_msg(socket_type)

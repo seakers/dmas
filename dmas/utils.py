@@ -7,18 +7,22 @@ ASYNCHRONOUS CONTAINER
 ------------------
 """
 class Container:
-    def __init__(self, level: float =0, capacity: float =numpy.Infinity):
+    """
+    ## Container Object
+
+    Holds a numerical value ('float' or 'int') 
+    """
+    def __init__(self, level: float = 0, capacity: float = numpy.Infinity):
         if level > capacity:
             raise Exception('Initial level must be lower than maximum capacity.')
 
         self.level = level
         self.capacity = capacity
-        self.updated = None
 
         self.updated = asyncio.Event()
         self.lock = asyncio.Lock()
 
-    async def set_level(self, value):
+    async def set_level(self, value : float):
         self.level = 0
         await self.put(value)
 

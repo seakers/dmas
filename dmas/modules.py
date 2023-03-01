@@ -33,8 +33,9 @@ class InternalModuleNetworkConfig(NetworkConfig):
         - parent_pub_address (`str`): a module's parent node's broadcast address
         - module_pub_address (`str`): the internal module's broadcast address
         """
-        external_address_map = {zmq.SUB: [parent_pub_address], zmq.PUB: [module_pub_address]}       
-        super().__init__(network_name, external_address_map=external_address_map)
+        internal_address_map = {zmq.SUB: [parent_pub_address], 
+                                zmq.PUB: [module_pub_address]}       
+        super().__init__(network_name, internal_address_map=internal_address_map)
 
 class InternalModule(NetworkElement):
     """
@@ -147,7 +148,7 @@ class InternalModule(NetworkElement):
                 # inform parent module that this module has terminated
                 terminated_msg = TerminateInternalModuleMessage(self.name, self.get_parent_name())
                 self._send_internal_msg(terminated_msg, zmq.PUB)
-        
+
         return asyncio.run(main())
 
     @abstractmethod

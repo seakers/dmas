@@ -49,3 +49,7 @@ docs_clean:
 bare: clean
 	pip uninstall -y $(PROJECT) 
 	rm -rf $(PROJECT).egg-info .eggs
+
+runtest:
+	-X=`pwd`; \
+	cd $$X; cd $(TEST); python -m unittest discover

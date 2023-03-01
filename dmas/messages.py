@@ -26,7 +26,7 @@ class SimulationMessage(object):
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
     """
-    def __init__(self, src : str, dst : str, msg_type : str, id : uuid.UUID=None):
+    def __init__(self, src : str, dst : str, msg_type : Enum, id : uuid.UUID=None):
         """
         Initiates an instance of a simulation message.
         
@@ -49,10 +49,16 @@ class SimulationMessage(object):
             raise TypeError(f'Message sender `src` must be of type `str`. Is of type {type(self.src)}')
         if not isinstance(self.dst , str):
             raise TypeError(f'Message receiver `dst` must be of type `str`. Is of type {type(self.dst)}')
-        if not isinstance(self.msg_type , str):
-            raise TypeError(f'Message type `msg_type` must be of type `str`. Is of type {type(self.msg_type)}')
+        if not isinstance(self.msg_type , Enum):
+            raise TypeError(f'Message type `msg_type` must be of type `Enum`. Is of type {type(self.msg_type)}')
         if not isinstance(self.id , str):
             raise TypeError(f'Message id `id` must be of type `str`. Is of type {type(self.id)}')
+
+    def __eq__(self, other) -> bool:
+        """
+        Compares two instances of a simulation message. Returns True if they represent the same message.
+        """
+        return self.to_dict() == other.to_dict()
 
     def to_dict(self) -> dict:
         """

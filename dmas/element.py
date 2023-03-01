@@ -168,7 +168,7 @@ class SimulationElement(NetworkElement):
         # inform others of deactivation
         self._publish_deactivate()
 
-        # close connections
+        # close network connections
         self._deactivate_network()
     
     @abstractmethod
