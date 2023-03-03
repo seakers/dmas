@@ -339,14 +339,14 @@ class TestNetworkElement(unittest.TestCase):
         # INTERNAL MESSAGING
         print('\nTEST: Internal Message Broadcast (PUB-SUB)')
         for n_listeners in listeners:
-            print(f'\nNumber of listeners: {n_listeners}')
+            print(f'Number of listeners: {n_listeners}')
             self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, PORT, n_listeners, N_MESSAGES)
             print('\n')
 
         # EXTERNAL MESSAGING
-        print('\nTEST: External Message Broadcast (PUB-SUB)')
+        print('TEST: External Message Broadcast (PUB-SUB)')
         for n_listeners in listeners:
-            print(f'\nNumber of listeners: {n_listeners}')
+            print(f'Number of listeners: {n_listeners}')
             self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUB, zmq.SUB, PORT, n_listeners, N_MESSAGES)
             print('\n')
 
@@ -358,14 +358,13 @@ class TestNetworkElement(unittest.TestCase):
         # INTERNAL MESSAGING
         print('\nTEST: Internal Message Distribution (PUSH-PULL)')
         for n_listeners in listeners:
-            print(f'Number of listeners: {n_listeners}\n')
+            print(f'Number of listeners: {n_listeners}')
             self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, PORT, n_listeners, N_MESSAGES)
             print('\n')
 
         # EXTERNAL MESSAGING
-        print('\nTEST: External Message Broadcast (PUB-SUB)')
+        print('TEST: Internal Message Distribution (PUSH-PULL)')
         for n_listeners in listeners:
-            print(f'\nNumber of listeners: {n_listeners}')
+            print(f'Number of listeners: {n_listeners}')
             self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUSH, zmq.PULL, PORT, n_listeners, N_MESSAGES)
             print('\n')
-            
