@@ -106,12 +106,14 @@ class TestNetworkElement(unittest.TestCase):
         def activate(self) -> dict:
             self._external_socket_map, self._internal_socket_map = self.config_network()
 
+            print(f'{self.name}: Internal Addresses:', self._network_config.get_internal_addresses()) 
+            print(f'{self.name}: External Addresses:', self._network_config.get_external_addresses()) 
+
         @abstractmethod
         async def routine():
             pass
 
         async def main(self):
-                # try:
                 timeout_task = asyncio.create_task(asyncio.sleep(15))
                 coroutine_task = asyncio.create_task(self.routine())
 
@@ -122,9 +124,6 @@ class TestNetworkElement(unittest.TestCase):
                 else:
                     coroutine_task.cancel()
                     await coroutine_task
-
-                # finally:
-                #     self._deactivate_network()
 
         def run(self):
             try:
@@ -192,7 +191,7 @@ class TestNetworkElement(unittest.TestCase):
             self.socket_type = socket_type
             self.msgs = []
             self.n = n
-            self.t_type = t_type
+            self.t_type = t_type          
 
         async def routine(self):
             try:
@@ -253,7 +252,7 @@ class TestNetworkElement(unittest.TestCase):
         print('\nTEST: Internal Message Broadcast (PUB-SUB)')
         self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n) 
 
-        # # PUSH-PULL pattern
-        # print('\nTEST: Internal Message Distribution (PUSH-PULL)')
-        # self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, port, n) 
+        # PUSH-PULL pattern
+        print('\nTEST: Internal Message Distribution (PUSH-PULL)')
+        self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, port, n) 
         print('\n')

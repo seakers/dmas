@@ -412,10 +412,17 @@ class NetworkElement(ABC):
         """
         Shut down all activated network ports
         """
-        # close connections
+        # close external connections
         for socket_type in self._external_socket_map:
             socket_type : zmq.SocketType
             socket, _ = self._external_socket_map[socket_type]
+            socket : zmq.Socket
+            socket.close()  
+
+        # close internal connections
+        for socket_type in self._internal_socket_map:
+            socket_type : zmq.SocketType
+            socket, _ = self._internal_socket_map[socket_type]
             socket : zmq.Socket
             socket.close()  
 
