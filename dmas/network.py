@@ -207,7 +207,6 @@ class NetworkElement(ABC):
         self.name = network_config.network_name + '/' + element_name
         self._logger : logging.Logger = self.__set_up_logger(level) if logger is None else logger
 
-        self._network_context = azmq.Context()
         self._network_config = network_config
         self._internal_socket_map = None
         self._internal_address_ledger = None
@@ -298,6 +297,7 @@ class NetworkElement(ABC):
         if self.__network_activated:
             raise PermissionError('Attempted to configure network after it has already been configurated.')
 
+        self._network_context = azmq.Context()
         external_socket_map = self.__config_external_network()
         internal_socket_map = self.__config_internal_network()
 
@@ -359,73 +359,35 @@ class NetworkElement(ABC):
         ### Usage
             socket, lock = socket_factory(context, socket_type, address)
         """
-        if socket_type is zmq.PUB:
-            # create PUB socket
-            socket : zmq.Socket = self._network_context.socket(zmq.PUB)  
-            socket.sndhwm = 1100000
 
-            # bind to desired addresses
-            for address in addresses:
+        # create socket
+        socket : zmq.Socket = self._network_context.socket(socket_type)
+
+        # connect or bind to network port
+        for address in addresses:
+            if socket_type in [zmq.PUB, zmq.PUSH, zmq.REP]:
                 if self.__is_address_in_use(address):
-                    raise ConnectionAbortedError(f'Cannot bind to address {address}. Currently under use by another process.')
-                socket.bind(address)  
+                    raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
+                
+                socket.bind(address)
 
-        elif socket_type is zmq.SUB:
-            # create SUB socket
-            socket : zmq.Socket = self._network_context.socket(zmq.SUB)
-            
-            # connect to desired addresses
-            for address in addresses:
+            elif socket_type in [zmq.SUB, zmq.PULL]:
                 socket.connect(address)
 
+            else:
+                raise NotImplementedError(f'Socket of type {socket_type} not yet supported.')
+
+        # set socket options
+        socket.setsockopt(zmq.LINGER, 0)
+        if socket_type is zmq.PUB:
+            # allow for subscribers to connect to this port
+            socket.sndhwm = 1100000
+
+        elif socket_type is zmq.SUB:
             # subscribe to messages addressed to this element or to all elements in the network
             socket.setsockopt(zmq.SUBSCRIBE, self._network_name.encode('ascii'))
             socket.setsockopt(zmq.SUBSCRIBE, self._element_name.encode('ascii'))
             # socket.setsockopt(zmq.SUBSCRIBE, SimulationElementRoles.ALL.value.encode('ascii'))
-            
-        elif socket_type is zmq.REQ:
-            # create REQ socket
-            socket : zmq.Socket = self._network_context.socket(zmq.REQ)
-            socket.setsockopt(zmq.LINGER, 0)
-
-            # no initial connection. Socket is to be connected to its destination on demand
-
-        elif socket_type is zmq.REP:
-            # create REP socket
-            socket : zmq.Socket = self._network_context.socket(zmq.REP)
-            
-            # bind to desired addresses
-            for address in addresses:
-                if self.__is_address_in_use(address):
-                    raise ConnectionAbortedError(f'Cannot bind to address {address}. Currently under use by another process.')
-                socket.bind(address)
-
-            socket.setsockopt(zmq.LINGER, 0)
-            
-        elif socket_type is zmq.PUSH:
-            # create PUSH socket
-            socket : zmq.Socket = self._network_context.socket(zmq.PUSH)
-
-            # connect to desired addresses
-            for address in addresses:
-                socket.connect(address)
-
-            socket.setsockopt(zmq.LINGER, 0)
-        
-        elif socket_type is zmq.PULL:
-            # create PULL socket
-            socket : zmq.Socket = self._network_context.socket(zmq.PULL)
-            
-            # conent to desired addresses
-            for address in addresses:
-                if self.__is_address_in_use(address):
-                    raise ConnectionAbortedError(f'Cannot bind to address {address}. Currently under use by another process.')
-                socket.bind(address)
-
-            socket.setsockopt(zmq.LINGER, 0)
-
-        else:
-            raise NotImplementedError(f'Socket of type {socket_type} not yet supported.')
         
         return (socket, asyncio.Lock())
 

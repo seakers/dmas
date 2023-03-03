@@ -1,12 +1,12 @@
 import json
 import random
 import unittest
+from tqdm import tqdm
 
 import zmq
 import concurrent.futures
 
 from dmas.network import *
-
 
 class TestNetworkConfig(unittest.TestCase): 
     def test_init(self):
@@ -88,11 +88,14 @@ class TestNetworkConfig(unittest.TestCase):
         self.assertEqual(network_config_1, network_config_1_reconstructed)
         self.assertNotEqual(network_config_1, network_config_2_reconstructed)
 
-    # TODO Test Port in Use and Port/Address generators
-
-   
+    # TODO Test Port in Use and Port/Address generators   
 
 class TestNetworkElement(unittest.TestCase): 
+
+    class TransmissionTypes:
+        INT = 'INTERNAL'
+        EXT = 'EXTERNAL'
+
     class DummyNetworkElement(NetworkElement):
         def _external_sync(self) -> dict:
             return dict()
@@ -104,49 +107,54 @@ class TestNetworkElement(unittest.TestCase):
             self._external_socket_map, self._internal_socket_map = self.config_network()
 
         @abstractmethod
-        async def coroutine():
+        async def routine():
             pass
+
+        async def main(self):
+                # try:
+                timeout_task = asyncio.create_task(asyncio.sleep(15))
+                coroutine_task = asyncio.create_task(self.routine())
+
+                _, pending = await asyncio.wait([timeout_task, coroutine_task], return_when=asyncio.FIRST_COMPLETED)
+
+                if timeout_task in pending:
+                    return
+                else:
+                    coroutine_task.cancel()
+                    await coroutine_task
+
+                # finally:
+                #     self._deactivate_network()
 
         def run(self):
             try:
-                async def routine():
-                    timeout_task = asyncio.create_task(asyncio.sleep(5))
-                    coroutine_task = asyncio.create_task(self.coroutine())
-
-                    _, pending = await asyncio.wait([timeout_task, coroutine_task], return_when=asyncio.FIRST_COMPLETED)
-
-                    if timeout_task in pending:
-                        return
-                    else:
-                        for task in pending:
-                            task : asyncio.Task
-                            task.cancel()
-                            await task
-
-                asyncio.run(routine())
+                asyncio.run(self.main())
             finally:
                 self._deactivate_network()
 
-    class ExternalSender(DummyNetworkElement):
-        def __init__(self, socket_type : zmq.SocketType, n) -> None:
-            network_name = 'TEST_NETWORK'        
-            internal_address_map = dict()
-            if socket_type == zmq.PUB:
-                external_address_map = {socket_type: ['tcp://*:5556']}
-            elif socket_type == zmq.PUSH:
-                external_address_map = {socket_type: ['tcp://localhost:5556']}
+    class Sender(DummyNetworkElement):
+        def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO) -> None:
+            network_name = 'TEST_NETWORK'    
+            if t_type is TestNetworkElement.TransmissionTypes.INT:   
+                internal_address_map = {socket_type: [f'tcp://*:{port}']}
+                external_address_map = dict()
+
+            elif t_type is TestNetworkElement.TransmissionTypes.EXT:
+                internal_address_map = dict()
+                external_address_map = {socket_type: [f'tcp://*:{port}']}
+
             network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
             
-            super().__init__('SENDER', network_config, level=logging.INFO)
+            super().__init__('SENDER', network_config, level)
             self.socket_type = socket_type
             self.msgs = []
             self.n = n
+            self.t_type = t_type
 
-        async def coroutine(self):
+        async def routine(self):
             try:
-                for _ in range(self.n):
+                for _ in tqdm (range (self.n), desc="SENDER: Transmitting..."):
                     dt = 0.01
-                    # print(f'SENDER: sleeping for {dt}[s]...')
                     await asyncio.sleep(dt)
 
                     src = self.name
@@ -154,173 +162,98 @@ class TestNetworkElement(unittest.TestCase):
                     msg_type = 'TEST'
 
                     msg = SimulationMessage(src, dst, msg_type)
-                    print(f'SENDER: sending message through port of type {self.socket_type}...')
-                    status = 'successful!' if await self._send_external_msg(msg, self.socket_type) else 'failed.'
+                    self._log(f'sending message through port of type {self.socket_type}...')
+                    if self.t_type is TestNetworkElement.TransmissionTypes.INT:   
+                        status = 'successful!' if await self._send_internal_msg(msg, self.socket_type) else 'failed.'
+
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
+                        status = 'successful!' if await self._send_external_msg(msg, self.socket_type) else 'failed.'
                     self.msgs.append(msg)
-                    print(f'SENDER: finished sending message! Transmission status: {status}')
+                    self._log(f'finished sending message! Transmission status: {status}')
 
             except asyncio.CancelledError:
                 return
 
-    class ExternalReceiver(DummyNetworkElement):
-        def __init__(self, socket_type : zmq.SocketType, n) -> None:
-            network_name = 'TEST_NETWORK'        
-            internal_address_map = dict()
+    class Receiver(DummyNetworkElement):
+        def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO) -> None:
+            network_name = 'TEST_NETWORK'     
 
-            if socket_type == zmq.SUB:
-                external_address_map = {socket_type: ['tcp://localhost:5556']}
-            elif socket_type == zmq.PULL:
-                external_address_map = {socket_type: ['tcp://*:5556']}
+            if t_type is TestNetworkElement.TransmissionTypes.INT:   
+                internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
+                external_address_map = dict()
+
+            elif t_type is TestNetworkElement.TransmissionTypes.EXT:
+                internal_address_map = dict()
+                external_address_map = {socket_type: [f'tcp://localhost:{port}']}
 
             network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
             
-            super().__init__('RECEIVER', network_config, level=logging.INFO)
+            super().__init__('RECEIVER', network_config, level)
             self.socket_type = socket_type
             self.msgs = []
             self.n = n
+            self.t_type = t_type
 
-        async def coroutine(self):
+        async def routine(self):
             try:
-                while len(self.msgs) < self.n:
-                    print(f'RECEIVER: waiting for incoming messages through port of type {self.socket_type}...')
-                    dst, src, content = await self._receive_external_msg(self.socket_type)
+                for _ in tqdm (range (self.n), desc="RECEIVER:  Listening..."):
+                    self._log(f'waiting for incoming messages through port of type {self.socket_type}...')
+                    if self.t_type is TestNetworkElement.TransmissionTypes.INT:   
+                        dst, src, content = await self._receive_internal_msg(self.socket_type)
+
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
+                        dst, src, content = await self._receive_external_msg(self.socket_type)
+
                     self.msgs.append(SimulationMessage(**content))
-                    print(f'RECEIVER: received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
+                    self._log(f'received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
 
             except asyncio.CancelledError:
                 return
-        
-    # def test_external_broadcast_msg(self):
-    #     # PUB-SUB pattern
-    #     n = 10
 
-    #     sender_pub = TestNetworkElement.ExternalSender(zmq.PUB, n)
-    #     receiver_sub = TestNetworkElement.ExternalReceiver(zmq.SUB, n)
-        
-    #     sender_pub.activate()
-    #     receiver_sub.activate()
+    def transmission_tester(self,
+                            t_type : TransmissionTypes, 
+                            sender_port_type : zmq.SocketType, 
+                            receiver_port_type : zmq.SocketType, 
+                            port : int,
+                            n : int):
+        if t_type is not TestNetworkElement.TransmissionTypes.INT and t_type is not TestNetworkElement.TransmissionTypes.EXT:
+            raise TypeError('`t_type` must be of type `TransmissionTypes`')
 
-    #     with concurrent.futures.ThreadPoolExecutor(2) as pool:
-    #         pool.submit(receiver_sub.run, *[])
-    #         pool.submit(sender_pub.run, *[])
+        sender = TestNetworkElement.Sender(t_type, sender_port_type, port, n)
+        receiver = TestNetworkElement.Receiver(t_type, receiver_port_type, port, n)
 
-    #     self.assertEqual(sender_pub.msgs, receiver_sub.msgs)    
-
-    def test_external_distributed_msg(self):
-        # PUSH-PULL pattern
-        n = 10
-
-        sender = TestNetworkElement.ExternalSender(zmq.PUSH, n)
-        receiver = TestNetworkElement.ExternalReceiver(zmq.PULL, n)
-        
         sender.activate()
         receiver.activate()
-
+    
         with concurrent.futures.ThreadPoolExecutor(2) as pool:
             pool.submit(receiver.run, *[])
             pool.submit(sender.run, *[])
 
-        self.assertEqual(sender.msgs, receiver.msgs)
-            
+        self.assertEqual(sender.msgs, receiver.msgs)  
+         
+    def test_external_messaging(self):
+        port = 5556
+        n = 10
 
+        # PUB-SUB pattern
+        print('\nTEST: External Message Broadcast (PUB-SUB)')
+        self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUB, zmq.SUB, port, n) 
+        print('\n')
 
-    class InternalSender(DummyNetworkElement):
-        def __init__(self, socket_type : zmq.SocketType, n) -> None:
-            network_name = 'TEST_NETWORK'        
-            external_address_map = dict()
-            if socket_type is zmq.PUB:
-                internal_address_map = {socket_type: ['tcp://*:5556']}
-            elif socket_type is zmq.PUSH:
-                internal_address_map = {socket_type: ['tcp://localhost:5556']}
-
-            network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
-            
-            super().__init__('SENDER', network_config)
-            self.socket_type = socket_type
-            self.msgs = []
-            self.n = n
-
-        async def coroutine(self):
-            try:
-                for _ in range(self.n):
-                    dt = 0.01
-                    print(f'SENDER: sleeping for {dt}[s]...')
-                    await asyncio.sleep(dt)
-
-                    src = self.name
-                    dst = self.get_network_name()
-                    msg_type = 'TEST'
-
-                    msg = SimulationMessage(src, dst, msg_type)
-                    print(f'SENDER: sending message through port of type {self.socket_type}...')
-                    status = 'successful!' if await self._send_internal_msg(msg, self.socket_type) else 'failed.'
-                    self.msgs.append(msg)
-                    print(f'SENDER: finished sending message! Transmission status: {status}')
-                
-                print('SENDER: DONE!')
-                return
-            except asyncio.CancelledError:
-                return
-
-    class InternalReceiver(DummyNetworkElement):
-        def __init__(self, socket_type : zmq.SocketType, n) -> None:
-            network_name = 'TEST_NETWORK'        
-            external_address_map = dict()
-
-            if socket_type is zmq.SUB:
-                internal_address_map = {socket_type: ['tcp://localhost:5556']}
-            elif socket_type is zmq.PULL:
-                internal_address_map = {socket_type: ['tcp://*:5556']}
-
-            network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
-            
-            super().__init__('RECEIVER', network_config)
-            self.socket_type = socket_type
-            self.msgs = []
-            self.n = n
-
-        async def coroutine(self):
-            try:
-                while len(self.msgs) < self.n:
-                    print(f'RECEIVER: waiting for incoming messages through port of type {self.socket_type}...')
-                    dst, src, content = await self._receive_internal_msg(self.socket_type)
-                    self.msgs.append(SimulationMessage(**content))
-                    print(f'RECEIVER: received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
-
-                print('RECEIVER: DONE!')
-                return
-            except asyncio.CancelledError:
-                return
-            
-    # def test_internal_broadcast_msg(self):
-    #     # PUB-SUB pattern
-    #     n = 10
-
-    #     sender = TestNetworkElement.InternalSender(zmq.PUB, n)
-    #     receiver = TestNetworkElement.InternalReceiver(zmq.SUB, n)
-
-    #     print(sender.get_socket_maps())
-    #     print(receiver.get_socket_maps())
-        
-    #     sender.activate()
-    #     receiver.activate()
-
-    #     with concurrent.futures.ThreadPoolExecutor(2) as pool:
-    #         pool.submit(receiver.run, *[])
-    #         pool.submit(sender.run, *[])
-        
-    #     self.assertEqual(sender.msgs, receiver.msgs)
-
-    # def test_internal_distributed_msg(self):
         # PUSH-PULL pattern
-        # sender = TestNetworkElement.InternalSender(zmq.PUSH, n)
-        # receiver = TestNetworkElement.InternalReceiver(zmq.PULL, n)
-        
-        # sender.activate()
-        # receiver.activate()
+        print('\nTEST: External Message Distribution (PUSH-PULL)')
+        self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUSH, zmq.PULL, port, n) 
+        print('\n')
 
-        # with concurrent.futures.ThreadPoolExecutor(2) as pool:
-        #     pool.submit(receiver.run, *[])
-        #     pool.submit(sender.run, *[])
+    def test_internal_messaging(self):
+        port = 5556
+        n = 10
 
-        # self.assertEqual(sender.msgs, receiver.msgs)
+        # PUB-SUB pattern
+        print('\nTEST: Internal Message Broadcast (PUB-SUB)')
+        self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n) 
+
+        # # PUSH-PULL pattern
+        # print('\nTEST: Internal Message Distribution (PUSH-PULL)')
+        # self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, port, n) 
+        print('\n')
