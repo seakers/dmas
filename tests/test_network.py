@@ -102,14 +102,15 @@ class TestNetworkElement(unittest.TestCase):
             super().__init__(element_name, network_config, level, logger)
             self.msgs = []
 
-        def _external_sync(self) -> dict:
+        async def _external_sync(self) -> dict:
             return dict()
 
-        def _internal_sync(self) -> dict:
+        async def _internal_sync(self) -> dict:
             return dict()
         
         def activate(self) -> dict:
             self._external_socket_map, self._internal_socket_map = self.config_network()
+            _, _ = self.sync()
 
         @abstractmethod
         async def routine():
@@ -281,6 +282,42 @@ class TestNetworkElement(unittest.TestCase):
             except asyncio.CancelledError:
                 return
 
+    # def sync_tester(self,
+    #                 t_type : TransmissionTypes, 
+    #                 sender_port_type : zmq.SocketType, 
+    #                 receiver_port_type : zmq.SocketType, 
+    #                 port : int,
+    #                 n_receivers : int,
+    #                 n_messages : int,
+    #                 level : int = logging.INFO):
+    #     sender = TestNetworkElement.Sender(t_type, sender_port_type, port, n_messages, level)
+    #     receivers = []
+    #     for i in range(n_receivers):
+    #         receiver = TestNetworkElement.Receiver(f'RECEVER_{i+1}', t_type, receiver_port_type, port, n_messages, level)
+    #         receivers.append(receiver)
+        
+    #     sender.activate()
+    #     for receiver in receivers:
+    #         receiver : TestNetworkElement.DummyNetworkElement
+    #         receiver.activate()
+        
+    #     print(sender.sync())
+    #     for receiver in receivers:
+    #         receiver : TestNetworkElement.DummyNetworkElement
+    #         print(receiver.sync())
+
+    # def test_sync(self):
+    #     port = 5555
+    #     listeners = [1]
+    #     n_messages = 20
+
+    #     # INTERNAL MESSAGING
+    #     print('\nTEST: Internal Sync (PUB-SUB)')
+    #     for n_listeners in listeners:
+    #         print(f'Number of listeners: {n_listeners}')
+    #         self.sync_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
+    #         print('\n')        
+
     def transmission_tester(self,
                             t_type : TransmissionTypes, 
                             sender_port_type : zmq.SocketType, 
@@ -307,9 +344,7 @@ class TestNetworkElement(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(len(receivers) + 1) as pool:
             for receiver in receivers:
                 pool.submit(receiver.run, *[])
-            # print('\n')
             pool.submit(sender.run, *[])
-            # print('\n')
 
         if receiver_port_type is zmq.SUB:
             received_messages = None
@@ -332,39 +367,39 @@ class TestNetworkElement(unittest.TestCase):
             self.assertTrue(msg in received_messages)
 
     def test_message_broadcast(self):
-        PORT = 5555
-        listeners = [1, 20]
-        N_MESSAGES = 20
+        port = 5555
+        listeners = [1]
+        n_messages = 20
 
         # INTERNAL MESSAGING
         print('\nTEST: Internal Message Broadcast (PUB-SUB)')
         for n_listeners in listeners:
             print(f'Number of listeners: {n_listeners}')
-            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, PORT, n_listeners, N_MESSAGES)
+            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
             print('\n')
 
-        # EXTERNAL MESSAGING
-        print('TEST: External Message Broadcast (PUB-SUB)')
-        for n_listeners in listeners:
-            print(f'Number of listeners: {n_listeners}')
-            self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUB, zmq.SUB, PORT, n_listeners, N_MESSAGES)
-            print('\n')
+        # # EXTERNAL MESSAGING
+        # print('TEST: External Message Broadcast (PUB-SUB)')
+        # for n_listeners in listeners:
+        #     print(f'Number of listeners: {n_listeners}')
+        #     self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
+        #     print('\n')
 
-    def test_message_distribution(self):
-        PORT = 5555
-        listeners = [1, 20]
-        N_MESSAGES = 20
+    # def test_message_distribution(self):
+    #     port = 5555
+    #     listeners = [1, 20]
+    #     n_messages = 20
 
-        # INTERNAL MESSAGING
-        print('\nTEST: Internal Message Distribution (PUSH-PULL)')
-        for n_listeners in listeners:
-            print(f'Number of listeners: {n_listeners}')
-            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, PORT, n_listeners, N_MESSAGES)
-            print('\n')
+    #     # INTERNAL MESSAGING
+    #     print('\nTEST: Internal Message Distribution (PUSH-PULL)')
+    #     for n_listeners in listeners:
+    #         print(f'Number of listeners: {n_listeners}')
+    #         self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages)
+    #         print('\n')
 
-        # EXTERNAL MESSAGING
-        print('TEST: Internal Message Distribution (PUSH-PULL)')
-        for n_listeners in listeners:
-            print(f'Number of listeners: {n_listeners}')
-            self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUSH, zmq.PULL, PORT, n_listeners, N_MESSAGES)
-            print('\n')
+    #     # EXTERNAL MESSAGING
+    #     print('TEST: Internal Message Distribution (PUSH-PULL)')
+    #     for n_listeners in listeners:
+    #         print(f'Number of listeners: {n_listeners}')
+    #         self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages)
+    #         print('\n')

@@ -497,12 +497,13 @@ class NetworkElement(ABC):
                     await external_sync_task
 
                 if not external_sync_task.done():
-                    external_sync_task.cancel()
+                    external_sync_task.  cancel()
                     await external_sync_task
 
                 raise e
 
-        return (asyncio.run(routine()))
+        return None, None
+        #TODO Find way to sync in a single asyncio loop? return asyncio.run(routine())
 
     @abstractmethod
     async def _external_sync(self) -> dict:
