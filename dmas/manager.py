@@ -10,6 +10,7 @@ class ManagerNetworkConfig(NetworkConfig):
     Describes the addresses assigned to the simulation manager
     """
     def __init__(self, 
+                network_name : str,
                 response_address : str,
                 broadcast_address: str,
                 monitor_address: str
@@ -25,7 +26,7 @@ class ManagerNetworkConfig(NetworkConfig):
         external_address_map = {zmq.REP: [response_address], 
                                 zmq.PUB: [broadcast_address], 
                                 zmq.PUSH: [monitor_address]}
-        super().__init__(external_address_map=external_address_map)
+        super().__init__(network_name, external_address_map=external_address_map)
 
 class Manager(SimulationElement):
     """
@@ -52,12 +53,11 @@ class Manager(SimulationElement):
     __doc__ += SimulationElement.__doc__
     
     def __init__(self, 
-            network_name : str,
-            simulation_element_name_list : list,
-            clock_config : ClockConfig,
-            network_config : ManagerNetworkConfig,
-            level : int = logging.INFO
-            ) -> None:
+                simulation_element_name_list : list,
+                clock_config : ClockConfig,
+                network_config : ManagerNetworkConfig,
+                level : int = logging.INFO
+                ) -> None:
         """
         Initializes and instance of a simulation manager
 
@@ -67,7 +67,7 @@ class Manager(SimulationElement):
             - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
             - level (`int`): logging level for this simulation element
         """
-        super().__init__(network_name, SimulationElementRoles.MANAGER.name, network_config, level)
+        super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
         
         # check if an environment is contained in the simulation
         # if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
@@ -144,7 +144,7 @@ class Manager(SimulationElement):
     def _publish_deactivate(self) -> None:
         async def subroutine():
             # push simulation end to monitor
-            sim_end_msg = SimulationEndMessage(time.perf_counter())
+            sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
             await self._send_external_msg(sim_end_msg, zmq.PUSH)
         
         asyncio.run(subroutine())
@@ -288,13 +288,13 @@ if __name__ == '__main__':
     response_address = "tcp://*:5558"
     broadcast_address = "tcp://*:5559"
     monitor_address = "tcp://127.0.0.1:55"
-    network_config = ManagerNetworkConfig(response_address, broadcast_address, monitor_address)
+    network_config = ManagerNetworkConfig('TEST_NETWORK', response_address, broadcast_address, monitor_address)
 
     start = datetime(2020, 1, 1, 7, 20, 0, tzinfo=timezone.utc)
     end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
-    clock_config = RealTimeClockConfig(start, end)
+    clock_config = RealTimeClockConfig(str(start), str(end))
 
-    manager = Manager('TEST_NETWORK', [], clock_config, network_config, level=logging.DEBUG)
+    manager = Manager([], clock_config, network_config, level=logging.DEBUG)
 
     t_o = time.perf_counter()
     manager.run()

@@ -109,8 +109,7 @@ class TestNetworkElement(unittest.TestCase):
             return dict()
         
         def activate(self) -> dict:
-            self._external_socket_map, self._internal_socket_map = self.config_network()
-            _, _ = self.sync()
+            self._network_context, self._external_socket_map, self._internal_socket_map = self.config_network()
 
         @abstractmethod
         async def routine():
@@ -129,10 +128,10 @@ class TestNetworkElement(unittest.TestCase):
                     await coroutine_task
 
         def run(self):
-            try:
-                asyncio.run(self.main())
-            finally:
-                self._deactivate_network()
+            # try:
+            asyncio.run(self.main())
+            # finally:
+            #     self._deactivate_network()
 
     class ReceiverKillMessage(SimulationMessage):
         """
@@ -280,43 +279,12 @@ class TestNetworkElement(unittest.TestCase):
                     self._log(f'received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
 
             except asyncio.CancelledError:
-                return
+                return      
 
-    # def sync_tester(self,
-    #                 t_type : TransmissionTypes, 
-    #                 sender_port_type : zmq.SocketType, 
-    #                 receiver_port_type : zmq.SocketType, 
-    #                 port : int,
-    #                 n_receivers : int,
-    #                 n_messages : int,
-    #                 level : int = logging.INFO):
-    #     sender = TestNetworkElement.Sender(t_type, sender_port_type, port, n_messages, level)
-    #     receivers = []
-    #     for i in range(n_receivers):
-    #         receiver = TestNetworkElement.Receiver(f'RECEVER_{i+1}', t_type, receiver_port_type, port, n_messages, level)
-    #         receivers.append(receiver)
-        
-    #     sender.activate()
-    #     for receiver in receivers:
-    #         receiver : TestNetworkElement.DummyNetworkElement
-    #         receiver.activate()
-        
-    #     print(sender.sync())
-    #     for receiver in receivers:
-    #         receiver : TestNetworkElement.DummyNetworkElement
-    #         print(receiver.sync())
-
-    # def test_sync(self):
-    #     port = 5555
-    #     listeners = [1]
-    #     n_messages = 20
-
-    #     # INTERNAL MESSAGING
-    #     print('\nTEST: Internal Sync (PUB-SUB)')
-    #     for n_listeners in listeners:
-    #         print(f'Number of listeners: {n_listeners}')
-    #         self.sync_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
-    #         print('\n')        
+    # def test_config_network(self):
+    #     network_congif = NetworkConfig('TEST_NETWORK',
+    #                                     {}, 
+    #                                     {})
 
     def transmission_tester(self,
                             t_type : TransmissionTypes, 
@@ -386,7 +354,7 @@ class TestNetworkElement(unittest.TestCase):
             print('\n')
 
     def test_message_distribution(self):
-        port = 5555
+        port = 5556
         listeners = [1, 20]
         n_messages = 20
 

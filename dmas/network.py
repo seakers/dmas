@@ -96,6 +96,7 @@ class NetworkConfig(ABC):
         """
         Compares two instances of a network configuration. Returns True if they represent the same configuration.
         """
+        other : NetworkElement
         return self.to_dict() == other.to_dict()
 
     def get_internal_addresses(self) -> dict:
@@ -213,14 +214,13 @@ class NetworkElement(ABC):
         self._external_socket_map = None
         self._external_address_ledger = None
 
-        self.__network_activated = False
-        self.__network_synced = False
+        self._network_activated = False
 
     def __del__(self):
         """
-        Closes all open netowrk connections in case any are open when deleting an instance of this class
+        Closes all open network connections in case any are open when deleting an instance of this class
         """
-        self._deactivate_network() if self.__network_activated else None
+        self._deactivate_network() if self._network_activated else None
 
     def get_network_name(self) -> str:
         """
@@ -294,18 +294,20 @@ class NetworkElement(ABC):
             - `tuple` of two `dict`s mapping the types of sockets used by this simulation element to a dedicated 
                 port socket and asynchronous lock pair
         """ 
-        if self.__network_activated:
+        if self._network_activated:
             raise PermissionError('Attempted to configure network after it has already been configurated.')
 
-        self._network_context = azmq.Context()
-        external_socket_map = self.__config_external_network()
-        internal_socket_map = self.__config_internal_network()
+        network_context = azmq.Context()
 
-        self.__network_activated = True
+        external_socket_map = self.__config_external_network(network_context)
 
-        return external_socket_map, internal_socket_map
+        internal_socket_map = self.__config_internal_network(network_context)
 
-    def __config_external_network(self) -> dict:
+        self._network_activated = True
+
+        return network_context, external_socket_map, internal_socket_map
+
+    def __config_external_network(self, network_context) -> dict:
         """
         Initializes and connects essential network port sockets for inter-element communication
         
@@ -320,11 +322,11 @@ class NetworkElement(ABC):
             address = external_addresses[socket_type]
             socket_type : zmq.Socket; address : str
 
-            external_socket_map[socket_type] = self.__socket_factory(socket_type, address)
+            external_socket_map[socket_type] = self.__socket_factory(socket_type, address, network_context)
 
         return external_socket_map
 
-    def __config_internal_network(self) -> dict:
+    def __config_internal_network(self, network_context) -> dict:
         """
         Initializes and connects essential network port sockets for intra-element communication
         
@@ -339,11 +341,11 @@ class NetworkElement(ABC):
             address = internal_addresses[socket_type]
             socket_type : zmq.Socket; address : str
 
-            internal_socket_map[socket_type] = self.__socket_factory(socket_type, address)
+            internal_socket_map[socket_type] = self.__socket_factory(socket_type, address, network_context)
 
         return internal_socket_map
 
-    def __socket_factory(self, socket_type : zmq.SocketType, addresses : list) -> tuple:
+    def __socket_factory(self, socket_type : zmq.SocketType, addresses : list, network_context : azmq.Context) -> tuple:
         """
         Creates a ZMQ socket of a given type and binds it or connects it to a given address .
 
@@ -361,7 +363,7 @@ class NetworkElement(ABC):
         """
 
         # create socket
-        socket : zmq.Socket = self._network_context.socket(socket_type)
+        socket : zmq.Socket = network_context.socket(socket_type)
 
         # connect or bind to network port
         for address in addresses:
@@ -371,7 +373,7 @@ class NetworkElement(ABC):
                 
                 socket.bind(address)
 
-            elif socket_type in [zmq.SUB, zmq.PULL]:
+            elif socket_type in [zmq.SUB, zmq.PULL ,zmq.REQ]:
                 socket.connect(address)
 
             else:
@@ -387,7 +389,6 @@ class NetworkElement(ABC):
             # subscribe to messages addressed to this element or to all elements in the network
             socket.setsockopt(zmq.SUBSCRIBE, self._network_name.encode('ascii'))
             socket.setsockopt(zmq.SUBSCRIBE, self._element_name.encode('ascii'))
-            # socket.setsockopt(zmq.SUBSCRIBE, SimulationElementRoles.ALL.value.encode('ascii'))
         
         return (socket, asyncio.Lock())
 
@@ -418,6 +419,7 @@ class NetworkElement(ABC):
             socket, _ = self._external_socket_map[socket_type]
             socket : zmq.Socket
             socket.close()  
+            # self._log(f'closed external socket of type {socket_type}...', level=logging.INFO)
 
         # close internal connections
         for socket_type in self._internal_socket_map:
@@ -425,105 +427,15 @@ class NetworkElement(ABC):
             socket, _ = self._internal_socket_map[socket_type]
             socket : zmq.Socket
             socket.close()  
+            # self._log(f'closed internal socket of type {socket_type}...', level=logging.INFO)
 
         # close network context
         if self._network_context is not None:
             self._network_context : zmq.Context
             self._network_context.term()  
+            # self._network_context.destroy()
 
-        self.__network_activated = False
-
-    """
-    NETWORK SYNC
-    """
-    def sync(self) -> tuple:
-        """
-        Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
-        
-        Elements will then reach out to the manager subscribe to future broadcasts.
-
-        The manager will use these incoming messages to create a ledger mapping simulation elements to their assigned ports
-        and broadcast it to all memebers of the simulation once they all become online. 
-
-        This will signal the beginning of the simulation.
-
-        #### Returns:
-            - `tuple` of two `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
-        """
-        async def routine():
-            """
-            Synchronizes internal and external ports
-
-            ### Returns:
-                - `tuple` containing the external and internal address ledgers
-            """
-            try:
-                if self.__network_synced:
-                    raise PermissionError('Attempted to sync with network after it has already been synced.')
-
-                # sync internal network
-                internal_sync_task = asyncio.create_task(self._internal_sync(), name='Internal Sync Task')
-                timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
-
-                await asyncio.wait([internal_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
-                                
-                if timeout_task.done():
-                    internal_sync_task.cancel()
-                    await internal_sync_task
-                    raise TimeoutError('Sync with internal network elements timed out.')
-                
-                # sync external network
-                external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
-                
-                await asyncio.wait([external_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
-                
-                if timeout_task.done():
-                    external_sync_task.cancel()
-                    await external_sync_task
-                    raise TimeoutError('Sync with external network elements timed out.')
-
-                # log as synced
-                self.__network_synced = True
-
-                # return external and internal address ledgers
-                return (external_sync_task.result(), internal_sync_task.result())             
-                
-            except TimeoutError as e:
-                self._log(f'Sync aborted. {e}')
-                
-                # cancel sync subroutine
-                if not external_sync_task.done():
-                    external_sync_task.cancel()
-                    await external_sync_task
-
-                if not external_sync_task.done():
-                    external_sync_task.  cancel()
-                    await external_sync_task
-
-                raise e
-
-        return None, None
-        #TODO Find way to sync in a single asyncio loop? return asyncio.run(routine())
-
-    @abstractmethod
-    async def _external_sync(self) -> dict:
-        """
-        Synchronizes with other simulation elements
-
-        #### Returns:
-            - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
-        """
-        pass
-
-    @abstractmethod
-    async def _internal_sync(self) -> dict:
-        """
-        Synchronizes with this element's internal components
-
-        #### Returns:
-            - `dict` mapping a simulation element's components' names to the addresses pointing to their respective connecting ports
-        """
-        pass
+        self._network_activated = False
 
     """
     SEND/RECEIVE MESSAGES
@@ -579,11 +491,11 @@ class NetworkElement(ABC):
             return True
         
         except asyncio.CancelledError as e:
-            print(f'message transmission interrupted. {e}')
+            self._log(f'message transmission interrupted. {e}', level=logging.ERROR)
             return False
 
         except Exception as e:
-            print(f'message transmission failed. {e}')
+            self._log(f'message transmission failed. {e}', level=logging.ERROR)
             raise e
 
         finally:
@@ -677,11 +589,11 @@ class NetworkElement(ABC):
             return dst, src, content
 
         except asyncio.CancelledError as e:
-            print(f'message reception interrupted. {e}')
+            self._log(f'message reception interrupted. {e}', level=logging.ERROR)
             return
             
         except Exception as e:
-            self._log(f'message reception failed. {e}')
+            self._log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
