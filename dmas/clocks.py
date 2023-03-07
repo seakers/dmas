@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import datetime
 from enum import Enum
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 """
 ------------------
@@ -122,6 +122,12 @@ class ClockConfig(ABC):
 
         return datetime(year, month, day, hh, mm, ss, tzinfo=timezone.utc)
 
+    @abstractmethod
+    def get_total_seconds(self):
+        """
+        Returns the real-time period to be simulated in seconds
+        """
+        pass
 
 class AcceleratedRealTimeClockConfig(ClockConfig):
     """
@@ -162,6 +168,10 @@ class AcceleratedRealTimeClockConfig(ClockConfig):
         
         self.sim_clock_freq = sim_clock_freq
 
+    def get_total_seconds(self):
+        delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
+        return delta.total_seconds()/self.sim_clock_freq
+
 class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
     """
     ## Real Time Simulation Clock Configuration  
@@ -189,3 +199,6 @@ class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
         """
         super().__init__(start_date, end_date, 1.0)
         
+    def get_total_seconds(self):
+        delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
+        return delta.total_seconds()

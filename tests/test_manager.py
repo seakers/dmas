@@ -57,9 +57,7 @@ class TestSimulationManager(unittest.TestCase):
                 self._log('disconnected from manager\'s REQ port! waiting for simulation info message from manager...')
                 sock, _ = self._external_socket_map.get(zmq.SUB)
                 sock : zmq.Socket; 
-
-                # print(sock.)
-
+                
                 external_address_ledger = None
                 clock_config = None
 
@@ -80,7 +78,16 @@ class TestSimulationManager(unittest.TestCase):
                         clock_config = msg.get_clock_info()
                         break
                 
-                return ClockConfig(**clock_config), external_address_ledger
+                clock_type = clock_config['clock_type']
+                if clock_type == ClockTypes.REAL_TIME.value:
+                    return RealTimeClockConfig(**clock_config), external_address_ledger
+                    
+                elif clock_type == ClockTypes.ACCELERATED_REAL_TIME.value:
+                    return AcceleratedRealTimeClockConfig(**clock_config), external_address_ledger
+
+                else:
+                    raise NotImplementedError(f'clock type {clock_type} not yet implemented.')
+
 
             except asyncio.CancelledError:
                 return
@@ -180,23 +187,13 @@ class TestSimulationManager(unittest.TestCase):
                 raise e
 
     class DummyMonitor(SimulationElement):
-        def __init__(self, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+        def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PULL: [f'tcp://localhost:{port+2}']})
             
             super().__init__('MONITOR', network_config, level, logger)
-
-            year = 2023
-            month = 1
-            day = 1
-            hh = 12
-            mm = 00
-            ss = 00
-            start_date = datetime(year, month, day, hh, mm, ss)
-            end_date = datetime(year, month, day, hh, mm, ss+1)
-
-            self._clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+            self._clock_config = clock_config
 
         
         async def _external_sync(self) -> dict:
@@ -233,18 +230,7 @@ class TestSimulationManager(unittest.TestCase):
             return 
 
     class TestManager(AbstractManager):
-        def __init__(self, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
-            year = 2023
-            month = 1
-            day = 1
-            hh = 12
-            mm = 00
-            ss = 00
-            start_date = datetime(year, month, day, hh, mm, ss)
-            end_date = datetime(year, month, day, hh, mm, ss+1)
-
-            clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-
+        def __init__(self, clock_config, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
@@ -260,20 +246,27 @@ class TestSimulationManager(unittest.TestCase):
         n_clients = 1
         port = 5555
 
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
+
+        clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+
         simulation_element_name_list = []
         for i in range(n_clients):
             simulation_element_name_list.append(f'CLIENT_{i}')
 
-        manager = TestSimulationManager.TestManager(simulation_element_name_list, port)
+        manager = TestSimulationManager.TestManager(clock_config, simulation_element_name_list, port)
 
         self.assertTrue(isinstance(manager, AbstractManager))
 
-    def test_run(self):
-        n_clients = 1
-        port = 5556
-        level = logging.WARNING
-        
-        monitor = TestSimulationManager.DummyMonitor(port, level)
+    def run_tester(self, clock_config : ClockConfig, n_clients : int = 1, port : int = 5556, level : int = logging.WARNING):
+        monitor = TestSimulationManager.DummyMonitor(clock_config, port, level)
         logger = monitor.get_logger()
 
         clients = []
@@ -283,12 +276,46 @@ class TestSimulationManager(unittest.TestCase):
             clients.append(client)
             simulation_element_name_list.append(client.name)
 
-        manager = TestSimulationManager.TestManager(simulation_element_name_list, port, level, logger)
+        manager = TestSimulationManager.TestManager(clock_config, simulation_element_name_list, port, level, logger)
         
         print('\n')
         with concurrent.futures.ThreadPoolExecutor(len(clients) + 2) as pool:
+            pool.submit(manager.run, *[])
             client : TestSimulationManager.Client
             for client in clients:                
                 pool.submit(client.run, *[])
             pool.submit(monitor.run, *[])
-            pool.submit(manager.run, *[])
+        print('\n')
+
+    def test_realtime_clock_run(self):        
+        print('TESTING REAL-TIME CLOCK MANAGER')
+        n_clients = 5
+
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
+
+        clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+        self.run_tester(clock_config, n_clients, level=logging.WARNING)
+
+    
+    def test_accelerated_clock_run(self):
+        print('TESTING ACCELERATED REAL-TIME CLOCK MANAGER')
+        n_clients = 5
+
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
+
+        clock_config = AcceleratedRealTimeClockConfig(str(start_date), str(end_date), 2)
+        self.run_tester(clock_config, n_clients, level=logging.WARNING)

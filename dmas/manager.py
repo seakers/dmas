@@ -97,7 +97,7 @@ class AbstractManager(SimulationElement):
 
         # broadcast address ledger
         self._log('broadcasting simulation information to all elements...')
-        sim_info_msg = SimulationInfoMessage(self._simulation_element_name_list[-1], external_address_ledger, self._clock_config.to_dict(), time.perf_counter())
+        sim_info_msg = SimulationInfoMessage(self._network_name, external_address_ledger, self._clock_config.to_dict(), time.perf_counter())
         # self._log(sim_info_msg.to_dict())
         await self._send_external_msg(sim_info_msg, zmq.PUB)
         self._log('simulation information sent!')
@@ -113,16 +113,16 @@ class AbstractManager(SimulationElement):
 
         await asyncio.sleep(0.1)
 
-    async def _execute(self) -> None:  
-        async def cancellable_wait(dt):
-            try:
-                desc = f'{self.name}: Simulating for {dt}[s]'
-                for _ in tqdm (range (10), desc=desc):
-                    await asyncio.sleep(dt/10)
-            
-            except asyncio.CancelledError:
-                return        
+    async def cancellable_wait(self, dt):
+        try:
+            desc = f'{self.name}: Simulating for {dt}[s]'
+            for _ in tqdm (range (10), desc=desc):
+                await asyncio.sleep(dt/10)
+        
+        except asyncio.CancelledError:
+            return  
 
+    async def _execute(self) -> None:  
         # broadcast simulation start to all simulation elements
         self._log(f'starting simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
         sim_start_msg = SimulationStartMessage(self._network_name, time.perf_counter())
@@ -133,11 +133,8 @@ class AbstractManager(SimulationElement):
         await self._send_external_msg(sim_start_msg, zmq.PUSH)
 
         # wait for simulation duration to pass
-        self._clock_config : ClockConfig
-        delta : timedelta = ClockConfig.str_to_datetime(self._clock_config.end_date) - ClockConfig.str_to_datetime(self._clock_config.start_date)
-
         self._log('starting simulation timer...')
-        timer_task = asyncio.create_task( cancellable_wait(delta.total_seconds()) )
+        timer_task = asyncio.create_task( self.cancellable_wait(self._clock_config.get_total_seconds()) )
         timer_task.set_name('Simulation timer')
 
         # wait for all nodes to report as deactivated
@@ -197,7 +194,7 @@ class AbstractManager(SimulationElement):
                         self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
 
                         # inform node that its message request was not accepted
-                        msg_resp = ManagerReceptionIgnoredMessage(-1)
+                        msg_resp = ManagerReceptionIgnoredMessage(src, -1)
                         send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
                         await send_task
 
