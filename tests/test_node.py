@@ -94,7 +94,20 @@ class TestSimulationNode(unittest.TestCase):
 
             super().__init__(f'Node_{id}', network_config, [], level)
 
-        
+        async def _live(self) -> None:
+            self._log('living...')
+            while True:
+                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                
+                self._log(f'message received: {content}', level=logging.DEBUG)
+
+                if (dst not in self.name 
+                    or SimulationElementRoles.MANAGER.value not in src 
+                    or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
+                    self._log('wrong message received. ignoring message...')
+                else:
+                    self._log('simulation end message received! ending simulation...')
+                    break
 
     def test_init(self):
         node = TestSimulationNode.NonModularTestNode(1, 5555)
