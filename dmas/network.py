@@ -234,6 +234,12 @@ class NetworkElement(ABC):
         """
         return self._element_name
     
+    def get_logger(self) -> logging.Logger:
+        """
+        Returns this object's internal logger
+        """
+        return self._logger
+    
     def get_socket_maps(self) -> tuple:
         return self._external_socket_map, self._internal_socket_map
     

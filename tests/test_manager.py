@@ -118,6 +118,7 @@ class TestSimulationManager(unittest.TestCase):
                     break
             sock.disconnect(sever_addresses[-1])
 
+            # wait for simulation start message from manager
             self._log(f'disconnected from manager\'s REP port. waiting for simulation start message...')
             while True:
                 dst, src, content = await self._receive_external_msg(zmq.SUB)
@@ -161,11 +162,11 @@ class TestSimulationManager(unittest.TestCase):
                     await self._send_external_msg(msg, zmq.REQ)
 
                     dst, src, content = await self._receive_external_msg(zmq.REQ)
+                    self._log(f'message received: {content}', level=logging.DEBUG)
                     
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
                         or content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value):
-                        print(msg)
                         continue
                     else:
                         break
@@ -178,8 +179,14 @@ class TestSimulationManager(unittest.TestCase):
             except Exception as e:
                 raise e
 
-    class TestManager(Manager):
-        def __init__(self, simulation_element_name_list: list,port : int, level: int = logging.INFO) -> None:
+    class DummyMonitor(SimulationElement):
+        def __init__(self, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+            network_config = NetworkConfig('TEST_NETWORK',
+                                            external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PULL: [f'tcp://localhost:{port+2}']})
+            
+            super().__init__('MONITOR', network_config, level, logger)
+
             year = 2023
             month = 1
             day = 1
@@ -187,7 +194,54 @@ class TestSimulationManager(unittest.TestCase):
             mm = 00
             ss = 00
             start_date = datetime(year, month, day, hh, mm, ss)
-            end_date = datetime(year, month, day+1, hh, mm, ss)
+            end_date = datetime(year, month, day, hh, mm, ss+1)
+
+            self._clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+
+        
+        async def _external_sync(self) -> dict:
+            return self._clock_config, dict()
+        
+        async def _internal_sync(self) -> dict:
+            return dict()
+        
+        async def _wait_sim_start(self) -> None:
+            return
+
+        async def _execute(self) -> None:
+            try:
+                self._log('executing...')
+                while True:
+                    dst, src, content = await self._receive_external_msg(zmq.PULL)
+                    
+                    self._log(f'message received: {content}', level=logging.DEBUG)
+
+                    if (dst not in self.name 
+                        or SimulationElementRoles.MANAGER.value not in src 
+                        or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
+                        self._log('wrong message received. ignoring message...')
+                    else:
+                        self._log('simulation end message received! ending simulation...')
+                        break
+            except asyncio.CancelledError:
+                return
+
+            except Exception as e:
+                raise e
+
+        async def _publish_deactivate(self) -> None:
+            return 
+
+    class TestManager(AbstractManager):
+        def __init__(self, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
+            year = 2023
+            month = 1
+            day = 1
+            hh = 12
+            mm = 00
+            ss = 00
+            start_date = datetime(year, month, day, hh, mm, ss)
+            end_date = datetime(year, month, day, hh, mm, ss+1)
 
             clock_config = RealTimeClockConfig(str(start_date), str(end_date))
 
@@ -197,7 +251,10 @@ class TestSimulationManager(unittest.TestCase):
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://*:{port+2}']})
             
-            super().__init__(simulation_element_name_list, clock_config, network_config, level)
+            super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
+
+        def _check_element_list(self):
+            return
 
     def test_init(self):
         n_clients = 1
@@ -209,25 +266,29 @@ class TestSimulationManager(unittest.TestCase):
 
         manager = TestSimulationManager.TestManager(simulation_element_name_list, port)
 
-        self.assertTrue(isinstance(manager, Manager))
+        self.assertTrue(isinstance(manager, AbstractManager))
 
     def test_run(self):
         n_clients = 1
-        port = 5555
+        port = 5556
+        level = logging.WARNING
+        
+        monitor = TestSimulationManager.DummyMonitor(port, level)
+        logger = monitor.get_logger()
 
         clients = []
         simulation_element_name_list = []
         for i in range(n_clients):
-            client = TestSimulationManager.Client(i, port, level=logging.DEBUG)
+            client = TestSimulationManager.Client(i, port, level, logger)
             clients.append(client)
             simulation_element_name_list.append(client.name)
 
-        manager = TestSimulationManager.TestManager(simulation_element_name_list, port, level=logging.DEBUG)
+        manager = TestSimulationManager.TestManager(simulation_element_name_list, port, level, logger)
         
         print('\n')
-        with concurrent.futures.ThreadPoolExecutor(len(clients) + 1) as pool:
+        with concurrent.futures.ThreadPoolExecutor(len(clients) + 2) as pool:
             client : TestSimulationManager.Client
             for client in clients:                
                 pool.submit(client.run, *[])
+            pool.submit(monitor.run, *[])
             pool.submit(manager.run, *[])
-

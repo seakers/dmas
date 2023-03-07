@@ -1,3 +1,4 @@
+from datetime import timedelta
 import logging
 import random
 from dmas.clocks import ClockConfig
@@ -30,7 +31,7 @@ class ManagerNetworkConfig(NetworkConfig):
                                 zmq.PUSH: [monitor_address]}
         super().__init__(network_name, external_address_map=external_address_map)
 
-class Manager(SimulationElement):
+class AbstractManager(SimulationElement):
     """
     ## Simulation Manager Class 
     
@@ -58,7 +59,8 @@ class Manager(SimulationElement):
                 simulation_element_name_list : list,
                 clock_config : ClockConfig,
                 network_config : ManagerNetworkConfig,
-                level : int = logging.INFO
+                level : int = logging.INFO,
+                logger : logging.Logger = None
                 ) -> None:
         """
         Initializes and instance of a simulation manager
@@ -69,17 +71,19 @@ class Manager(SimulationElement):
             - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
             - level (`int`): logging level for this simulation element
         """
-        super().__init__(SimulationElementRoles.MANAGER.name, network_config, level)
-        
-        # check if an environment is contained in the simulation
-        # if SimulationElementRoles.ENVIRONMENT.name not in simulation_element_name_list:
-        #     raise AttributeError('List of simulation elements must include one simulation environment.')
-        # elif simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
-        #     raise AttributeError('List of simulation elements includes more than one simulation environment.')
-            
+        super().__init__(SimulationElementRoles.MANAGER.name, network_config, level, logger)
+                   
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
+
+    @abstractmethod
+    def _check_element_list(self):
+        """
+        Checks the names of the simulation elements given to the manager and confirms all necessary elements are being
+        considerd in the simulation.
+        """
+        pass
 
     async def _internal_sync(self) -> dict:
         # no internal modules to sync with
@@ -120,18 +124,20 @@ class Manager(SimulationElement):
                 return        
 
         # broadcast simulation start to all simulation elements
-        self._log(f'Starting simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
+        self._log(f'starting simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
         sim_start_msg = SimulationStartMessage(self._network_name, time.perf_counter())
         await self._send_external_msg(sim_start_msg, zmq.PUB)
 
         # push simulation start to monitor
-        # await self._send_external_msg(sim_start_msg, zmq.PUSH)
+        self._log('informing monitor of simulation start...')
+        await self._send_external_msg(sim_start_msg, zmq.PUSH)
 
         # wait for simulation duration to pass
         self._clock_config : ClockConfig
-        delta = ClockConfig.str_to_datetime(self._clock_config.end_date) - ClockConfig.str_to_datetime(self._clock_config.start_date)
+        delta : timedelta = ClockConfig.str_to_datetime(self._clock_config.end_date) - ClockConfig.str_to_datetime(self._clock_config.start_date)
 
-        timer_task = asyncio.create_task( cancellable_wait(delta.seconds) )
+        self._log('starting simulation timer...')
+        timer_task = asyncio.create_task( cancellable_wait(delta.total_seconds()) )
         timer_task.set_name('Simulation timer')
 
         # wait for all nodes to report as deactivated
@@ -157,7 +163,7 @@ class Manager(SimulationElement):
 
     async def _publish_deactivate(self) -> None:
         sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
-        # await self._send_external_msg(sim_end_msg, zmq.PUSH)
+        await self._send_external_msg(sim_end_msg, zmq.PUSH)
     
     async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : SimulationMessage = SimulationMessage, desc : str = 'Waiting for simulation elements'):
         """
@@ -295,25 +301,10 @@ class Manager(SimulationElement):
         await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
         self._log(f'All elements deactivated!')
 
-# if __name__ == '__main__':
-#     from datetime import datetime, timezone
-#     import sys
-
-#     print(sys.argv)
-    
-#     response_address = "tcp://*:5558"
-#     broadcast_address = "tcp://*:5559"
-#     monitor_address = "tcp://127.0.0.1:55"
-#     network_config = ManagerNetworkConfig('TEST_NETWORK', response_address, broadcast_address, monitor_address)
-
-#     start = datetime(2020, 1, 1, 7, 20, 0, tzinfo=timezone.utc)
-#     end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
-#     clock_config = RealTimeClockConfig(str(start), str(end))
-
-#     manager = Manager([], clock_config, network_config, level=logging.DEBUG)
-
-#     t_o = time.perf_counter()
-#     manager.run()
-#     t_f = time.perf_counter()
-    
-#     print(f'RUNTIME = {t_f - t_o}[s]')
+class Manager(AbstractManager):
+    def _check_element_list(self):
+        # check if an environment is contained in the simulation
+        if SimulationElementRoles.ENVIRONMENT.name not in self._simulation_element_name_list:
+            raise AttributeError('List of simulation elements must include one simulation environment.')
+        elif self._simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
+            raise AttributeError('List of simulation elements includes more than one simulation environment.')
