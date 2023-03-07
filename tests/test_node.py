@@ -6,7 +6,7 @@ from dmas.node import *
 from dmas.manager import *
 
 
-class TestSimulationManager(unittest.TestCase): 
+class TestSimulationNode(unittest.TestCase): 
     class DummyMonitor(SimulationElement):
         def __init__(self, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
@@ -83,3 +83,20 @@ class TestSimulationManager(unittest.TestCase):
 
         def _check_element_list(self):
             return
+
+    class NonModularTestNode(Node):
+        def __init__(self, id: int, port : int, level: int = logging.INFO) -> None:
+            network_config = NetworkConfig('TEST_NETWORK',
+                                            external_address_map = {
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}']})
+
+
+            super().__init__(f'Node_{id}', network_config, [], level)
+
+        
+
+    def test_init(self):
+        node = TestSimulationNode.NonModularTestNode(1, 5555)
+
+        self.assertEqual(type(node), TestSimulationNode.NonModularTestNode)

@@ -278,7 +278,6 @@ class TestSimulationManager(unittest.TestCase):
 
         manager = TestSimulationManager.TestManager(clock_config, simulation_element_name_list, port, level, logger)
         
-        print('\n')
         with concurrent.futures.ThreadPoolExecutor(len(clients) + 2) as pool:
             pool.submit(manager.run, *[])
             client : TestSimulationManager.Client
@@ -288,7 +287,7 @@ class TestSimulationManager(unittest.TestCase):
         print('\n')
 
     def test_realtime_clock_run(self):        
-        print('TESTING REAL-TIME CLOCK MANAGER')
+        print('\nTESTING REAL-TIME CLOCK MANAGER')
         n_clients = 5
 
         year = 2023
@@ -305,7 +304,7 @@ class TestSimulationManager(unittest.TestCase):
 
     
     def test_accelerated_clock_run(self):
-        print('TESTING ACCELERATED REAL-TIME CLOCK MANAGER')
+        print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
         n_clients = 5
 
         year = 2023
