@@ -1,7 +1,9 @@
 import logging
+import random
 from dmas.clocks import ClockConfig
 from dmas.element import *
 from dmas.utils import *
+from tqdm import tqdm
 
 class ManagerNetworkConfig(NetworkConfig):
     """
@@ -87,69 +89,77 @@ class Manager(SimulationElement):
         # wait for all simulation elements to initialize and connect to me
         external_address_ledger = await self.__wait_for_online_elements()
 
+        await asyncio.sleep(0.1)
+
         # broadcast address ledger
-        sim_info_msg = SimulationInfoMessage(external_address_ledger, self._clock_config, time.perf_counter())
+        self._log('broadcasting simulation information to all elements...')
+        sim_info_msg = SimulationInfoMessage(self._simulation_element_name_list[-1], external_address_ledger, self._clock_config.to_dict(), time.perf_counter())
+        # self._log(sim_info_msg.to_dict())
         await self._send_external_msg(sim_info_msg, zmq.PUB)
+        self._log('simulation information sent!')
 
-        # return external address ledger
-        return external_address_ledger
+        await asyncio.sleep(0.1)
 
-    def _wait_sim_start(self) -> None:
-        async def subroutine():
-            # await for all agents to report as ready
-            await self.__wait_for_ready_elements()
+        # return clock configuration and external address ledger
+        return self._clock_config, external_address_ledger
 
-        asyncio.run(subroutine())
+    async def _wait_sim_start(self) -> None:
+        # wait for all elements to be online
+        await self.__wait_for_ready_elements()
 
-    def _execute(self) -> None:        
-        async def subroutine():
-            # broadcast simulation start to all simulation elements
-            self._log(f'Starging simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
-            sim_start_msg = SimulationStartMessage(self._network_name, time.perf_counter())
-            await self._send_external_msg(sim_start_msg, zmq.PUB)
+        await asyncio.sleep(0.1)
 
-            # push simulation start to monitor
-            await self._send_external_msg(sim_start_msg, zmq.PUSH)
-
-            # wait for simulation duration to pass
-            self._clock_config : ClockConfig
-            delta = self._clock_config.end_date - self._clock_config.start_date
-
-            timer_task = asyncio.create_task( self._sim_wait(delta.seconds) )
-            timer_task.set_name('Simulation timer')
-
-            # wait for all nodes to report as deactivated
-            listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
-            listen_for_deactivated_task.set_name('Wait for deactivated nodes')
-
-            await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
+    async def _execute(self) -> None:  
+        async def cancellable_wait(dt):
+            try:
+                desc = f'{self.name}: Simulating for {dt}[s]'
+                for _ in tqdm (range (10), desc=desc):
+                    await asyncio.sleep(dt/10)
             
-            # broadcast simulation end
-            sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
-            await self._send_external_msg(sim_end_msg, zmq.PUB)
+            except asyncio.CancelledError:
+                return        
 
-            if timer_task.done():
-                # nodes may still be activated. wait for all simulation nodes to deactivate
-                await listen_for_deactivated_task
+        # broadcast simulation start to all simulation elements
+        self._log(f'Starting simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
+        sim_start_msg = SimulationStartMessage(self._network_name, time.perf_counter())
+        await self._send_external_msg(sim_start_msg, zmq.PUB)
 
-            else:                
-                # all nodes have already reported as deactivated before the timer ran out. Cancel timer task
-                timer_task.cancel()
-                await timer_task     
-            
-            self._log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
+        # push simulation start to monitor
+        # await self._send_external_msg(sim_start_msg, zmq.PUSH)
 
-        asyncio.run(subroutine())
+        # wait for simulation duration to pass
+        self._clock_config : ClockConfig
+        delta = ClockConfig.str_to_datetime(self._clock_config.end_date) - ClockConfig.str_to_datetime(self._clock_config.start_date)
 
-    def _publish_deactivate(self) -> None:
-        async def subroutine():
-            # push simulation end to monitor
-            sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
-            await self._send_external_msg(sim_end_msg, zmq.PUSH)
+        timer_task = asyncio.create_task( cancellable_wait(delta.seconds) )
+        timer_task.set_name('Simulation timer')
+
+        # wait for all nodes to report as deactivated
+        listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
+        listen_for_deactivated_task.set_name('Wait for deactivated nodes')
+
+        await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
         
-        asyncio.run(subroutine())
+        # broadcast simulation end
+        sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
+        await self._send_external_msg(sim_end_msg, zmq.PUB)
+
+        if timer_task.done():
+            # nodes may still be activated. wait for all simulation nodes to deactivate
+            await listen_for_deactivated_task
+
+        else:                
+            # all nodes have already reported as deactivated before the timer ran out. Cancel timer task
+            timer_task.cancel()
+            await timer_task     
+        
+        self._log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
+
+    async def _publish_deactivate(self) -> None:
+        sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
+        # await self._send_external_msg(sim_end_msg, zmq.PUSH)
     
-    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : SimulationMessage = SimulationMessage):
+    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : SimulationMessage = SimulationMessage, desc : str = 'Waiting for simulation elements'):
         """
         Awaits for all simulation elements to share a specific type of message with the manager.
         
@@ -161,63 +171,65 @@ class Manager(SimulationElement):
             read_task = None
             send_task = None
 
-            while (
-                    len(received_messages) < len(self._simulation_element_name_list) 
-                    and len(self._simulation_element_name_list) > 0
-                    ):
-                # reset tasks
-                read_task = None
-                send_task = None
+            with tqdm(total=len(self._simulation_element_name_list) , desc=desc) as pbar:
+                while (
+                        len(received_messages) < len(self._simulation_element_name_list) 
+                        and len(self._simulation_element_name_list) > 0
+                        ):
+                    # reset tasks
+                    read_task = None
+                    send_task = None
 
-                # wait for incoming messages
-                read_task = asyncio.create_task( self._receive_external_msg(zmq.REP) )
-                await read_task
-                src, msg_dict = read_task.result()
-                msg_type = msg_dict['@type']
+                    # wait for incoming messages
+                    read_task = asyncio.create_task( self._receive_external_msg(zmq.REP) )
+                    await read_task
+                    dst, src, msg_dict = read_task.result()
+                    msg_type = msg_dict['msg_type']
 
-                if NodeMessageTypes[msg_type] != message_type:
-                    # ignore all incoming messages that are not of the desired type 
-                    self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
+                    if NodeMessageTypes[msg_type] != message_type:
+                        # ignore all incoming messages that are not of the desired type 
+                        self._log(f'Received {msg_type} message from node {src}! Ignoring message...')
 
-                    # inform node that its message request was not accepted
-                    msg_resp = ManagerReceptionIgnoredMessage(-1)
+                        # inform node that its message request was not accepted
+                        msg_resp = ManagerReceptionIgnoredMessage(-1)
+                        send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
+                        await send_task
+
+                        continue
+
+                    # unpack and message
+                    self._log(f'Received {msg_type} message from node {src}! Message accepted!')
+                    msg_req = message_class(**msg_dict)
+                    msg_resp = None
+
+                    # log subscriber confirmation
+                    if src not in self._simulation_element_name_list:
+                        # node is not a part of the simulation
+                        self._log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+
+                        # inform agent that its message was not accepted
+                        msg_resp = ManagerReceptionIgnoredMessage(src, -1)
+
+                    elif src in received_messages:
+                        # node is a part of the simulation but has already communicated with me
+                        self._log(f'Node {src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+
+                        # inform agent that its message request was not accepted
+                        msg_resp = ManagerReceptionIgnoredMessage(src, -1)
+                    else:
+                        # node is a part of the simulation and has not yet been synchronized
+                        received_messages[src] = msg_req
+                        pbar.update(1)
+
+                        # inform agent that its message request was not accepted
+                        msg_resp = ManagerReceptionAckMessage(src, -1)
+                        self._log(f'Node {src} has now reported to be online to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+
+                    # send response
                     send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
                     await send_task
-
-                    continue
-
-                # unpack and message
-                self._log(f'Received {msg_type} message from node {src}! Message accepted!')
-                msg_req = message_class.from_dict(msg_dict)
-                msg_resp = None
-
-                # log subscriber confirmation
-                if src not in self._simulation_element_name_list:
-                    # node is not a part of the simulation
-                    self._log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
-
-                    # inform agent that its message was not accepted
-                    msg_resp = ManagerReceptionIgnoredMessage(-1)
-
-                elif src in received_messages:
-                    # node is a part of the simulation but has already communicated with me
-                    self._log(f'Node {src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
-
-                    # inform agent that its message request was not accepted
-                    msg_resp = ManagerReceptionIgnoredMessage(-1)
-                else:
-                    # node is a part of the simulation and has not yet been synchronized
-                    received_messages[src] = msg_req
-
-                    # inform agent that its message request was not accepted
-                    msg_resp = ManagerReceptionAckMessage(-1)
-
-                # send response
-                send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )
-                await send_task
-
-            self._log(f'wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})!', level=logging.INFO)
-            return received_messages
+                
+                return received_messages
         
         except asyncio.CancelledError:            
             return
@@ -247,8 +259,11 @@ class Manager(SimulationElement):
             - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
         """
         self._log(f'Waiting for sync requests from simulation elements...')
-        received_sync_requests = await self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, NodeSyncRequestMessage)
+        desc=f'{self.name}: Online simulation elements'
+        received_sync_requests = await self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, NodeSyncRequestMessage, desc=desc)
         
+        self._log(f'All elements online!')
+
         external_address_ledger = dict()
         for src in received_sync_requests:
             msg : NodeSyncRequestMessage = received_sync_requests[src]
@@ -256,7 +271,6 @@ class Manager(SimulationElement):
 
         external_address_ledger[self.name] = self._network_config.to_dict()
         
-        self._log(f'All elements online!')
         return external_address_ledger
 
     async def __wait_for_ready_elements(self) -> None:
@@ -266,7 +280,8 @@ class Manager(SimulationElement):
         Once all elements have reported to the manager, the simulation will begin.
         """
         self._log(f'Waiting for ready messages from simulation elements...')
-        await self.__wait_for_elements(NodeMessageTypes.NODE_READY, NodeReadyMessage)
+        desc=f'{self.name}: Ready simulation elements'
+        await self.__wait_for_elements(NodeMessageTypes.NODE_READY, NodeReadyMessage, desc=desc)
         self._log(f'All elements ready!')
 
     async def __wait_for_offline_elements(self) -> None:
@@ -276,28 +291,29 @@ class Manager(SimulationElement):
         Returns when all simulation elements are deactivated.
         """
         self._log(f'Waiting for deactivation confirmation from simulation elements...')
-        await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage)
+        desc=f'{self.name}: Offline simulation elements'
+        await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
         self._log(f'All elements deactivated!')
 
-if __name__ == '__main__':
-    from datetime import datetime, timezone
-    import sys
+# if __name__ == '__main__':
+#     from datetime import datetime, timezone
+#     import sys
 
-    print(sys.argv)
+#     print(sys.argv)
     
-    response_address = "tcp://*:5558"
-    broadcast_address = "tcp://*:5559"
-    monitor_address = "tcp://127.0.0.1:55"
-    network_config = ManagerNetworkConfig('TEST_NETWORK', response_address, broadcast_address, monitor_address)
+#     response_address = "tcp://*:5558"
+#     broadcast_address = "tcp://*:5559"
+#     monitor_address = "tcp://127.0.0.1:55"
+#     network_config = ManagerNetworkConfig('TEST_NETWORK', response_address, broadcast_address, monitor_address)
 
-    start = datetime(2020, 1, 1, 7, 20, 0, tzinfo=timezone.utc)
-    end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
-    clock_config = RealTimeClockConfig(str(start), str(end))
+#     start = datetime(2020, 1, 1, 7, 20, 0, tzinfo=timezone.utc)
+#     end = datetime(2020, 1, 1, 7, 20, 3, tzinfo=timezone.utc)
+#     clock_config = RealTimeClockConfig(str(start), str(end))
 
-    manager = Manager([], clock_config, network_config, level=logging.DEBUG)
+#     manager = Manager([], clock_config, network_config, level=logging.DEBUG)
 
-    t_o = time.perf_counter()
-    manager.run()
-    t_f = time.perf_counter()
+#     t_o = time.perf_counter()
+#     manager.run()
+#     t_f = time.perf_counter()
     
-    print(f'RUNTIME = {t_f - t_o}[s]')
+#     print(f'RUNTIME = {t_f - t_o}[s]')

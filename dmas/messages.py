@@ -12,7 +12,6 @@ class SimulationElementRoles(Enum):
     MONITOR = 'MONITOR'
     ENVIRONMENT = 'ENVIRONMENT'
     NODE = 'NODE'
-    ALL = 'ALL'
 
 class SimulationMessage(object):
     """
@@ -208,7 +207,7 @@ class SimulationInfoMessage(ManagerMessage):
         super().__init__(dst, ManagerMessageTypes.SIM_INFO.value, t, id)
 
         self.address_ledger = address_ledger.copy()
-        self.clock_config = clock_config.copy()        
+        self.clock_config = clock_config.copy()
 
     def get_address_ledger(self) -> dict:
         """

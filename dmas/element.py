@@ -104,7 +104,7 @@ class SimulationElement(NetworkElement):
 
                 # start element life
                 self._log('living...', level=logging.INFO)
-                self._execute()
+                await self._execute()
                 self._log('living completed!', level=logging.INFO)
                 
                 self._log('`run()` executed properly.')
@@ -113,7 +113,7 @@ class SimulationElement(NetworkElement):
             finally:
                 # deactivate element
                 self._log('deactivating...', level=logging.INFO)
-                self._deactivate()
+                await self._deactivate()
                 self._log('deactivation completed!', level=logging.INFO)
 
                 # update status to DEACTIVATED
@@ -250,7 +250,7 @@ class SimulationElement(NetworkElement):
         pass
 
     @abstractmethod
-    def _execute(self) -> None:
+    async def _execute(self) -> None:
         """
         Procedure to be executed by the simulation element during the simulation. 
 
@@ -258,18 +258,18 @@ class SimulationElement(NetworkElement):
         """
         pass
     
-    def _deactivate(self) -> None:
+    async def _deactivate(self) -> None:
         """
         Shut down procedure for this simulation entity. 
         """
         # inform others of deactivation
-        self._publish_deactivate()
+        await self._publish_deactivate()
         
         # close network connections
         self._deactivate_network()
     
     @abstractmethod
-    def _publish_deactivate(self) -> None:
+    async def _publish_deactivate(self) -> None:
         """
         Notifies other elements of the simulation that this element has deactivated and is no longer participating in the simulation.
         """
