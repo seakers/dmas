@@ -123,7 +123,6 @@ class Node(SimulationElement):
                     pool.submit(module.config_network, *[])
 
         return network_context, external_socket_map, internal_socket_map
-
     
     async def _internal_sync(self) -> dict:
         async def multiprocessing_sync_for_modules():
@@ -183,7 +182,7 @@ class Node(SimulationElement):
 
             self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
             # inform all internal nodes that they are now synched with their parent simulation node
-            synced_msg = NodeReceptionAckMessage(self.name, self.name)
+            synced_msg = NodeReceptionAckMessage(self._element_name, self._element_name)
             await self._send_internal_msg(synced_msg, zmq.PUB)
 
     async def _external_sync(self):
@@ -287,7 +286,7 @@ class Node(SimulationElement):
                     return
         try:
             task = asyncio.create_task(subroutine())
-            await asyncio.wait_for(task, timeout=10)
+            await asyncio.wait_for(task, timeout=100)
             
         except asyncio.TimeoutError as e:
             self._log(f'Wait for simulation start timed out. Aborting. {e}')
@@ -311,9 +310,14 @@ class Node(SimulationElement):
         live_task = asyncio.create_task(self._live())
         module_run_task = asyncio.create_task(multiprocessing_run_for_modules())
 
-        await asyncio.wait([live_task, module_run_task], return_when=asyncio.ALL_COMPLETED)
+        _, pending = await asyncio.wait([live_task, module_run_task], return_when=asyncio.FIRST_COMPLETED)
+
+        if live_task in pending:
+            live_task.cancel()
 
         await self.__wait_for_offline_modules()       
+
+        await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
 
     @abstractmethod
     async def _live(self) -> None:

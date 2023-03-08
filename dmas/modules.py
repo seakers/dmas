@@ -49,7 +49,7 @@ class InternalModule(NetworkElement):
         - _external_inbox (`asyncio.Queue()`):
     ####
     """
-    def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, logger: logging.Logger, submodules : list = []) -> None:
+    def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, submodules : list = [], logger: logging.Logger = None) -> None:
         super().__init__(module_name, network_config, logger.getEffectiveLevel(), logger)
 
         # copy submodule list
@@ -61,10 +61,6 @@ class InternalModule(NetworkElement):
                 self._submodules.append(submodule)
             else:
                 raise AttributeError(f'contents of `submodules` list given to module {self.name} must be of type `SubModule`. Contains elements of type `{type(submodule)}`.')
-
-        # initiate inboxes
-        self._intermodule_inbox = asyncio.Queue()
-        self._submodule_inbox = asyncio.Queue()
 
     def get_name(self) -> str:
         """
@@ -170,12 +166,57 @@ class InternalModule(NetworkElement):
         pass
 
 class InternalSubmodule(ABC):
-    def __init__(self, name : str, parent_module_name : str) -> None:
+    def __init__(self, name : str, parent_module_name : str, submodules : list = []) -> None:
         super().__init__()
         self.name = parent_module_name + '/' + name
+        self._submodules = submodules
     
-    async def run() -> None:
+    async def run(self) -> None:
+        """
+        Runs the following processes concurrently. All terminates if at least one of them does.
+        """
         try:
-            pass
+            try:
+                # perform this module's routine
+                tasks = [asyncio.create_task(self._routine(), name=f'{self.name}_routine'),
+                         asyncio.create_task(self._listen(), name=f'{self.name}_listen'),]
+
+                # instruct all submodules to perform their own routines
+                for submodule in self._submodules:
+                    submodule : InternalSubmodule
+                    tasks.append(submodule.run(), name=f'{submodule.name}_run')
+
+                # wait for a process to terminate
+                _, pending = asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                
+                # cancel all non-terminated tasks
+                for task in pending:
+                    task : asyncio.Task
+                    task.cancel()
+                    await task
+
+                return 1
+            
+            except :
+                return 0
+
         except asyncio.CancelledError:
             return
+        
+    @abstractmethod
+    async def _routine():
+        """
+        Routine to be performed by the submodule during when the parent module is executing.
+
+        Must have an `asyncio.CancellationError` handler.
+        """
+        pass
+
+    @abstractmethod
+    async def _listen(self):
+        """
+        Listens for messages from the other internal modules.
+
+        Must have an `asyncio.CancellationError` handler.
+        """
+        pass
