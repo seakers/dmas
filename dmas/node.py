@@ -29,8 +29,8 @@ class Node(SimulationElement):
     
     """
     __doc__ += SimulationElement.__doc__
-    def __init__(self, name: str, network_config: NetworkConfig, modules : list = [], level: int = logging.INFO) -> None:
-        super().__init__(name, network_config, level)   
+    def __init__(self, name: str, network_config: NetworkConfig, modules : list = [], level: int = logging.INFO, logger : logging.Logger = None) -> None:
+        super().__init__(name, network_config, level, logger)   
         
         for module in modules:
             if not isinstance(InternalModule):
@@ -38,10 +38,12 @@ class Node(SimulationElement):
         
         self.__modules = modules.copy()
         
-        # initiate ledger with just manager's addresses
-        external_addresses : dict = network_config.get_external_addresses()
-        publish_addresses = external_addresses[zmq.REQ]
-        self._external_address_ledger[SimulationElementRoles.MANAGER.name] = publish_addresses[-1]
+        # # initiate ledger with just manager's addresses
+        # external_addresses : dict = network_config.get_external_addresses()
+        # publish_addresses = external_addresses[zmq.REQ]
+        # print(publish_addresses)
+        # publish_addresses[-1]
+        # self._external_address_ledger[SimulationElementRoles.MANAGER.name] = publish_addresses[-1]
 
     def _activate(self) -> None:
         super()._activate()
@@ -334,8 +336,12 @@ class Node(SimulationElement):
             receive_task = None
 
             # get destination's socket address
-            dst_network_config : NetworkConfig = address_ledger.get(msg.dst, None)
-            dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)
+            if SimulationElementRoles.MANAGER.value in msg.dst:
+                dst_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
+                dst_address = dst_addresses[-1]
+            else:
+                dst_network_config : NetworkConfig = address_ledger.get(msg.dst, None)
+                dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)
             
             if dst_address is None:
                 raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
