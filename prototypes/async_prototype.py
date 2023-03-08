@@ -1,53 +1,36 @@
 import asyncio
 import time
+import concurrent.futures
 
-def f(x : float):
-    print(f'starting sleep of {x}[s]...')
-    time.sleep(x)
-    print(f'sleep of {x}[s] completed!')
+class Tester:
+    def f1(self, y):
+        print('doing some rough work...')
+        x = 0
+        for i in range(y):
+            x += i
+        print('rough work done!')
 
-async def af(x : float):
-    try:
-        print(f'starting async sleep of {x}[s]...')
-        await asyncio.sleep(x)
-        print(f'async sleep of {x}[s] completed!')
-        return 1
-    
-    except asyncio.CancelledError as e:
-        print(f'interrupted async sleep of {x}[s]...')
-        raise e
+    async def f2(self, t):
+        print(f'sleeping for {t} [s]...')
+        await asyncio.sleep(t)
+        print('sleep completed!')
 
-async def busy():
-    try:
-        await af(10)
+    def run(self):
+        async def routine():
+            n = 2
+            y = 10000000
+            dt = 1
 
-        await af(5)
+            with concurrent.futures.ThreadPoolExecutor(n + 2) as pool:
+                for _ in range(n):
+                    pool.submit(self.f1, *[y])
+                pool.submit(asyncio.run, *[self.f2(dt)])
+           
+            # await self.f2(dt)
 
-    except asyncio.CancelledError:
-        return
-
-
-def main():
-    async def subroutine():
-        t1 = asyncio.create_task(af(1))
-        t2 = asyncio.create_task(busy())
-
-        done, pending =await asyncio.wait([t1,t2], return_when=asyncio.FIRST_COMPLETED)
-
-        for t in done:
-            t : asyncio.Task
-            print(f'{t.get_name()} task completed!')
-
-        for t in pending:
-            t : asyncio.Task
-            await t
-
-        return t1.result()
-    
-    return asyncio.run(subroutine())
+        asyncio.run(routine())
 
 if __name__ == '__main__':
-    x = main()
-    print(x)
+    x = Tester()
+    x.run()
 
-    # asyncio.run(main())

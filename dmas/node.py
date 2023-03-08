@@ -53,9 +53,6 @@ class Node(SimulationElement):
         """
         async def routine():
             try:
-                # initiate successful completion flag
-                out = 0
-
                 # activate simulation element
                 self._log('activating...', level=logging.INFO)
                 await self._activate()
@@ -75,9 +72,9 @@ class Node(SimulationElement):
                 self._clock_config.set_simulation_runtime_start( time.perf_counter() )
 
                 # start element life
-                self._log('living...', level=logging.INFO)
+                self._log('executing...', level=logging.INFO)
                 await self._execute()
-                self._log('living completed!', level=logging.INFO)
+                self._log('executing completed!', level=logging.INFO)
                 
                 self._log('`run()` executed properly.')
                 return 1
@@ -100,8 +97,7 @@ class Node(SimulationElement):
 
         except Exception as e:
             self._log(f'`run()` interrupted. {e}')
-            return 0
-        
+            raise e
 
     async def _activate(self) -> None:
         await super()._activate()
@@ -115,7 +111,7 @@ class Node(SimulationElement):
 
     def config_network(self) -> tuple:
         # configure own network ports
-        external_socket_map, internal_socket_map = super().config_network()
+        network_context, external_socket_map, internal_socket_map = super().config_network()
 
         # instruct internal modules to configure their own network ports
         if len(self.__modules) > 0:
@@ -124,7 +120,7 @@ class Node(SimulationElement):
                     module : InternalModule
                     pool.submit(module.config_network, *[])
 
-        return external_socket_map, internal_socket_map
+        return network_context, external_socket_map, internal_socket_map
 
     async def _internal_sync(self) -> dict:
         # instruct internal modules to sync their networks with me
@@ -151,49 +147,56 @@ class Node(SimulationElement):
         responses = []
         module_names = [f'{self._element_name}/{m.name}' for m in self.__modules]
 
-        while len(responses) < len(self.__modules):
-            # listen for messages from internal nodes
-            dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
-            dst : str; src : str; msg_dict : dict
+        if len(self.__modules) > 0:
+            self._log('waiting for internal nodes to become online...')
+            while len(responses) < len(self.__modules):
+                # listen for messages from internal nodes
+                dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
+                dst : str; src : str; msg_dict : dict
 
-            if dst not in self.name:
-                # received a message intended for someone else. Ignoring message
-                continue
+                if dst not in self.name:
+                    # received a message intended for someone else. Ignoring message
+                    continue
 
-            if src not in module_names:
-                # received a message from an unrecognized sender. Ignoring message
-                continue
-            
-            msg_type = msg_dict.get('msg_type', None)
-            if msg_type != ModuleMessageTypes.SYNC_REQUEST.value:
-                # received a message that is not a sync request from an internal module. Ignoring message
-                continue
+                if src not in module_names:
+                    # received a message from an unrecognized sender. Ignoring message
+                    continue
+                
+                msg_type = msg_dict.get('msg_type', None)
+                if msg_type != ModuleMessageTypes.SYNC_REQUEST.value:
+                    # received a message that is not a sync request from an internal module. Ignoring message
+                    continue
 
-            if src not in responses:
-                # Add to list of synced modules if it hasn't been synched before
-                responses.append(src)
+                if src not in responses:
+                    # Add to list of synced modules if it hasn't been synched before
+                    responses.append(src)
 
-        # inform all internal nodes that they are now synched with their parent simulation node
-        synced_msg = NodeReceptionAckMessage(self.name, self.name)
-        await self._send_internal_msg(synced_msg, zmq.PUB)
+            self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
+            # inform all internal nodes that they are now synched with their parent simulation node
+            synced_msg = NodeReceptionAckMessage(self.name, self.name)
+            await self._send_internal_msg(synced_msg, zmq.PUB)
 
     async def _external_sync(self):
         # request to sync with the simulation manager
+        self._log('syncing with simulation manager...', level=logging.INFO) 
         while True:
             # send sync request from REQ socket
-            msg = NodeSyncRequestMessage(self.name, self._network_config)
+            msg = NodeSyncRequestMessage(self.name, self._network_config.to_dict())
             dst, src, content = await self._send_external_request_message(msg)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
-            if (dst not in self.name 
+            if (
+                dst not in self.name 
                 or SimulationElementRoles.MANAGER.value not in src
-                or msg_type != ManagerMessageTypes.RECEPTION_ACK.value):
-                
+                or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
+                ):
                 # if the manager did not acknowledge the sync request, try again later
+                self._log(f'sync request not accepted. trying again later...')
                 await asyncio.wait(random.random())
             else:
                 # if the manager acknowledged the sync request, stop trying
+                self._log(f'sync request accepted! waiting for simulation information from simulation manager...', level=logging.INFO)
                 break
 
         # wait for external address ledger from manager
@@ -203,14 +206,17 @@ class Node(SimulationElement):
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
-            if (dst != self.name 
-                or src != SimulationElementRoles.MANAGER.value 
-                or msg_type != ManagerMessageTypes.SIM_INFO.value):
-                
+            if (
+                dst not in self.name 
+                or SimulationElementRoles.MANAGER.value not in src
+                or msg_type != ManagerMessageTypes.SIM_INFO.value
+                ):
                 # undesired message received. Ignoring and trying again later
+                self._log(f'received undesired message of type {msg_type}. Ignoring...')
                 await asyncio.wait(random.random())
             else:
                 # if the manager did not acknowledge the sync request, try again later
+                self._log(f'received simulation information message from simulation manager!', level=logging.INFO)
                 msg = SimulationInfoMessage(**content)
                 
                 external_ledger = dict()
@@ -239,7 +245,8 @@ class Node(SimulationElement):
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
-                if (dst not in self.name 
+                if (
+                    dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
                     or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                     ):
@@ -257,7 +264,8 @@ class Node(SimulationElement):
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
-                if (dst not in self.name 
+                if (
+                    dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
                     or msg_type != ManagerMessageTypes.SIM_START.value
                     ):
@@ -280,29 +288,25 @@ class Node(SimulationElement):
 
             raise e
 
-
     async def _execute(self) -> None:
-        with concurrent.futures.ProcessPoolExecutor(len(self.__modules) + 1) as pool:
-            # perform live routine
-            pool.submit(asyncio.wait, *[asyncio.create_task(self.__live_routine())])
+        if len(self.__modules) > 0:
+            self._log(f'creating {len(self.__modules) + 1} parallel processes...')
+            with concurrent.futures.ProcessPoolExecutor(len(self.__modules) + 1) as pool:
+                # start all modules' run routines
+                for module in self.__modules:
+                    module : InternalModule
+                    self._log(f'submitting {module.name}\'s `run()` method for execution...')
+                    pool.submit(module.run, *[])
+
+                # perform live routine
+                self._log(f'submitting {self.name}\'s `run()` method for execution...')
+                pool.submit(asyncio.run, *[self._live()])  
             
-            # start all modules' run routines
-            for module in self.__modules:
-                module : InternalModule
-                pool.submit(module.run, *[])
-
-    async def __live_routine(self):
-        """
-        Wrapper method for node's `live` method. 
-
-        This method terminates all internal modules' processes after their parent node fulfills
-        its `live` routine.
-        """
-        try:
+            await self.__wait_for_offline_modules()       
+        else:
+            self._log('living...')
             await self._live()
-        finally:
-            # await for confirmation from modules
-            await self.__wait_for_offline_modules()
+            self._log('living completed!')
 
     @abstractmethod
     async def _live(self) -> None:
@@ -347,6 +351,12 @@ class Node(SimulationElement):
 
     async def _publish_deactivate(self) -> None:
         try:
+            # inform monitor that I am deactivated
+            self._log(f'informing monitor of offline status...')
+            msg = NodeDeactivatedMessage(self.name)
+            await self._send_external_msg(msg, zmq.PUSH)
+            self._log(f'informed monitor of offline status. informing manager of offline status...')
+
             # inform manager that I am deactivated
             while True:
                 # send ready announcement from REQ socket
@@ -359,16 +369,13 @@ class Node(SimulationElement):
                     or SimulationElementRoles.MANAGER.value not in src
                     or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                     ):
-                    
                     # if the manager did not acknowledge the request, try again later
+                    self._log(f'manager did not accept my message. trying again...')
                     await asyncio.wait(random.random())
                 else:
                     # if the manager acknowledge the message, stop trying
+                    self._log(f'manager accepted my message! informing monitor of offline status....')
                     break
-
-            # push deactivate message to monitor
-            msg = NodeDeactivatedMessage(self.name)
-            dst, src, content = await self._send_external_msg(msg, zmq.PUSH)
 
         except asyncio.CancelledError:
             return
@@ -412,7 +419,7 @@ class Node(SimulationElement):
             self._log(f'connection to {msg.dst} established! Transmitting a message of type {type(msg)}...')
 
             # transmit message
-            send_task = asyncio.create_task( self.__send_msg(msg, zmq.REQ, socket_map) )
+            send_task = asyncio.create_task( self._send_msg(msg, zmq.REQ, socket_map) )
             await send_task
             self._log(f'message of type {type(msg)} transmitted sucessfully! Waiting for response from {msg.dst}...')
 

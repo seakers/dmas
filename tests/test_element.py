@@ -223,6 +223,7 @@ class TestSimulationElement(unittest.TestCase):
                 raise e
 
     def test_run(self):
+        print('TEST: Simulation Element Sync Routine')
         port = 5556
         n_clients = 10
 

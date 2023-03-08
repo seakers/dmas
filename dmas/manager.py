@@ -298,10 +298,14 @@ class AbstractManager(SimulationElement):
         await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
         self._log(f'All elements deactivated!')
 
-class Manager(AbstractManager):
+class SimulationManager(AbstractManager):
     def _check_element_list(self):
         # check if an environment is contained in the simulation
         if SimulationElementRoles.ENVIRONMENT.name not in self._simulation_element_name_list:
             raise AttributeError('List of simulation elements must include one simulation environment.')
+        
+        elif SimulationElementRoles.MONITOR.name not in self._simulation_element_name_list:
+            raise AttributeError('List of simulation elements must include one simulation monitor.')
+        
         elif self._simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
             raise AttributeError('List of simulation elements includes more than one simulation environment.')

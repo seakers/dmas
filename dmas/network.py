@@ -305,9 +305,13 @@ class NetworkElement(ABC):
 
         network_context = azmq.Context()
 
+        self._log(f'configuring extenal network sockets...')
         external_socket_map = self.__config_external_network(network_context)
+        self._log(f'extenal network sockets configured! external socket map: {external_socket_map}')
 
+        self._log(f'configuring intenal network sockets...')
         internal_socket_map = self.__config_internal_network(network_context)
+        self._log(f'intenal network sockets configured! external socket map: {internal_socket_map}')
 
         self._network_activated = True
 
@@ -444,7 +448,7 @@ class NetworkElement(ABC):
     """
     SEND/RECEIVE MESSAGES
     """
-    async def __send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType, socket_map : dict):
+    async def _send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType, socket_map : dict):
         """
         Sends a multipart message to a given socket type.
 
@@ -525,7 +529,7 @@ class NetworkElement(ABC):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self.__send_msg(msg, socket_type, self._external_socket_map)
+        return await self._send_msg(msg, socket_type, self._external_socket_map)
 
     async def _send_internal_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
         """
@@ -538,7 +542,7 @@ class NetworkElement(ABC):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self.__send_msg(msg, socket_type, self._internal_socket_map)
+        return await self._send_msg(msg, socket_type, self._internal_socket_map)
 
     async def __receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
         """

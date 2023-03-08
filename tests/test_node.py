@@ -11,7 +11,7 @@ class TestSimulationNode(unittest.TestCase):
         def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PULL: [f'tcp://localhost:{port+2}']})
+                                                                    zmq.PULL: [f'tcp://*:{port+2}']})
             
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
@@ -56,7 +56,7 @@ class TestSimulationNode(unittest.TestCase):
                                             external_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
-                                                                    zmq.PUSH: [f'tcp://*:{port+2}']})
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
             
             super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
 
@@ -69,16 +69,15 @@ class TestSimulationNode(unittest.TestCase):
                                             external_address_map = {
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PUSH: [f'tcp://*:{port+2}']})
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
 
 
             super().__init__(f'Node_{id}', network_config, [], level, logger)
 
         async def _live(self) -> None:
-            self._log('living...')
+            self._log(f'waiting for manager to end simulation...')
             while True:
                 dst, src, content = await self._receive_external_msg(zmq.SUB)
-                
                 self._log(f'message received: {content}', level=logging.DEBUG)
 
                 if (dst not in self.name 
@@ -128,4 +127,4 @@ class TestSimulationNode(unittest.TestCase):
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
         clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-        self.run_tester(clock_config, n_nodes, level=logging.DEBUG)
+        self.run_tester(clock_config, n_nodes, level=logging.WARNING)

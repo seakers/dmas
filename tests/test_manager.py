@@ -190,7 +190,7 @@ class TestSimulationManager(unittest.TestCase):
         def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PULL: [f'tcp://localhost:{port+2}']})
+                                                                    zmq.PULL: [f'tcp://*:{port+2}']})
             
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
@@ -235,7 +235,7 @@ class TestSimulationManager(unittest.TestCase):
                                             external_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
-                                                                    zmq.PUSH: [f'tcp://*:{port+2}']})
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
             
             super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
 
