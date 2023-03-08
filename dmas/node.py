@@ -3,7 +3,7 @@ import logging
 import random
 import zmq
 import concurrent.futures
-from dmas.element import SimulationElement
+from dmas.element import *
 from dmas.messages import *
 from dmas.modules import InternalModule
 from dmas.network import NetworkConfig
@@ -37,16 +37,74 @@ class Node(SimulationElement):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
         
         self.__modules = modules.copy()
-        
-        # # initiate ledger with just manager's addresses
-        # external_addresses : dict = network_config.get_external_addresses()
-        # publish_addresses = external_addresses[zmq.REQ]
-        # print(publish_addresses)
-        # publish_addresses[-1]
-        # self._external_address_ledger[SimulationElementRoles.MANAGER.name] = publish_addresses[-1]
 
-    def _activate(self) -> None:
-        super()._activate()
+    def run(self) -> int:
+        """
+        Main function. Executes this similation element.
+
+        Procedure follows the sequence:
+        1. `activate()`
+        2. `execute()`
+        3. `deactivate()`.
+
+        Returns `1` if excecuted successfully or if `0` otherwise
+
+        Do NOT override
+        """
+        async def routine():
+            try:
+                # initiate successful completion flag
+                out = 0
+
+                # activate simulation element
+                self._log('activating...', level=logging.INFO)
+                await self._activate()
+
+                ## update status to ACTIVATED
+                self._status = SimulationElementStatus.ACTIVATED
+                self._log('activated! Waiting for simulation to start...', level=logging.INFO)
+
+                # wait for simulatio nstart
+                await self._wait_sim_start()
+                self._log('simulation has started!', level=logging.INFO)
+
+                ## update status to RUNNING
+                self._status = SimulationElementStatus.RUNNING
+
+                ## register simulation runtime start
+                self._clock_config.set_simulation_runtime_start( time.perf_counter() )
+
+                # start element life
+                self._log('living...', level=logging.INFO)
+                await self._execute()
+                self._log('living completed!', level=logging.INFO)
+                
+                self._log('`run()` executed properly.')
+                return 1
+
+            finally:
+                # deactivate element
+                self._log('deactivating...', level=logging.INFO)
+                await self._deactivate()
+                self._log('deactivation completed!', level=logging.INFO)
+
+                # update status to DEACTIVATED
+                self._status = SimulationElementStatus.DEACTIVATED
+
+                #reguster simulation runtime end
+                self._clock_config.set_simulation_runtime_end( time.perf_counter() )
+
+        try:
+            out = asyncio.run(routine())
+            return out
+
+        except Exception as e:
+            self._log(f'`run()` interrupted. {e}')
+            return 0
+        
+
+    async def _activate(self) -> None:
+        await super()._activate()
 
         # check for correct socket initialization
         if self._internal_socket_map is None:

@@ -1,5 +1,6 @@
 import json
 import random
+
 import time
 import unittest
 from tqdm import tqdm
@@ -141,25 +142,27 @@ class TestNetworkElement(unittest.TestCase):
             super().__init__(src, dst, msg_type, id)
 
     class Sender(DummyNetworkElement):
-        def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO) -> None:
+        def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'    
             if t_type is TestNetworkElement.TransmissionTypes.INT:   
-                internal_address_map = {socket_type: [f'tcp://*:{port}']}
+                if socket_type is zmq.PUB:
+                    internal_address_map = {socket_type: [f'tcp://*:{port}']}
+                elif socket_type is zmq.PUSH:
+                    internal_address_map = {socket_type: [f'tcp://*:{port}']}
+                    internal_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
                 external_address_map = dict()
 
-                if socket_type is not zmq.PUB:
-                    internal_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
-
             elif t_type is TestNetworkElement.TransmissionTypes.EXT:
-                internal_address_map = dict()
-                external_address_map = {socket_type: [f'tcp://*:{port}']}
-
-                if socket_type is not zmq.PUB:
+                if socket_type is zmq.PUB:
+                    external_address_map = {socket_type: [f'tcp://*:{port}']}
+                elif socket_type is zmq.PUSH:
+                    external_address_map = {socket_type: [f'tcp://*:{port}']}
                     external_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
+                internal_address_map = dict()
 
             network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
             
-            super().__init__('SENDER', network_config, level)
+            super().__init__('SENDER', network_config, level, logger)
             self.socket_type = socket_type
             self.msgs = []
             self.n = n
@@ -200,26 +203,28 @@ class TestNetworkElement(unittest.TestCase):
                 return
 
     class Receiver(DummyNetworkElement):
-        def __init__(self, name, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO) -> None:
+        def __init__(self, name, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'     
 
-            if t_type is TestNetworkElement.TransmissionTypes.INT:   
-                internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
+            if t_type is TestNetworkElement.TransmissionTypes.INT: 
+                if socket_type is zmq.SUB:
+                    internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
+                elif socket_type is zmq.PULL:
+                    internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
+                    internal_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
                 external_address_map = dict()
 
-                if socket_type is not zmq.SUB:
-                    internal_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
-
             elif t_type is TestNetworkElement.TransmissionTypes.EXT:
-                internal_address_map = dict()
-                external_address_map = {socket_type: [f'tcp://localhost:{port}']}
-
-                if socket_type is not zmq.SUB:
+                if socket_type is zmq.SUB:
+                    external_address_map = {socket_type: [f'tcp://localhost:{port}']}
+                elif socket_type is zmq.PULL:
+                    external_address_map = {socket_type: [f'tcp://localhost:{port}']}
                     external_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
+                internal_address_map = dict()
 
             network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
             
-            super().__init__(name, network_config, level)
+            super().__init__(name, network_config, level, logger)
             self.socket_type = socket_type
             self.n = n
             self.t_type = t_type          
@@ -281,11 +286,6 @@ class TestNetworkElement(unittest.TestCase):
             except asyncio.CancelledError:
                 return      
 
-    # def test_config_network(self):
-    #     network_congif = NetworkConfig('TEST_NETWORK',
-    #                                     {}, 
-    #                                     {})
-
     def transmission_tester(self,
                             t_type : TransmissionTypes, 
                             sender_port_type : zmq.SocketType, 
@@ -299,9 +299,11 @@ class TestNetworkElement(unittest.TestCase):
             raise TypeError('`t_type` must be of type `TransmissionTypes`')
 
         sender = TestNetworkElement.Sender(t_type, sender_port_type, port, n_messages, level)
+        logger = sender.get_logger()
+
         receivers = []
         for i in range(n_receivers):
-            receiver = TestNetworkElement.Receiver(f'RECEVER_{i+1}', t_type, receiver_port_type, port, n_messages, level)
+            receiver = TestNetworkElement.Receiver(f'RECEVER_{i+1}', t_type, receiver_port_type, port, n_messages, level, logger)
             receivers.append(receiver)
         
         sender.activate()
@@ -354,7 +356,7 @@ class TestNetworkElement(unittest.TestCase):
             print('\n')
 
     def test_message_distribution(self):
-        port = 5556
+        port = 5555
         listeners = [1, 20]
         n_messages = 20
 
@@ -362,7 +364,7 @@ class TestNetworkElement(unittest.TestCase):
         print('\n\nTEST: Internal Message Distribution (PUSH-PULL)')
         for n_listeners in listeners:
             print(f'Number of listeners: {n_listeners}')
-            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages)
+            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages, level=logging.WARNING)
             print('\n')
 
         # EXTERNAL MESSAGING

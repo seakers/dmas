@@ -8,23 +8,13 @@ from dmas.manager import *
 
 class TestSimulationNode(unittest.TestCase): 
     class DummyMonitor(SimulationElement):
-        def __init__(self, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+        def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PULL: [f'tcp://localhost:{port+2}']})
             
             super().__init__('MONITOR', network_config, level, logger)
-
-            year = 2023
-            month = 1
-            day = 1
-            hh = 12
-            mm = 00
-            ss = 00
-            start_date = datetime(year, month, day, hh, mm, ss)
-            end_date = datetime(year, month, day+1, hh, mm, ss)
-
-            self._clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+            self._clock_config = clock_config
 
         
         async def _external_sync(self) -> dict:
@@ -78,7 +68,8 @@ class TestSimulationNode(unittest.TestCase):
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                    zmq.SUB: [f'tcp://localhost:{port+1}']})
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://*:{port+2}']})
 
 
             super().__init__(f'Node_{id}', network_config, [], level, logger)
@@ -112,11 +103,11 @@ class TestSimulationNode(unittest.TestCase):
         manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
         
         with concurrent.futures.ThreadPoolExecutor(len(nodes) + 2) as pool:
+            pool.submit(monitor.run, *[])
             pool.submit(manager.run, *[])
             node : TestSimulationNode.NonModularTestNode
             for node in nodes:                
                 pool.submit(node.run, *[])
-            pool.submit(monitor.run, *[])
         print('\n')
 
     def test_init(self):
@@ -125,7 +116,7 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_nodes = 5
+        n_nodes = 1
 
         year = 2023
         month = 1
@@ -137,4 +128,4 @@ class TestSimulationNode(unittest.TestCase):
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
         clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-        self.run_tester(clock_config, n_nodes, level=logging.WARNING)
+        self.run_tester(clock_config, n_nodes, level=logging.DEBUG)

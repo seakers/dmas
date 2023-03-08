@@ -373,15 +373,14 @@ class NetworkElement(ABC):
 
         # connect or bind to network port
         for address in addresses:
-            if socket_type in [zmq.PUB, zmq.PUSH, zmq.REP]:
-                if self.__is_address_in_use(address):
-                    raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
-                
-                socket.bind(address)
-
-            elif socket_type in [zmq.SUB, zmq.PULL ,zmq.REQ]:
-                socket.connect(address)
-
+            if socket_type in [zmq.PUB, zmq.SUB ,zmq.REQ, zmq.REP, zmq.PUSH ,zmq.PULL]:
+                if 'localhost' in address:
+                    socket.connect(address)
+                else:
+                    if self.__is_address_in_use(address):
+                        raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
+                    
+                    socket.bind(address)
             else:
                 raise NotImplementedError(f'Socket of type {socket_type} not yet supported.')
 
@@ -425,7 +424,7 @@ class NetworkElement(ABC):
             socket, _ = self._external_socket_map[socket_type]
             socket : zmq.Socket
             socket.close()  
-            # self._log(f'closed external socket of type {socket_type}...', level=logging.INFO)
+            self._log(f'closed external socket of type {socket_type}...', level=logging.DEBUG)
 
         # close internal connections
         for socket_type in self._internal_socket_map:
@@ -433,13 +432,12 @@ class NetworkElement(ABC):
             socket, _ = self._internal_socket_map[socket_type]
             socket : zmq.Socket
             socket.close()  
-            # self._log(f'closed internal socket of type {socket_type}...', level=logging.INFO)
+            self._log(f'closed internal socket of type {socket_type}...', level=logging.DEBUG)
 
         # close network context
         if self._network_context is not None:
             self._network_context : zmq.Context
             self._network_context.term()  
-            # self._network_context.destroy()
 
         self._network_activated = False
 
