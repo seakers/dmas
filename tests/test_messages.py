@@ -100,7 +100,6 @@ class TestSimulationMessages(unittest.TestCase):
             return delta.total_seconds()
 
     def test_manager_messages(self):
-    # def test_manager_message(self):   
         dst = 'TEST_DST'
         msg = ManagerMessage(dst, ManagerMessageTypes.TEST.value, -1)
         msg_dif = ManagerMessage(dst, ManagerMessageTypes.TEST.value, -1)
@@ -108,7 +107,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, ManagerMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, ManagerMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_simulation_start_message(self):
         dst = 'TEST_DST'
         msg = SimulationStartMessage(dst, -1)        
         msg_dif = SimulationStartMessage(dst, -1)        
@@ -116,7 +114,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, SimulationStartMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, SimulationStartMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_simulation_end_message(self):
         dst = 'TEST_DST'
         msg = SimulationEndMessage(dst, -1)        
         msg_dif = SimulationEndMessage(dst, -1)        
@@ -124,7 +121,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, SimulationEndMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, SimulationEndMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_simulation_info_test(self):
         year = 2023
         month = 1
         day = 1
@@ -142,8 +138,7 @@ class TestSimulationMessages(unittest.TestCase):
         
         self.assertEqual(msg, SimulationInfoMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, SimulationInfoMessage(**json.loads(msg_dif.to_json())))
-
-    # def test_maanger_reception_ack_message(self):        
+        
         dst = 'TEST_DST'
         msg = ManagerReceptionAckMessage(dst, -1)        
         msg_dif = ManagerReceptionAckMessage(dst, -1)        
@@ -151,7 +146,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, ManagerReceptionAckMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, ManagerReceptionAckMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_manager_reception_ignored_message(self):
         dst = 'TEST_DST'
         msg = ManagerReceptionIgnoredMessage(dst, -1)        
         msg_dif = ManagerReceptionIgnoredMessage(dst, -1)        
@@ -160,7 +154,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertNotEqual(msg, ManagerReceptionIgnoredMessage(**json.loads(msg_dif.to_json())))
         
     def test_node_messages(self):
-    # def test_node_sync_request_message(self):
         src = 'TEST_SRC'
         network_config = NetworkConfig('TEST_NETWORK')
         msg = NodeSyncRequestMessage(src, network_config.to_dict())
@@ -169,7 +162,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, NodeSyncRequestMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeSyncRequestMessage(**json.loads(msg_dif.to_json())))
         
-    # def test_node_ready_message(self):
         src = 'TEST_SRC'
         msg = NodeReadyMessage(src)
         msg_dif = NodeReadyMessage(src)
@@ -177,7 +169,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, NodeReadyMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeReadyMessage(**json.loads(msg_dif.to_json())))
     
-    # def test_node_deactivate_message(self):
         src = 'TEST_SRC'
         msg = NodeDeactivatedMessage(src)
         msg_dif = NodeDeactivatedMessage(src)
@@ -185,7 +176,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, NodeDeactivatedMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeDeactivatedMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_node_reception_acknowledged_message(self):
         src = 'TEST_SRC'
         dst = 'TEST_DST'
         msg = NodeReceptionAckMessage(src, dst)
@@ -194,7 +184,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, NodeReceptionAckMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeReceptionAckMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_node_reception_ignored_message(self):
         src = 'TEST_SRC'
         dst = 'TEST_DST'
         msg = NodeReceptionIgnoredMessage(src, dst)
@@ -203,7 +192,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, NodeReceptionIgnoredMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeReceptionIgnoredMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_terminate_internal_module_message(self):
         src = 'TEST_SRC'
         dst = 'TEST_DST'
         msg = TerminateInternalModuleMessage(src, dst)
@@ -212,7 +200,6 @@ class TestSimulationMessages(unittest.TestCase):
         self.assertEqual(msg, TerminateInternalModuleMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, TerminateInternalModuleMessage(**json.loads(msg_dif.to_json())))
 
-    # def test_module_sync_request_message(self):
         src = 'TEST_SRC'
         dst = 'TEST_DST'
         msg = ModuleSyncRequestMessage(src, dst)

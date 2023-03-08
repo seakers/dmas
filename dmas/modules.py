@@ -83,8 +83,12 @@ class InternalModule(NetworkElement):
         Returns the name of this module's parent network node
         """
         return self._network_name
+    
+    async def config_network(self) -> tuple:
+        # configure own network ports
+        self._network_context, self._external_socket_map, self._internal_socket_map = super().config_network()
 
-    async def _internal_sync(self) -> dict:
+    async def sync(self) -> dict:
         # send a sync request to parent node
         sync_req = ModuleSyncRequestMessage(self.get_module_name(), self.get_parent_name())
         await self._send_internal_msg(sync_req, zmq.PUB)
@@ -99,21 +103,17 @@ class InternalModule(NetworkElement):
                 # received a message intended for someone else. Ignoring message
                 continue
 
-            if src not in self.get_parent_name():
-                # received a message from an undesired sender. Ignoring message
+            if self.get_parent_name() != src:
+                # received a message from an undesired external sender. Ignoring message
                 continue
             
-            msg_type = msg_dict.get('@type', None)
-            if msg_type is not None and NodeMessageTypes[msg_type] == NodeMessageTypes.RECEPTION_ACK:
+            msg_type = msg_dict.get('msg_type', None)
+            if msg_type == NodeMessageTypes.RECEPTION_ACK.value:
                 # received a sync request acknowledgement from the parent node. Sync complete!
                 break
 
         # connections are static throughout the simulation. No ledger is required
-        return dict()
-
-    async def _external_sync(self) -> dict:
-        # no external communications allowed for internal modules.  
-        return dict()        
+        return dict()      
     
     def run(self):
         async def main():
@@ -122,7 +122,7 @@ class InternalModule(NetworkElement):
             """
             try:
                 # perform this module's routine
-                tasks = [asyncio.create_task(self.routine(), name=f'{self.name}_routine'),
+                tasks = [asyncio.create_task(self._routine(), name=f'{self.name}_routine'),
                          asyncio.create_task(self._listen(), name=f'{self.name}_listen'),]
 
                 # instruct all submodules to perform their own routines
@@ -152,7 +152,7 @@ class InternalModule(NetworkElement):
         return asyncio.run(main())
 
     @abstractmethod
-    async def routine():
+    async def _routine():
         """
         Routine to be performed by the module during when the parent node is executing.
 
@@ -169,13 +169,10 @@ class InternalModule(NetworkElement):
         """
         pass
 
-    async def sync(self) -> tuple:
-        return
-
 class InternalSubmodule(ABC):
-    def __init__(self, name : str, parent_name : str) -> None:
+    def __init__(self, name : str, parent_module_name : str) -> None:
         super().__init__()
-        self.name = parent_name + '/' + name
+        self.name = parent_module_name + '/' + name
     
     async def run() -> None:
         try:
