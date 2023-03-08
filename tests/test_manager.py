@@ -3,7 +3,7 @@ import unittest
 import concurrent.futures
 
 from tqdm import tqdm
-from dmas.manager import *
+from dmas.managers import *
 
 
 class TestSimulationManager(unittest.TestCase): 

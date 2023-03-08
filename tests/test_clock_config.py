@@ -4,7 +4,15 @@ from dmas.clocks import *
 from datetime import datetime, timezone
 
 
-class TestSimulationMessages(unittest.TestCase):    
+class TestSimulationMessages(unittest.TestCase): 
+    class TestClockConfig(ClockConfig):
+        def __init__(self, start_date: str, end_date: str, clock_type: str, simulation_runtime_start: float = -1, simulation_runtime_end: float = -1, **kwargs) -> None:
+            super().__init__(start_date, end_date, clock_type, simulation_runtime_start, simulation_runtime_end, **kwargs)
+        
+        def get_total_seconds(self):
+            delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
+            return delta.total_seconds()
+
     def test_init(self):
         year = 2023
         month = 1
@@ -15,18 +23,18 @@ class TestSimulationMessages(unittest.TestCase):
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day+1, hh, mm, ss)
 
-        clock_config = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        clock_config = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
 
-        self.assertEqual(type(clock_config), ClockConfig)
+        self.assertTrue(isinstance(clock_config, ClockConfig))
 
         with self.assertRaises(TypeError):
-            ClockConfig(1, str(end_date), ClockTypes.TEST.value)
-            ClockConfig(str(start_date), 1, ClockTypes.TEST.value)
-            ClockConfig(str(start_date), str(end_date), ClockTypes.TEST)
-            ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, 'OTHER')
-            ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, -1, 'OTHER')
+            TestSimulationMessages.TestClockConfig(1, str(end_date), ClockTypes.TEST.value)
+            TestSimulationMessages.TestClockConfig(str(start_date), 1, ClockTypes.TEST.value)
+            TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST)
+            TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, 'OTHER')
+            TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, -1, 'OTHER')
 
-            ClockConfig('2023/01/2 ASD', str(end_date), ClockTypes.TEST.value)
+            TestSimulationMessages.TestClockConfig('2023/01/2 ASD', str(end_date), ClockTypes.TEST.value)
 
     def test_equal(self):
         year = 2023
@@ -39,34 +47,34 @@ class TestSimulationMessages(unittest.TestCase):
         end_date = datetime(year, month, day+1, hh, mm, ss)
 
         # same message
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
-        config_2 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
         
         self.assertTrue(config_1 == config_2)
 
         # differ start date
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
-        config_2 = ClockConfig(str(end_date), str(end_date), ClockTypes.TEST.value)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_2 = TestSimulationMessages.TestClockConfig(str(end_date), str(end_date), ClockTypes.TEST.value)
         self.assertFalse(config_1 == config_2)
 
         # differ end date
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
-        config_2 = ClockConfig(str(start_date), str(start_date), ClockTypes.TEST.value)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(start_date), ClockTypes.TEST.value)
         self.assertFalse(config_1 == config_2)
 
         # differ clock type
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
-        config_2 = ClockConfig(str(start_date), str(end_date), 'OTHER')
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), 'OTHER')
         self.assertFalse(config_1 == config_2)
 
         # differ runtime start
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, 1)
-        config_2 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, 0)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, 1)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, 0)
         self.assertFalse(config_1 == config_2)
 
         # differ runtime end
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, -1, 1)
-        config_2 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, -1, 0)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, -1, 1)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value, -1, 0)
         self.assertFalse(config_1 == config_2)
     
     def test_dict(self):
@@ -79,11 +87,11 @@ class TestSimulationMessages(unittest.TestCase):
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day+1, hh, mm, ss)
 
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
-        config_2 = ClockConfig(str(start_date), str(start_date), ClockTypes.TEST.value)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(start_date), ClockTypes.TEST.value)
 
-        self.assertEqual(config_1, ClockConfig(**config_1.to_dict()))
-        self.assertNotEqual(config_1, ClockConfig(**config_2.to_dict()))
+        self.assertEqual(config_1, TestSimulationMessages.TestClockConfig(**config_1.to_dict()))
+        self.assertNotEqual(config_1, TestSimulationMessages.TestClockConfig(**config_2.to_dict()))
 
     def test_json(self):
         year = 2023
@@ -95,11 +103,11 @@ class TestSimulationMessages(unittest.TestCase):
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day+1, hh, mm, ss)
 
-        config_1 = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
-        config_2 = ClockConfig(str(start_date), str(start_date), ClockTypes.TEST.value)
+        config_1 = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        config_2 = TestSimulationMessages.TestClockConfig(str(start_date), str(start_date), ClockTypes.TEST.value)
 
-        self.assertEqual(config_1, ClockConfig(**json.loads(config_1.to_json())))
-        self.assertNotEqual(config_1, ClockConfig(**json.loads(config_2.to_json())))
+        self.assertEqual(config_1, TestSimulationMessages.TestClockConfig(**json.loads(config_1.to_json())))
+        self.assertNotEqual(config_1, TestSimulationMessages.TestClockConfig(**json.loads(config_2.to_json())))
 
     def test_str_to_datetime(self):
         year = 2023

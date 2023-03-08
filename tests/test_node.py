@@ -2,8 +2,8 @@ import unittest
 import concurrent.futures
 
 from tqdm import tqdm
-from dmas.node import *
-from dmas.manager import *
+from dmas.nodes import *
+from dmas.managers import *
 
 
 class TestSimulationNode(unittest.TestCase): 

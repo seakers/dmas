@@ -129,10 +129,10 @@ class TestNetworkElement(unittest.TestCase):
                     await coroutine_task
 
         def run(self):
-            # try:
             asyncio.run(self.main())
-            # finally:
-            #     self._deactivate_network()
+
+        async def sync(self):
+            return
 
     class ReceiverKillMessage(SimulationMessage):
         """

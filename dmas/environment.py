@@ -1,6 +1,6 @@
 import logging
 from dmas.modules import InternalModule, InternalModuleNetworkConfig
-from dmas.node import Node
+from dmas.nodes import Node
 from dmas.element import SimulationElement
 from dmas.utils import *
 from dmas.network import *

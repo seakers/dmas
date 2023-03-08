@@ -198,7 +198,3 @@ class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
             - end_date (:obj:`datetime`): simulation end date
         """
         super().__init__(start_date, end_date, 1.0)
-        
-    def get_total_seconds(self):
-        delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
-        return delta.total_seconds()

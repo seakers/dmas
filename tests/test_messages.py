@@ -12,7 +12,7 @@ def messageFactory(msg_type : type):
         id = str(uuid.uuid1())
         return SimulationMessage(src, dst, TestMessageTypes.TEST.value, id)
 
-class TestSimulationMessage(unittest.TestCase): 
+class TestSimulationMessage(unittest.TestCase):     
     def test_init(self):
         src = 'TEST_SRC'
         dst = 'TEST_DST'
@@ -91,7 +91,13 @@ class TestSimulationMessage(unittest.TestCase):
         self.assertNotEqual(msg, SimulationMessage(**json.loads(msg_dif.to_json())))
 
 class TestSimulationMessages(unittest.TestCase): 
-    # def test_subclasses(self):
+    class TestClockConfig(ClockConfig):
+        def __init__(self, start_date: str, end_date: str, clock_type: str, simulation_runtime_start: float = -1, simulation_runtime_end: float = -1, **kwargs) -> None:
+            super().__init__(start_date, end_date, clock_type, simulation_runtime_start, simulation_runtime_end, **kwargs)
+        
+        def get_total_seconds(self):
+            delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
+            return delta.total_seconds()
 
     def test_manager_messages(self):
     # def test_manager_message(self):   
@@ -127,7 +133,7 @@ class TestSimulationMessages(unittest.TestCase):
         ss = 00
         start_date = datetime(year, month, day, hh, mm, ss, tzinfo=timezone.utc)
         end_date = datetime(year, month, day+1, hh, mm, ss, tzinfo=timezone.utc)
-        clock_config = ClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
+        clock_config = TestSimulationMessages.TestClockConfig(str(start_date), str(end_date), ClockTypes.TEST.value)
 
         dst = 'TEST_DST'
         
