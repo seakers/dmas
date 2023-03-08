@@ -15,5 +15,5 @@ setup(
     author_email='aguilaraj15@tamu.edu',
     packages=['dmas'],
     scripts=[],
-    install_requires=['matplotlib', 'neo4j', 'pyzmq'] 
+    install_requires=['matplotlib', 'neo4j', 'pyzmq', 'tqdm'] 
 )
