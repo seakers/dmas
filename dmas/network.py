@@ -374,7 +374,7 @@ class NetworkElement(ABC):
         # connect or bind to network port
         for address in addresses:
             if socket_type in [zmq.PUB, zmq.SUB ,zmq.REQ, zmq.REP, zmq.PUSH ,zmq.PULL]:
-                if 'localhost' in address:
+                if '*' not in address:
                     socket.connect(address)
                 else:
                     if self.__is_address_in_use(address):
