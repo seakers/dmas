@@ -7,7 +7,7 @@ from dmas.modules import *
 class TestSimulationNode(unittest.TestCase):
     class DummyModule(InternalModule):
         def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, logger: logging.Logger = None) -> None:
-            super().__init__(module_name, network_config, logger, [])
+            super().__init__(module_name, network_config, [], logger=logger)
 
         async def _listen(self):
             try:
@@ -48,10 +48,9 @@ class TestSimulationNode(unittest.TestCase):
         port = 5555
 
         network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {
-                                                                    zmq.REP: [f'tcp://*:{port}'],
-                                                                    zmq.PUB: [f'tcp://*:{port+1}'],
-                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+                                            internal_address_map = {
+                                                                    zmq.PUB: [f'tcp://*:{port}'],
+                                                                    zmq.SUB: [f'tcp://*:{port+1}']})
             
         module = TestSimulationNode.DummyModule('TEST_MODULE', network_config)
 

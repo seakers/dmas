@@ -49,8 +49,8 @@ class InternalModule(NetworkElement):
         - _external_inbox (`asyncio.Queue()`):
     ####
     """
-    def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, submodules : list = [], logger: logging.Logger = None) -> None:
-        super().__init__(module_name, network_config, logger.getEffectiveLevel(), logger)
+    def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, submodules : list = [], level : int = logging.INFO, logger: logging.Logger = None) -> None:
+        super().__init__(module_name, network_config, logger=logger)
 
         # copy submodule list
         self._submodules = []

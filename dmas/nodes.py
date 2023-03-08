@@ -33,7 +33,7 @@ class Node(SimulationElement):
         super().__init__(name, network_config, level, logger)   
         
         for module in modules:
-            if not isinstance(InternalModule):
+            if not isinstance(module, InternalModule):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
         
         self.__modules = modules.copy()
@@ -307,13 +307,16 @@ class Node(SimulationElement):
                         self._log(f'submitting {module.name}\'s `run()` method for execution...')
                         pool.submit(module.run, *[])  
 
-        live_task = asyncio.create_task(self._live())
-        module_run_task = asyncio.create_task(multiprocessing_run_for_modules())
+        live_task = asyncio.create_task(self._live())        
+        if len(self.__modules) > 0:
+            module_run_task = asyncio.create_task(multiprocessing_run_for_modules())
 
-        _, pending = await asyncio.wait([live_task, module_run_task], return_when=asyncio.FIRST_COMPLETED)
+            _, pending = await asyncio.wait([live_task, module_run_task], return_when=asyncio.FIRST_COMPLETED)
 
-        if live_task in pending:
-            live_task.cancel()
+            if live_task in pending:
+                live_task.cancel()
+        else:
+            await live_task
 
         await self.__wait_for_offline_modules()       
 
