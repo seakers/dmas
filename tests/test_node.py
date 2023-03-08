@@ -113,7 +113,7 @@ class TestSimulationNode(unittest.TestCase):
         node = TestSimulationNode.NonModularTestNode(1, 5555)
         self.assertEqual(type(node), TestSimulationNode.NonModularTestNode)
 
-    def test_run(self):
+    def test__realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
         n_nodes = 1
 
@@ -127,4 +127,20 @@ class TestSimulationNode(unittest.TestCase):
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
         clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+        self.run_tester(clock_config, n_nodes, level=logging.WARNING)
+
+    def test_accelerated_run(self):
+        print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
+        n_nodes = 1
+
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
+
+        clock_config = AcceleratedRealTimeClockConfig(str(start_date), str(end_date), 2.0)
         self.run_tester(clock_config, n_nodes, level=logging.WARNING)

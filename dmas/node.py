@@ -115,21 +115,31 @@ class Node(SimulationElement):
 
         # instruct internal modules to configure their own network ports
         if len(self.__modules) > 0:
+            self._log(f'creating {len(self.__modules)} parallel processes...')
             with concurrent.futures.ThreadPoolExecutor(len(self.__modules)) as pool:
                 for module in self.__modules:
                     module : InternalModule
+                    self._log(f'submitting {module.name}\'s `config_network()` method for execution...')
                     pool.submit(module.config_network, *[])
 
         return network_context, external_socket_map, internal_socket_map
 
+    
     async def _internal_sync(self) -> dict:
-        # instruct internal modules to sync their networks with me
-        with concurrent.futures.ThreadPoolExecutor(len(self.__modules) + 1) as pool:
-            pool.submit(asyncio.run, *[self.__wait_for_online_modules()])    
+        async def multiprocessing_sync_for_modules():
+            if len(self.__modules) > 0:
+                self._log(f'creating {len(self.__modules)} parallel processes...')
+                with concurrent.futures.ThreadPoolExecutor(len(self.__modules)) as pool:
+                    for module in self.__modules:
+                        module : InternalModule
+                        self._log(f'submitting {module.name}\'s `sync()` method for execution...')
+                        pool.submit(module.sync, *[])  
 
-            for module in self.__modules:
-                module : InternalModule
-                pool.submit(module.sync, *[])                       
+        # instruct internal modules to sync their networks with me
+        wait_task = asyncio.create_task(self.__wait_for_online_modules())           
+
+        multiprocessing_task = asyncio.create_task(multiprocessing_sync_for_modules())  
+        await asyncio.wait([wait_task, multiprocessing_task], return_when=asyncio.ALL_COMPLETED)
 
         # create internal ledger
         internal_address_ledger = dict()
@@ -289,24 +299,21 @@ class Node(SimulationElement):
             raise e
 
     async def _execute(self) -> None:
-        if len(self.__modules) > 0:
-            self._log(f'creating {len(self.__modules) + 1} parallel processes...')
-            with concurrent.futures.ProcessPoolExecutor(len(self.__modules) + 1) as pool:
-                # start all modules' run routines
-                for module in self.__modules:
-                    module : InternalModule
-                    self._log(f'submitting {module.name}\'s `run()` method for execution...')
-                    pool.submit(module.run, *[])
+        async def multiprocessing_run_for_modules():
+            if len(self.__modules) > 0:
+                self._log(f'creating {len(self.__modules)} parallel processes...')
+                with concurrent.futures.ThreadPoolExecutor(len(self.__modules)) as pool:
+                    for module in self.__modules:
+                        module : InternalModule
+                        self._log(f'submitting {module.name}\'s `run()` method for execution...')
+                        pool.submit(module.run, *[])  
 
-                # perform live routine
-                self._log(f'submitting {self.name}\'s `run()` method for execution...')
-                pool.submit(asyncio.run, *[self._live()])  
-            
-            await self.__wait_for_offline_modules()       
-        else:
-            self._log('living...')
-            await self._live()
-            self._log('living completed!')
+        live_task = asyncio.create_task(self._live())
+        module_run_task = asyncio.create_task(multiprocessing_run_for_modules())
+
+        await asyncio.wait([live_task, module_run_task], return_when=asyncio.ALL_COMPLETED)
+
+        await self.__wait_for_offline_modules()       
 
     @abstractmethod
     async def _live(self) -> None:

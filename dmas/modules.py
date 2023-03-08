@@ -169,6 +169,9 @@ class InternalModule(NetworkElement):
         """
         pass
 
+    async def sync(self) -> tuple:
+        return
+
 class InternalSubmodule(ABC):
     def __init__(self, name : str, parent_name : str) -> None:
         super().__init__()

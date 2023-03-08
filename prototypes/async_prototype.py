@@ -15,18 +15,34 @@ class Tester:
         await asyncio.sleep(t)
         print('sleep completed!')
 
+    async def f3(self, n, t):
+        with concurrent.futures.ThreadPoolExecutor(n) as pool:
+                for _ in range(n):
+                    pool.submit(asyncio.run, *[self.f2(t)])
+    
+    async def f4(self, n, y):
+        with concurrent.futures.ThreadPoolExecutor(n) as pool:
+                for _ in range(n):
+                    pool.submit(self.f1, *[y])
+
     def run(self):
         async def routine():
             n = 2
             y = 10000000
-            dt = 1
+            t = 1
 
-            with concurrent.futures.ThreadPoolExecutor(n + 2) as pool:
-                for _ in range(n):
-                    pool.submit(self.f1, *[y])
-                pool.submit(asyncio.run, *[self.f2(dt)])
+            t2 = asyncio.create_task(self.f2(t))
+            t4 = asyncio.create_task(self.f4(n, y))
+
+            # await t2
+            await asyncio.wait([t2, t4], return_when=asyncio.ALL_COMPLETED)
+
+            # with concurrent.futures.ThreadPoolExecutor(n) as pool:
+            #     for _ in range(n):
+            #         pool.submit(self.f1, *[y])
+                    # pool.submit(asyncio.run, *[self.f3(n, t)])
            
-            # await self.f2(dt)
+            # await t2
 
         asyncio.run(routine())
 

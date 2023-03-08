@@ -417,6 +417,10 @@ class NetworkElement(ABC):
             port = int(address_components[-1])
 
             return s.connect_ex(('localhost', port)) == 0
+        
+    @abstractmethod
+    async def sync(self) -> tuple:
+        pass
 
     def _deactivate_network(self) -> None:
         """
