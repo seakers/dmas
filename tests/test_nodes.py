@@ -1,7 +1,6 @@
 import unittest
 import concurrent.futures
 
-from tqdm import tqdm
 from dmas.nodes import *
 from dmas.managers import *
 from dmas.modules import *
@@ -88,7 +87,7 @@ class TestSimulationNode(unittest.TestCase):
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
 
 
-            super().__init__(f'Node_{id}', network_config, [], level, logger)
+            super().__init__(f'NODE_{id}', network_config, [], level, logger)
         
     class ModularTestNode(DummyNode):
         def __init__(self, id: int, port : int, n_modules : int = 1, level: int = logging.INFO, logger:logging.Logger=None) -> None:
@@ -99,19 +98,20 @@ class TestSimulationNode(unittest.TestCase):
                 module_ports.append(module_port)
             node_pub_port = port + 4+id*(n_modules + 1) + n_modules
 
+            if n_modules > 0:
+                internal_address_map = {
+                                        zmq.PUB: [f'tcp://*:{node_pub_port}'],
+                                        zmq.SUB: [f'tcp://localhost:{module_port}' for module_port in module_ports]
+                                        }
+            else:
+                internal_address_map = dict()
+
             network_config = NetworkConfig('TEST_NETWORK',
-                                            internal_address_map = {
-                                                                    zmq.PUB: [f'tcp://*:{node_pub_port}'],
-                                                                    zmq.SUB: [f'tcp://localhost:{module_port}' for module_port in module_ports]},
-                                            external_address_map = {
+                                            internal_address_map=internal_address_map,
+                                            external_address_map={
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
-            
-            print(f'Node id: {id}')
-            print(f'\tnode port: {node_pub_port}')            
-            print(f'\tmodule ports: {module_ports}')   
-            
             submodules = []
             for i in range(n_modules):
                 module_port = module_ports[i]
@@ -121,19 +121,14 @@ class TestSimulationNode(unittest.TestCase):
                         module_sub_ports.append(port)
                 module_sub_ports.append(node_pub_port)
 
-                print(f'Internal Module:')
-                print(f'\tid: {i}')
-                print(f'\tmodule port: {module_port}')
-                print(f'\tsub ports: {module_sub_ports}')
-
-                submodule_network_config = NetworkConfig('TEST_NETWORK',
+                submodule_network_config = NetworkConfig(f'NODE_{id}',
                                             internal_address_map = {
                                                                     zmq.PUB: [f'tcp://*:{module_port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{module_sub_port}' for module_sub_port in module_sub_ports]})
                 
-                submodules.append( TestSimulationNode.DummyModule(f'Module_{i}', submodule_network_config, logger) )
+                submodules.append( TestSimulationNode.DummyModule(f'MODULE_{i}', submodule_network_config, logger) )
 
-            super().__init__(f'Node_{id}', network_config, submodules, level, logger)
+            super().__init__(f'NODE_{id}', network_config, submodules, level, logger)
 
     class DummyModule(InternalModule):
         def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, logger: logging.Logger = None) -> None:
@@ -163,10 +158,10 @@ class TestSimulationNode(unittest.TestCase):
             
         async def _routine(self):
             try:
+                # do some 'work'
                 while True:
-                    # does some "work"
                     asyncio.sleep(1e6)
-                    
+                   
             except asyncio.CancelledError:
                 self._log(f'`_routine()` interrupted. {e}')
                 return
@@ -180,11 +175,8 @@ class TestSimulationNode(unittest.TestCase):
 
         nodes = []
         simulation_element_name_list = []
-        for i in range(n_nodes):
-            if n_modules > 0:
-                node = TestSimulationNode.ModularTestNode(i, port, n_modules, level, logger)
-            else:
-                node = TestSimulationNode.NonModularTestNode(i, port, level, logger)
+        for i in range(n_nodes):            
+            node = TestSimulationNode.ModularTestNode(i, port, n_modules, level, logger)
             nodes.append(node)
             simulation_element_name_list.append(node.name)
 
@@ -205,21 +197,24 @@ class TestSimulationNode(unittest.TestCase):
         node = TestSimulationNode.ModularTestNode(1, 5555, 2)
         self.assertTrue(isinstance(node, Node))
 
-    # def test__realtime_run(self):
-    #     print('\nTESTING REAL-TIME CLOCK MANAGER')
-    #     n_nodes = 1
+    def test__realtime_run(self):
+        print('\nTESTING REAL-TIME CLOCK MANAGER')
+        n_nodes = 1
+        n_modules = 1
+        port = 5555
 
-    #     year = 2023
-    #     month = 1
-    #     day = 1
-    #     hh = 12
-    #     mm = 00
-    #     ss = 00
-    #     start_date = datetime(year, month, day, hh, mm, ss)
-    #     end_date = datetime(year, month, day, hh, mm, ss+1)
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
 
-    #     clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-    #     self.run_tester(clock_config, n_nodes, level=logging.WARNING)
+        clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+        self.run_tester(clock_config, n_nodes, n_modules, port, level=logging.DEBUG)
+    
 
     # def test_accelerated_run(self):
     #     print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')

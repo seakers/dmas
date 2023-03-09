@@ -80,12 +80,15 @@ class InternalModule(NetworkElement):
         """
         return self._network_name
     
-    async def config_network(self) -> tuple:
+    def config_network(self) -> tuple:
         # configure own network ports
+        self._log(f'configuring network...')
         self._network_context, self._external_socket_map, self._internal_socket_map = super().config_network()
+        self._log(f'NETWORK CONFIGURED!')
 
-    async def sync(self) -> dict:
+    async def network_sync(self) -> dict:
         # send a sync request to parent node
+        self._log('syncing with parent node...') 
         sync_req = ModuleSyncRequestMessage(self.get_module_name(), self.get_parent_name())
         await self._send_internal_msg(sync_req, zmq.PUB)
 
@@ -97,16 +100,21 @@ class InternalModule(NetworkElement):
 
             if dst not in self.name:
                 # received a message intended for someone else. Ignoring message
+                self._log(f'received message intended for {dst}. Ignoring...')
                 continue
 
             if self.get_parent_name() != src:
                 # received a message from an undesired external sender. Ignoring message
+                self._log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
             
             msg_type = msg_dict.get('msg_type', None)
             if msg_type == NodeMessageTypes.RECEPTION_ACK.value:
                 # received a sync request acknowledgement from the parent node. Sync complete!
+                self._log(f'sync request accepted!', level=logging.INFO)
                 break
+            else:
+                self._log(f'received undesired message of type {msg_type}. Ignoring...')
 
         # connections are static throughout the simulation. No ledger is required
         return dict()      
@@ -117,6 +125,11 @@ class InternalModule(NetworkElement):
             Runs the following processes concurrently. All terminates if at least one of them does.
             """
             try:
+                # configure and sync network 
+                self.config_network()
+                await asyncio.sleep(1)
+                await self.network_sync()
+
                 # perform this module's routine
                 tasks = [asyncio.create_task(self._routine(), name=f'{self.name}_routine'),
                          asyncio.create_task(self._listen(), name=f'{self.name}_listen'),]
@@ -144,8 +157,12 @@ class InternalModule(NetworkElement):
                 # inform parent module that this module has terminated
                 terminated_msg = TerminateInternalModuleMessage(self.name, self.get_parent_name())
                 self._send_internal_msg(terminated_msg, zmq.PUB)
-
-        return asyncio.run(main())
+        try:
+            self._log('running...')
+            return asyncio.run(main())
+        finally:
+            # close network connections
+            self._deactivate_network()
 
     @abstractmethod
     async def _routine():

@@ -282,6 +282,7 @@ class NetworkElement(ABC):
         Returns a 1 for a successful execution. Returns a 0 otherwise.
         """
         pass
+    
 
     def get_network_config(self) -> NetworkConfig:
         """
@@ -419,7 +420,10 @@ class NetworkElement(ABC):
             return s.connect_ex(('localhost', port)) == 0
         
     @abstractmethod
-    async def sync(self) -> tuple:
+    async def network_sync(self) -> tuple:
+        """
+        Performs sychronization routine any internal or external networks that this element might be a part of.
+        """
         pass
 
     def _deactivate_network(self) -> None:

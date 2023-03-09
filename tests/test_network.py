@@ -131,7 +131,7 @@ class TestNetworkElement(unittest.TestCase):
         def run(self):
             asyncio.run(self.main())
 
-        async def sync(self):
+        async def network_sync(self):
             return
 
     class ReceiverKillMessage(SimulationMessage):
