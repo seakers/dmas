@@ -27,7 +27,6 @@ class ScienceModule(Module):
         spacecraft_list = parent_agent.mission_dict.get('spacecraft')
         for spacecraft in spacecraft_list:
             name = spacecraft.get('name')
-            # land coverage data metrics data
             mission_profile = spacecraft.get('missionProfile')
             notifier = spacecraft.get('notifier')
             mission_profile_data[name] = mission_profile
@@ -37,8 +36,14 @@ class ScienceModule(Module):
         else:
             self.mission_profile = mission_profile_data[parent_agent.name]
         self.notifier = notifier_data[parent_agent.name]
-        self.points = self.load_points_scenario1b()
-        
+
+        # TODO change this to switch when more scenarios are added?
+        if "scenario1a" in self.scenario_dir:
+            self.points = self.load_points_scenario1a()
+            self.log(f'Scenario 1a points loaded!',level=logging.INFO)
+        elif "scenario1b" in self.scenario_dir:
+            self.points = self.load_points_scenario1b()
+            self.log(f'Scenario 1b points loaded!',level=logging.INFO)
 
         data_products = self.load_data_products()        
 
@@ -49,6 +54,19 @@ class ScienceModule(Module):
         ]
         if predictive_model:
             self.submodules.append(SciencePredictiveModelModule(self,data_products))
+
+    def load_points_scenario1a(self):
+        points = np.zeros(shape=(1000,4))
+        with open(self.scenario_dir+'resources/riverATLAS.csv') as csvfile:
+            reader = csv.reader(csvfile)
+            count = 0
+            for row in reader:
+                if count == 0:
+                    count = 1
+                    continue
+                points[count-1,:] = [row[0], row[1], row[2], row[3]]
+                count = count + 1
+        return points
 
     def load_points_scenario1b(self):
         points = []
@@ -81,9 +99,9 @@ class ScienceModule(Module):
 
         return data_products
 
-    def check_altimetry_outliers(self,item):
+    def check_flood_outliers(self,item):
         """
-        Checks altimetry data for outliers. Currently hardcoded. TODO update to use actual data source.
+        Checks USGS flood data for outliers. To be used for Scenario 1B.
         """
         outlier = False
         outlier_data = None
@@ -99,6 +117,25 @@ class ScienceModule(Module):
             outlier_data["severity"] = 0.0
             outlier_data["event_type"] = ""
             self.log(f'No flood detected at {lat}, {lon}',level=logging.DEBUG)
+        return outlier, outlier_data
+
+    
+    def check_altimetry_outlier(self,item):
+        """
+        Checks altimetry data for outliers. Currently hardcoded. TODO use real data source.
+        """
+        outlier = False
+        outlier_data = None
+        if(item["checked"] is False):
+            flood_chance, lat, lon = self.get_flood_chance(item["lat"], item["lon"], self.points)
+            if flood_chance > 0.50: # TODO remove this hardcode
+                item["severity"] = flood_chance
+                outlier = True
+                outlier_data = item
+                self.log(f'Flood detected at {lat}, {lon}!',level=logging.INFO)
+            else:
+                self.log(f'No flood detected at {lat}, {lon}',level=logging.INFO)
+            item["checked"] = True
         return outlier, outlier_data
 
     def get_severity(self, lat, lon, points, curr_time):
@@ -312,9 +349,14 @@ class ScienceValueModule(Module):
         """
         self.log(f'Computing science value...', level=logging.DEBUG)
         outlier = False
-
-        outlier, outlier_data = self.parent_module.check_altimetry_outliers(obs)
-        science_val = outlier_data["severity"]
+        if "scenario1a" in self.parent_module.scenario_dir:
+            science_val = 1.0
+            outlier, outlier_data = self.check_altimetry_outlier(obs)
+            self.log(f'Scenario 1a outlier checked!',level=logging.INFO)
+        elif "scenario1b" in self.parent_module.scenario_dir:
+            outlier, outlier_data = self.parent_module.check_flood_outliers(obs)
+            science_val = outlier_data["severity"]
+            self.log(f'Scenario 1b outlier checked!',level=logging.INFO)
         if outlier:
             self.log(f'Computed bonus science value: {science_val}', level=logging.DEBUG)
             outlier = True
@@ -658,7 +700,10 @@ class OnboardProcessingModule(Module):
         parent_agent = self.get_top_module()
         sat_name = parent_agent.name
         for potential_outlier in self.downlink_items:
-            outlier, outlier_data = self.parent_module.check_altimetry_outliers(potential_outlier)
+            if "scenario1a" in self.parent_module.scenario_dir:
+                outlier, outlier_data = self.parent_module.check_altimetry_outlier(potential_outlier)
+            elif "scenario1b" in self.parent_module.scenario_dir: 
+                outlier, outlier_data = self.parent_module.check_flood_outliers(potential_outlier)
             if outlier_data["event_type"] == "flood":
                 floods_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
             elif outlier_data["event_type"] == "hf":
@@ -768,7 +813,7 @@ class SciencePredictiveModelModule(Module):
                     if(self.unsent_points[i,3] <= self.get_current_time() <= self.unsent_points[i, 4]):
                         measurement_request = MeasurementRequest(["tss", "altimetry"], self.unsent_points[i,0],self.unsent_points[i,1], self.unsent_points[i,2], {})
                         ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)
-                        self.log(f'Sending message from predictive model!!!',level=logging.DEBUG)
+                        self.log(f'Sending message from predictive model!!!',level=logging.INFO)
                         await self.send_internal_message(ext_msg)
                         self.unsent_points = np.delete(self.unsent_points, i, 0)
                     else:
@@ -878,7 +923,10 @@ class ScienceReasoningModule(Module):
                         #    outliers.append(outlier_data)
                     elif(item["product_type"] == "altimetry"):
                         if item["checked"] is False:
-                            outlier, outlier_data = self.parent_module.check_altimetry_outliers(item)
+                            if "scenario1a" in self.parent_module.scenario_dir:
+                                outlier, outlier_data = self.parent_module.check_altimetry_outlier(item)
+                            if "scenario1b" in self.parent_module.scenario_dir:
+                                outlier, outlier_data = self.parent_module.check_flood_outliers(item)
                             if outlier is True:
                                 self.log(f'Altimetry outlier in check_sd',level=logging.DEBUG)
                                 outliers.append(outlier_data)

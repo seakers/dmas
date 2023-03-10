@@ -1236,7 +1236,7 @@ if __name__ == '__main__':
     scenario_dir = "./scenarios/"+sys.argv[1]+"/"
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 86400*16
+    duration = 86400*16.0
     # duration = 70
     # duration = 537 * dt 
     print(f'Simulation duration: {duration}[s]')
