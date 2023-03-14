@@ -85,11 +85,11 @@ class AbstractManager(SimulationElement):
         """
         pass
 
-    async def _internal_sync(self) -> dict:
+    async def _internal_sync(self, clock_config : ClockConfig) -> dict:
         # no internal modules to sync with
         return None
 
-    async def _external_sync(self) -> dict:
+    async def _external_sync(self) -> tuple:
         # wait for all simulation elements to initialize and connect to me
         external_address_ledger = await self.__wait_for_online_elements()
 

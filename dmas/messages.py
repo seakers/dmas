@@ -291,6 +291,7 @@ class NodeMessageTypes(Enum):
     RECEPTION_ACK = 'RECEPTION_ACK'
     RECEPTION_IGNORED = 'RECEPTION_IGNORED'
     MODULE_DEACTIVATE = 'MODULE_DEACTIVATE'
+    NODE_INFO = 'NODE_INFO'
 
 class NodeSyncRequestMessage(SimulationMessage):
     """
@@ -367,6 +368,35 @@ class NodeDeactivatedMessage(SimulationMessage):
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
         super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.NODE_DEACTIVATED.value, id)
+
+class NodeInfoMessage(SimulationMessage):
+    """
+    ## Node Deactivated Message
+
+    Message from a node informing all internal modules of general information about the simulation.
+
+    ### Attributes:
+        - src (`str`): name of the simulation node sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        - clock_config (`dict`): clock configuration to be used in the simulation
+    """
+    def __init__(self, src: str, dst: str, clock_config : dict, id: str = None, **kwargs):
+        """
+        Initializes an instance of a Node Info Message
+
+        ### Arguments:
+            - src (`str`): name of the simulation node sending this message
+            - dst (`str`): name of the internal module receiving this message
+            - clock_config (`dict`): clock configuration to be used in the simulation
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, NodeMessageTypes.NODE_INFO.value, id)
+        self.clock_config = clock_config
+    
+    def get_clock_config(self) -> ClockConfig:
+        return ClockConfig(**self.clock_config)
 
 class NodeReceptionAckMessage(SimulationMessage):
     """

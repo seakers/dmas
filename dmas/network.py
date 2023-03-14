@@ -423,6 +423,10 @@ class NetworkElement(ABC):
     async def network_sync(self) -> tuple:
         """
         Performs sychronization routine any internal or external networks that this element might be a part of.
+
+        #### Returns:
+            - `tuple` of a `ClockConfig` describing the simulation clock to be used and two `dict` mapping simulation 
+                elements' names to the addresses pointing to their respective connecting ports    
         """
         pass
 
@@ -452,6 +456,13 @@ class NetworkElement(ABC):
             self._network_context.term()  
 
         self._network_activated = False
+
+    @abstractmethod
+    async def _publish_deactivate(self) -> None:
+        """
+        Notifies other elements of the network that this element has deactivated.
+        """
+        pass
 
     """
     SEND/RECEIVE MESSAGES
@@ -659,3 +670,101 @@ class NetworkElement(ABC):
             - dst, src, content = await self._receive_internal_msg(socket_type)
         """
         return await self.__receive_msg(socket_type, self._internal_socket_map)
+
+    async def __send_request_message(self, msg : SimulationMessage, address_ledger : dict, socket_map : dict) -> list:
+        """
+        Sends a message through one of this node's request socket
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+            - address_ledger (`dict`): address ledger containing the destinations address
+            - socket_map (`dict`): list mapping de the desired type of socket to a socket contained by the node
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+        """
+        try:
+            # initialize progress trackers
+            send_task = None
+            receive_task = None
+
+            # get destination's socket address
+            if SimulationElementRoles.MANAGER.value in msg.dst:
+                dst_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
+                dst_address = dst_addresses[-1]
+            else:
+                dst_network_config : NetworkConfig = address_ledger.get(msg.dst, None)
+                dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)
+            
+            if dst_address is None:
+                raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
+            
+            # connect to destination's socket
+            socket, _ = socket_map.get(zmq.REQ, (None, None))
+            socket : zmq.Socket
+            self._log(f'connecting to {msg.dst} via `{dst_address}`...')
+            socket.connect(dst_address)
+            self._log(f'connection to {msg.dst} established! Transmitting a message of type {type(msg)}...')
+
+            # transmit message
+            send_task = asyncio.create_task( self._send_msg(msg, zmq.REQ, socket_map) )
+            await send_task
+            self._log(f'message of type {type(msg)} transmitted sucessfully! Waiting for response from {msg.dst}...')
+
+            # wait for response
+            receive_task = asyncio.create_task( self._receive_external_msg(zmq.REQ) )
+            await receive_task
+            self._log(f'response received from {msg.dst}!')
+
+            # disconnect from destination's socket
+            socket.disconnect(dst_address)
+
+            return receive_task.result()
+        
+        except asyncio.CancelledError as e:
+            self._log(f'message broadcast interrupted.')
+            if send_task is not None and not send_task.done():
+                send_task.cancel()
+                await send_task
+            
+            if receive_task is not None and not receive_task.done():
+                receive_task.cancel()
+                await receive_task
+
+        except Exception as e:
+            self._log(f'message broadcast failed.')
+            raise e
+
+    async def _send_external_request_message(self, msg : SimulationMessage) -> list:
+        """
+        Sends a message through this node's external request socket
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+        """
+        return await self.__send_request_message(msg, self._external_address_ledger, self._external_socket_map)
+    
+    async def _send_internal_request_message(self, msg : SimulationMessage) -> list:
+        """
+        Sends a message through this node's external request socket
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+        """
+        return await self.__send_request_message(msg, self._internal_address_ledger, self._internal_socket_map)
+    

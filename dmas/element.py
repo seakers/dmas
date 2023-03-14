@@ -166,25 +166,16 @@ class SimulationElement(NetworkElement):
         This will signal the beginning of the simulation.
 
         #### Returns:
-            - `tuple` of two `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
+            - `tuple` of a `ClockConfig` describing the simulation clock to be used and two `dict` mapping simulation 
+                elements' names to the addresses pointing to their respective connecting ports    
         """
         try:
             if self.__network_synced:
                 raise PermissionError('Attempted to sync with network after it has already been synced.')
 
-            # sync internal network
-            internal_sync_task = asyncio.create_task(self._internal_sync(), name='Internal Sync Task')
-            timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
-
-            await asyncio.wait([internal_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
-                            
-            if timeout_task.done():
-                internal_sync_task.cancel()
-                await internal_sync_task
-                raise TimeoutError('Sync with internal network elements timed out.')
-            
             # sync external network
             external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
+            timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
             
             await asyncio.wait([external_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
             
@@ -193,12 +184,23 @@ class SimulationElement(NetworkElement):
                 await external_sync_task
                 raise TimeoutError('Sync with external network elements timed out.')
 
+            clock_config, external_address_ledger = external_sync_task.result()
+
+            # sync internal network
+            internal_sync_task = asyncio.create_task(self._internal_sync(clock_config), name='Internal Sync Task')
+
+            await asyncio.wait([internal_sync_task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
+                            
+            if timeout_task.done():
+                internal_sync_task.cancel()
+                await internal_sync_task
+                raise TimeoutError('Sync with internal network elements timed out.')          
+
             # log as synced
             self.__network_synced = True
 
             # return external and internal address ledgers
             internal_address_ledger = internal_sync_task.result()
-            clock_config, external_address_ledger = external_sync_task.result()
 
             return (clock_config, external_address_ledger, internal_address_ledger)             
             
@@ -217,7 +219,7 @@ class SimulationElement(NetworkElement):
             raise e
 
     @abstractmethod
-    async def _external_sync(self) -> dict:
+    async def _external_sync(self) -> tuple:
         """
         Synchronizes with other simulation elements
 
@@ -228,9 +230,12 @@ class SimulationElement(NetworkElement):
         pass
 
     @abstractmethod
-    async def _internal_sync(self) -> dict:
+    async def _internal_sync(self, clock_config : ClockConfig) -> dict:
         """
         Synchronizes with this element's internal components
+
+        #### Arguments:
+            - `clock_config` (:obj:`ClockConfig`): clock configuration to be shared with internal processes
 
         #### Returns:
             - `dict` mapping a simulation element's components' names to the addresses pointing to their respective connecting ports
@@ -262,13 +267,6 @@ class SimulationElement(NetworkElement):
         
         # close network connections
         self._deactivate_network()
-    
-    @abstractmethod
-    async def _publish_deactivate(self) -> None:
-        """
-        Notifies other elements of the simulation that this element has deactivated and is no longer participating in the simulation.
-        """
-        pass
 
     async def _sim_wait(self, delay : float) -> None:
         """

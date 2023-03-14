@@ -17,6 +17,9 @@ activate Manager
 User ->Main Process: \run()
 activate Main Process
 
+Main Process -> Internal Module: \run()
+activate Internal Module
+
 # Network Config
 Manager -> Manager :\configNetwork()
 activate Manager
@@ -26,31 +29,31 @@ Main Process->Main Process:\configNetwork()
 activate Main Process
 deactivateafter Main Process
 
-Main Process-->Internal Module:\configNetwork()
+Internal Module->Internal Module:\configNetwork()
 activate Internal Module
 deactivateafter Internal Module
+
+# Network Sync
+
+Manager -> Manager :\syncNetwork()
+activate Manager
 
 Main Process->Main Process:\syncNetwork()
 activate Main Process
 
-Main Process-->Internal Module:\syncNetwork()
+Main Process->Manager: Sync \nRequest
+Manager -->Main Process: Sync Req\nAcknowledged!
+
+Internal Module->Internal Module:\syncNetwork()
 activate Internal Module
 
 Internal Module ->Main Process: Sync \nRequest
-Main Process --> Internal Module : Sync Req\nAcknowledged
 
+Manager -->Main Process: Sim \nInfo
+
+Main Process --> Internal Module : Sync Req\nAcknowledged\n+Sim Info
 deactivate Internal Module
 
-# Network Sync
-Manager -> Manager :\syncNetwork()
-activate Manager
-
-Main Process->Manager: Sync \nRequest
-Manager -->Main Process: Sync Req\nAcknowledged!
-deactivate Main Process
-
-Manager -->Main Process: Network \nLedger
-activate Main Process
 Main Process ->Manager: Ready!
 deactivate Main Process
 deactivate Manager
@@ -58,7 +61,7 @@ deactivate Manager
 Manager -->Main Process: Sim Start!
 activate Manager
 activate Main Process
-Main Process -->Internal Module: \run()
+Main Process -->Internal Module: Sim Start!
 activate Main Process
 activate Internal Module
 

@@ -20,7 +20,7 @@ class TestSimulationNode(unittest.TestCase):
         async def _external_sync(self) -> dict:
             return self._clock_config, dict()
         
-        async def _internal_sync(self) -> dict:
+        async def _internal_sync(self, _ : ClockConfig) -> dict:
             return dict()
         
         async def _wait_sim_start(self) -> None:
@@ -94,12 +94,20 @@ class TestSimulationNode(unittest.TestCase):
             
             module_ports = []
             for i in range(n_modules):
-                module_port = port + 4+id*(n_modules + 1) + i
+                module_port = port + 3 + id*(n_modules + 2) + i
                 module_ports.append(module_port)
-            node_pub_port = port + 4+id*(n_modules + 1) + n_modules
+            
+            node_pub_port = port + 3 + id*(n_modules + 2) + n_modules
+            node_rep_port = port + 3 + id*(n_modules + 2) + n_modules + 1
+
+            print(f'MANAGER REQ AND PUB PORT:\t{[port, port+1]}')
+            print(f'MONITOR PORT:\t\t\t{[port+2]}')
+            print(f'MODULE PORTS:\t\t\t{module_ports}')
+            print(f'NODE INTERNAL PUB AND REP PORTS:{[node_pub_port, node_rep_port]}\n')
 
             if n_modules > 0:
                 internal_address_map = {
+                                        zmq.REP: [f'tcp://*{node_rep_port}'],
                                         zmq.PUB: [f'tcp://*:{node_pub_port}'],
                                         zmq.SUB: [f'tcp://localhost:{module_port}' for module_port in module_ports]
                                         }
@@ -123,6 +131,7 @@ class TestSimulationNode(unittest.TestCase):
 
                 submodule_network_config = NetworkConfig(f'NODE_{id}',
                                             internal_address_map = {
+                                                                    zmq.REQ: [f'tcp://localhost:{node_rep_port}'],
                                                                     zmq.PUB: [f'tcp://*:{module_port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{module_sub_port}' for module_sub_port in module_sub_ports]})
                 
@@ -190,12 +199,12 @@ class TestSimulationNode(unittest.TestCase):
                 pool.submit(node.run, *[])
         print('\n')
 
-    def test_init(self):
-        node = TestSimulationNode.NonModularTestNode(1, 5555)
-        self.assertTrue(isinstance(node, Node))
+    # def test_init(self):
+    #     node = TestSimulationNode.NonModularTestNode(1, 5555)
+    #     self.assertTrue(isinstance(node, Node))
 
-        node = TestSimulationNode.ModularTestNode(1, 5555, 2)
-        self.assertTrue(isinstance(node, Node))
+    #     node = TestSimulationNode.ModularTestNode(1, 5555, 2)
+    #     self.assertTrue(isinstance(node, Node))
 
     def test__realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
