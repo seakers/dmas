@@ -698,8 +698,12 @@ class NetworkElement(ABC):
             receive_task = None
 
             # get destination's socket address
+            
             if SimulationElementRoles.MANAGER.value in msg.dst:
                 dst_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
+                dst_address = dst_addresses[-1]
+            elif self._network_name in msg.dst:
+                dst_addresses = self._network_config.get_internal_addresses().get(zmq.REQ)
                 dst_address = dst_addresses[-1]
             else:
                 dst_network_config : NetworkConfig = address_ledger.get(msg.dst, None)
