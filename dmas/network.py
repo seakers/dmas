@@ -375,18 +375,24 @@ class NetworkElement(ABC):
 
         # create socket
         socket : zmq.Socket = network_context.socket(socket_type)
+        # self._log(f'created socket of type {socket_type}!')
 
         # connect or bind to network port
         for address in addresses:
+            # self._log(f'connecting/binding to address {address}...')
             if socket_type in [zmq.PUB, zmq.SUB ,zmq.REQ, zmq.REP, zmq.PUSH ,zmq.PULL]:
                 if '*' not in address:
+                    # self._log(f'connected socket to address{address}!')
                     socket.connect(address)
                 else:
                     if self.__is_address_in_use(address):
+                        # self._log(f'ERROR address {address} already in use!')
                         raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
                     
+                    # self._log(f'bound socket to address {address}!')
                     socket.bind(address)
             else:
+                # self._log(f'ERROR socket type not yet supported.')
                 raise NotImplementedError(f'Socket of type {socket_type} not yet supported.')
 
         # set socket options

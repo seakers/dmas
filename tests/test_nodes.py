@@ -107,7 +107,7 @@ class TestSimulationNode(unittest.TestCase):
 
             if n_modules > 0:
                 internal_address_map = {
-                                        zmq.REP: [f'tcp://*{node_rep_port}'],
+                                        zmq.REP: [f'tcp://*:{node_rep_port}'],
                                         zmq.PUB: [f'tcp://*:{node_pub_port}'],
                                         zmq.SUB: [f'tcp://localhost:{module_port}' for module_port in module_ports]
                                         }
