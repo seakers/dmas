@@ -112,10 +112,10 @@ class Node(SimulationElement):
                 await self._send_internal_msg(resp, zmq.REP)
 
 
-            # inform all internal nodes that they are now synched with their parent simulation node
-            self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
-            sim_info = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
-            await self._send_internal_msg(sim_info, zmq.PUB)
+            # # inform all internal nodes that they are now synched with their parent simulation node
+            # self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
+            # sim_info = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
+            # await self._send_internal_msg(sim_info, zmq.PUB)
 
     async def _external_sync(self) -> tuple:
         try:
@@ -224,6 +224,12 @@ class Node(SimulationElement):
                 else:
                     # manager announced the start of the simulation
                     self._log(f'received simulation start message from simulation manager!', level=logging.INFO)
+                    
+                    # inform all internal nodes that they are now synched with their parent simulation node
+                    self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
+                    sim_info = NodeInfoMessage(self._element_name, self._element_name, self._clock_config.to_dict())
+                    await self._send_internal_msg(sim_info, zmq.PUB)
+
                     return
         try:
             task = asyncio.create_task(subroutine())

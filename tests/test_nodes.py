@@ -168,8 +168,9 @@ class TestSimulationNode(unittest.TestCase):
         async def _routine(self):
             try:
                 # do some 'work'
+                self._log('doing some work...')
                 while True:
-                    asyncio.sleep(1e6)
+                    await asyncio.sleep(2)
                    
             except asyncio.CancelledError:
                 self._log(f'`_routine()` interrupted. {e}')
