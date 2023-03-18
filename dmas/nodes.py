@@ -101,17 +101,20 @@ class Node(SimulationElement):
                     or src not in module_names
                     or msg_type != ModuleMessageTypes.SYNC_REQUEST.value
                     ):
-                    resp = NodeReceptionAckMessage(self.name, src)
-                    await self._send_external_msg(resp, zmq.REP)
-                    continue
-
+                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
                 if src not in responses:
                     # Add to list of synced modules if it hasn't been synched before
                     responses.append(src)
+                    resp = NodeReceptionAckMessage(self._element_name, src)
+                else:
+                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
+
+                await self._send_internal_msg(resp, zmq.REP)
+
 
             # inform all internal nodes that they are now synched with their parent simulation node
             self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
-            sim_info = NodeInfoMessage(self.name, self.name, clock_config.to_dict())
+            sim_info = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
             await self._send_internal_msg(sim_info, zmq.PUB)
 
     async def _external_sync(self) -> tuple:
@@ -253,6 +256,7 @@ class Node(SimulationElement):
 
                 # wait for all modules to terminate and become offline
                 terminate_task = asyncio.create_task(self.__wait_for_offline_modules())
+                pending = list(pending)
                 pending.append(terminate_task)
 
             await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)               
@@ -288,14 +292,19 @@ class Node(SimulationElement):
                 or src in responses
                 ):
                 # undesired message received. Ignoring and trying again later
-                self._log(f'received undesired message of type {msg_type}. Ignoring...')
-                resp = NodeReceptionIgnoredMessage(self.name, src)
+                print(dst not in self.name)
+                print(src not in module_names )
+                print(msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value)
+                print(src in responses)
+
+                self._log(f'received undesired message of type {msg_type}, expected tye {ModuleMessageTypes.MODULE_DEACTIVATED.value}. Ignoring...')
+                resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
             else:
                 # add to list of offline modules if it hasn't been registered as offline before
-                self._log(f'{src} is now offline! offline module status: {len(responses)}/{len(self.__modules)}')
-                resp = NodeReceptionAckMessage(self.name, src)
+                resp = NodeReceptionAckMessage(self._element_name, src)
                 responses.append(src)
+                self._log(f'{src} is now offline! offline module status: {len(responses)}/{len(self.__modules)}')
 
             await self._send_internal_msg(resp, zmq.REP)
 
