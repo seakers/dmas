@@ -396,7 +396,18 @@ class NodeInfoMessage(SimulationMessage):
         self.clock_config = clock_config
     
     def get_clock_config(self) -> ClockConfig:
-        return ClockConfig(**self.clock_config)
+        clock_type = self.clock_config['clock_type']
+
+        if clock_type == ClockTypes.ACCELERATED_REAL_TIME.value:
+            clock_config = AcceleratedRealTimeClockConfig(**self.clock_config)
+            
+        elif clock_type == ClockTypes.REAL_TIME.value:
+            clock_config = RealTimeClockConfig(**self.clock_config)
+
+        else:
+            raise NotImplemented(f'Clock Configuration of type {clock_type} not yet supported')
+
+        return clock_config
 
 class NodeReceptionAckMessage(SimulationMessage):
     """
@@ -509,3 +520,7 @@ class ModuleSyncRequestMessage(SimulationMessage):
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
         super().__init__(src, dst, ModuleMessageTypes.SYNC_REQUEST.value, id)
+
+class ModuleDeactivatedMessage(SimulationMessage):
+    def __init__(self, src: str, dst: str, id: str = None, **kargs):
+        super().__init__(src, dst, ModuleMessageTypes.MODULE_DEACTIVATED.value, id)

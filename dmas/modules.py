@@ -96,7 +96,7 @@ class InternalModule(NetworkElement):
                 self._log(f'received message intended for {dst}. Ignoring...')
                 continue
 
-            elif self.get_parent_name() != src:
+            elif self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
                 self._log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
@@ -121,7 +121,7 @@ class InternalModule(NetworkElement):
                 self._log(f'received message intended for {dst}. Ignoring...')
                 continue
 
-            if self.get_parent_name() != src:
+            if self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
                 self._log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
@@ -136,7 +136,7 @@ class InternalModule(NetworkElement):
                 self._log(f'received undesired message of type {msg_type}. Ignoring...')
         
         # connections are static throughout the simulation. No ledger is required
-        return resp.get_clock_config(), dict(), dict()           
+        return resp.get_clock_config(), dict(), dict()    
     
     def run(self):                
         self._log('running...')
@@ -149,7 +149,7 @@ class InternalModule(NetworkElement):
         try:
             # configure own network ports
             self._log(f'configuring network...')
-            asyncio.sleep(0.1)
+            await asyncio.sleep(0.1)
             self._network_context, self._external_socket_map, self._internal_socket_map = super().config_network()
             self._log(f'NETWORK CONFIGURED!', level = logging.INFO)
             
@@ -171,7 +171,7 @@ class InternalModule(NetworkElement):
 
             # wait for a process to terminate
             self._log(f'running...')
-            done, pending = asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             
             # cancel all non-terminated tasks
             for task in done:
@@ -201,7 +201,7 @@ class InternalModule(NetworkElement):
         self._log(f'informing parent node of module termination...')
         while True:
             # send sync request from REQ socket
-            terminated_msg = TerminateInternalModuleMessage(self.name, self.get_parent_name())
+            terminated_msg = ModuleDeactivatedMessage(self.name, self.get_parent_name())
             dst, src, content = await self._send_internal_request_message(terminated_msg)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
@@ -211,7 +211,7 @@ class InternalModule(NetworkElement):
                 self._log(f'received message intended for {dst}. Ignoring...')
                 continue
 
-            elif self.get_parent_name() != src:
+            elif self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
                 self._log(f'received message from someone who is not the parent node. Ignoring...')
                 continue

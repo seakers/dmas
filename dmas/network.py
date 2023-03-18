@@ -312,7 +312,7 @@ class NetworkElement(ABC):
 
         self._log(f'configuring intenal network sockets...')
         internal_socket_map = self.__config_internal_network(network_context)
-        self._log(f'intenal network sockets configured! external socket map: {internal_socket_map}')
+        self._log(f'intenal network sockets configured! internal socket map: {internal_socket_map}')
 
         self._network_activated = True
 
@@ -725,14 +725,16 @@ class NetworkElement(ABC):
             self._log(f'message of type {type(msg)} transmitted sucessfully! Waiting for response from {msg.dst}...')
 
             # wait for response
-            receive_task = asyncio.create_task( self._receive_external_msg(zmq.REQ) )
+            receive_task = asyncio.create_task( self.__receive_msg(zmq.REQ, socket_map) )
             await receive_task
+            dst, src, content = receive_task.result()
             self._log(f'response received from {msg.dst}!')
+            self._log(f'message received: {content}')
 
             # disconnect from destination's socket
             socket.disconnect(dst_address)
 
-            return receive_task.result()
+            return dst, src, content
         
         except asyncio.CancelledError as e:
             self._log(f'message broadcast interrupted.')
