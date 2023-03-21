@@ -257,13 +257,8 @@ class Node(SimulationElement):
             else:
                 # node is disabled. inform modules that the node is terminating
                 self._log('node\'s `live()` finalized. Terminating internal modules....')
-                terminate_msg = TerminateInternalModuleMessage(self.name, self.name)
+                terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
                 await self._send_internal_msg(terminate_msg, zmq.PUB)
-
-                # wait for all modules to terminate and become offline
-                terminate_task = asyncio.create_task(self.__wait_for_offline_modules())
-                pending = list(pending)
-                pending.append(terminate_task)
 
             await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)               
         else:
@@ -298,21 +293,17 @@ class Node(SimulationElement):
                 or src in responses
                 ):
                 # undesired message received. Ignoring and trying again later
-                print(dst not in self.name)
-                print(src not in module_names )
-                print(msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value)
-                print(src in responses)
-
                 self._log(f'received undesired message of type {msg_type}, expected tye {ModuleMessageTypes.MODULE_DEACTIVATED.value}. Ignoring...')
                 resp = NodeReceptionIgnoredMessage(self._element_name, src)
+                await self._send_internal_msg(resp, zmq.REP)
 
             else:
                 # add to list of offline modules if it hasn't been registered as offline before
-                resp = NodeReceptionAckMessage(self._element_name, src)
                 responses.append(src)
                 self._log(f'{src} is now offline! offline module status: {len(responses)}/{len(self.__modules)}')
+                resp = NodeReceptionAckMessage(self._element_name, src)
+                await self._send_internal_msg(resp, zmq.REP)
 
-            await self._send_internal_msg(resp, zmq.REP)
 
     async def _publish_deactivate(self) -> None:
         try:

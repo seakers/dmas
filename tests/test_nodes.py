@@ -200,17 +200,10 @@ class TestSimulationNode(unittest.TestCase):
                 pool.submit(node.run, *[])
         print('\n')
 
-    # def test_init(self):
-    #     node = TestSimulationNode.NonModularTestNode(1, 5555)
-    #     self.assertTrue(isinstance(node, Node))
-
-    #     node = TestSimulationNode.ModularTestNode(1, 5555, 2)
-    #     self.assertTrue(isinstance(node, Node))
-
-    def test__realtime_run(self):
+    def test_realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_nodes = 1
-        n_modules = 1
+        n_nodes = [1, 3, 5, 10]
+        n_modules = [1, 2, 3, 5]
         port = 5555
 
         year = 2023
@@ -223,12 +216,20 @@ class TestSimulationNode(unittest.TestCase):
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
         clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-        self.run_tester(clock_config, n_nodes, n_modules, port, level=logging.DEBUG)
-    
 
-    # def test_accelerated_run(self):
+        # for n in n_nodes:
+        #     for m in n_modules:
+        #         self.run_tester(clock_config, n, m, port, level=logging.WARNING)
+        
+        self.run_tester(clock_config, 4, 1, port, level=logging.DEBUG)
+        # for n in n_modules:
+        #     self.run_tester(clock_config, n, 1, port, level=logging.WARNING)
+    
+    # def test_accelerated_realtime_run(self):
     #     print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
-    #     n_nodes = [1, 5]
+    #     n_nodes = 1
+    #     n_modules = 1
+    #     port = 5555
 
     #     year = 2023
     #     month = 1
@@ -240,20 +241,4 @@ class TestSimulationNode(unittest.TestCase):
     #     end_date = datetime(year, month, day, hh, mm, ss+1)
 
     #     clock_config = AcceleratedRealTimeClockConfig(str(start_date), str(end_date), 2.0)
-    #     for n in n_nodes:
-    #         self.run_tester(clock_config, n, level=logging.WARNING)
-
-    # def test_init(self):
-    #     port = 5555
-    #     n_modules = 3
-    #     n_nodes = 3
-
-    #     for id in range(n_nodes):
-    #         module_ports = []
-    #         for i in range(n_modules):
-    #             module_port = port + 4+id*(n_modules + 1) + i
-    #             module_ports.append(module_port)
-    #             print(module_port)
-            
-    #         pub_port = port + 4+id*(n_modules + 1) + n_modules
-    #         print(pub_port)
+    #     self.run_tester(clock_config, n_nodes, n_modules, port, level=logging.WARNING)

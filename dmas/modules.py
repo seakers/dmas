@@ -220,6 +220,7 @@ class InternalModule(NetworkElement):
                 # received a sync request acknowledgement from the parent node. Sync complete!
                 self._log(f'message accepted! parent node knows of my termination!', level=logging.INFO)
                 break
+            
             else:
                 self._log(f'message not accepted. trying again later...')
                 await asyncio.wait(random.random())
