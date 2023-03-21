@@ -224,19 +224,19 @@ class TestInternalModule(unittest.TestCase):
         async def _wait_sim_start(self):
             return
     
-    # def test_init(self):
-    #     port = 5555
-    #     n_modules = 1
+    def test_init(self):
+        port = 5555
+        n_modules = 1
 
-    #     module = TestInternalModule.TestModule('TEST_NODE', 'MODULE_0', port, port+1)
-    #     self.assertTrue(isinstance(module, TestInternalModule.TestModule))
+        module = TestInternalModule.TestModule('TEST_NODE', 'MODULE_0', port, port+1)
+        self.assertTrue(isinstance(module, TestInternalModule.TestModule))
 
-    #     node = TestInternalModule.DummyNode('NODE_0', n_modules, port)
-    #     self.assertTrue(isinstance(node, TestInternalModule.DummyNode))
+        node = TestInternalModule.DummyNode('NODE_0', n_modules, port)
+        self.assertTrue(isinstance(node, TestInternalModule.DummyNode))
 
     def test_module(self):
         port = 5555
         n_modules = 1
         
-        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, level=logging.DEBUG)
+        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, level=logging.WARNING)
         node.run()

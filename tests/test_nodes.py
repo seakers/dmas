@@ -100,10 +100,11 @@ class TestSimulationNode(unittest.TestCase):
             node_pub_port = port + 3 + id*(n_modules + 2) + n_modules
             node_rep_port = port + 3 + id*(n_modules + 2) + n_modules + 1
 
-            print(f'MANAGER REQ AND PUB PORT:\t{[port, port+1]}')
-            print(f'MONITOR PORT:\t\t\t{[port+2]}')
-            print(f'MODULE PORTS:\t\t\t{module_ports}')
-            print(f'NODE INTERNAL PUB AND REP PORTS:{[node_pub_port, node_rep_port]}\n')
+            print(f'NODE {id} NETWORK CONFIG:')
+            print(f'\tMANAGER REQ AND PUB PORT:\t{[port, port+1]}')
+            print(f'\tMONITOR PORT:\t\t\t{[port+2]}')
+            print(f'\tINTERNAL MODULE PORTS:\t\t{module_ports}')
+            print(f'\tINTERNAL PUB AND REP PORTS:\t{[node_pub_port, node_rep_port]}\n')
 
             if n_modules > 0:
                 internal_address_map = {
@@ -180,6 +181,8 @@ class TestSimulationNode(unittest.TestCase):
                 raise e
 
     def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING):
+        print(f'TESTING {n_nodes} NODES WITH {n_modules} MODULES')
+        
         monitor = TestSimulationNode.DummyMonitor(clock_config, port, level)
         logger = monitor.get_logger()
 
@@ -202,8 +205,8 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_nodes = [1, 3, 5, 10]
-        n_modules = [1, 2, 3, 5]
+        n_nodes = [2, 20]
+        n_modules = [0, 4]
         port = 5555
 
         year = 2023
@@ -215,30 +218,29 @@ class TestSimulationNode(unittest.TestCase):
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
-        clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+        clock_config = RealTimeClockConfig(start_date, end_date)
 
-        # for n in n_nodes:
-        #     for m in n_modules:
-        #         self.run_tester(clock_config, n, m, port, level=logging.WARNING)
-        
-        self.run_tester(clock_config, 4, 1, port, level=logging.DEBUG)
-        # for n in n_modules:
-        #     self.run_tester(clock_config, n, 1, port, level=logging.WARNING)
+        for n in n_nodes:
+            for m in n_modules:
+                self.run_tester(clock_config, n, m, port, level=logging.WARNING)
     
-    # def test_accelerated_realtime_run(self):
-    #     print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
-    #     n_nodes = 1
-    #     n_modules = 1
-    #     port = 5555
+    def test_accelerated_realtime_run(self):
+        print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
+        n_nodes = [2, 20]
+        n_modules = [0, 4]
+        port = 5555
 
-    #     year = 2023
-    #     month = 1
-    #     day = 1
-    #     hh = 12
-    #     mm = 00
-    #     ss = 00
-    #     start_date = datetime(year, month, day, hh, mm, ss)
-    #     end_date = datetime(year, month, day, hh, mm, ss+1)
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
 
-    #     clock_config = AcceleratedRealTimeClockConfig(str(start_date), str(end_date), 2.0)
-    #     self.run_tester(clock_config, n_nodes, n_modules, port, level=logging.WARNING)
+        clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
+
+        for n in n_nodes:
+            for m in n_modules:
+                self.run_tester(clock_config, n, m, port, level=logging.WARNING)

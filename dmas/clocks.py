@@ -3,6 +3,7 @@ import datetime
 from enum import Enum
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Union
 
 """
 ------------------
@@ -21,15 +22,15 @@ class ClockConfig(ABC):
     Describes the type of clock being used by the simulation manager.
 
     ### Attributes:
-        - start_date (`str`): simulation start date
-        - end_date (`str`): simulation end date
+        - start_date (`str` or `datetime`): simulation start date
+        - end_date (`str` or `datetime`): simulation end date
         - clock_type (`str`): type of clock to be used in the simulation
         - simulation_runtime_start (`float`): real-clock start time of the simulation
         - simulation_runtime_end (`float`): real-clock end time of the simulation
     """
     def __init__(self, 
-                start_date : str, 
-                end_date : str, 
+                start_date : Union[str, datetime], 
+                end_date : Union[str, datetime], 
                 clock_type : str,
                 simulation_runtime_start : float = -1.0,
                 simulation_runtime_end : float = -1.0,
@@ -46,6 +47,11 @@ class ClockConfig(ABC):
         super().__init__()
 
         # check types 
+        if isinstance(start_date, datetime):
+            start_date = str(start_date)
+        if isinstance(end_date, datetime):
+            end_date = str(end_date)
+
         if not isinstance(start_date , str):
             raise TypeError(f'Attribute `start_date` must be of type `str`. Is of type {type(start_date)}')
         if not isinstance(end_date , str):
@@ -136,17 +142,17 @@ class AcceleratedRealTimeClockConfig(ClockConfig):
     Describes a real-time clock to be used in the simulation.
 
     ### Attributes:
-        - start_date (`str`): simulation start date
-        - end_date (`str`): simulation end date
-        - clock_type (`str`): type of clock to be used in the simulation
+        - start_date (`str` or `datetime`): simulation start date
+        - end_date (`str` or `datetime`): simulation end date
+        - clock_type (`str` or `datetime`): type of clock to be used in the simulation
         - simulation_runtime_start (`float`): real-clock start time of the simulation
         - simulation_runtime_end (`float`): real-clock end time of the simulation
         - sim_clock_freq (`float`): ratio of simulation-time seconds to real-time seconds [t_sim/t_real]
     """
 
     def __init__(self, 
-                start_date : str, 
-                end_date : str, 
+                start_date : Union[str, datetime], 
+                end_date : Union[str, datetime], 
                 sim_clock_freq : float,
                 **kwargs
                 ) -> None:
@@ -179,15 +185,15 @@ class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
     Describes a real-time clock to be used in the simulation.
 
     ### Attributes:
-        - start_date (`str`): simulation start date
-        - end_date (`str`): simulation end date
+        - start_date (`str` or `datetime`): simulation start date
+        - end_date (`str` or `datetime`): simulation end date
         - clock_type (`str`): type of clock to be used in the simulation
         - simulation_runtime_start (`float`): real-clock start time of the simulation
         - simulation_runtime_end (`float`): real-clock end time of the simulation
     """
     def __init__(self, 
-                start_date : str, 
-                end_date : str, 
+                start_date : Union[str, datetime], 
+                end_date : Union[str, datetime], 
                 **kwargs
                 ) -> None:
         """

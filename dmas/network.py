@@ -473,7 +473,7 @@ class NetworkElement(ABC):
     """
     SEND/RECEIVE MESSAGES
     """
-    async def _send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType, socket_map : dict):
+    async def __send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType, socket_map : dict):
         """
         Sends a multipart message to a given socket type.
 
@@ -519,6 +519,7 @@ class NetworkElement(ABC):
                                          src.encode('ascii'), 
                                          content.encode('ascii')])
             self._log(f'message sent! Releasing lock...')
+            self._log(f'message sent: {content}')
             
             # return sucessful transmission flag
             return True
@@ -554,7 +555,7 @@ class NetworkElement(ABC):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self._send_msg(msg, socket_type, self._external_socket_map)
+        return await self.__send_msg(msg, socket_type, self._external_socket_map)
 
     async def _send_internal_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
         """
@@ -567,7 +568,7 @@ class NetworkElement(ABC):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self._send_msg(msg, socket_type, self._internal_socket_map)
+        return await self.__send_msg(msg, socket_type, self._internal_socket_map)
 
     async def __receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
         """
@@ -617,6 +618,7 @@ class NetworkElement(ABC):
             src : str = b_src.decode('ascii')
             content : dict = json.loads(b_content.decode('ascii'))
             self._log(f'message received from {src} intended for {dst}! Releasing lock...')
+            self._log(f'message received: {content}')
 
             # return received message
             return dst, src, content
@@ -720,7 +722,7 @@ class NetworkElement(ABC):
             self._log(f'connection to {msg.dst} established! Transmitting a message of type {type(msg)}...')
 
             # transmit message
-            send_task = asyncio.create_task( self._send_msg(msg, zmq.REQ, socket_map) )
+            send_task = asyncio.create_task( self.__send_msg(msg, zmq.REQ, socket_map) )
             await send_task
             self._log(f'message of type {type(msg)} transmitted sucessfully! Waiting for response from {msg.dst}...')
 
@@ -728,8 +730,6 @@ class NetworkElement(ABC):
             receive_task = asyncio.create_task( self.__receive_msg(zmq.REQ, socket_map) )
             await receive_task
             dst, src, content = receive_task.result()
-            self._log(f'response received from {msg.dst}!')
-            self._log(f'message received: {content}')
 
             # disconnect from destination's socket
             socket.disconnect(dst_address)

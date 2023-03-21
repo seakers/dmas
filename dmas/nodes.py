@@ -68,7 +68,8 @@ class Node(SimulationElement):
     async def _internal_sync(self, clock_config : ClockConfig) -> dict:
         try:
             # wait for all modules to be online
-            await self.__wait_for_online_modules(clock_config)
+            if self.__has_modules():
+                await self.__wait_for_online_modules(clock_config)
 
             # create internal ledger
             internal_address_ledger = dict()
@@ -89,33 +90,26 @@ class Node(SimulationElement):
         responses = []
         module_names = [f'{self._element_name}/{m.name}' for m in self.__modules]
 
-        if len(self.__modules) > 0:
-            self._log('waiting for internal nodes to become online...')
-            while len(responses) < len(self.__modules):
-                # listen for messages from internal nodes
-                dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
-                dst : str; src : str; msg_dict : dict
-                msg_type = msg_dict.get('msg_type', None)
+        self._log('waiting for internal nodes to become online...')
+        while len(responses) < len(self.__modules):
+            # listen for messages from internal nodes
+            dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
+            dst : str; src : str; msg_dict : dict
+            msg_type = msg_dict.get('msg_type', None)
 
-                if (dst not in self.name
-                    or src not in module_names
-                    or msg_type != ModuleMessageTypes.SYNC_REQUEST.value
-                    ):
-                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
-                if src not in responses:
-                    # Add to list of synced modules if it hasn't been synched before
-                    responses.append(src)
-                    resp = NodeReceptionAckMessage(self._element_name, src)
-                else:
-                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
+            if (dst not in self.name
+                or src not in module_names
+                or msg_type != ModuleMessageTypes.SYNC_REQUEST.value
+                ):
+                resp = NodeReceptionIgnoredMessage(self._element_name, src)
+            if src not in responses:
+                # Add to list of synced modules if it hasn't been synched before
+                responses.append(src)
+                resp = NodeReceptionAckMessage(self._element_name, src)
+            else:
+                resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
-                await self._send_internal_msg(resp, zmq.REP)
-
-
-            # # inform all internal nodes that they are now synched with their parent simulation node
-            # self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
-            # sim_info = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
-            # await self._send_internal_msg(sim_info, zmq.PUB)
+            await self._send_internal_msg(resp, zmq.REP)
 
     async def _external_sync(self) -> tuple:
         try:
@@ -207,7 +201,7 @@ class Node(SimulationElement):
 
             # wait for message from manager
             while True:
-                # listen for any incoming broadcasts through PUB socket
+                # listen for any incoming broadcasts through SUB socket
                 dst, src, content = await self._receive_external_msg(zmq.SUB)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
@@ -225,10 +219,11 @@ class Node(SimulationElement):
                     # manager announced the start of the simulation
                     self._log(f'received simulation start message from simulation manager!', level=logging.INFO)
                     
-                    # inform all internal nodes that they are now synched with their parent simulation node
-                    self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
-                    sim_info = NodeInfoMessage(self._element_name, self._element_name, self._clock_config.to_dict())
-                    await self._send_internal_msg(sim_info, zmq.PUB)
+                    if self.__has_modules():
+                        # inform all internal nodes that they are now synched with their parent simulation node
+                        self._log('all external nodes are now online! Informing internal modules of simulation information...')
+                        sim_info = NodeInfoMessage(self._element_name, self._element_name, self._clock_config.to_dict())
+                        await self._send_internal_msg(sim_info, zmq.PUB)
 
                     return
         try:
@@ -246,10 +241,10 @@ class Node(SimulationElement):
 
     async def _execute(self) -> None:
         live_task = asyncio.create_task(self._live())
-        if len(self.__modules) > 0:
-            offline_nodes_task = asyncio.create_task(self.__wait_for_offline_modules())
+        if self.__has_modules():
+            offline_modules_task = asyncio.create_task(self.__wait_for_offline_modules())
 
-            _, pending = await asyncio.wait([live_task, offline_nodes_task], return_when=asyncio.FIRST_COMPLETED)
+            _, pending = await asyncio.wait([live_task, offline_modules_task], return_when=asyncio.FIRST_COMPLETED)
             pending : list
 
             if live_task in pending:
@@ -335,3 +330,9 @@ class Node(SimulationElement):
 
         except asyncio.CancelledError:
             return
+
+    def __has_modules(self) -> bool:
+        """
+        checks if this node has any internal modules
+        """
+        return len(self.__modules) > 0

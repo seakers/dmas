@@ -12,7 +12,7 @@ class TestSimulationElement(unittest.TestCase):
             super().__init__(element_name, network_config, level, logger)
             self.msgs = []        
 
-        async def _internal_sync(self) -> dict:
+        async def _internal_sync(self, _) -> dict:
             return dict()
 
     class Server(DummyNetworkElement):        
@@ -225,17 +225,18 @@ class TestSimulationElement(unittest.TestCase):
     def test_run(self):
         print('TEST: Simulation Element Sync Routine')
         port = 5556
-        n_clients = 10
+        n_clients = 1
 
-        sever = TestSimulationElement.Server(port, n_clients, level=logging.INFO)
+        server = TestSimulationElement.Server(port, n_clients, level=logging.WARNING)
+        logger = server.get_logger()
         clients = []
         for id in range(n_clients):
-            clients.append(TestSimulationElement.Client(id, port,level=logging.WARNING))
+            clients.append(TestSimulationElement.Client(id, port,logger=logger))
 
         print('\n')
         with concurrent.futures.ThreadPoolExecutor(len(clients) + 1) as pool:
             client : TestSimulationElement.Client
             for client in clients:                
                 pool.submit(client.run, *[])
-            pool.submit(sever.run, *[])
+            pool.submit(server.run, *[])
     

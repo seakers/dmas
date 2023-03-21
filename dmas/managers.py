@@ -41,17 +41,7 @@ class AbstractManager(SimulationElement):
 
     ### Additional Attributes:
         - _simulation_element_list (`list`): list of the names of all simulation elements
-        - _clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
-        
-
-    ### Communications diagram:
-    +------------+---------+                
-    |            | REP     |<---->>
-    | SIMULATION +---------+       
-    |   MANAGER  | PUB     |------>
-    |            +---------+       
-    |            | PUSH    |------>
-    +------------+---------+             
+        - _clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration                  
     """
     __doc__ += SimulationElement.__doc__
     
@@ -98,7 +88,6 @@ class AbstractManager(SimulationElement):
         # broadcast address ledger
         self._log('broadcasting simulation information to all elements...')
         sim_info_msg = SimulationInfoMessage(self._network_name, external_address_ledger, self._clock_config.to_dict(), time.perf_counter())
-        # self._log(sim_info_msg.to_dict())
         await self._send_external_msg(sim_info_msg, zmq.PUB)
         self._log('simulation information sent!')
 
@@ -122,6 +111,7 @@ class AbstractManager(SimulationElement):
         except asyncio.CancelledError:
             return  
 
+
     async def _execute(self) -> None:  
         # broadcast simulation start to all simulation elements
         self._log(f'starting simulation for date {self._clock_config.start_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
@@ -136,25 +126,32 @@ class AbstractManager(SimulationElement):
         self._log('starting simulation timer...')
         timer_task = asyncio.create_task( self.cancellable_wait(self._clock_config.get_total_seconds()) )
         timer_task.set_name('Simulation timer')
+        await timer_task
 
-        # wait for all nodes to report as deactivated
-        listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
-        listen_for_deactivated_task.set_name('Wait for deactivated nodes')
-
-        await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
-        
         # broadcast simulation end
         sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
         await self._send_external_msg(sim_end_msg, zmq.PUB)
 
-        if timer_task.done():
-            # nodes may still be activated. wait for all simulation nodes to deactivate
-            await listen_for_deactivated_task
+        # wait for all nodes to report as deactivated
+        listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
+        listen_for_deactivated_task.set_name('Wait for deactivated nodes')
+        await listen_for_deactivated_task
 
-        else:                
-            # all nodes have already reported as deactivated before the timer ran out. Cancel timer task
-            timer_task.cancel()
-            await timer_task     
+        # TODO: allow for simulation to end if all nodes are deactivated before the timer runs out
+        # await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
+        
+        # # broadcast simulation end
+        # sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
+        # await self._send_external_msg(sim_end_msg, zmq.PUB)
+
+        # if timer_task.done():
+        #     # nodes may still be activated. wait for all simulation nodes to deactivate
+        #     await listen_for_deactivated_task
+
+        # else:                
+        #     # all nodes have already reported as deactivated before the timer ran out. Cancel timer task
+        #     timer_task.cancel()
+        #     await timer_task     
         
         self._log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
 

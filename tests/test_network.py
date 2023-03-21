@@ -133,6 +133,9 @@ class TestNetworkElement(unittest.TestCase):
 
         async def network_sync(self):
             return
+        
+        async def _publish_deactivate(self) -> None:
+            return
 
     class ReceiverKillMessage(SimulationMessage):
         """

@@ -15,7 +15,7 @@ class TestSimulationManager(unittest.TestCase):
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}']})
             super().__init__(f'CLIENT_{id}', network_config, level, logger)
 
-        async def _internal_sync(self) -> dict:
+        async def _internal_sync(self, _) -> dict:
             return dict()
 
         async def _external_sync(self) -> dict:   
@@ -199,7 +199,7 @@ class TestSimulationManager(unittest.TestCase):
         async def _external_sync(self) -> dict:
             return self._clock_config, dict()
         
-        async def _internal_sync(self) -> dict:
+        async def _internal_sync(self, _) -> dict:
             return dict()
         
         async def _wait_sim_start(self) -> None:
