@@ -24,6 +24,19 @@ class Node(SimulationElement):
                  logger : logging.Logger = None
                  ) -> None:
         super().__init__(name, network_config, level, logger)   
+
+        if zmq.REQ not in network_config.get_external_addresses():
+            raise AttributeError(f'`network_config` must contain a REQ port and an address to parent node within external address map.')
+        if zmq.SUB not in network_config.get_external_addresses():
+            raise AttributeError(f'`network_config` must contain a SUB port and an address to parent node within external address map.')
+        if zmq.PUSH not in network_config.get_external_addresses():
+            raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within external address map.')
+
+        if len(modules) > 0:
+            if zmq.REP not in network_config.get_internal_addresses():
+                raise AttributeError(f'`network_config` must contain a REP port and an address to parent node within internal address map.')
+            if zmq.PUB not in network_config.get_internal_addresses():
+                raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within internal address map.')
         
         for module in modules:
             if not isinstance(module, InternalModule):

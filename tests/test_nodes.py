@@ -141,7 +141,7 @@ class TestSimulationNode(unittest.TestCase):
             super().__init__(f'NODE_{id}', network_config, submodules, level, logger)
 
     class DummyModule(InternalModule):
-        def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, logger: logging.Logger = None) -> None:
+        def __init__(self, module_name: str, network_config: NetworkConfig, logger: logging.Logger = None) -> None:
             super().__init__(module_name, network_config, [], logger=logger)
 
         async def _listen(self):
@@ -198,10 +198,47 @@ class TestSimulationNode(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(len(nodes) + 2) as pool:
             pool.submit(monitor.run, *[])
             pool.submit(manager.run, *[])
-            node : TestSimulationNode.NonModularTestNode
+            node : TestSimulationNode.ModularTestNode
             for node in nodes:                
                 pool.submit(node.run, *[])
         print('\n')
+
+    def test_init(self):
+        port = 5555
+        network_config = NetworkConfig('TEST', {}, external_address_map={
+                                                                zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                zmq.PUSH: [f'tcp://localhost:{port+2}']})
+        TestSimulationNode.DummyNode('NAME', network_config, [])
+
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', 
+                                            internal_address_map = {
+                                                                zmq.REP: [f'tcp://*:{port + 3}'],
+                                                                zmq.PUB: [f'tcp://*:{port + 5}'],
+                                                                zmq.SUB: [f'tcp://localhost:{port + 6}']
+                                                                }, 
+                                            external_address_map={
+                                                                zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                zmq.PUSH: [f'tcp://localhost:{port+2}']})
+
+
+            network_config = NetworkConfig('TEST', {}, {})
+            TestSimulationNode.DummyNode('NAME', network_config, [])
+            network_config = NetworkConfig('TEST', {}, external_address_map={
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationNode.DummyNode('NAME', network_config, [])
+            network_config = NetworkConfig('TEST', {}, external_address_map={
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationNode.DummyNode('NAME', network_config, [])
+            network_config = NetworkConfig('TEST', {}, external_address_map={
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}']})
+            TestSimulationNode.DummyNode('NAME', network_config, [])
+            
 
     def test_realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')

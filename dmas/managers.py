@@ -45,11 +45,11 @@ class AbstractManager(SimulationElement):
             raise AttributeError(f'`clock_config` must be of type `ClockConfig`. is of type {type(clock_config)}')        
         
         if zmq.REP not in network_config.get_external_addresses():
-            raise AttributeError(f'`network_config` must contain a REP port and an address to parent node within internal address map.')
+            raise AttributeError(f'`network_config` must contain a REP port and an address to parent node within external address map.')
         if zmq.PUB not in network_config.get_external_addresses():
-            raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within internal address map.')
+            raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within external address map.')
         if zmq.PUSH not in network_config.get_external_addresses():
-            raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within internal address map.')
+            raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within external address map.')
 
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
@@ -282,15 +282,3 @@ class AbstractManager(SimulationElement):
         desc=f'{self.name}: Offline simulation elements'
         await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
         self._log(f'All elements deactivated!')
-
-class SimulationManager(AbstractManager):
-    def _check_element_list(self):
-        # check if an environment is contained in the simulation
-        if SimulationElementRoles.ENVIRONMENT.name not in self._simulation_element_name_list:
-            raise AttributeError('List of simulation elements must include one simulation environment.')
-        
-        elif SimulationElementRoles.MONITOR.name not in self._simulation_element_name_list:
-            raise AttributeError('List of simulation elements must include one simulation monitor.')
-        
-        elif self._simulation_element_name_list.count(SimulationElementRoles.ENVIRONMENT.name) > 1:
-            raise AttributeError('List of simulation elements includes more than one simulation environment.')
