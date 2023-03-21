@@ -261,7 +261,16 @@ class ScienceValueModule(Module):
                 metadata = {
                     "observation" : obs
                 }
-                measurement_request = MeasurementRequest(["tss","altimetry"], lat, lon, science_value, metadata)
+                desired_variables = []
+                if "scenario1a" in self.parent_module.scenario_dir:
+                    desired_variables = ["imagery"]
+                elif "scenario1b" in self.parent_module.scenario_dir:
+                    desired_variables = ["imagery","altimetry"]
+                elif "scenario2" in self.parent_module.scenario_dir:
+                    desired_variables = ["imagery"]
+                else:
+                    self.log(f'Scenario not supported by request_handler',level=logging.INFO)
+                measurement_request = MeasurementRequest(desired_variables, lat, lon, science_value, metadata)
 
                 req_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, measurement_request)
                 ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, measurement_request)

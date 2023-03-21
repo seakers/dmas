@@ -48,7 +48,7 @@
                     "state":{"@type": "KEPLERIAN_EARTH_CENTERED_INERTIAL", "sma": 7715.137, "ecc": 0.001, "inc": 66.084, "raan": 180, "aop": 0, "ta": 60}
                     }, 
     "planner" : {"@type": "COMMS_TEST"},
-    "notifier": "False",
+    "notifier": "True",
     "missionProfile" : "3D-CHESS",
-    "preplan" : "False"
+    "preplan" : "True"
 }
