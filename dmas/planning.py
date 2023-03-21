@@ -290,6 +290,7 @@ class ObservationPlanningModule(Module):
                     meas_req = msg.content
                     parent_agent = self.get_top_module()
                     new_obs = ObservationPlannerTask(meas_req._target[0],meas_req._target[1],meas_req._science_val,parent_agent.payload[parent_agent.name],0.0,1.0,meas_req.metadata)
+                    self.log(f'Measurement request: {meas_req._target[0]}, {meas_req._target[1]}',level=logging.INFO)
                     new_obs_list = []
                     new_obs_list.append(new_obs)
                     await self.obs_list.put(new_obs_list)
@@ -340,15 +341,15 @@ class ObservationPlanningModule(Module):
             while True:
                 # wait for observation request
                 obs_list = await self.obs_list.get()
-                #self.log(f'Length of obs list: {len(obs_list)}',level=logging.INFO)
+                self.log(f'Length of obs list: {len(obs_list)}',level=logging.INFO)
                 for obs in obs_list:
                     # estimate next observation opportunities
                     gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
-                    #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
+                    self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
                         gp_access_list.append(row)
-                    #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
+                    self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
                         obs.start = gp_access_list[0]['time index']
                         obs.end = obs.start

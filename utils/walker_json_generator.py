@@ -1,12 +1,12 @@
 import json
 from copy import deepcopy
 
-with open('./utils/base_sat.json', 'r') as openfile:
+with open('./utils/base_imaging_sat.json', 'r') as openfile:
     base_satellite = json.load(openfile)
 
 satellites = []
-r = 2; # number of planes
-s = 2; # number of satellites per plane
+r = 10; # number of planes
+s = 10; # number of satellites per plane
 re = 6378
 altitude = 500
 ecc = 0.01
