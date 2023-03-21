@@ -14,22 +14,15 @@ class Node(SimulationElement):
     ## Abstract Simulation Participant 
 
     Base class for all simulation participants. This including all agents, environment, and simulation manager.
-
-
-    ### Communications diagram:
-    +-----------+---------+       +--------------+
-    |           | REQ     |------>|              | 
-    |           +---------+       |              |
-    | ABSTRACT  | PUB     |------>| SIM ELEMENTS |
-    |   SIM     +---------+       |              |
-    |   NODE    | SUB     |<------|              |
-    |           +---------+       +==============+ 
-    |           | PUSH    |------>|  SIM MONITOR |
-    +-----------+---------+       +--------------+
-    
     """
     __doc__ += SimulationElement.__doc__
-    def __init__(self, name: str, network_config: NetworkConfig, modules : list = [], level: int = logging.INFO, logger : logging.Logger = None) -> None:
+    def __init__(self, 
+                 name: str, 
+                 network_config: NetworkConfig, 
+                 modules : list = [], 
+                 level: int = logging.INFO, 
+                 logger : logging.Logger = None
+                 ) -> None:
         super().__init__(name, network_config, level, logger)   
         
         for module in modules:
@@ -67,9 +60,8 @@ class Node(SimulationElement):
     
     async def _internal_sync(self, clock_config : ClockConfig) -> dict:
         try:
-            # wait for all modules to be online
-            if self.__has_modules():
-                await self.__wait_for_online_modules(clock_config)
+            # wait for all modules to be online        
+            await self.__wait_for_online_modules(clock_config) if self.__has_modules() else None
 
             # create internal ledger
             internal_address_ledger = dict()

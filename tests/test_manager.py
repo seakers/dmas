@@ -229,6 +229,12 @@ class TestSimulationManager(unittest.TestCase):
         async def _publish_deactivate(self) -> None:
             return 
 
+
+    class DummyManager(AbstractManager):
+        def _check_element_list(self):
+                return
+        
+
     class TestManager(AbstractManager):
         def __init__(self, clock_config, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
@@ -239,8 +245,10 @@ class TestSimulationManager(unittest.TestCase):
             
             super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
 
+
         def _check_element_list(self):
             return
+        
 
     def test_init(self):
         n_clients = 1
@@ -265,6 +273,29 @@ class TestSimulationManager(unittest.TestCase):
 
         self.assertTrue(isinstance(manager, AbstractManager))
 
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', {}, external_address_map = {
+                                                                    zmq.REP: [f'tcp://*:{port}'],
+                                                                    zmq.PUB: [f'tcp://*:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationManager.DummyManager('[]', clock_config, network_config)
+            TestSimulationManager.DummyManager([], 'clock_config', network_config)
+            network_config = NetworkConfig('TEST', {}, external_address_map = {
+                                                                    zmq.PUB: [f'tcp://*:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationManager.DummyManager([], clock_config, network_config)
+            network_config = NetworkConfig('TEST', {}, external_address_map = {
+                                                                    zmq.REP: [f'tcp://*:{port}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationManager.DummyManager([], clock_config, network_config)
+            network_config = NetworkConfig('TEST', {}, external_address_map = {
+                                                                    zmq.REP: [f'tcp://*:{port}'],
+                                                                    zmq.PUB: [f'tcp://*:{port+1}']})
+            TestSimulationManager.DummyManager([], clock_config, network_config)
+            network_config = NetworkConfig('TEST', {}, {})
+            TestSimulationManager.DummyManager([], clock_config, network_config)
+
+
     def run_tester(self, clock_config : ClockConfig, n_clients : int = 1, port : int = 5556, level : int = logging.WARNING):
         monitor = TestSimulationManager.DummyMonitor(clock_config, port, level)
         logger = monitor.get_logger()
@@ -285,6 +316,7 @@ class TestSimulationManager(unittest.TestCase):
                 pool.submit(client.run, *[])
             pool.submit(monitor.run, *[])
         print('\n')
+
 
     def test_realtime_clock_run(self):        
         print('\nTESTING REAL-TIME CLOCK MANAGER')

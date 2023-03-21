@@ -16,28 +16,6 @@ class InternalModuleStatus(Enum):
     RUNNING = 'RUNNING'
     DEACTIVATED = 'DEACTIVATED'
 
-class InternalModuleNetworkConfig(NetworkConfig):
-    """
-    ## Internal Module Network Config
-    
-    Describes the addresses assigned to a node's internal module 
-    """
-    def __init__(self, 
-                network_name : str,
-                parent_pub_address: str,
-                module_pub_address : str
-                ) -> None:
-        """
-        Initializes an instance of an Internal Module Network Config Object
-        
-        ### Arguments:
-        - parent_pub_address (`str`): a module's parent node's broadcast address
-        - module_pub_address (`str`): the internal module's broadcast address
-        """
-        internal_address_map = {zmq.SUB: [parent_pub_address], 
-                                zmq.PUB: [module_pub_address]}       
-        super().__init__(network_name, internal_address_map=internal_address_map)
-
 class InternalModule(NetworkElement):
     """
     ## Internal Module
@@ -50,10 +28,18 @@ class InternalModule(NetworkElement):
         - _external_inbox (`asyncio.Queue()`):
     ####
     """
-    def __init__(self, module_name: str, network_config: InternalModuleNetworkConfig, submodules : list = [], level : int = logging.INFO, logger: logging.Logger = None) -> None:
+    def __init__(self, module_name: str, network_config: NetworkConfig, submodules : list = [], level : int = logging.INFO, logger: logging.Logger = None) -> None:
         super().__init__(module_name, network_config, logger=logger)
-        self._clock_config = None
 
+        # check arguments
+        if zmq.REQ not in network_config.get_internal_addresses():
+            raise AttributeError(f'`network_config` must contain a REQ port and an address to parent node within internal address map.')
+        if zmq.SUB not in network_config.get_internal_addresses():
+            raise AttributeError(f'`network_config` must contain a SUB port and an address to parent node within internal address map.')
+        
+        # initialize arguments with `None` values
+        self._clock_config = None
+        
         # copy submodule list
         self._submodules = []
         for submodule in submodules:

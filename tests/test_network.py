@@ -98,7 +98,32 @@ class TestNetworkElement(unittest.TestCase):
         INT = 'INTERNAL'
         EXT = 'EXTERNAL'
 
-    class DummyNetworkElement(NetworkElement):
+    class DummyElement(NetworkElement):
+        def __init__(self, element_name: str, network_config: NetworkConfig, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+            super().__init__(element_name, network_config, level, logger)
+
+        async def _external_sync(self) -> dict:
+            return dict()
+
+        async def _internal_sync(self) -> dict:
+            return dict()
+        
+        def activate(self) -> dict:
+            return
+
+        async def main(self):
+            return
+
+        def run(self):
+            asyncio.run(self.main())
+
+        async def network_sync(self):
+            return
+        
+        async def _publish_deactivate(self) -> None:
+            return
+
+    class TestElement(NetworkElement):
         def __init__(self, element_name: str, network_config: NetworkConfig, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             super().__init__(element_name, network_config, level, logger)
             self.msgs = []
@@ -117,16 +142,16 @@ class TestNetworkElement(unittest.TestCase):
             pass
 
         async def main(self):
-                timeout_task = asyncio.create_task(asyncio.sleep(5))
-                coroutine_task = asyncio.create_task(self.routine())
+            timeout_task = asyncio.create_task(asyncio.sleep(5))
+            coroutine_task = asyncio.create_task(self.routine())
 
-                _, pending = await asyncio.wait([timeout_task, coroutine_task], return_when=asyncio.FIRST_COMPLETED)
+            _, pending = await asyncio.wait([timeout_task, coroutine_task], return_when=asyncio.FIRST_COMPLETED)
 
-                if timeout_task in pending:
-                    return
-                else:
-                    coroutine_task.cancel()
-                    await coroutine_task
+            if timeout_task in pending:
+                return
+            else:
+                coroutine_task.cancel()
+                await coroutine_task
 
         def run(self):
             asyncio.run(self.main())
@@ -144,7 +169,7 @@ class TestNetworkElement(unittest.TestCase):
         def __init__(self, src: str, dst: str, msg_type: str, id: str = None):
             super().__init__(src, dst, msg_type, id)
 
-    class Sender(DummyNetworkElement):
+    class Sender(TestElement):
         def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'    
             if t_type is TestNetworkElement.TransmissionTypes.INT:   
@@ -205,7 +230,7 @@ class TestNetworkElement(unittest.TestCase):
             except asyncio.CancelledError:
                 return
 
-    class Receiver(DummyNetworkElement):
+    class Receiver(TestElement):
         def __init__(self, name, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'     
 
@@ -311,7 +336,7 @@ class TestNetworkElement(unittest.TestCase):
         
         sender.activate()
         for receiver in receivers:
-            receiver : TestNetworkElement.DummyNetworkElement
+            receiver : TestNetworkElement.TestElement
             receiver.activate()
     
         with concurrent.futures.ThreadPoolExecutor(len(receivers) + 1) as pool:
@@ -338,6 +363,15 @@ class TestNetworkElement(unittest.TestCase):
         self.assertEqual(len(sender.msgs), len(received_messages))
         for msg in sender.msgs:
             self.assertTrue(msg in received_messages)
+
+    def test_init(self):
+        TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST'), logging.WARNING)
+
+        with self.assertRaises(AttributeError):
+            TestNetworkElement.DummyElement(1, NetworkConfig('TEST'), logging.WARNING)
+            TestNetworkElement.DummyElement('TEST', 1, logging.WARNING)
+            TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST'), 'a')
+            TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST'), logging.WARNING, logger=1)
 
     def test_message_broadcast(self):
         port = 5555

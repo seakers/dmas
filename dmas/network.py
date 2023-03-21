@@ -192,7 +192,11 @@ class NetworkElement(ABC):
     | INTERNAL PROCESSES |                                                                                               
     +--------------------+   
     """
-    def __init__(self, element_name : str, network_config : NetworkConfig, level : int = logging.INFO, logger : logging.Logger = None) -> None:
+    def __init__(self, 
+                element_name : str, 
+                network_config : NetworkConfig, 
+                level : int = logging.INFO, 
+                logger : logging.Logger = None) -> None:
         """
         Initiates a new network element
 
@@ -201,13 +205,8 @@ class NetworkElement(ABC):
             - element_name (`str`): The element's name
             - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this nmetwork element
         """
-        super().__init__()
-        
-        self._network_name = network_config.network_name
-        self._element_name = element_name
-        self.name = network_config.network_name + '/' + element_name
-        self._logger : logging.Logger = self.__set_up_logger(level) if logger is None else logger
-
+        super().__init__()      
+        # initialize attributes with `None` values
         self._network_config = network_config
         self._internal_socket_map = None
         self._internal_address_ledger = None
@@ -215,6 +214,22 @@ class NetworkElement(ABC):
         self._external_address_ledger = None
 
         self._network_activated = False
+
+        # check for attribute types
+        if not isinstance(element_name, str):
+            raise AttributeError(f'`element_name` must be of type `str`. is of type {type(element_name)}')
+        if not isinstance(network_config, NetworkConfig):
+            raise AttributeError(f'`network_config` must be of type `NetworkConfig`. is of type {type(network_config)}')
+        if not isinstance(level, int):
+            raise AttributeError(f'`level` must be of type `int`. is of type {type(level)}')
+        if logger is not None and not isinstance(logger, logging.Logger):
+            raise AttributeError(f'`logger` must be of type `logging.Logger`. is of type {type(logger)}')
+
+        # initialize attributes with parameters
+        self._network_name = network_config.network_name
+        self._element_name = element_name
+        self.name = network_config.network_name + '/' + element_name
+        self._logger : logging.Logger = self.__set_up_logger(level) if logger is None else logger
 
     def __del__(self):
         """

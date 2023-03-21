@@ -6,31 +6,6 @@ from dmas.element import *
 from dmas.utils import *
 from tqdm import tqdm
 
-class ManagerNetworkConfig(NetworkConfig):
-    """
-    ## Manager Network Config
-    
-    Describes the addresses assigned to the simulation manager
-    """
-    def __init__(self, 
-                network_name : str,
-                response_address : str,
-                broadcast_address: str,
-                monitor_address: str
-                ) -> None:
-        """
-        Initializes an instance of a Manager Network Config Object
-        
-        ### Arguments:
-        - response_address (`str`): a manager's response port address
-        - broadcast_address (`str`): a manager's broadcast port address
-        - monitor_address (`str`): the simulation's monitor port address
-        """
-        external_address_map = {zmq.REP: [response_address], 
-                                zmq.PUB: [broadcast_address], 
-                                zmq.PUSH: [monitor_address]}
-        super().__init__(network_name, external_address_map=external_address_map)
-
 class AbstractManager(SimulationElement):
     """
     ## Simulation Manager Class 
@@ -48,7 +23,7 @@ class AbstractManager(SimulationElement):
     def __init__(self, 
                 simulation_element_name_list : list,
                 clock_config : ClockConfig,
-                network_config : ManagerNetworkConfig,
+                network_config : NetworkConfig,
                 level : int = logging.INFO,
                 logger : logging.Logger = None
                 ) -> None:
@@ -58,11 +33,24 @@ class AbstractManager(SimulationElement):
         ### Arguments
             - simulation_element_name_list (`list`): list of names of all simulation elements
             - clock_config (:obj:`ClockConfig`): description of this simulation's clock configuration
-            - network_config (:obj:`ManagerNetworkConfig`): description of the addresses pointing to this simulation manager
+            - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this simulation manager
             - level (`int`): logging level for this simulation element
         """
         super().__init__(SimulationElementRoles.MANAGER.name, network_config, level, logger)
                    
+        # check arguments
+        if not isinstance(simulation_element_name_list, list):
+            raise AttributeError(f'`simulation_element_name_list` must be of type `list`. is of type {type(simulation_element_name_list)}')        
+        if not isinstance(clock_config, ClockConfig):
+            raise AttributeError(f'`clock_config` must be of type `ClockConfig`. is of type {type(clock_config)}')        
+        
+        if zmq.REP not in network_config.get_external_addresses():
+            raise AttributeError(f'`network_config` must contain a REP port and an address to parent node within internal address map.')
+        if zmq.PUB not in network_config.get_external_addresses():
+            raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within internal address map.')
+        if zmq.PUSH not in network_config.get_external_addresses():
+            raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within internal address map.')
+
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config

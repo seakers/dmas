@@ -10,6 +10,13 @@ from dmas.network import NetworkConfig
 
 
 class TestInternalModule(unittest.TestCase): 
+    class DummyModule(InternalModule):
+        async def _listen(self):
+            return
+        
+        async def _routine(self):
+            return
+
     class TestModule(InternalModule):
         def __init__(self, 
                     parent_name : str, 
@@ -233,6 +240,16 @@ class TestInternalModule(unittest.TestCase):
 
         node = TestInternalModule.DummyNode('NODE_0', n_modules, port)
         self.assertTrue(isinstance(node, TestInternalModule.DummyNode))
+
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', {}, {})
+            TestInternalModule.DummyModule('TEST', network_config)
+            
+            network_config = NetworkConfig('TEST', {zmq.REQ: [f'tcp://localhost:{port+2}']}, {})
+            TestInternalModule.DummyModule('TEST', network_config)
+
+            network_config = NetworkConfig('TEST', {}, {zmq.SUB: [f'tcp://localhost:{port+3}']})
+            TestInternalModule.DummyModule('TEST', network_config)
 
     def test_module(self):
         port = 5555
