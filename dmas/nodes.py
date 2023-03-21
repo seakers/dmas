@@ -244,17 +244,45 @@ class Node(SimulationElement):
 
             raise e
 
+    async def __listen_for_manager(self):
+        try:
+            self._log(f'waiting for manager to end simulation...')
+            while True:
+                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                self._log(f'message received: {content}', level=logging.DEBUG)
+
+                if (dst not in self.name 
+                    or SimulationElementRoles.MANAGER.value not in src 
+                    or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
+                    self._log('wrong message received. ignoring message...')
+                else:
+                    self._log('simulation end message received! ending simulation...')
+                    break
+
+        except asyncio.CancelledError:
+            return
+
     async def _execute(self) -> None:
+        offline_manager_task = asyncio.create_task(self.__listen_for_manager())
         live_task = asyncio.create_task(self._live())
+
         if self.__has_modules():
             offline_modules_task = asyncio.create_task(self.__wait_for_offline_modules())
 
-            _, pending = await asyncio.wait([live_task, offline_modules_task], return_when=asyncio.FIRST_COMPLETED)
-            pending : list
+            _, pending = await asyncio.wait([
+                                                live_task, 
+                                                offline_modules_task, 
+                                                offline_manager_task
+                                            ], 
+                                            return_when=asyncio.FIRST_COMPLETED)
 
             if live_task in pending:
                 live_task.cancel()
-            else:
+            
+            if offline_manager_task in pending:
+                offline_manager_task.cancel()
+
+            if offline_modules_task in pending:
                 # node is disabled. inform modules that the node is terminating
                 self._log('node\'s `live()` finalized. Terminating internal modules....')
                 terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
@@ -262,7 +290,19 @@ class Node(SimulationElement):
 
             await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)               
         else:
-            await live_task
+            _, pending = await asyncio.wait([
+                                                live_task,  
+                                                offline_manager_task
+                                            ], 
+                                            return_when=asyncio.FIRST_COMPLETED)
+
+            if live_task in pending:
+                live_task.cancel()
+            
+            if offline_manager_task in pending:
+                offline_manager_task.cancel()
+
+            await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
 
     @abstractmethod
     async def _live(self) -> None:

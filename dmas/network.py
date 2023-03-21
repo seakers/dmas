@@ -585,7 +585,8 @@ class NetworkElement(ABC):
         """
         return await self.__send_msg(msg, socket_type, self._internal_socket_map)
 
-    async def __receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
+    # async def __receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
+    async def __receive_msg(self, socket : zmq.Socket, socket_type : zmq.SocketType, socket_lock : asyncio.Lock) -> list:
         """
         Reads a multipart message from a given socket.
 
@@ -599,10 +600,13 @@ class NetworkElement(ABC):
                 and the body of the message as `content` (`dict`)
         """
         try:
+            # TODO: REQUIRE FOR EXTERNAL METHODS TO ACQUIRE LOCKS BEFORE RECEIVING/SENDING MESSAGES
+
              # get appropriate socket and lock
-            socket, socket_lock = None, None
-            socket, socket_lock = socket_map.get(socket_type, (None, None))
-            socket : zmq.Socket; socket_lock : asyncio.Lock
+            # socket, socket_lock = None, None
+            # socket, socket_lock = socket_map.get(socket_type, (None, None))
+            # socket : zmq.Socket; socket_lock : asyncio.Lock
+            
             acquired_by_me = False
             
             if (socket is None 
@@ -639,8 +643,8 @@ class NetworkElement(ABC):
             return dst, src, content
 
         except asyncio.CancelledError as e:
-            self._log(f'message reception interrupted. {e}', level=logging.ERROR)
-            return
+            self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            raise e
             
         except Exception as e:
             self._log(f'message reception failed. {e}', level=logging.ERROR)
@@ -714,18 +718,23 @@ class NetworkElement(ABC):
             send_task = None
             receive_task = None
 
-            # get destination's socket address
-            
+            # get destination's socket address            
             if SimulationElementRoles.MANAGER.value in msg.dst:
                 dst_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
                 dst_address = dst_addresses[-1]
+
             elif self._network_name in msg.dst:
                 dst_addresses = self._network_config.get_internal_addresses().get(zmq.REQ)
                 dst_address = dst_addresses[-1]
+
             else:
                 dst_network_config : NetworkConfig = address_ledger.get(msg.dst, None)
-                dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)
-            
+
+                dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)[-1]
+                if '*' in dst_address:
+                    dst_address : str
+                    dst_address = dst_address.replace('*', 'localhost')
+                        
             if dst_address is None:
                 raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
             
@@ -760,6 +769,8 @@ class NetworkElement(ABC):
             if receive_task is not None and not receive_task.done():
                 receive_task.cancel()
                 await receive_task
+
+            raise e
 
         except Exception as e:
             self._log(f'message broadcast failed.')

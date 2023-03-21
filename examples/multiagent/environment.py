@@ -1,41 +1,38 @@
 import logging
-from dmas.modules import InternalModule
 from dmas.nodes import Node
-from dmas.element import SimulationElement
 from dmas.utils import *
 from dmas.network import *
 
-class Environment(Node):
-    def __init__(self, network_name, port, logger: logging.Logger) -> None:
-        network_config = NetworkConfig( network_name, 
+class EnvironmentNode(Node):
+    def __init__(self, port, logger: logging.Logger) -> None:
+        network_config = NetworkConfig( 'TEST_NETWORK', 
                                         internal_address_map={},
-                                        external_address_map={  zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                        external_address_map={  zmq.REQ:  [f'tcp://localhost:{port}'],
+                                                                zmq.SUB:  [f'tcp://localhost:{port+1}'],
                                                                 zmq.PUSH: [f'tcp://localhost:{port+2}'],
-                                                                zmq.REP: [f'tcp://*:{port+3}'],
+                                                                zmq.REP:  [f'tcp://*:{port+3}'],
                                                                 }
                                         )        
 
         super().__init__(SimulationElementRoles.ENVIRONMENT.name, network_config, [], logger=logger)
 
     async def _live(self):
-        dst, src, msg_dict = await self._send_external_request_message(zmq.REP)
-        dst : str; src : str; msg_dict : dict
-        msg_type = msg_dict.get('msg_type', None)    
+        try:
+            while True:
+                self._log('waiting on messages...', level=logging.INFO)
 
-        if (
-            dst not in self.name
-            or src not in module_names 
-            or msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value
-            or src in responses
-            ):
-            # undesired message received. Ignoring and trying again later
-            self._log(f'received undesired message of type {msg_type}, expected tye {ModuleMessageTypes.MODULE_DEACTIVATED.value}. Ignoring...')
-            resp = NodeReceptionIgnoredMessage(self._element_name, src)
-            await self._send_internal_msg(resp, zmq.REP)
+                _, src, msg_dict = await self._receive_external_msg(zmq.REP)
+                await self._receive_external_msg(zmq.REP)
+                src : str; msg_dict : dict  
 
-        else:
+                self._log(f'Message from {src}: {msg_dict}', level=logging.INFO)
 
+                resp = NodeReceptionAckMessage(self.name, src)
+                await self._send_external_msg(resp, zmq.REP)
+
+        except asyncio.CancelledError:
+            return
+    
 if __name__ == '__main__':
     print('Environment debugger')
     port = 5555
@@ -48,4 +45,4 @@ if __name__ == '__main__':
     c_handler.setLevel(level)
     logger.addHandler(c_handler)
 
-    env = Environment('EXAMPLE_NETWORK', port, logger)
+    env = EnvironmentNode('EXAMPLE_NETWORK', port, logger)

@@ -190,6 +190,10 @@ class AbstractManager(SimulationElement):
                     msg_req = message_class(**msg_dict)
                     msg_resp = None
 
+                    if '/' in src:
+                        src : str
+                        _, src = src.split('/')
+
                     # log subscriber confirmation
                     if src not in self._simulation_element_name_list:
                         # node is not a part of the simulation
