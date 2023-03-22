@@ -108,7 +108,7 @@ class SimulationElement(NetworkElement):
             # start element life
             self._log('executing...', level=logging.INFO)
             await self._execute()
-            self._log('executing completed!', level=logging.INFO)
+            self._log('execution completed!', level=logging.INFO)
             
             self._log('`run()` executed properly.')
             return 1

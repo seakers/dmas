@@ -128,6 +128,58 @@ class InternalModule(NetworkElement):
         self._log('running...')
         return asyncio.run(self.main())
 
+    async def _wait_sim_start(self) -> None:
+        # inform parent node of ready status
+        self._log(f'informing parent node of ready status...', level=logging.INFO) 
+        while True:
+            # send sync request from REQ socket
+            sync_req = ModuleReadyMessage(self.get_module_name(), self.get_parent_name())
+            dst, _, content = await self._send_internal_request_message(sync_req)
+            dst : str; _ : str; content : dict
+            msg_type = content['msg_type']
+
+            if dst not in self.name:
+                # received a message intended for someone else. Ignoring message
+                self._log(f'received message intended for {dst}. Ignoring...')
+                continue
+
+            elif self.get_parent_name() != content['src']:
+                # received a message from an undesired external sender. Ignoring message
+                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                continue
+
+            elif msg_type == NodeMessageTypes.RECEPTION_ACK.value:
+                # received a sync request acknowledgement from the parent node. Sync complete!
+                self._log(f'module readu message accepted! waiting for simulation start message from parent node...', level=logging.INFO)
+                break
+            else:
+                self._log(f'module readu message not accepted. trying again later...')
+                await asyncio.wait(random.random())
+                
+        # wait for node information message
+        while True:
+            # wait for response from parent node and listen for internal messages
+            dst, _, msg_dict = await self._receive_internal_msg(zmq.SUB)
+            dst : str; _ : str; msg_dict : dict
+
+            if dst not in self.name:
+                # received a message intended for someone else. Ignoring message
+                self._log(f'received message intended for {dst}. Ignoring...')
+                continue
+
+            if self.get_parent_name() != content['src']:
+                # received a message from an undesired external sender. Ignoring message
+                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                continue
+            
+            msg_type = msg_dict.get('msg_type', None)
+            if msg_type == NodeMessageTypes.MODULE_ACTIVATE.value:
+                # received sim start message from the parent node!
+                self._log(f'simulation start message received! starting simulation...', level=logging.INFO)
+                break
+            else:
+                self._log(f'received undesired message of type {msg_type}. Ignoring...')
+
     async def main(self):
         """
         Runs the following processes concurrently. All terminates if at least one of them does.
@@ -143,6 +195,11 @@ class InternalModule(NetworkElement):
             self._log(f'syncing network...')
             self._clock_config, _, _ = await self.network_sync()
             self._log(f'NETWORK SYNCED!', level = logging.INFO)
+
+            # wait for sim start
+            self._log(f'waiting on sim start...')
+            await self._wait_sim_start()
+            self._log(f'SIM STARTED!', level = logging.INFO)
 
             # perform this module's routine
             self._log(f'starting internal routines...')

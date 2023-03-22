@@ -225,7 +225,7 @@ class TestSimulationElement(unittest.TestCase):
     def test_run(self):
         print('TEST: Simulation Element Sync Routine')
         port = 5556
-        n_clients = 1
+        n_clients = 10
 
         server = TestSimulationElement.Server(port, n_clients, level=logging.WARNING)
         logger = server.get_logger()

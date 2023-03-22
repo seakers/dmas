@@ -488,24 +488,58 @@ class NetworkElement(ABC):
     """
     SEND/RECEIVE MESSAGES
     """
-    async def __send_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType, socket_map : dict):
+    async def __send_msg(self, msg : SimulationMessage, socket : zmq.Socket):
         """
-        Sends a multipart message to a given socket type.
+        Sends a multipart message through a given socket.
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        """
+        try:
+            # send multi-part message
+            dst : str = msg.dst
+            src : str = self.name
+            content : str = str(msg.to_json())
+            self._log(f'sending message: {content}')
+
+            await socket.send_multipart([dst.encode('ascii'), 
+                                         src.encode('ascii'), 
+                                         content.encode('ascii')])
+            
+            # return sucessful transmission flag
+            self._log('message sent!')
+            return True
+        
+        except asyncio.CancelledError as e:
+            self._log(f'message transmission interrupted. {e}', level=logging.ERROR)
+            return False
+
+        except Exception as e:
+            self._log(f'message transmission failed. {e}', level=logging.ERROR)
+            raise e
+
+    async def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
+        """
+        Sends a multipart message to a given socket type for external communication.
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
             - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
-            - socket_map (`dict`): map of socket types to socket objects and their respective locks
+        
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
         try:
             # get appropriate socket and lock
             socket, socket_lock = None, None
-            socket, socket_lock = socket_map.get(socket_type, (None, None))
+            self._external_socket_map : dict
+
+            socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
-            
+
             if (socket is None 
                 or socket_lock is None):
                 raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
@@ -521,24 +555,12 @@ class NetworkElement(ABC):
 
             # acquire lock
             self._log(f'acquiring port lock for socket of type {socket_type.name}...')
-            await socket_lock.acquire()
-            acquired_by_me = True
+            acquired_by_me = await socket_lock.acquire()
             self._log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
 
-            # send multi-part message
-            dst : str = msg.dst
-            src : str = self.name
-            content : str = str(msg.to_json())
-
-            await socket.send_multipart([dst.encode('ascii'), 
-                                         src.encode('ascii'), 
-                                         content.encode('ascii')])
-            self._log(f'message sent! Releasing lock...')
-            self._log(f'message sent: {content}')
+            # send message
+            return await self.__send_msg(msg, socket)
             
-            # return sucessful transmission flag
-            return True
-        
         except asyncio.CancelledError as e:
             self._log(f'message transmission interrupted. {e}', level=logging.ERROR)
             return False
@@ -555,22 +577,9 @@ class NetworkElement(ABC):
                 and acquired_by_me
                 ):
 
-                # if lock was acquired by this method and transmission failed, release it 
+                # release lock
                 socket_lock.release()
                 self._log(f'lock released!')
-
-    async def _send_external_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
-        """
-        Sends a multipart message to a given socket type for external communication.
-
-        ### Arguments:
-            - msg (:obj:`SimulationMessage`): message being sent
-            - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
-        
-        ### Returns:
-            - `bool` representing a successful transmission if True or False if otherwise.
-        """
-        return await self.__send_msg(msg, socket_type, self._external_socket_map)
 
     async def _send_internal_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
         """
@@ -578,20 +587,67 @@ class NetworkElement(ABC):
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
-            - socket_type (`zmq.SocketType`): desired socket type to be used to transmit messages
+            - socket (`zmq.Socket`): desired socket to be used to transmit messages
         
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self.__send_msg(msg, socket_type, self._internal_socket_map)
+        try:
+            # get appropriate socket and lock
+            socket, socket_lock = None, None
+            self._internal_socket_map : dict
 
-    # async def __receive_msg(self, socket_type : zmq.SocketType, socket_map : dict) -> list:
-    async def __receive_msg(self, socket : zmq.Socket, socket_type : zmq.SocketType, socket_lock : asyncio.Lock) -> list:
+            socket, socket_lock = self._internal_socket_map.get(socket_type, (None, None))
+            socket : zmq.Socket; socket_lock : asyncio.Lock
+            acquired_by_me = False
+
+            if (socket is None 
+                or socket_lock is None):
+                raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
+            
+            # check socket's message transmition capabilities
+            if (
+                socket_type != zmq.REQ 
+                and socket_type != zmq.REP 
+                and socket_type != zmq.PUB 
+                and socket_type != zmq.PUSH
+                ):
+                raise RuntimeError(f'Cannot send messages from a port of type {socket_type.name}.')
+
+            # acquire lock
+            self._log(f'acquiring port lock for socket of type {socket_type.name}...')
+            acquired_by_me = await socket_lock.acquire()
+            self._log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
+
+            # send message
+            return await self.__send_msg(msg, socket)
+            
+        except asyncio.CancelledError as e:
+            self._log(f'message transmission interrupted. {e}', level=logging.ERROR)
+            return False
+
+        except Exception as e:
+            self._log(f'message transmission failed. {e}', level=logging.ERROR)
+            raise e
+
+        finally:
+            if (
+                socket_lock is not None
+                and isinstance(socket_lock, asyncio.Lock) 
+                and socket_lock.locked() 
+                and acquired_by_me
+                ):
+
+                # release lock
+                socket_lock.release()
+                self._log(f'lock released!')
+
+    async def __receive_msg(self, socket : zmq.Socket) -> list:    
         """
         Reads a multipart message from a given socket.
 
         ### Arguments:
-            - socket_type (`zmq.SocketType`): desired socket type to be used to receive a messages
+            - socket (`zmq.Socket`): desired socket to be used to receive a messages
 
         ### Returns:
             - `list` containing the received information:  
@@ -599,36 +655,7 @@ class NetworkElement(ABC):
                 name of sender as `src` (`str`) 
                 and the body of the message as `content` (`dict`)
         """
-        try:
-            # TODO: REQUIRE FOR EXTERNAL METHODS TO ACQUIRE LOCKS BEFORE RECEIVING/SENDING MESSAGES
-
-             # get appropriate socket and lock
-            # socket, socket_lock = None, None
-            # socket, socket_lock = socket_map.get(socket_type, (None, None))
-            # socket : zmq.Socket; socket_lock : asyncio.Lock
-            
-            acquired_by_me = False
-            
-            if (socket is None 
-                or socket_lock is None):
-                raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
-
-            # check socket's message transmition capabilities
-            if (
-                socket_type != zmq.REQ 
-                and socket_type != zmq.REP
-                and socket_type != zmq.SUB
-                and socket_type != zmq.PULL
-                ):
-                raise RuntimeError(f'Cannot receive a messages from a port of type {socket_type.name}.')
-
-            # acquire lock
-            self._log(f'acquiring port lock for socket of type {socket_type.name}...')
-            await socket_lock.acquire()
-            acquired_by_me = True
-            self._log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
-
-
+        try:        
             # send multi-part message
             b_dst, b_src, b_content = await socket.recv_multipart()
             b_dst : bytes; b_src : bytes; b_content : bytes
@@ -643,24 +670,12 @@ class NetworkElement(ABC):
             return dst, src, content
 
         except asyncio.CancelledError as e:
-            self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            self._log(f'message reception on socket {socket} interrupted. {e}', level=logging.WARNING)
             raise e
             
         except Exception as e:
-            self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self._log(f'message reception on socket {socket} failed. {e}', level=logging.ERROR)
             raise e
-        
-        finally:
-            if (
-                socket_lock is not None
-                and isinstance(socket_lock, asyncio.Lock)
-                and socket_lock.locked() 
-                and acquired_by_me
-                ):
-
-                # if lock was acquired by this method and transmission failed, release it 
-                socket_lock.release()
-                self._log(f'lock released!')
 
     async def _receive_external_msg(self, socket_type : zmq.SocketType) -> list:
         """
@@ -678,7 +693,54 @@ class NetworkElement(ABC):
         ### Usage:
             - dst, src, content = await self._receive_external_msg(socket_type)
         """
-        return await self.__receive_msg(socket_type, self._external_socket_map)
+        try:
+            # get appropriate socket and lock
+            socket, socket_lock = None, None
+            socket, socket_lock = self._external_socket_map.get(socket_type, (None, None))
+            socket : zmq.Socket; socket_lock : asyncio.Lock
+            
+            acquired_by_me = False
+            
+            if (socket is None 
+                or socket_lock is None):
+                raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
+
+            # check socket's message transmition capabilities
+            if (
+                socket_type != zmq.REP
+                and socket_type != zmq.REQ 
+                and socket_type != zmq.SUB
+                and socket_type != zmq.PULL
+                ):
+                raise RuntimeError(f'Cannot receive a messages from a port of type {socket_type.name}.')
+
+            # acquire lock
+            self._log(f'acquiring port lock for socket of type {socket_type.name}...')
+            acquired_by_me = await socket_lock.acquire()
+            self._log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
+
+            # send multi-part message
+            return  await self.__receive_msg(socket)
+
+        except asyncio.CancelledError as e:
+            # self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            raise e
+            
+        except Exception as e:
+            # self._log(f'message reception failed. {e}', level=logging.ERROR)
+            raise e
+        
+        finally:
+            if (
+                socket_lock is not None
+                and isinstance(socket_lock, asyncio.Lock)
+                and socket_lock.locked() 
+                and acquired_by_me
+                ):
+
+                # if lock was acquired by this method and transmission failed, release it 
+                socket_lock.release()
+                self._log(f'lock released!')
 
     async def _receive_internal_msg(self, socket_type : zmq.SocketType) -> list:
         """
@@ -696,7 +758,55 @@ class NetworkElement(ABC):
         ### Usage:
             - dst, src, content = await self._receive_internal_msg(socket_type)
         """
-        return await self.__receive_msg(socket_type, self._internal_socket_map)
+        try:
+            # get appropriate socket and lock
+            socket, socket_lock = None, None
+            socket, socket_lock = self._internal_socket_map.get(socket_type, (None, None))
+            socket : zmq.Socket; socket_lock : asyncio.Lock
+            
+            acquired_by_me = False
+            
+            if (socket is None 
+                or socket_lock is None):
+                raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
+
+            # check socket's message transmition capabilities
+            if (
+                socket_type != zmq.REP
+                and socket_type != zmq.REQ
+                and socket_type != zmq.SUB
+                and socket_type != zmq.PULL
+                ):
+                raise RuntimeError(f'Cannot receive a messages from a port of type {socket_type.name}.')
+
+            # acquire lock
+            self._log(f'acquiring port lock for socket of type {socket_type.name}...')
+            acquired_by_me = await socket_lock.acquire()
+            self._log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
+
+
+            # send multi-part message
+            return  await self.__receive_msg(socket)
+
+        except asyncio.CancelledError as e:
+            # self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            raise e
+            
+        except Exception as e:
+            # self._log(f'message reception failed. {e}', level=logging.ERROR)
+            raise e
+        
+        finally:
+            if (
+                socket_lock is not None
+                and isinstance(socket_lock, asyncio.Lock)
+                and socket_lock.locked() 
+                and acquired_by_me
+                ):
+
+                # if lock was acquired by this method and transmission failed, release it 
+                socket_lock.release()
+                self._log(f'lock released!')
 
     async def __send_request_message(self, msg : SimulationMessage, address_ledger : dict, socket_map : dict) -> list:
         """
@@ -717,6 +827,19 @@ class NetworkElement(ABC):
             # initialize progress trackers
             send_task = None
             receive_task = None
+
+            # get appropriate socket and lock
+            socket, socket_lock = socket_map.get(zmq.REQ, (None, None))
+            socket : zmq.Socket; socket_lock : asyncio.Lock
+
+            if (socket is None 
+                or socket_lock is None):
+                raise KeyError(f'Socket of type {zmq.SocketType.REQ.name} not contained in this simulation element.')
+            
+            # acquire lock
+            self._log(f'acquiring port lock for socket of type {zmq.SocketType.REQ.name}...')
+            acquired_by_me = await socket_lock.acquire()
+            self._log(f'port lock for socket of type {zmq.SocketType.REQ.name} acquired! connecting to {msg.dst}...')
 
             # get destination's socket address            
             if SimulationElementRoles.MANAGER.value in msg.dst:
@@ -739,29 +862,33 @@ class NetworkElement(ABC):
                 raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
             
             # connect to destination's socket
-            socket, _ = socket_map.get(zmq.REQ, (None, None))
-            socket : zmq.Socket
             self._log(f'connecting to {msg.dst} via `{dst_address}`...')
             socket.connect(dst_address)
-            self._log(f'connection to {msg.dst} established! Transmitting a message of type {type(msg)}...')
+            self._log(f'connection to {msg.dst} established! Transmitting a message of type {type(msg)}...')           
 
-            # transmit message
-            send_task = asyncio.create_task( self.__send_msg(msg, zmq.REQ, socket_map) )
+            # send message
+            send_task = asyncio.create_task( self.__send_msg(msg, socket) )
             await send_task
             self._log(f'message of type {type(msg)} transmitted sucessfully! Waiting for response from {msg.dst}...')
 
             # wait for response
-            receive_task = asyncio.create_task( self.__receive_msg(zmq.REQ, socket_map) )
+            receive_task = asyncio.create_task( self.__receive_msg(socket) )
             await receive_task
-            dst, src, content = receive_task.result()
 
             # disconnect from destination's socket
             socket.disconnect(dst_address)
 
-            return dst, src, content
+            return receive_task.result()
         
         except asyncio.CancelledError as e:
             self._log(f'message broadcast interrupted.')
+            raise e
+
+        except Exception as e:
+            self._log(f'message broadcast failed.')
+            raise e
+        
+        finally:
             if send_task is not None and not send_task.done():
                 send_task.cancel()
                 await send_task
@@ -770,11 +897,17 @@ class NetworkElement(ABC):
                 receive_task.cancel()
                 await receive_task
 
-            raise e
+            if (
+                socket_lock is not None
+                and isinstance(socket_lock, asyncio.Lock) 
+                and socket_lock.locked() 
+                and acquired_by_me
+                ):
 
-        except Exception as e:
-            self._log(f'message broadcast failed.')
-            raise e
+                # release lock
+                socket_lock.release()
+                self._log(f'lock released!')
+
 
     async def _send_external_request_message(self, msg : SimulationMessage) -> list:
         """

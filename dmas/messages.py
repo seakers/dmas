@@ -96,7 +96,7 @@ class ManagerMessageTypes(Enum):
     SIM_START = 'SIM_START'
     SIM_END = 'SIM_END'
     RECEPTION_ACK = 'RECEPTION_ACKNOWLEDGED'
-    RECEPTION_IGNORED = 'RECEPTION_ACKNOWLEDGED'
+    RECEPTION_IGNORED = 'RECEPTION_IGNORED'
     TEST = 'TEST'
 
 class ManagerMessage(SimulationMessage):
@@ -290,6 +290,7 @@ class NodeMessageTypes(Enum):
     NODE_DEACTIVATED = 'NODE_DEACTIVATED'
     RECEPTION_ACK = 'RECEPTION_ACK'
     RECEPTION_IGNORED = 'RECEPTION_IGNORED'
+    MODULE_ACTIVATE = 'MODULE_ACTIVATE'
     MODULE_DEACTIVATE = 'MODULE_DEACTIVATE'
     NODE_INFO = 'NODE_INFO'
 
@@ -457,6 +458,30 @@ class NodeReceptionIgnoredMessage(SimulationMessage):
         """
         super().__init__(src, dst, NodeMessageTypes.RECEPTION_IGNORED.value, id)
 
+class ActivateInternalModuleMessage(SimulationMessage):
+    """
+    ## Activate Internal Module Message
+
+    Insturcts an internal module to start its processes.
+
+    ### Attributes:
+        - src (`str`): name of the simulation node sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`) = NodeMessageTypes.MODULE_DEACTIVATE: type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
+
+    def __init__(self, src: str, dst: str, id: uuid.UUID = None, **kwargs):
+        """
+        Initializes an instance of a Activate Internal Module Message
+
+        ### Arguments:
+            - src (`str`): name of the simulation node sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, NodeMessageTypes.MODULE_ACTIVATE.value, id)
+
 class TerminateInternalModuleMessage(SimulationMessage):
     """
     ## Terminate Internal Module Message
@@ -520,6 +545,29 @@ class ModuleSyncRequestMessage(SimulationMessage):
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
         super().__init__(src, dst, ModuleMessageTypes.SYNC_REQUEST.value, id)
+
+class ModuleReadyMessage(SimulationMessage):
+    """
+    ## Node Ready Message
+
+    Informs the simulation manager that a simulation node has activated and is ready to start the simulation
+
+    ### Attributes:
+        - src (`str`): name of the simulation node sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
+    def __init__(self, src: str, dst : str, id : uuid.UUID = None, **kwargs):
+        """
+        Initializes an instance of a Node Ready Message
+
+        ### Arguments:
+            - src (`str`): name of the simulation node sending this message
+            - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, ModuleMessageTypes.MODULE_READY.value, id)
+
 
 class ModuleDeactivatedMessage(SimulationMessage):
     def __init__(self, src: str, dst: str, id: str = None, **kargs):

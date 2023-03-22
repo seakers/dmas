@@ -186,7 +186,7 @@ class AbstractManager(SimulationElement):
                         continue
 
                     # unpack and message
-                    self._log(f'Received {msg_type} message from node {src}! Message accepted!')
+                    self._log(f'Received {msg_type} message from node {src}!')
                     msg_req = message_class(**msg_dict)
                     msg_resp = None
 
@@ -201,10 +201,11 @@ class AbstractManager(SimulationElement):
 
                         # inform agent that its message was not accepted
                         msg_resp = ManagerReceptionIgnoredMessage(src, -1)
+                        print(self._simulation_element_name_list)
 
                     elif src in received_messages:
                         # node is a part of the simulation but has already communicated with me
-                        self._log(f'Node {src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                        self._log(f'{src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
                         # inform agent that its message request was not accepted
                         msg_resp = ManagerReceptionIgnoredMessage(src, -1)
@@ -215,7 +216,7 @@ class AbstractManager(SimulationElement):
 
                         # inform agent that its message request was not accepted
                         msg_resp = ManagerReceptionAckMessage(src, -1)
-                        self._log(f'Node {src} has now reported to be online to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                        self._log(f'{src} has now reported to be online to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
                     # send response
                     send_task = asyncio.create_task( self._send_external_msg(msg_resp, zmq.REP) )

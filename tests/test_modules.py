@@ -1,5 +1,6 @@
 import logging
 import unittest
+from tqdm import tqdm
 
 import zmq
 from dmas.element import *
@@ -38,7 +39,6 @@ class TestInternalModule(unittest.TestCase):
                 self._log(f'waiting for parent module to deactivate me...')
                 while True:
                     dst, src, content = await self._receive_internal_msg(zmq.SUB)
-                    self._log(f'message received: {content}', level=logging.DEBUG)
 
                     if (dst not in self.name 
                         or self.get_parent_name() not in src 
@@ -122,61 +122,72 @@ class TestInternalModule(unittest.TestCase):
 
             return RealTimeClockConfig(str(start_date), str(end_date)), dict()
         
-        async def _internal_sync(self, clock_config : ClockConfig):
+        async def _internal_sync(self, clock_config : ClockConfig) -> dict:
             try:
-                # wait for all modules to be online
-                await self.__wait_for_online_modules(clock_config)
+                # wait for module sync request       
+                await self.__wait_for_module_sycs()
 
                 # create internal ledger
                 internal_address_ledger = dict()
                 for module in self.__modules:
                     module : InternalModule
                     internal_address_ledger[module.name] = module.get_network_config()
+                
+                # broadcast simulation info to modules
+                msg = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
+                await self._send_internal_msg(msg, zmq.PUB)
 
                 # return ledger
                 return internal_address_ledger
             
             except asyncio.CancelledError:
                 return
-
-        async def __wait_for_online_modules(self, clock_config : ClockConfig) -> None:
+            
+        async def __wait_for_module_sycs(self):
             """
-            Waits for all internal modules to become online
+            Waits for all internal modules to send their respective sync requests
+            """
+            await self.__wait_for_module_messages(ModuleMessageTypes.SYNC_REQUEST, 'Syncing w/ Internal Nodes')
+
+        async def __wait_for_module_messages(self, target_type : ModuleMessageTypes, desc : str):
+            """
+            Waits for all internal modules to send a message of type `target_type` through the node's REP port
             """
             responses = []
-            module_names = [f'{self._element_name}/{m.name}' for m in self.__modules]
+            module_names = [f'{self._element_name}/{m._element_name}' for m in self.__modules]
 
-            if len(self.__modules) > 0:
-                self._log('waiting for internal nodes to become online...')
+            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
                 while len(responses) < len(self.__modules):
-                    # listen for messages from internal nodes
+                    # listen for messages from internal module
                     dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
                     dst : str; src : str; msg_dict : dict
                     msg_type = msg_dict.get('msg_type', None)
 
-                    if (dst not in self.name
-                        or src not in module_names
-                        or msg_type != ModuleMessageTypes.SYNC_REQUEST.value
+                    if (dst in self.name
+                        and src in module_names
+                        and msg_type == target_type.value
+                        and src not in responses
                         ):
-                        resp = NodeReceptionIgnoredMessage(self._element_name, src)
-                    if src not in responses:
-                        # Add to list of synced modules if it hasn't been synched before
+                        # Add to list of registered modules if it hasn't been registered before
                         responses.append(src)
+                        pbar.update(1)
                         resp = NodeReceptionAckMessage(self._element_name, src)
                     else:
+                        print(dst in self.name, dst, self.name)
+                        print(src in module_names, src, module_names)
+                        print(msg_type == target_type.value, msg_type, target_type.value)
+                        print(src not in responses, src, responses)
+                        # ignore message
                         resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
+                    # respond to module
                     await self._send_internal_msg(resp, zmq.REP)
 
-
-                # inform all internal nodes that they are now synched with their parent simulation node
-                self._log('all internal nodes are now online! Informing them that they are now synced with their parent node...')
-                sim_info = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
-                await self._send_internal_msg(sim_info, zmq.PUB)
-                
         async def _execute(self):
             dt = self._clock_config.get_total_seconds()
-            await asyncio.sleep(dt)
+            
+            for _ in tqdm (range (10), desc=f'{self.name} Working'):
+                await asyncio.sleep(dt/10)
 
             # node is disabled. inform modules that the node is terminating
             self._log('node\'s `live()` finalized. Terminating internal modules....')
@@ -195,41 +206,54 @@ class TestInternalModule(unittest.TestCase):
             responses = []
             module_names = [m.name for m in self.__modules]
 
-            self._log('listening for internal modules\' termination confirmation...')
-            while len(responses) < len(self.__modules):
-                # listen for messages from internal nodes
-                dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
-                dst : str; src : str; msg_dict : dict
-                msg_type = msg_dict.get('msg_type', None)    
+            with tqdm(total=len(self.__modules) , desc=f'{self.name} Offline Internal Modules') as pbar:
+                while len(responses) < len(self.__modules):
+                    # listen for messages from internal nodes
+                    dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
+                    dst : str; src : str; msg_dict : dict
+                    msg_type = msg_dict.get('msg_type', None)    
 
-                if (
-                    dst not in self.name
-                    or src not in module_names 
-                    or msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value
-                    or src in responses
-                    ):
-                    # undesired message received. Ignoring and trying again later
-                    print(dst not in self.name)
-                    print(src not in module_names )
-                    print(msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value)
-                    print(src in responses)
+                    if (
+                        dst not in self.name
+                        or src not in module_names 
+                        or msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value
+                        or src in responses
+                        ):
+                        # undesired message received. Ignoring and trying again later
+                        print(dst not in self.name)
+                        print(src not in module_names )
+                        print(msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value)
+                        print(src in responses)
 
-                    self._log(f'received undesired message of type {msg_type}, expected tye {ModuleMessageTypes.MODULE_DEACTIVATED.value}. Ignoring...')
-                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
+                        self._log(f'received undesired message of type {msg_type}, expected tye {ModuleMessageTypes.MODULE_DEACTIVATED.value}. Ignoring...')
+                        resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
-                else:
-                    # add to list of offline modules if it hasn't been registered as offline before
-                    resp = NodeReceptionAckMessage(self._element_name, src)
-                    responses.append(src)
-                    self._log(f'{src} is now offline! offline module status: {len(responses)}/{len(self.__modules)}')
+                    else:
+                        # add to list of offline modules if it hasn't been registered as offline before
+                        pbar.update(1)
+                        resp = NodeReceptionAckMessage(self._element_name, src)
+                        responses.append(src)
+                        self._log(f'{src} is now offline! offline module status: {len(responses)}/{len(self.__modules)}')
 
-                await self._send_internal_msg(resp, zmq.REP)
+                    await self._send_internal_msg(resp, zmq.REP)
         
         async def _publish_deactivate(self):
             return
 
         async def _wait_sim_start(self):
-            return
+            # wait for all modules to become online
+            await self.__wait_for_ready_modules()
+
+            self._log('all external nodes are now online! Informing internal modules of simulation information...')
+            sim_start = ActivateInternalModuleMessage(self._element_name, self._element_name)
+            await self._send_internal_msg(sim_start, zmq.PUB)
+
+        async def __wait_for_ready_modules(self) -> None:
+            """
+            Waits for all internal modules to become online and be ready to start their simulation
+            """
+            await self.__wait_for_module_messages(ModuleMessageTypes.MODULE_READY, 'Online Internal Modules')
+
     
     def test_init(self):
         port = 5555
@@ -238,22 +262,23 @@ class TestInternalModule(unittest.TestCase):
         module = TestInternalModule.TestModule('TEST_NODE', 'MODULE_0', port, port+1)
         self.assertTrue(isinstance(module, TestInternalModule.TestModule))
 
-        node = TestInternalModule.DummyNode('NODE_0', n_modules, port)
+        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, logger=module.get_logger())
         self.assertTrue(isinstance(node, TestInternalModule.DummyNode))
 
         with self.assertRaises(AttributeError):
             network_config = NetworkConfig('TEST', {}, {})
-            TestInternalModule.DummyModule('TEST', network_config)
+            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
             
             network_config = NetworkConfig('TEST', {zmq.REQ: [f'tcp://localhost:{port+2}']}, {})
-            TestInternalModule.DummyModule('TEST', network_config)
+            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
 
             network_config = NetworkConfig('TEST', {}, {zmq.SUB: [f'tcp://localhost:{port+3}']})
-            TestInternalModule.DummyModule('TEST', network_config)
+            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
 
     def test_module(self):
         port = 5555
-        n_modules = 1
-        
-        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, level=logging.WARNING)
+        n_modules = 100
+        level = logging.WARNING
+
+        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, level=level)
         node.run()
