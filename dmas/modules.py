@@ -187,7 +187,6 @@ class InternalModule(NetworkElement):
         try:
             # configure own network ports
             self._log(f'configuring network...')
-            await asyncio.sleep(0.1)
             self._network_context, self._external_socket_map, self._internal_socket_map = super().config_network()
             self._log(f'NETWORK CONFIGURED!', level = logging.INFO)
             

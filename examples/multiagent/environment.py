@@ -22,7 +22,6 @@ class EnvironmentNode(Node):
                 self._log('waiting on messages...', level=logging.INFO)
 
                 _, src, msg_dict = await self._receive_external_msg(zmq.REP)
-                await self._receive_external_msg(zmq.REP)
                 src : str; msg_dict : dict  
 
                 self._log(f'Message from {src}: {msg_dict}', level=logging.INFO)
@@ -32,17 +31,3 @@ class EnvironmentNode(Node):
 
         except asyncio.CancelledError:
             return
-    
-if __name__ == '__main__':
-    print('Environment debugger')
-    port = 5555
-    level = logging.DEBUG
-    logger = logging.getLogger()
-    logger.propagate = False
-    logger.setLevel(level)
-
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(level)
-    logger.addHandler(c_handler)
-
-    env = EnvironmentNode('EXAMPLE_NETWORK', port, logger)

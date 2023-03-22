@@ -309,7 +309,9 @@ class Node(SimulationElement):
     @abstractmethod
     async def _live(self) -> None:
         """
-        Routine to be performed by simulation node during when the node is executing
+        Routine to be performed by simulation node during when the node is executing. 
+
+        Must be able to handle `asyncio.CancelledError` exceptions.
         """
         pass
 

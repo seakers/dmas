@@ -7,49 +7,64 @@ from dmas.network import NetworkConfig
 
 from dmas.nodes import Node
 
-class Agent(Node):
-    def __init__(   self, 
-                    name: str, 
-                    network_config: NetworkConfig, 
-                    logger: logging.Logger) -> None:
+class AgentNode(Node):
+    def __init__(self, 
+                 name: str, 
+                 network_config: NetworkConfig, 
+                 logger: logging.Logger
+                ) -> None:
         super().__init__(name, network_config, [], logger=logger)
 
     async def _live(self) -> None:
         try:
-            while True:
-                self._log('sending request to environment...', level=logging.INFO)
+            send_task = asyncio.create_task(self._send())
+            listen_task = asyncio.create_task(self._listen())
 
-                msg = SimulationMessage(self.name,
+            await asyncio.wait([send_task, listen_task], return_when=asyncio.ALL_COMPLETED)
+
+        except asyncio.CancelledError:
+            if not send_task.done():
+                send_task.cancel()
+            if not listen_task.done():
+                listen_task.cancel()
+            
+            await asyncio.wait([send_task, listen_task], return_when=asyncio.ALL_COMPLETED)
+        
+    async def _send(self):
+        try:
+            # connect to every peer's broadcast sockets
+            for peer in self._external_address_ledger:
+                if peer == self._element_name:
+                    continue
+
+                peer_network_config = self._external_address_ledger[peer]
+                self._log(f'Peer: {peer}; Network config: {peer_network_config}')
+
+            while True:
+                # peer-to-peer message
+                self._log('sending request to environment...', level=logging.INFO)
+                peer_msg = SimulationMessage(self.name,
                                         SimulationElementRoles.ENVIRONMENT.value,
                                         'TEST')
-                await self._send_external_request_message(msg)
+                await self._send_external_request_message(peer_msg)
 
                 self._log('response received!', level=logging.INFO)
+                
+                # wait some random period
                 await asyncio.sleep(random.random())
+
+                # peer-to-peer broacast
+                # broadcast_msg = SimulationMessage(self.name,
+                #                         SimulationElementRoles.ENVIRONMENT.value,
+                #                         'TEST')
+                # await self._send_external_msg(broadcast_msg, zmq.PUB)
 
         except asyncio.CancelledError:
             return
-
-
-if __name__ == '__main__':
-    print('Agent debugger')
-    port = 5555
-    level = logging.DEBUG
-    logger = logging.getLogger()
-    logger.propagate = False
-    logger.setLevel(level)
-
-    c_handler = logging.StreamHandler()
-    c_handler.setLevel(level)
-    logger.addHandler(c_handler)
-
-    network_config = NetworkConfig( 'TEST_NETWORK',
-                                    internal_address_map = {},
-                                    external_address_map = {
-                                                            zmq.REQ: [f'tcp://localhost:{port}'],
-                                                            zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                            zmq.PUSH: [f'tcp://localhost:{port+2}']}
-                                    )
-    
-
-    agent = Agent('AGENT_i', network_config, logger)
+        
+    async def _listen(self):
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            return

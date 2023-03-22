@@ -12,6 +12,8 @@ NETWORK CONFIG
 ------------------
 """
 class NetworkConfig(ABC):
+    # TODO Add additional parameter for simulation manager address map
+
     """
     ## Network Configuration Object
 

@@ -238,11 +238,8 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_nodes = [100]
-        n_modules = [3]
-
-        # n_nodes = [2, 20]
-        # n_modules = [0, 4]
+        n_nodes = [20]
+        n_modules = [4]
         port = 5555
         level=logging.WARNING
 
@@ -261,23 +258,23 @@ class TestSimulationNode(unittest.TestCase):
             for m in n_modules:
                 self.run_tester(clock_config, n, m, port, level=level)
     
-    # def test_accelerated_realtime_run(self):
-    #     print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
-    #     n_nodes = [2, 20]
-    #     n_modules = [0, 4]
-    #     port = 5555
+    def test_accelerated_realtime_run(self):
+        print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
+        n_nodes = [20]
+        n_modules = [4]
+        port = 5555
 
-    #     year = 2023
-    #     month = 1
-    #     day = 1
-    #     hh = 12
-    #     mm = 00
-    #     ss = 00
-    #     start_date = datetime(year, month, day, hh, mm, ss)
-    #     end_date = datetime(year, month, day, hh, mm, ss+1)
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
 
-    #     clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
+        clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
 
-    #     for n in n_nodes:
-    #         for m in n_modules:
-    #             self.run_tester(clock_config, n, m, port, level=logging.WARNING)
+        for n in n_nodes:
+            for m in n_modules:
+                self.run_tester(clock_config, n, m, port, level=logging.WARNING)

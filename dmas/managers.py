@@ -63,7 +63,7 @@ class AbstractManager(SimulationElement):
         """
         pass
 
-    async def _internal_sync(self, clock_config : ClockConfig) -> dict:
+    async def _internal_sync(self, _ : ClockConfig) -> dict:
         # no internal modules to sync with
         return None
 
@@ -98,7 +98,6 @@ class AbstractManager(SimulationElement):
         
         except asyncio.CancelledError:
             return  
-
 
     async def _execute(self) -> None:  
         # broadcast simulation start to all simulation elements
