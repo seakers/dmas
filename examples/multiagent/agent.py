@@ -15,7 +15,7 @@ class AgentNode(Node):
                 ) -> None:
         super().__init__(name, network_config, [], logger=logger)
 
-    async def _live(self) -> None:
+    async def live(self) -> None:
         try:
             send_task = asyncio.create_task(self._send())
             listen_task = asyncio.create_task(self._listen())

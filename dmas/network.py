@@ -209,7 +209,6 @@ class NetworkElement(ABC):
         """
         super().__init__()      
         # initialize attributes with `None` values
-        self._network_config = network_config
         self._internal_socket_map = None
         self._internal_address_ledger = None
         self._external_socket_map = None
@@ -228,6 +227,7 @@ class NetworkElement(ABC):
             raise AttributeError(f'`logger` must be of type `logging.Logger`. is of type {type(logger)}')
 
         # initialize attributes with parameters
+        self._network_config = network_config
         self._network_name = network_config.network_name
         self._element_name = element_name
         self.name = network_config.network_name + '/' + element_name
@@ -322,6 +322,7 @@ class NetworkElement(ABC):
             raise PermissionError('Attempted to configure network after it has already been configurated.')
 
         network_context = azmq.Context()
+        network_context.setsockopt(zmq.MAX_SOCKETS, 1024*4)
 
         self._log(f'configuring extenal network sockets...')
         external_socket_map = self.__config_external_network(network_context)
@@ -392,25 +393,24 @@ class NetworkElement(ABC):
 
         # create socket
         socket : zmq.Socket = network_context.socket(socket_type)
-        # self._log(f'created socket of type {socket_type}!')
+        self._log(f'created socket of type `{socket_type.name}`!')
 
         # connect or bind to network port
         for address in addresses:
-            # self._log(f'connecting/binding to address {address}...')
-            if socket_type in [zmq.PUB, zmq.SUB ,zmq.REQ, zmq.REP, zmq.PUSH ,zmq.PULL]:
+            if socket_type in [zmq.PUB, zmq.SUB, zmq.REP, zmq.PUSH ,zmq.PULL]:
                 if '*' not in address:
-                    # self._log(f'connected socket to address{address}!')
+                    self._log(f'connected socket to address `{address}`!')
                     socket.connect(address)
                 else:
                     if self.__is_address_in_use(address):
-                        # self._log(f'ERROR address {address} already in use!')
                         raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
                     
-                    # self._log(f'bound socket to address {address}!')
+                    self._log(f'bound socket to address `{address}`!')
                     socket.bind(address)
+            elif socket_type == zmq.REQ:
+                continue
             else:
-                # self._log(f'ERROR socket type not yet supported.')
-                raise NotImplementedError(f'Socket of type {socket_type} not yet supported.')
+                raise NotImplementedError(f'Socket of type `{socket_type}` not yet supported.')
 
         # set socket options
         socket.setsockopt(zmq.LINGER, 0)
@@ -420,8 +420,12 @@ class NetworkElement(ABC):
 
         elif socket_type is zmq.SUB:
             # subscribe to messages addressed to this element or to all elements in the network
-            socket.setsockopt(zmq.SUBSCRIBE, self._network_name.encode('ascii'))
-            socket.setsockopt(zmq.SUBSCRIBE, self._element_name.encode('ascii'))
+            topics = [  self._network_name.encode('ascii'), 
+                        self.name.encode('ascii')
+                    ]
+            for topic in topics:
+                socket.setsockopt(zmq.SUBSCRIBE, topic)
+                self._log(f'PUB port subscribed to topic `{topic}`!')
         
         return (socket, asyncio.Lock())
 
@@ -443,7 +447,7 @@ class NetworkElement(ABC):
             return s.connect_ex(('localhost', port)) == 0
         
     @abstractmethod
-    async def network_sync(self) -> tuple:
+    async def _network_sync(self) -> tuple:
         """
         Performs sychronization routine any internal or external networks that this element might be a part of.
 

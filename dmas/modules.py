@@ -68,7 +68,7 @@ class InternalModule(NetworkElement):
         """
         return self._network_name       
 
-    async def network_sync(self) -> tuple:
+    async def _network_sync(self) -> tuple:
         self._log(f'syncing with parent node {self.get_parent_name()}...', level=logging.INFO) 
         while True:
             # send sync request from REQ socket
@@ -185,6 +185,9 @@ class InternalModule(NetworkElement):
         Runs the following processes concurrently. All terminates if at least one of them does.
         """
         try:
+            # wait for parent node to configure their network ports
+            await asyncio.sleep(random.random())
+
             # configure own network ports
             self._log(f'configuring network...')
             self._network_context, self._external_socket_map, self._internal_socket_map = super().config_network()
@@ -192,7 +195,7 @@ class InternalModule(NetworkElement):
             
             # sync network 
             self._log(f'syncing network...')
-            self._clock_config, _, _ = await self.network_sync()
+            self._clock_config, _, _ = await self._network_sync()
             self._log(f'NETWORK SYNCED!', level = logging.INFO)
 
             # wait for sim start
@@ -202,8 +205,8 @@ class InternalModule(NetworkElement):
 
             # perform this module's routine
             self._log(f'starting internal routines...')
-            tasks = [asyncio.create_task(self._routine(), name=f'{self.name}_routine'),
-                        asyncio.create_task(self._listen(), name=f'{self.name}_listen'),]
+            tasks = [asyncio.create_task(self.routine(), name=f'{self.name}_routine'),
+                        asyncio.create_task(self.listen(), name=f'{self.name}_listen'),]
 
             # instruct all submodules to perform their own routines
             self._log(f'starting submodule routines...')
@@ -268,7 +271,7 @@ class InternalModule(NetworkElement):
                 await asyncio.wait(random.random())
 
     @abstractmethod
-    async def _routine():
+    async def routine():
         """
         Routine to be performed by the module during when the parent node is executing.
 
@@ -277,7 +280,7 @@ class InternalModule(NetworkElement):
         pass
 
     @abstractmethod
-    async def _listen(self):
+    async def listen(self):
         """
         Listens for messages from the parent node or other internal modules.
 
@@ -298,8 +301,8 @@ class InternalSubmodule(ABC):
         try:
             try:
                 # perform this module's routine
-                tasks = [asyncio.create_task(self._routine(), name=f'{self.name}_routine'),
-                         asyncio.create_task(self._listen(), name=f'{self.name}_listen'),]
+                tasks = [asyncio.create_task(self.routine(), name=f'{self.name}_routine'),
+                         asyncio.create_task(self.listen(), name=f'{self.name}_listen'),]
 
                 # instruct all submodules to perform their own routines
                 for submodule in self._submodules:
@@ -324,7 +327,7 @@ class InternalSubmodule(ABC):
             return
         
     @abstractmethod
-    async def _routine():
+    async def routine():
         """
         Routine to be performed by the submodule during when the parent module is executing.
 
@@ -333,7 +336,7 @@ class InternalSubmodule(ABC):
         pass
 
     @abstractmethod
-    async def _listen(self):
+    async def listen(self):
         """
         Listens for messages from the other internal modules.
 

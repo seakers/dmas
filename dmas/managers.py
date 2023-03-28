@@ -189,12 +189,8 @@ class AbstractManager(SimulationElement):
                     msg_req = message_class(**msg_dict)
                     msg_resp = None
 
-                    if '/' in src:
-                        src : str
-                        _, src = src.split('/')
-
                     # log subscriber confirmation
-                    if src not in self._simulation_element_name_list:
+                    if src not in self._simulation_element_name_list and self._element_name + '/' + src not in self._simulation_element_name_list:
                         # node is not a part of the simulation
                         self._log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
@@ -251,10 +247,10 @@ class AbstractManager(SimulationElement):
             - `dict` mapping simulation elements' names to the addresses pointing to their respective connecting ports    
         """
         self._log(f'Waiting for sync requests from simulation elements...')
-        desc=f'{self.name}: Online simulation elements'
+        desc=f'{self.name}: Syncing simulation elements'
         received_sync_requests = await self.__wait_for_elements(NodeMessageTypes.SYNC_REQUEST, NodeSyncRequestMessage, desc=desc)
         
-        self._log(f'All elements online!')
+        self._log(f'All elements synced!')
 
         external_address_ledger = dict()
         for src in received_sync_requests:
@@ -286,3 +282,12 @@ class AbstractManager(SimulationElement):
         desc=f'{self.name}: Offline simulation elements'
         await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
         self._log(f'All elements deactivated!')
+
+    async def _sim_wait(self, delay : float) -> None:
+        """
+        Simulation element waits for a given delay to occur according to the clock configuration being used
+
+        ### Arguments:
+            - delay (`float`): number of seconds to be waited
+        # """
+        await asyncio.sleep(delay)

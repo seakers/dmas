@@ -144,7 +144,7 @@ class SimulationElement(NetworkElement):
 
         # synchronize with other elements in the simulation or internal modules
         self._log('Syncing network...')
-        self._clock_config, self._external_address_ledger, self._internal_address_ledger = await self.network_sync()     
+        self._clock_config, self._external_address_ledger, self._internal_address_ledger = await self._network_sync()     
         self._log('NETWORK SYNCED!')
 
         # check for correct element activation
@@ -154,7 +154,10 @@ class SimulationElement(NetworkElement):
         elif self._external_address_ledger is None:
             raise RuntimeError(f'{self.name}: External address ledger not received during activation.')
 
-    async def network_sync(self) -> tuple:
+        # perform user-defined setup method
+        await self.setup()
+
+    async def _network_sync(self) -> tuple:
         """
         Awaits for all other simulation elements to undergo their initialization and activation routines and become online. 
         
@@ -243,6 +246,15 @@ class SimulationElement(NetworkElement):
         pass
 
     @abstractmethod
+    async def setup(self) -> None:
+        """
+        Performs user-defined set up instructions to be done before the simulation is started.
+
+        Nothing is done by default but functionality may be expanded by the user.
+        """
+        return
+
+    @abstractmethod
     async def _wait_sim_start(self) -> None:
         """
         Waits for the simulation to start
@@ -257,17 +269,30 @@ class SimulationElement(NetworkElement):
         Element will deactivate if this method returns.
         """
         pass
+
+    @abstractmethod
+    async def teardown(self) -> None:
+        """
+        Performs user-defined tear-down instructions to be performed after the simulation has been terminated.
+
+        Nothing is done by default but functionality may be expanded by the user.
+        """
+        return
     
     async def _deactivate(self) -> None:
         """
         Shut down procedure for this simulation entity. 
         """
+        # perform tear-down procedure
+        await self.teardown()
+
         # inform others of deactivation
         await self._publish_deactivate()
         
         # close network connections
         self._deactivate_network()
 
+    @abstractmethod
     async def _sim_wait(self, delay : float) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
@@ -275,27 +300,4 @@ class SimulationElement(NetworkElement):
         ### Arguments:
             - delay (`float`): number of seconds to be waited
         # """
-        try:
-            wait_for_clock = None
-
-            if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-                async def cancellable_wait(delay : float, freq : float):
-                    try:
-                        await asyncio.sleep(delay / freq)
-                    except asyncio.CancelledError:
-                        self._log(f'Cancelled sleep of delay {delay / freq} [s]')
-                        raise
-                    
-                self._clock_config : AcceleratedRealTimeClockConfig
-                freq = self._clock_config.sim_clock_freq
-                wait_for_clock = asyncio.create_task(cancellable_wait(delay, freq))
-                await wait_for_clock
-
-            else:
-                raise NotImplementedError(f'clock type {type(self._clock_config)} is not yet supported.')
-        
-        except asyncio.CancelledError:
-            if wait_for_clock is not None and not wait_for_clock.done():
-                wait_for_clock : asyncio.Task
-                wait_for_clock.cancel()
-                await wait_for_clock
+        pass

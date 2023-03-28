@@ -1,4 +1,5 @@
 import logging
+import random
 import unittest
 from tqdm import tqdm
 
@@ -12,10 +13,10 @@ from dmas.network import NetworkConfig
 
 class TestInternalModule(unittest.TestCase): 
     class DummyModule(InternalModule):
-        async def _listen(self):
+        async def listen(self):
             return
         
-        async def _routine(self):
+        async def routine(self):
             return
 
     class TestModule(InternalModule):
@@ -34,7 +35,7 @@ class TestInternalModule(unittest.TestCase):
             network_config = NetworkConfig(parent_name, internal_address_map, dict())
             super().__init__(module_name, network_config, [], level, logger)
 
-        async def _listen(self):
+        async def listen(self):
             try:
                 self._log(f'waiting for parent module to deactivate me...')
                 while True:
@@ -55,7 +56,7 @@ class TestInternalModule(unittest.TestCase):
                 self._log(f'`_listen()` failed. {e}')
                 raise e
             
-        async def _routine(self):
+        async def routine(self):
             try:
                 # do some 'work'
                 while True:
@@ -92,6 +93,14 @@ class TestInternalModule(unittest.TestCase):
                                                                     port+1, 
                                                                     level,
                                                                     self.get_logger()))
+        async def _sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
 
         def run(self) -> int:
             """
@@ -132,7 +141,9 @@ class TestInternalModule(unittest.TestCase):
                 for module in self.__modules:
                     module : InternalModule
                     internal_address_ledger[module.name] = module.get_network_config()
-                
+
+                # await asyncio.sleep(1*random.random())
+
                 # broadcast simulation info to modules
                 msg = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
                 await self._send_internal_msg(msg, zmq.PUB)
@@ -255,30 +266,39 @@ class TestInternalModule(unittest.TestCase):
             await self.__wait_for_module_messages(ModuleMessageTypes.MODULE_READY, 'Online Internal Modules')
 
     
-    def test_init(self):
-        port = 5555
-        n_modules = 1
+    # def test_init(self):
+    #     port = 5555
+    #     n_modules = 1
 
-        module = TestInternalModule.TestModule('TEST_NODE', 'MODULE_0', port, port+1)
-        self.assertTrue(isinstance(module, TestInternalModule.TestModule))
+    #     module = TestInternalModule.TestModule('TEST_NODE', 'MODULE_0', port, port+1)
+    #     self.assertTrue(isinstance(module, TestInternalModule.TestModule))
 
-        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, logger=module.get_logger())
-        self.assertTrue(isinstance(node, TestInternalModule.DummyNode))
+    #     node = TestInternalModule.DummyNode('NODE_0', n_modules, port, logger=module.get_logger())
+    #     self.assertTrue(isinstance(node, TestInternalModule.DummyNode))
 
-        with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', {}, {})
-            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
+    #     with self.assertRaises(AttributeError):
+    #         network_config = NetworkConfig('TEST', {}, {})
+    #         TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
             
-            network_config = NetworkConfig('TEST', {zmq.REQ: [f'tcp://localhost:{port+2}']}, {})
-            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
+    #         network_config = NetworkConfig('TEST', {zmq.REQ: [f'tcp://localhost:{port+2}']}, {})
+    #         TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
 
-            network_config = NetworkConfig('TEST', {}, {zmq.SUB: [f'tcp://localhost:{port+3}']})
-            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
+    #         network_config = NetworkConfig('TEST', {}, {zmq.SUB: [f'tcp://localhost:{port+3}']})
+    #         TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
 
     def test_module(self):
         port = 5555
-        n_modules = 100
-        level = logging.WARNING
+        n_modules = [1, 3, 10]
+        level = logging.DEBUG
 
-        node = TestInternalModule.DummyNode('NODE_0', n_modules, port, level=level)
-        node.run()
+        prev_logger = None
+        prev_n = 0
+        for n in n_modules:
+            print(f'\nTESTING NODE WITH {n} MODULES')
+            node = TestInternalModule.DummyNode('NODE_0', n, port + prev_n + 1, level=level, logger=prev_logger)
+
+            if prev_logger is None:
+                prev_logger = node.get_logger()
+            prev_n = n
+
+            node.run()

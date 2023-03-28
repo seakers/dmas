@@ -117,7 +117,7 @@ class TestNetworkElement(unittest.TestCase):
         def run(self):
             asyncio.run(self.main())
 
-        async def network_sync(self):
+        async def _network_sync(self):
             return
         
         async def _publish_deactivate(self) -> None:
@@ -156,7 +156,7 @@ class TestNetworkElement(unittest.TestCase):
         def run(self):
             asyncio.run(self.main())
 
-        async def network_sync(self):
+        async def _network_sync(self):
             return
         
         async def _publish_deactivate(self) -> None:
@@ -377,12 +377,13 @@ class TestNetworkElement(unittest.TestCase):
         port = 5555
         listeners = [1, 20]
         n_messages = 20
+        level = logging.WARNING
 
         # INTERNAL MESSAGING
         print('\n\nTEST: Internal Message Broadcast (PUB-SUB)')
         for n_listeners in listeners:
             print(f'Number of listeners: {n_listeners}')
-            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
+            self.transmission_tester(TestNetworkElement.TransmissionTypes.INT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages, level=level)
             print('\n')
 
         # EXTERNAL MESSAGING

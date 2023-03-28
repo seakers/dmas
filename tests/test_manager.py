@@ -15,6 +15,15 @@ class TestSimulationManager(unittest.TestCase):
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}']})
             super().__init__(f'CLIENT_{id}', network_config, level, logger)
 
+        async def _sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
+
         async def _internal_sync(self, _) -> dict:
             return dict()
 
@@ -195,7 +204,15 @@ class TestSimulationManager(unittest.TestCase):
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
 
+        async def _sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
         
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
+
         async def _external_sync(self) -> dict:
             return self._clock_config, dict()
         
@@ -234,8 +251,14 @@ class TestSimulationManager(unittest.TestCase):
         def _check_element_list(self):
                 return
         
+        async def setup(self) -> None:
+            return
 
-    class TestManager(AbstractManager):
+        async def teardown(self) -> None:
+            return
+        
+
+    class TestManager(DummyManager):
         def __init__(self, clock_config, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {
@@ -244,11 +267,6 @@ class TestSimulationManager(unittest.TestCase):
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
             
             super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
-
-
-        def _check_element_list(self):
-            return
-        
 
     def test_init(self):
         n_clients = 1
@@ -320,7 +338,7 @@ class TestSimulationManager(unittest.TestCase):
 
     def test_realtime_clock_run(self):        
         print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_clients = 5
+        n_clients = [1, 5, 20]
 
         year = 2023
         month = 1
@@ -331,13 +349,14 @@ class TestSimulationManager(unittest.TestCase):
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
-        clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-        self.run_tester(clock_config, n_clients, level=logging.WARNING)
+        for n in n_clients:
+            clock_config = RealTimeClockConfig(str(start_date), str(end_date))
+            self.run_tester(clock_config, n, level=logging.WARNING)
 
     
     def test_accelerated_clock_run(self):
         print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
-        n_clients = 5
+        n_clients = [1, 5, 20]
 
         year = 2023
         month = 1
@@ -348,5 +367,6 @@ class TestSimulationManager(unittest.TestCase):
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
-        clock_config = AcceleratedRealTimeClockConfig(str(start_date), str(end_date), 2)
-        self.run_tester(clock_config, n_clients, level=logging.WARNING)
+        for n in n_clients:
+            clock_config = AcceleratedRealTimeClockConfig(str(start_date), str(end_date), 2)
+            self.run_tester(clock_config, n, level=logging.WARNING)

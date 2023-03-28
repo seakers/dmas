@@ -16,6 +16,14 @@ class TestSimulationNode(unittest.TestCase):
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
 
+        async def _sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
         
         async def _external_sync(self) -> dict:
             return self._clock_config, dict()
@@ -62,9 +70,24 @@ class TestSimulationNode(unittest.TestCase):
 
         def _check_element_list(self):
             return
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
 
     class DummyNode(Node):
-        async def _live(self) -> None:
+        async def _sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
+
+        async def live(self) -> None:
             try:
                 self._log(f'doing some work...')
                 while True:
@@ -140,7 +163,7 @@ class TestSimulationNode(unittest.TestCase):
         def __init__(self, module_name: str, network_config: NetworkConfig, logger: logging.Logger = None) -> None:
             super().__init__(module_name, network_config, [], logger=logger)
 
-        async def _listen(self):
+        async def listen(self):
             try:
                 self._log(f'waiting for parent module to deactivate me...')
                 while True:
@@ -162,7 +185,7 @@ class TestSimulationNode(unittest.TestCase):
                 self._log(f'`_listen()` failed. {e}')
                 raise e
             
-        async def _routine(self):
+        async def routine(self):
             try:
                 # do some 'work'
                 self._log('doing some work...')
@@ -176,18 +199,19 @@ class TestSimulationNode(unittest.TestCase):
                 self._log(f'`_routine()` failed. {e}')
                 raise e
 
-    def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING):
+    def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING, logger : logging.Logger = None):
         print(f'TESTING {n_nodes} NODES WITH {n_modules} MODULES')
         
-        monitor = TestSimulationNode.DummyMonitor(clock_config, port, level)
-        logger = monitor.get_logger()
+        monitor = TestSimulationNode.DummyMonitor(clock_config, port, level, logger)
+        
+        logger = monitor.get_logger() if logger is None else logger
 
         nodes = []
         simulation_element_name_list = []
         for i in range(n_nodes):            
             node = TestSimulationNode.ModularTestNode(i, port, n_modules, level, logger=logger)
             nodes.append(node)
-            simulation_element_name_list.append(node.get_element_name())
+            simulation_element_name_list.append(node.name)
 
         manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
         
@@ -198,6 +222,8 @@ class TestSimulationNode(unittest.TestCase):
             for node in nodes:                
                 pool.submit(node.run, *[])
         print('\n')
+
+        return logger
 
     def test_init(self):
         port = 5555
@@ -238,8 +264,8 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_realtime_run(self):
         print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_nodes = [20]
-        n_modules = [4]
+        n_nodes = [1, 20]
+        n_modules = [1, 4]
         port = 5555
         level=logging.WARNING
 
@@ -254,15 +280,17 @@ class TestSimulationNode(unittest.TestCase):
 
         clock_config = RealTimeClockConfig(start_date, end_date)
 
+        logger = None
         for n in n_nodes:
             for m in n_modules:
-                self.run_tester(clock_config, n, m, port, level=level)
+                logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
     
     def test_accelerated_realtime_run(self):
         print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
-        n_nodes = [20]
-        n_modules = [4]
+        n_nodes = [1, 20]
+        n_modules = [1, 4]
         port = 5555
+        level=logging.WARNING
 
         year = 2023
         month = 1
@@ -275,6 +303,7 @@ class TestSimulationNode(unittest.TestCase):
 
         clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
 
+        logger = None
         for n in n_nodes:
             for m in n_modules:
-                self.run_tester(clock_config, n, m, port, level=logging.WARNING)
+                logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)

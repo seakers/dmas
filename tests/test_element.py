@@ -15,6 +15,15 @@ class TestSimulationElement(unittest.TestCase):
         async def _internal_sync(self, _) -> dict:
             return dict()
 
+        async def _sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
+
     class Server(DummyNetworkElement):        
         def __init__(self, port : int, n_clients: int = 1, dt : float = 1.0, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',

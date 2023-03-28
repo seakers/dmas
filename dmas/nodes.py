@@ -62,15 +62,19 @@ class Node(SimulationElement):
             self._log(f'`run()` interrupted. {e}')
             raise e
 
-    async def _activate(self) -> None:
-        await super()._activate()
-
+    async def setup(self) -> None:
         # check for correct socket initialization
         if self._internal_socket_map is None:
             raise AttributeError(f'{self.name}: Intra-element communication sockets not activated during activation.')
 
         if self._internal_address_ledger is None:
             raise RuntimeError(f'{self.name}: Internal address ledger not created during activation.')
+
+    async def _activate(self) -> None:
+        self._log('waiting for simulation manager to configure its network...', level=logging.INFO) 
+        await asyncio.sleep(1e-1 * random.random())
+
+        await super()._activate()
 
     async def _external_sync(self) -> tuple:
         try:
@@ -272,7 +276,7 @@ class Node(SimulationElement):
     async def _execute(self) -> None:
         # activate concurrent tasks to be performed by node
         offline_manager_task = asyncio.create_task(self.__listen_for_manager(), name='offline_manager_task')     # listen if manager becomes offline       
-        live_task = asyncio.create_task(self._live(), name='live_task')                               # execute live routine
+        live_task = asyncio.create_task(self.live(), name='live_task')                               # execute live routine
         tasks = [offline_manager_task, live_task]
 
         if self.has_modules():
@@ -307,7 +311,7 @@ class Node(SimulationElement):
         self._log(f'all pending tasks cancelled and terminated!')
 
     @abstractmethod
-    async def _live(self) -> None:
+    async def live(self) -> None:
         """
         Routine to be performed by simulation node during when the node is executing. 
 
@@ -391,3 +395,4 @@ class Node(SimulationElement):
         checks if this node has any internal modules
         """
         return len(self.__modules) > 0
+    

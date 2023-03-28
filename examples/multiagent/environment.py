@@ -16,7 +16,7 @@ class EnvironmentNode(Node):
 
         super().__init__(SimulationElementRoles.ENVIRONMENT.name, network_config, [], logger=logger)
 
-    async def _live(self):
+    async def live(self):
         try:
             while True:
                 self._log('waiting on messages...', level=logging.INFO)
