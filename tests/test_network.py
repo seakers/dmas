@@ -15,50 +15,70 @@ class TestNetworkConfig(unittest.TestCase):
         network_name = 'TEST_NETWORK'
         internal_address_map = {zmq.PUB: ['http://localhost.5555']}
         external_address_map = {zmq.SUB: ['http://localhost.5556']}
+        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
         
-        network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
+        network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
         self.assertEqual(type(network_config), NetworkConfig)
 
         with self.assertRaises(TypeError):
-            NetworkConfig(1, internal_address_map, external_address_map)
-            NetworkConfig(network_name, {'x' : ['http://localhost.5555']}, external_address_map)
-            NetworkConfig(network_name, internal_address_map, {'x' : ['http://localhost.5555']})
-            NetworkConfig(network_name, {zmq.PUB : 'http://localhost.5555'}, external_address_map)
-            NetworkConfig(network_name, internal_address_map, {zmq.SUB : 'http://localhost.5555'})
-            NetworkConfig(network_name, {zmq.PUB : [1]}, external_address_map)
-            NetworkConfig(network_name, internal_address_map, {zmq.SUB : [1]})
+            NetworkConfig(1, manager_address_map, internal_address_map, external_address_map)
+        with self.assertRaises(ValueError):
+            NetworkConfig(network_name, {'x' : ['http://localhost.5555']}, internal_address_map, external_address_map)
+        with self.assertRaises(ValueError):
+            NetworkConfig(network_name, manager_address_map, {'x' : ['http://localhost.5555']}, external_address_map)
+        with self.assertRaises(ValueError):
+            NetworkConfig(network_name, manager_address_map, internal_address_map, {'x' : ['http://localhost.5555']})
+        with self.assertRaises(TypeError):
+            NetworkConfig(network_name, {zmq.PUB : 'http://localhost.5555'}, internal_address_map, external_address_map)
+        with self.assertRaises(TypeError):
+            NetworkConfig(network_name, manager_address_map, {zmq.PUB : 'http://localhost.5555'}, external_address_map)
+        with self.assertRaises(TypeError):
+            NetworkConfig(network_name, manager_address_map, internal_address_map, {zmq.SUB : 'http://localhost.5555'})
+        with self.assertRaises(TypeError):
+            NetworkConfig(network_name, {zmq.PUB : [1]}, internal_address_map, external_address_map)
+        with self.assertRaises(TypeError):
+            NetworkConfig(network_name, manager_address_map, {zmq.PUB : [1]}, external_address_map)
+        with self.assertRaises(TypeError):
+            NetworkConfig(network_name, manager_address_map, internal_address_map, {zmq.SUB : [1]})
             
     def test_eq(self):
         network_name = 'TEST_NETWORK'
         internal_address_map = {zmq.PUB: ['http://localhost.5555']}
         external_address_map = {zmq.SUB: ['http://localhost.5556']}
+        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
         
-        config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        config_2 = NetworkConfig(network_name, internal_address_map, external_address_map)
+        config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        config_2 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
 
         self.assertEqual(config_1, config_2)
 
         # network name
-        config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        config_2 = NetworkConfig('OTHER', internal_address_map, external_address_map)
+        config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        config_2 = NetworkConfig('OTHER', manager_address_map, internal_address_map, external_address_map)
+
+        self.assertNotEqual(config_1, config_2)
+
+        # manager addresses
+        config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        config_2 = NetworkConfig(network_name, dict(), internal_address_map, external_address_map)
 
         self.assertNotEqual(config_1, config_2)
 
         # internal addresses
-        config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        config_2 = NetworkConfig(network_name, dict(), external_address_map)
+        config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        config_2 = NetworkConfig(network_name, manager_address_map, dict(), external_address_map)
 
         self.assertNotEqual(config_1, config_2)
 
         # external addresses
-        config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        config_2 = NetworkConfig(network_name, internal_address_map, dict())
+        config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        config_2 = NetworkConfig(network_name, manager_address_map, internal_address_map, dict())
 
         self.assertNotEqual(config_1, config_2)
 
         # all
-        config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        config_2 = NetworkConfig('OTHER', dict(), dict())
+        config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        config_2 = NetworkConfig('OTHER', dict(), dict(), dict())
 
         self.assertNotEqual(config_1, config_2)
 
@@ -67,9 +87,10 @@ class TestNetworkConfig(unittest.TestCase):
         network_name = 'TEST_NETWORK'
         internal_address_map = {zmq.PUB: ['http://localhost.5555']}
         external_address_map = {zmq.SUB: ['http://localhost.5556']}
+        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
 
-        network_config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        network_config_2 = NetworkConfig(network_name, dict(), external_address_map)
+        network_config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        network_config_2 = NetworkConfig(network_name, manager_address_map, dict(), external_address_map)
         network_config_1_reconstructed = NetworkConfig(**network_config_1.to_dict())
         network_config_2_reconstructed = NetworkConfig(**json.loads(network_config_2.to_json()))
 
@@ -80,9 +101,10 @@ class TestNetworkConfig(unittest.TestCase):
         network_name = 'TEST_NETWORK'
         internal_address_map = {zmq.PUB: ['http://localhost.5555']}
         external_address_map = {zmq.SUB: ['http://localhost.5556']}
+        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
 
-        network_config_1 = NetworkConfig(network_name, internal_address_map, external_address_map)
-        network_config_2 = NetworkConfig(network_name, dict(), external_address_map)
+        network_config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+        network_config_2 = NetworkConfig(network_name, manager_address_map, dict(), external_address_map)
 
         network_config_1_reconstructed = NetworkConfig(**json.loads(network_config_1.to_json()))
         network_config_2_reconstructed = NetworkConfig(**json.loads(network_config_2.to_json()))
@@ -97,6 +119,7 @@ class TestNetworkElement(unittest.TestCase):
     class TransmissionTypes:
         INT = 'INTERNAL'
         EXT = 'EXTERNAL'
+        MGR = 'MANAGER'
 
     class DummyElement(NetworkElement):
         def __init__(self, element_name: str, network_config: NetworkConfig, level: int = logging.INFO, logger: logging.Logger = None) -> None:
@@ -135,7 +158,7 @@ class TestNetworkElement(unittest.TestCase):
             return dict()
         
         def activate(self) -> dict:
-            self._network_context, self._external_socket_map, self._internal_socket_map = self.config_network()
+            self._network_context, self._manager_socket_map, self._external_socket_map, self._internal_socket_map = self._config_network()
 
         @abstractmethod
         async def routine():
@@ -172,12 +195,23 @@ class TestNetworkElement(unittest.TestCase):
     class Sender(TestElement):
         def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'    
-            if t_type is TestNetworkElement.TransmissionTypes.INT:   
+
+            if t_type is TestNetworkElement.TransmissionTypes.MGR:   
+                if socket_type is zmq.PUB:
+                    manager_address_map = {socket_type: [f'tcp://*:{port}']}
+                elif socket_type is zmq.PUSH:
+                    manager_address_map = {socket_type: [f'tcp://*:{port}']}
+                    manager_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
+                internal_address_map = dict()
+                external_address_map = dict()
+                          
+            elif t_type is TestNetworkElement.TransmissionTypes.INT:   
                 if socket_type is zmq.PUB:
                     internal_address_map = {socket_type: [f'tcp://*:{port}']}
                 elif socket_type is zmq.PUSH:
                     internal_address_map = {socket_type: [f'tcp://*:{port}']}
                     internal_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
+                manager_address_map = dict()
                 external_address_map = dict()
 
             elif t_type is TestNetworkElement.TransmissionTypes.EXT:
@@ -186,9 +220,10 @@ class TestNetworkElement(unittest.TestCase):
                 elif socket_type is zmq.PUSH:
                     external_address_map = {socket_type: [f'tcp://*:{port}']}
                     external_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
+                manager_address_map = dict()
                 internal_address_map = dict()
 
-            network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
+            network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
             
             super().__init__('SENDER', network_config, level, logger)
             self.socket_type = socket_type
@@ -207,14 +242,18 @@ class TestNetworkElement(unittest.TestCase):
                     dst = self.get_network_name()
 
                     msg = SimulationMessage(src, dst, 'TEST')
-                    self._log(f'sending message through port of type {self.socket_type}...')
+                    self.log(f'sending message through port of type {self.socket_type}...')
                     if self.t_type is TestNetworkElement.TransmissionTypes.INT:   
                         status = 'successful!' if await self._send_internal_msg(msg, self.socket_type) else 'failed.'
 
                     elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
                         status = 'successful!' if await self._send_external_msg(msg, self.socket_type) else 'failed.'
+
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.MGR:
+                        status = 'successful!' if await self._send_manager_msg(msg, self.socket_type) else 'failed.'
+
                     self.msgs.append(msg)
-                    self._log(f'finished sending message! Transmission status: {status}')
+                    self.log(f'finished sending message! Transmission status: {status}')
 
                 src = self.name
                 dst = self.get_network_name()
@@ -225,7 +264,10 @@ class TestNetworkElement(unittest.TestCase):
                 elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
                     status = 'successful!' if await self._send_external_msg(kill_msg, zmq.PUB) else 'failed.'
 
-                self._log(f'finished sending messages! Kill message transmission status: {status}')
+                elif self.t_type is TestNetworkElement.TransmissionTypes.MGR:
+                    status = 'successful!' if await self._send_manager_msg(kill_msg, zmq.PUB) else 'failed.'
+
+                self.log(f'finished sending messages! Kill message transmission status: {status}')
 
             except asyncio.CancelledError:
                 return
@@ -234,12 +276,22 @@ class TestNetworkElement(unittest.TestCase):
         def __init__(self, name, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'     
 
-            if t_type is TestNetworkElement.TransmissionTypes.INT: 
+            if t_type is TestNetworkElement.TransmissionTypes.MGR: 
+                if socket_type is zmq.SUB:
+                    manager_address_map = {socket_type: [f'tcp://localhost:{port}']}
+                elif socket_type is zmq.PULL:
+                    manager_address_map = {socket_type: [f'tcp://localhost:{port}']}
+                    manager_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
+                internal_address_map = dict()
+                external_address_map = dict()
+
+            elif t_type is TestNetworkElement.TransmissionTypes.INT: 
                 if socket_type is zmq.SUB:
                     internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
                 elif socket_type is zmq.PULL:
                     internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
                     internal_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
+                manager_address_map = dict()
                 external_address_map = dict()
 
             elif t_type is TestNetworkElement.TransmissionTypes.EXT:
@@ -248,9 +300,10 @@ class TestNetworkElement(unittest.TestCase):
                 elif socket_type is zmq.PULL:
                     external_address_map = {socket_type: [f'tcp://localhost:{port}']}
                     external_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
+                manager_address_map = dict()
                 internal_address_map = dict()
 
-            network_config = NetworkConfig(network_name, internal_address_map, external_address_map)
+            network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
             
             super().__init__(name, network_config, level, logger)
             self.socket_type = socket_type
@@ -270,11 +323,16 @@ class TestNetworkElement(unittest.TestCase):
                 for socket_type in self._external_socket_map:
                     socket, _ = self._external_socket_map[socket_type]
                     self.poller.register(socket, zmq.POLLIN)
+            
+            elif self.t_type is TestNetworkElement.TransmissionTypes.MGR:
+                for socket_type in self._manager_socket_map:
+                    socket, _ = self._manager_socket_map[socket_type]
+                    self.poller.register(socket, zmq.POLLIN)
 
         async def routine(self):
             try:
                 for _ in tqdm (range (self.n), desc="RECEIVER:  Listening..."):
-                    self._log(f'waiting for incoming messages...')
+                    self.log(f'waiting for incoming messages...')
 
                     socks = dict(await self.poller.poll())
 
@@ -289,11 +347,11 @@ class TestNetworkElement(unittest.TestCase):
                                     dst, src, content = await self._receive_internal_msg(socket_type)
                                     
                                     if content['msg_type'] == 'KILL':
-                                        self._log(f'received kill message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
+                                        self.log(f'received kill message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
                                         return
                                     break
 
-                        elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:   # 
+                        elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
                             for socket_type in self._external_socket_map:
                                 sock, _ = self._external_socket_map[socket_type]
                             
@@ -301,7 +359,19 @@ class TestNetworkElement(unittest.TestCase):
                                     dst, src, content = await self._receive_external_msg(socket_type)
 
                                     if content['msg_type'] == 'KILL':
-                                        self._log(f'received kill message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
+                                        self.log(f'received kill message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
+                                        return
+                                    break
+
+                        elif self.t_type is TestNetworkElement.TransmissionTypes.MGR: 
+                            for socket_type in self._manager_socket_map:
+                                sock, _ = self._manager_socket_map[socket_type]
+                            
+                                if polled_sock is sock:
+                                    dst, src, content = await self._receive_manager_msg(socket_type)
+
+                                    if content['msg_type'] == 'KILL':
+                                        self.log(f'received kill message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
                                         return
                                     break
                         
@@ -309,7 +379,7 @@ class TestNetworkElement(unittest.TestCase):
                             break
                             
                     self.msgs.append(SimulationMessage(**content))
-                    self._log(f'received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
+                    self.log(f'received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
 
             except asyncio.CancelledError:
                 return      
@@ -323,7 +393,9 @@ class TestNetworkElement(unittest.TestCase):
                             n_messages : int,
                             level : int = logging.INFO):
 
-        if t_type is not TestNetworkElement.TransmissionTypes.INT and t_type is not TestNetworkElement.TransmissionTypes.EXT:
+        if (t_type is not TestNetworkElement.TransmissionTypes.INT 
+            and t_type is not TestNetworkElement.TransmissionTypes.EXT
+            and t_type is not TestNetworkElement.TransmissionTypes.MGR):
             raise TypeError('`t_type` must be of type `TransmissionTypes`')
 
         sender = TestNetworkElement.Sender(t_type, sender_port_type, port, n_messages, level)
@@ -365,13 +437,16 @@ class TestNetworkElement(unittest.TestCase):
             self.assertTrue(msg in received_messages)
 
     def test_init(self):
-        TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST'), logging.WARNING)
+        TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST', dict()), logging.WARNING)
 
         with self.assertRaises(AttributeError):
-            TestNetworkElement.DummyElement(1, NetworkConfig('TEST'), logging.WARNING)
+            TestNetworkElement.DummyElement(1, NetworkConfig('TEST', dict()), logging.WARNING)
+        with self.assertRaises(AttributeError):
             TestNetworkElement.DummyElement('TEST', 1, logging.WARNING)
-            TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST'), 'a')
-            TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST'), logging.WARNING, logger=1)
+        with self.assertRaises(AttributeError):
+            TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST', dict()), 'a')
+        with self.assertRaises(AttributeError):
+            TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST', dict()), logging.WARNING, logger=1)
 
     def test_message_broadcast(self):
         port = 5555
@@ -393,6 +468,13 @@ class TestNetworkElement(unittest.TestCase):
             self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
             print('\n')
 
+        # MANAGER MESSAGING
+        print('TEST: Manager Message Broadcast (PUB-SUB)')
+        for n_listeners in listeners:
+            print(f'Number of listeners: {n_listeners}')
+            self.transmission_tester(TestNetworkElement.TransmissionTypes.MGR, zmq.PUB, zmq.SUB, port, n_listeners, n_messages)
+            print('\n')
+
     def test_message_distribution(self):
         port = 5555
         listeners = [1, 20]
@@ -406,8 +488,15 @@ class TestNetworkElement(unittest.TestCase):
             print('\n')
 
         # EXTERNAL MESSAGING
-        print('TEST: Internal Message Distribution (PUSH-PULL)')
+        print('TEST: External Message Distribution (PUSH-PULL)')
         for n_listeners in listeners:
             print(f'Number of listeners: {n_listeners}')
             self.transmission_tester(TestNetworkElement.TransmissionTypes.EXT, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages)
+            print('\n')
+
+        # MANAGER MESSAGING
+        print('TEST: Manager Message Distribution (PUSH-PULL)')
+        for n_listeners in listeners:
+            print(f'Number of listeners: {n_listeners}')
+            self.transmission_tester(TestNetworkElement.TransmissionTypes.MGR, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages)
             print('\n')

@@ -10,10 +10,18 @@ class TestSimulationManager(unittest.TestCase):
     class Client(SimulationElement):
         def __init__(self, id : int, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {
+                                            manager_address_map= {
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}']})
             super().__init__(f'CLIENT_{id}', network_config, level, logger)
+
+        async def _activate(self) -> None:
+            # give manager time to set up
+            self.log('waiting for simulation manager to configure its network...', level=logging.INFO) 
+            await asyncio.sleep(1e-1 * random.random())
+
+            # perform activation routine
+            await super()._activate()
 
         async def _sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
@@ -30,22 +38,22 @@ class TestSimulationManager(unittest.TestCase):
         async def _external_sync(self) -> dict:   
             try:         
                 # inform manager client is online
-                self._log('synchronizing to manager! connecting to manager\'s RES port...')
-                sock, _ = self._external_socket_map.get(zmq.REQ)
+                self.log('synchronizing to manager! connecting to manager\'s RES port...')
+                sock, _ = self._manager_socket_map.get(zmq.REQ)
                 sock : zmq.Socket; 
 
-                sever_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
+                sever_addresses = self._network_config.get_manager_addresses().get(zmq.REQ)
                 sock.connect(sever_addresses[-1])
-                self._log('connecting to manager\'s RES achieved!')
+                self.log('connecting to manager\'s RES achieved!')
                 
                 while True:
-                    self._log('sending sync request to manager...')
+                    self.log('sending sync request to manager...')
                     msg = NodeSyncRequestMessage(self.name, self._network_config.to_dict())
-                    await self._send_external_msg(msg, zmq.REQ)
+                    await self._send_manager_msg(msg, zmq.REQ)
                     
-                    self._log('sync request sent! awaiting for response from manager...')
-                    dst, src, content = await self._receive_external_msg(zmq.REQ)
-                    self._log(f'message received: {content}')
+                    self.log('sync request sent! awaiting for response from manager...')
+                    dst, src, content = await self._receive_manager_msg(zmq.REQ)
+                    self.log(f'message received: {content}')
                     
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
@@ -55,33 +63,33 @@ class TestSimulationManager(unittest.TestCase):
                         print(SimulationElementRoles.MANAGER.value not in src)
                         print(content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value)
 
-                        self._log('wrong message received. ignoring message...')
+                        self.log('wrong message received. ignoring message...')
                         continue
                     else:
-                        self._log('sync request accepted! disconnecting from manager\'s REQ port...')
+                        self.log('sync request accepted! disconnecting from manager\'s REQ port...')
                         break
                 sock.disconnect(sever_addresses[-1])
 
                 # wait for simulation info from manager
-                self._log('disconnected from manager\'s REQ port! waiting for simulation info message from manager...')
-                sock, _ = self._external_socket_map.get(zmq.SUB)
+                self.log('disconnected from manager\'s REQ port! waiting for simulation info message from manager...')
+                sock, _ = self._manager_socket_map.get(zmq.SUB)
                 sock : zmq.Socket; 
                 
                 external_address_ledger = None
                 clock_config = None
 
                 while True:
-                    dst, src, content = await self._receive_external_msg(zmq.SUB)
+                    dst, src, content = await self._receive_manager_msg(zmq.SUB)
                     
-                    self._log(f'message received: {content}')
+                    self.log(f'message received: {content}')
 
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
                         or content['msg_type'] != ManagerMessageTypes.SIM_INFO.value):
-                        self._log('wrong message received. ignoring message...')
+                        self.log('wrong message received. ignoring message...')
                         continue
                     else:
-                        self._log('simulation information message received!')
+                        self.log('simulation information message received!')
                         msg = SimulationInfoMessage(**content)
                         external_address_ledger = msg.get_address_ledger()
                         clock_config = msg.get_clock_info()
@@ -106,79 +114,79 @@ class TestSimulationManager(unittest.TestCase):
 
         async def _wait_sim_start(self) -> None:
             # inform manager client is online
-            self._log('waiting for simulation to start! connecting to manager\'s RES port...')
-            sock, _ = self._external_socket_map.get(zmq.REQ)
+            self.log('waiting for simulation to start! connecting to manager\'s RES port...')
+            sock, _ = self._manager_socket_map.get(zmq.REQ)
             sock : zmq.Socket; _ : asyncio.Lock
 
-            sever_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
+            sever_addresses = self._network_config.get_manager_addresses().get(zmq.REQ)
             sock.connect(sever_addresses[-1])
-            self._log('connecting to manager\'s RES achieved!')
+            self.log('connecting to manager\'s RES achieved!')
             
             while True:
-                self._log('sending ready message to manager...')
+                self.log('sending ready message to manager...')
                 msg = NodeReadyMessage(self.name)
-                await self._send_external_msg(msg, zmq.REQ)
+                await self._send_manager_msg(msg, zmq.REQ)
                 
-                self._log('ready message sent! awaiting for response from manager...')
-                dst, src, content = await self._receive_external_msg(zmq.REQ)
+                self.log('ready message sent! awaiting for response from manager...')
+                dst, src, content = await self._receive_manager_msg(zmq.REQ)
 
-                self._log(f'message received: {content}')
+                self.log(f'message received: {content}')
 
                 if (dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
                     or content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value):
-                    self._log('wrong message received. ignoring message...')
+                    self.log('wrong message received. ignoring message...')
                     continue
                 else:
-                    self._log('ready message accepted! disconnecting from manager\'s REQ port...')
+                    self.log('ready message accepted! disconnecting from manager\'s REQ port...')
                     break
             sock.disconnect(sever_addresses[-1])
 
             # wait for simulation start message from manager
-            self._log(f'disconnected from manager\'s REP port. waiting for simulation start message...')
+            self.log(f'disconnected from manager\'s REP port. waiting for simulation start message...')
             while True:
-                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                dst, src, content = await self._receive_manager_msg(zmq.SUB)
 
-                self._log(f'message received: {content}', level=logging.DEBUG)
+                self.log(f'message received: {content}', level=logging.DEBUG)
 
                 if (dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
                     or content['msg_type'] != ManagerMessageTypes.SIM_START.value):
-                    self._log('wrong message received. ignoring message...')
+                    self.log('wrong message received. ignoring message...')
                 else:
-                    self._log('simulation start message received! starting simulation...')
+                    self.log('simulation start message received! starting simulation...')
                     break
 
         async def _execute(self):
-            self._log('executing...')
+            self.log('executing...')
             while True:
-                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                dst, src, content = await self._receive_manager_msg(zmq.SUB)
                 
-                self._log(f'message received: {content}', level=logging.DEBUG)
+                self.log(f'message received: {content}', level=logging.DEBUG)
 
                 if (dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
                     or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                    self._log('wrong message received. ignoring message...')
+                    self.log('wrong message received. ignoring message...')
                 else:
-                    self._log('simulation end message received! ending simulation...')
+                    self.log('simulation end message received! ending simulation...')
                     break
 
         async def _publish_deactivate(self) -> None:
             try:         
                 # inform manager client is offline
-                sock, _ = self._external_socket_map.get(zmq.REQ)
+                sock, _ = self._manager_socket_map.get(zmq.REQ)
                 sock : zmq.Socket; _ : asyncio.Lock
 
-                sever_addresses = self._network_config.get_external_addresses().get(zmq.REQ)
+                sever_addresses = self._network_config.get_manager_addresses().get(zmq.REQ)
                 sock.connect(sever_addresses[-1])
                 
                 while True:
                     msg = NodeDeactivatedMessage(self.name)
-                    await self._send_external_msg(msg, zmq.REQ)
+                    await self._send_manager_msg(msg, zmq.REQ)
 
-                    dst, src, content = await self._receive_external_msg(zmq.REQ)
-                    self._log(f'message received: {content}', level=logging.DEBUG)
+                    dst, src, content = await self._receive_manager_msg(zmq.REQ)
+                    self.log(f'message received: {content}', level=logging.DEBUG)
                     
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
@@ -198,8 +206,8 @@ class TestSimulationManager(unittest.TestCase):
     class DummyMonitor(SimulationElement):
         def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PULL: [f'tcp://*:{port+2}']})
+                                            manager_address_map= {zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                  zmq.PULL: [f'tcp://*:{port+2}']})
             
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
@@ -224,18 +232,18 @@ class TestSimulationManager(unittest.TestCase):
 
         async def _execute(self) -> None:
             try:
-                self._log('executing...')
+                self.log('executing...')
                 while True:
-                    dst, src, content = await self._receive_external_msg(zmq.PULL)
+                    dst, src, content = await self._receive_manager_msg(zmq.PULL)
                     
-                    self._log(f'message received: {content}', level=logging.DEBUG)
+                    self.log(f'message received: {content}', level=logging.DEBUG)
 
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
                         or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                        self._log('wrong message received. ignoring message...')
+                        self.log('wrong message received. ignoring message...')
                     else:
-                        self._log('simulation end message received! ending simulation...')
+                        self.log('simulation end message received! ending simulation...')
                         break
             except asyncio.CancelledError:
                 return
@@ -261,7 +269,7 @@ class TestSimulationManager(unittest.TestCase):
     class TestManager(DummyManager):
         def __init__(self, clock_config, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {
+                                            manager_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
@@ -292,25 +300,30 @@ class TestSimulationManager(unittest.TestCase):
         self.assertTrue(isinstance(manager, AbstractManager))
 
         with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', {}, external_address_map = {
+            network_config = NetworkConfig('TEST', manager_address_map= {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
             TestSimulationManager.DummyManager('[]', clock_config, network_config)
+        with self.assertRaises(AttributeError):
             TestSimulationManager.DummyManager([], 'clock_config', network_config)
-            network_config = NetworkConfig('TEST', {}, external_address_map = {
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map = {
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
             TestSimulationManager.DummyManager([], clock_config, network_config)
-            network_config = NetworkConfig('TEST', {}, external_address_map = {
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
             TestSimulationManager.DummyManager([], clock_config, network_config)
-            network_config = NetworkConfig('TEST', {}, external_address_map = {
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUB: [f'tcp://*:{port+1}']})
             TestSimulationManager.DummyManager([], clock_config, network_config)
-            network_config = NetworkConfig('TEST', {}, {})
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', {})
             TestSimulationManager.DummyManager([], clock_config, network_config)
 
 
@@ -339,6 +352,7 @@ class TestSimulationManager(unittest.TestCase):
     def test_realtime_clock_run(self):        
         print('\nTESTING REAL-TIME CLOCK MANAGER')
         n_clients = [1, 5, 20]
+        # n_clients = [1]
 
         year = 2023
         month = 1
@@ -353,7 +367,6 @@ class TestSimulationManager(unittest.TestCase):
             clock_config = RealTimeClockConfig(str(start_date), str(end_date))
             self.run_tester(clock_config, n, level=logging.WARNING)
 
-    
     def test_accelerated_clock_run(self):
         print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
         n_clients = [1, 5, 20]

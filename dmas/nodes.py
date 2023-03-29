@@ -39,6 +39,9 @@ class Node(SimulationElement):
             if zmq.PUB not in network_config.get_internal_addresses():
                 raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within internal address map.')
         
+        self.internal_inbox = None
+        self.external_inbox = None
+
         for module in modules:
             if not isinstance(module, InternalModule):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
@@ -58,11 +61,24 @@ class Node(SimulationElement):
                     module : InternalModule
                     pool.submit(module.run, *[])
 
+            return 1
+
         except Exception as e:
-            self._log(f'`run()` interrupted. {e}')
+            self.log(f'`run()` interrupted. {e}')
             raise e
 
-    async def setup(self) -> None:
+    async def _activate(self) -> None:
+        # give manager time to set up
+        self.log('waiting for simulation manager to configure its network...', level=logging.INFO) 
+        await asyncio.sleep(1e-1 * random.random())
+
+        # perform activation routine
+        await super()._activate()
+
+        # initiate inboxes
+        self.internal_inbox = asyncio.Queue()
+        self.external_inbox = asyncio.Queue()
+    
         # check for correct socket initialization
         if self._internal_socket_map is None:
             raise AttributeError(f'{self.name}: Intra-element communication sockets not activated during activation.')
@@ -70,16 +86,10 @@ class Node(SimulationElement):
         if self._internal_address_ledger is None:
             raise RuntimeError(f'{self.name}: Internal address ledger not created during activation.')
 
-    async def _activate(self) -> None:
-        self._log('waiting for simulation manager to configure its network...', level=logging.INFO) 
-        await asyncio.sleep(1e-1 * random.random())
-
-        await super()._activate()
-
     async def _external_sync(self) -> tuple:
         try:
             # request to sync with the simulation manager
-            self._log('syncing with simulation manager...', level=logging.INFO) 
+            self.log('syncing with simulation manager...', level=logging.INFO) 
             while True:
                 # send sync request from REQ socket
                 msg = NodeSyncRequestMessage(self.name, self._network_config.to_dict())
@@ -95,11 +105,11 @@ class Node(SimulationElement):
                     or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                     ):
                     # if the manager did not acknowledge the sync request, try again later
-                    self._log(f'sync request not accepted. trying again later...')
+                    self.log(f'sync request not accepted. trying again later...')
                     await asyncio.wait(random.random())
                 else:
                     # if the manager acknowledged the sync request, stop trying
-                    self._log(f'sync request accepted! waiting for simulation information from simulation manager...', level=logging.INFO)
+                    self.log(f'sync request accepted! waiting for simulation information from simulation manager...', level=logging.INFO)
                     break
 
             # wait for external address ledger from manager
@@ -115,12 +125,12 @@ class Node(SimulationElement):
                     or msg_type != ManagerMessageTypes.SIM_INFO.value
                     ):
                     # undesired message received. Ignoring and trying again later
-                    self._log(f'received undesired message of type {msg_type}. Ignoring...')
+                    self.log(f'received undesired message of type {msg_type}. Ignoring...')
                     await asyncio.wait(random.random())
 
                 else:
                     # if the manager did not acknowledge the sync request, try again later
-                    self._log(f'received simulation information message from simulation manager!', level=logging.INFO)
+                    self.log(f'received simulation information message from simulation manager!', level=logging.INFO)
                     msg = SimulationInfoMessage(**content)
                     
                     external_ledger = dict()
@@ -183,7 +193,7 @@ class Node(SimulationElement):
 
             # inform module of simulation start
             if self.has_modules():
-                self._log('Informing internal modules of simulation start...')
+                self.log('Informing internal modules of simulation start...')
                 sim_start = ActivateInternalModuleMessage(self._element_name, self._element_name)
                 await self._send_internal_msg(sim_start, zmq.PUB)
 
@@ -192,7 +202,7 @@ class Node(SimulationElement):
             await asyncio.wait_for(task, timeout=100)
             
         except asyncio.TimeoutError as e:
-            self._log(f'Wait for simulation start timed out. Aborting. {e}')
+            self.log(f'Wait for simulation start timed out. Aborting. {e}')
             
             # cancel sync subroutine
             task.cancel()
@@ -210,7 +220,7 @@ class Node(SimulationElement):
         """
         Informs the simulation manager that the node is ready to start the simulation.
         """
-        self._log('informing manager of ready state...', level=logging.INFO) 
+        self.log('informing manager of ready state...', level=logging.INFO) 
         while True:
             # send ready announcement from REQ socket
             ready_msg = NodeReadyMessage(self.name)
@@ -224,11 +234,11 @@ class Node(SimulationElement):
                 or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                 ):
                 # if the manager did not acknowledge the request, try again later
-                self._log(f'received undesired message of type {msg_type}. Ignoring...')
+                self.log(f'received undesired message of type {msg_type}. Ignoring...')
                 await asyncio.wait(random.random())
             else:
                 # if the manager acknowledge the message, stop trying
-                self._log(f'ready state message accepted! waiting for simulation to start...', level=logging.INFO)
+                self.log(f'ready state message accepted! waiting for simulation to start...', level=logging.INFO)
                 break
 
     async def __wait_for_manager_ready(self):
@@ -247,31 +257,13 @@ class Node(SimulationElement):
                 or msg_type != ManagerMessageTypes.SIM_START.value
                 ):
                 # undesired message received. Ignoring and trying again later
-                self._log(f'received undesired message of type {msg_type}. Ignoring...')
+                self.log(f'received undesired message of type {msg_type}. Ignoring...')
                 await asyncio.wait(random.random())
 
             else:
                 # manager announced the start of the simulation
-                self._log(f'received simulation start message from simulation manager!', level=logging.INFO)
+                self.log(f'received simulation start message from simulation manager!', level=logging.INFO)
                 return
-
-    async def __listen_for_manager(self):
-        try:
-            self._log(f'waiting for manager to end simulation...')
-            while True:
-                dst, src, content = await self._receive_external_msg(zmq.SUB)
-                self._log(f'message received: {content}', level=logging.DEBUG)
-
-                if (dst not in self.name 
-                    or SimulationElementRoles.MANAGER.value not in src 
-                    or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                    self._log('wrong message received. ignoring message...')
-                else:
-                    self._log('simulation end message received! ending simulation...')
-                    break
-
-        except asyncio.CancelledError:
-            return
 
     async def _execute(self) -> None:
         # activate concurrent tasks to be performed by node
@@ -288,27 +280,45 @@ class Node(SimulationElement):
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         for task in done:
-            self._log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+            self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
 
         # cancel all pending tasks
         if live_task in pending:
             live_task.cancel()
-            self._log(f'cancelling `{live_task.get_name()}` task...')
+            self.log(f'cancelling `{live_task.get_name()}` task...')
         
         if offline_manager_task in pending:
             offline_manager_task.cancel()
-            self._log(f'cancelling `{offline_manager_task.get_name()}` task...')
+            self.log(f'cancelling `{offline_manager_task.get_name()}` task...')
 
         if self.has_modules() and offline_modules_task in pending:
             # internal modules are not yet disabled. inform modules that the node is terminating
-            self._log('terminating internal modules....')
+            self.log('terminating internal modules....')
             terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
             await self._send_internal_msg(terminate_msg, zmq.PUB)
         
         # wait for pending tasks to terminate
-        self._log(f'waiting on pending tasks to return...')
+        self.log(f'waiting on pending tasks to return...')
         await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
-        self._log(f'all pending tasks cancelled and terminated!')
+        self.log(f'all pending tasks cancelled and terminated!')
+
+    async def __listen_for_manager(self):
+        try:
+            self.log(f'waiting for manager to end simulation...')
+            while True:
+                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                self.log(f'message received: {content}', level=logging.DEBUG)
+
+                if (dst not in self.name 
+                    or SimulationElementRoles.MANAGER.value not in src 
+                    or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
+                    self.log('wrong message received. ignoring message...')
+                else:
+                    self.log('simulation end message received! ending simulation...')
+                    break
+
+        except asyncio.CancelledError:
+            return
 
     @abstractmethod
     async def live(self) -> None:
@@ -362,10 +372,10 @@ class Node(SimulationElement):
     async def _publish_deactivate(self) -> None:
         try:
             # inform monitor that I am deactivated
-            self._log(f'informing monitor of offline status...')
+            self.log(f'informing monitor of offline status...')
             msg = NodeDeactivatedMessage(self.name)
             await self._send_external_msg(msg, zmq.PUSH)
-            self._log(f'informed monitor of offline status. informing manager of offline status...')
+            self.log(f'informed monitor of offline status. informing manager of offline status...')
 
             # inform manager that I am deactivated
             while True:
@@ -380,11 +390,11 @@ class Node(SimulationElement):
                     or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                     ):
                     # if the manager did not acknowledge the request, try again later
-                    self._log(f'manager did not accept my message. trying again...')
+                    self.log(f'manager did not accept my message. trying again...')
                     await asyncio.wait(random.random())
                 else:
                     # if the manager acknowledge the message, stop trying
-                    self._log(f'manager accepted my message! informing monitor of offline status....')
+                    self.log(f'manager accepted my message! informing monitor of offline status....')
                     break
 
         except asyncio.CancelledError:
@@ -395,4 +405,5 @@ class Node(SimulationElement):
         checks if this node has any internal modules
         """
         return len(self.__modules) > 0
+
     

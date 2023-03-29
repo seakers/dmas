@@ -32,10 +32,10 @@ class InternalModule(NetworkElement):
         super().__init__(module_name, network_config, logger=logger)
 
         # check arguments
-        if zmq.REQ not in network_config.get_internal_addresses():
-            raise AttributeError(f'`network_config` must contain a REQ port and an address to parent node within internal address map.')
-        if zmq.SUB not in network_config.get_internal_addresses():
-            raise AttributeError(f'`network_config` must contain a SUB port and an address to parent node within internal address map.')
+        if zmq.REQ not in network_config.get_manager_addresses():
+            raise AttributeError(f'`network_config` must contain a REQ port and an address to parent node within manager address map.')
+        if zmq.SUB not in network_config.get_manager_addresses():
+            raise AttributeError(f'`network_config` must contain a SUB port and an address to parent node within manager address map.')
         
         # initialize arguments with `None` values
         self._clock_config = None
@@ -69,116 +69,116 @@ class InternalModule(NetworkElement):
         return self._network_name       
 
     async def _network_sync(self) -> tuple:
-        self._log(f'syncing with parent node {self.get_parent_name()}...', level=logging.INFO) 
+        self.log(f'syncing with parent node {self.get_parent_name()}...', level=logging.INFO) 
         while True:
             # send sync request from REQ socket
-            sync_req = ModuleSyncRequestMessage(self.get_module_name(), self.get_parent_name())
-            dst, src, content = await self._send_internal_request_message(sync_req)
+            sync_req = ModuleSyncRequestMessage(self.get_module_name(), SimulationElementRoles.MANAGER.value)
+            dst, src, content = await self._send_manager_request_message(sync_req)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
             if dst not in self.name:
                 # received a message intended for someone else. Ignoring message
-                self._log(f'received message intended for {dst}. Ignoring...')
+                self.log(f'received message intended for {dst}. Ignoring...')
                 continue
 
             elif self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
-                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                self.log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
 
             elif msg_type == NodeMessageTypes.RECEPTION_ACK.value:
                 # received a sync request acknowledgement from the parent node. Sync complete!
-                self._log(f'sync request accepted!', level=logging.INFO)
+                self.log(f'sync request accepted!', level=logging.INFO)
                 break
             else:
-                self._log(f'sync request not accepted. trying again later...')
+                self.log(f'sync request not accepted. trying again later...')
                 await asyncio.wait(random.random())
                 
         # wait for node information message
-        self._log('waiting for simulation information message from parent node...') 
+        self.log('waiting for simulation information message from parent node...') 
         while True:
             # wait for response from parent node and listen for internal messages
-            dst, src, msg_dict = await self._receive_internal_msg(zmq.SUB)
+            dst, src, msg_dict = await self._receive_manager_msg(zmq.SUB)
             dst : str; src : str; msg_dict : dict
 
             if dst not in self.name:
                 # received a message intended for someone else. Ignoring message
-                self._log(f'received message intended for {dst}. Ignoring...')
+                self.log(f'received message intended for {dst}. Ignoring...')
                 continue
 
             if self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
-                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                self.log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
             
             msg_type = msg_dict.get('msg_type', None)
             if msg_type == NodeMessageTypes.NODE_INFO.value:
                 # received a node information message from the parent node!
-                self._log(f'simulation information message recevied! sync complete.', level=logging.INFO)
+                self.log(f'simulation information message recevied! sync complete.', level=logging.INFO)
                 resp = NodeInfoMessage(**msg_dict)
                 break
             else:
-                self._log(f'received undesired message of type {msg_type}. Ignoring...')
+                self.log(f'received undesired message of type {msg_type}. Ignoring...')
         
         # connections are static throughout the simulation. No ledger is required
         return resp.get_clock_config(), dict(), dict()    
     
     def run(self):                
-        self._log('running...')
+        self.log('running...')
         return asyncio.run(self.main())
 
     async def _wait_sim_start(self) -> None:
         # inform parent node of ready status
-        self._log(f'informing parent node of ready status...', level=logging.INFO) 
+        self.log(f'informing parent node of ready status...', level=logging.INFO) 
         while True:
             # send sync request from REQ socket
-            sync_req = ModuleReadyMessage(self.get_module_name(), self.get_parent_name())
-            dst, _, content = await self._send_internal_request_message(sync_req)
+            sync_req = ModuleReadyMessage(self.get_module_name(), SimulationElementRoles.MANAGER.value)
+            dst, _, content = await self._send_manager_request_message(sync_req)
             dst : str; _ : str; content : dict
             msg_type = content['msg_type']
 
             if dst not in self.name:
                 # received a message intended for someone else. Ignoring message
-                self._log(f'received message intended for {dst}. Ignoring...')
+                self.log(f'received message intended for {dst}. Ignoring...')
                 continue
 
             elif self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
-                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                self.log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
 
             elif msg_type == NodeMessageTypes.RECEPTION_ACK.value:
                 # received a sync request acknowledgement from the parent node. Sync complete!
-                self._log(f'module readu message accepted! waiting for simulation start message from parent node...', level=logging.INFO)
+                self.log(f'module readu message accepted! waiting for simulation start message from parent node...', level=logging.INFO)
                 break
             else:
-                self._log(f'module readu message not accepted. trying again later...')
+                self.log(f'module readu message not accepted. trying again later...')
                 await asyncio.wait(random.random())
                 
         # wait for node information message
         while True:
             # wait for response from parent node and listen for internal messages
-            dst, _, msg_dict = await self._receive_internal_msg(zmq.SUB)
+            dst, _, msg_dict = await self._receive_manager_msg(zmq.SUB)
             dst : str; _ : str; msg_dict : dict
 
             if dst not in self.name:
                 # received a message intended for someone else. Ignoring message
-                self._log(f'received message intended for {dst}. Ignoring...')
+                self.log(f'received message intended for {dst}. Ignoring...')
                 continue
 
             if self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
-                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                self.log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
             
             msg_type = msg_dict.get('msg_type', None)
             if msg_type == NodeMessageTypes.MODULE_ACTIVATE.value:
                 # received sim start message from the parent node!
-                self._log(f'simulation start message received! starting simulation...', level=logging.INFO)
+                self.log(f'simulation start message received! starting simulation...', level=logging.INFO)
                 break
             else:
-                self._log(f'received undesired message of type {msg_type}. Ignoring...')
+                self.log(f'received undesired message of type {msg_type}. Ignoring...')
 
     async def main(self):
         """
@@ -186,56 +186,68 @@ class InternalModule(NetworkElement):
         """
         try:
             # wait for parent node to configure their network ports
+            tasks, done, pending = None, None, None
             await asyncio.sleep(random.random())
 
             # configure own network ports
-            self._log(f'configuring network...')
-            self._network_context, self._external_socket_map, self._internal_socket_map = super().config_network()
-            self._log(f'NETWORK CONFIGURED!', level = logging.INFO)
+            self.log(f'configuring network...')
+            self._network_context, self._manager_socket_map, self._external_socket_map, self._internal_socket_map = super()._config_network()
+            self.log(f'NETWORK CONFIGURED!', level = logging.INFO)
             
             # sync network 
-            self._log(f'syncing network...')
+            self.log(f'syncing network...')
             self._clock_config, _, _ = await self._network_sync()
-            self._log(f'NETWORK SYNCED!', level = logging.INFO)
+            self.log(f'NETWORK SYNCED!', level = logging.INFO)
 
             # wait for sim start
-            self._log(f'waiting on sim start...')
+            self.log(f'waiting on sim start...')
             await self._wait_sim_start()
-            self._log(f'SIM STARTED!', level = logging.INFO)
+            self.log(f'SIM STARTED!', level = logging.INFO)
 
             # perform this module's routine
-            self._log(f'starting internal routines...')
+            self.log(f'starting internal routines...')
             tasks = [asyncio.create_task(self.routine(), name=f'{self.name}_routine'),
-                        asyncio.create_task(self.listen(), name=f'{self.name}_listen'),]
+                        asyncio.create_task(self.listen(), name=f'{self.name}_listen'),
+                        asyncio.create_task(self.listen_for_manager(), name=f'{self.name}_listen_manager')]
 
             # instruct all submodules to perform their own routines
-            self._log(f'starting submodule routines...')
+            self.log(f'starting submodule routines...')
             for submodule in self._submodules:
                 submodule : InternalSubmodule
                 tasks.append(submodule.run(), name=f'{submodule.name}_run')
 
             # wait for a process to terminate
-            self._log(f'running...')
+            self.log(f'running...')
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             
-            # cancel all non-terminated tasks
-            for task in done:
-                task : asyncio.Task
-                self._log(f'{task.get_name()} TERMINATED! Terminating all other tasks...')
-
-            for task in pending:
-                task : asyncio.Task
-                self._log(f'terminaitng {task.get_name()}...')
-                task.cancel()
-                await task
-                self._log(f'{task.get_name()} successfully terminated!')
-
             return 1
         
         except :
             return 0
         
         finally:
+            # cancel all non-terminated tasks
+            if done is not None and pending is not None:
+                for task in done:
+                    task : asyncio.Task
+                    self.log(f'{task.get_name()} TERMINATED! Terminating all other tasks...')
+
+                for task in pending:
+                    task : asyncio.Task
+                    self.log(f'terminaitng {task.get_name()}...')
+                    task.cancel()
+                    await task
+                    self.log(f'{task.get_name()} successfully terminated!')
+
+            elif tasks is not None:
+                self.log(f'Terminating all other tasks...')
+                for task in tasks:
+                    task : asyncio.Task
+                    self.log(f'terminaitng {task.get_name()}...')
+                    task.cancel()
+                    await task
+                    self.log(f'{task.get_name()} successfully terminated!')
+
             # inform parent module that this module has terminated
             await self._publish_deactivate()
 
@@ -243,31 +255,31 @@ class InternalModule(NetworkElement):
             self._deactivate_network()
 
     async def _publish_deactivate(self) -> None:
-        self._log(f'informing parent node of module termination...')
+        self.log(f'informing parent node of module termination...')
         while True:
             # send sync request from REQ socket
-            terminated_msg = ModuleDeactivatedMessage(self.name, self.get_parent_name())
-            dst, src, content = await self._send_internal_request_message(terminated_msg)
-            dst : str; src : str; content : dict
+            terminated_msg = ModuleDeactivatedMessage(self.name, SimulationElementRoles.MANAGER.value)
+            dst, _, content = await self._send_manager_request_message(terminated_msg)
+            dst : str; content : dict
             msg_type = content['msg_type']
 
             if dst not in self.name:
                 # received a message intended for someone else. Ignoring message
-                self._log(f'received message intended for {dst}. Ignoring...')
+                self.log(f'received message intended for {dst}. Ignoring...')
                 continue
 
             elif self.get_parent_name() != content['src']:
                 # received a message from an undesired external sender. Ignoring message
-                self._log(f'received message from someone who is not the parent node. Ignoring...')
+                self.log(f'received message from someone who is not the parent node. Ignoring...')
                 continue
 
             elif msg_type == NodeMessageTypes.RECEPTION_ACK.value:
                 # received a sync request acknowledgement from the parent node. Sync complete!
-                self._log(f'message accepted! parent node knows of my termination!', level=logging.INFO)
+                self.log(f'message accepted! parent node knows of my termination!', level=logging.INFO)
                 break
             
             else:
-                self._log(f'message not accepted. trying again later...')
+                self.log(f'message not accepted. trying again later...')
                 await asyncio.wait(random.random())
 
     @abstractmethod
@@ -287,6 +299,32 @@ class InternalModule(NetworkElement):
         Must have an `asyncio.CancellationError` handler.
         """
         pass
+
+    async def listen_for_manager(self):
+        """
+        Listens for any messages from the parent node. 
+
+        By default it only listens for deactivation broadcasts.
+        """
+        try:
+            self.log(f'waiting for parent module to deactivate me...')
+            while True:
+                dst, src, content = await self._receive_manager_msg(zmq.SUB)
+
+                if (dst not in self.name 
+                    or self.get_parent_name() not in src 
+                    or content['msg_type'] != NodeMessageTypes.MODULE_DEACTIVATE.value):
+                    self.log('wrong message received. ignoring message...')
+                else:
+                    self.log('deactivate module message received! ending simulation...')
+                    break
+
+        except asyncio.CancelledError:
+            self.log(f'`_listen()` interrupted. {e}')
+            return
+        except Exception as e:
+            self.log(f'`_listen()` failed. {e}')
+            raise e
 
 class InternalSubmodule(ABC):
     def __init__(self, name : str, parent_module_name : str, submodules : list = []) -> None:

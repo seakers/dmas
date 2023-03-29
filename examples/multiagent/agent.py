@@ -38,17 +38,17 @@ class AgentNode(Node):
                     continue
 
                 peer_network_config = self._external_address_ledger[peer]
-                self._log(f'Peer: {peer}; Network config: {peer_network_config}')
+                self.log(f'Peer: {peer}; Network config: {peer_network_config}')
 
             while True:
                 # peer-to-peer message
-                self._log('sending request to environment...', level=logging.INFO)
+                self.log('sending request to environment...', level=logging.INFO)
                 peer_msg = SimulationMessage(self.name,
                                         SimulationElementRoles.ENVIRONMENT.value,
                                         'TEST')
                 await self._send_external_request_message(peer_msg)
 
-                self._log('response received!', level=logging.INFO)
+                self.log('response received!', level=logging.INFO)
                 
                 # wait some random period
                 await asyncio.sleep(random.random())

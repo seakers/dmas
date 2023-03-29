@@ -60,8 +60,7 @@ class SimulationElement(NetworkElement):
         super().__init__(element_name, network_config, level, logger)
 
         self._status = SimulationElementStatus.INIT
-        self._clock_config = None     
-        self.__network_synced = False
+        self._clock_config : ClockConfig = None     
 
     """
     ELEMENT OPERATION METHODS
@@ -76,10 +75,10 @@ class SimulationElement(NetworkElement):
             return asyncio.run(self._run_routine())
 
         except Exception as e:
-            self._log(f'`run()` interrupted. {e}')
+            self.log(f'`run()` interrupted. {e}')
             raise e
 
-    async def _run_routine(self):
+    async def _run_routine(self) -> None:
         """
         Asynchronous procedure that follows the sequence:
         1. `activate()`
@@ -88,16 +87,16 @@ class SimulationElement(NetworkElement):
         """
         try:
             # activate simulation element
-            self._log('activating...', level=logging.INFO)
+            self.log('activating...', level=logging.INFO)
             await self._activate()
 
             ## update status to ACTIVATED
             self._status = SimulationElementStatus.ACTIVATED
-            self._log('activated! Waiting for simulation to start...', level=logging.INFO)
+            self.log('activated! Waiting for simulation to start...', level=logging.INFO)
 
             # wait for simulatio nstart
             await self._wait_sim_start()
-            self._log('simulation has started!', level=logging.INFO)
+            self.log('simulation has started!', level=logging.INFO)
 
             ## update status to RUNNING
             self._status = SimulationElementStatus.RUNNING
@@ -106,18 +105,18 @@ class SimulationElement(NetworkElement):
             self._clock_config.set_simulation_runtime_start( time.perf_counter() )
 
             # start element life
-            self._log('executing...', level=logging.INFO)
+            self.log('executing...', level=logging.INFO)
             await self._execute()
-            self._log('execution completed!', level=logging.INFO)
+            self.log('execution completed!', level=logging.INFO)
             
-            self._log('`run()` executed properly.')
+            self.log('`run()` executed properly.')
             return 1
 
         finally:
             # deactivate element
-            self._log('deactivating...', level=logging.INFO)
+            self.log('deactivating...', level=logging.INFO)
             await self._deactivate()
-            self._log('deactivation completed!', level=logging.INFO)
+            self.log('deactivation completed!', level=logging.INFO)
 
             # update status to DEACTIVATED
             self._status = SimulationElementStatus.DEACTIVATED
@@ -134,18 +133,18 @@ class SimulationElement(NetworkElement):
         May be expanded if more capabilities are needed.
         """
         # inititate base network connections 
-        self._log(f'configuring network...')
-        self._network_context, self._external_socket_map, self._internal_socket_map = self.config_network()
-        self._log(f'NETWORK CONFIGURED!')
+        self.log(f'configuring network...')
+        self._network_context, self._manager_socket_map, self._external_socket_map, self._internal_socket_map = self._config_network()
+        self.log(f'NETWORK CONFIGURED!')
 
         # check for correct socket initialization
         if self._external_socket_map is None:
             raise AttributeError(f'{self.name}: Inter-element communication sockets not activated during activation.')
 
         # synchronize with other elements in the simulation or internal modules
-        self._log('Syncing network...')
+        self.log('Syncing network...')
         self._clock_config, self._external_address_ledger, self._internal_address_ledger = await self._network_sync()     
-        self._log('NETWORK SYNCED!')
+        self.log('NETWORK SYNCED!')
 
         # check for correct element activation
         if self._clock_config is None:
@@ -173,9 +172,6 @@ class SimulationElement(NetworkElement):
                 elements' names to the addresses pointing to their respective connecting ports    
         """
         try:
-            if self.__network_synced:
-                raise PermissionError('Attempted to sync with network after it has already been synced.')
-
             # sync external network
             external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
             timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
@@ -199,16 +195,13 @@ class SimulationElement(NetworkElement):
                 await internal_sync_task
                 raise TimeoutError('Sync with internal network elements timed out.')          
 
-            # log as synced
-            self.__network_synced = True
-
             # return external and internal address ledgers
             internal_address_ledger = internal_sync_task.result()
 
             return (clock_config, external_address_ledger, internal_address_ledger)             
             
         except Exception as e:
-            self._log(f'Sync aborted. {e}')
+            self.log(f'Sync aborted. {e}')
             
             # cancel sync subroutine
             if not external_sync_task.done():
@@ -288,9 +281,6 @@ class SimulationElement(NetworkElement):
 
         # inform others of deactivation
         await self._publish_deactivate()
-        
-        # close network connections
-        self._deactivate_network()
 
     @abstractmethod
     async def _sim_wait(self, delay : float) -> None:

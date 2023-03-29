@@ -33,18 +33,18 @@ class DummyMonitor(SimulationElement):
 
     async def _execute(self) -> None:
         try:
-            self._log('executing...')
+            self.log('executing...')
             while True:
                 dst, src, content = await self._receive_external_msg(zmq.PULL)
                 
-                self._log(f'message received: {content}', level=logging.DEBUG)
+                self.log(f'message received: {content}', level=logging.DEBUG)
 
                 if (dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
                     or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                    self._log('wrong message received. ignoring message...')
+                    self.log('wrong message received. ignoring message...')
                 else:
-                    self._log('simulation end message received! ending simulation...')
+                    self.log('simulation end message received! ending simulation...')
                     break
         except asyncio.CancelledError:
             return

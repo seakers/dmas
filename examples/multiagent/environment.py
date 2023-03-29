@@ -19,12 +19,12 @@ class EnvironmentNode(Node):
     async def live(self):
         try:
             while True:
-                self._log('waiting on messages...', level=logging.INFO)
+                self.log('waiting on messages...', level=logging.INFO)
 
                 _, src, msg_dict = await self._receive_external_msg(zmq.REP)
                 src : str; msg_dict : dict  
 
-                self._log(f'Message from {src}: {msg_dict}', level=logging.INFO)
+                self.log(f'Message from {src}: {msg_dict}', level=logging.INFO)
 
                 resp = NodeReceptionAckMessage(self.name, src)
                 await self._send_external_msg(resp, zmq.REP)

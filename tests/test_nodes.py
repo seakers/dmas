@@ -36,18 +36,18 @@ class TestSimulationNode(unittest.TestCase):
 
         async def _execute(self) -> None:
             try:
-                self._log('executing...')
+                self.log('executing...')
                 while True:
                     dst, src, content = await self._receive_external_msg(zmq.PULL)
                     
-                    self._log(f'message received: {content}', level=logging.DEBUG)
+                    self.log(f'message received: {content}', level=logging.DEBUG)
 
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
                         or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                        self._log('wrong message received. ignoring message...')
+                        self.log('wrong message received. ignoring message...')
                     else:
-                        self._log('simulation end message received! ending simulation...')
+                        self.log('simulation end message received! ending simulation...')
                         break
             except asyncio.CancelledError:
                 return
@@ -89,12 +89,12 @@ class TestSimulationNode(unittest.TestCase):
 
         async def live(self) -> None:
             try:
-                self._log(f'doing some work...')
+                self.log(f'doing some work...')
                 while True:
                     await asyncio.sleep(1.6*random.random())
             
             except asyncio.CancelledError:
-                self._log('work being done was cancelled!')
+                self.log('work being done was cancelled!')
                 return
 
     class NonModularTestNode(DummyNode):
@@ -165,38 +165,38 @@ class TestSimulationNode(unittest.TestCase):
 
         async def listen(self):
             try:
-                self._log(f'waiting for parent module to deactivate me...')
+                self.log(f'waiting for parent module to deactivate me...')
                 while True:
                     dst, src, content = await self._receive_internal_msg(zmq.SUB)
-                    self._log(f'message received: {content}', level=logging.DEBUG)
+                    self.log(f'message received: {content}', level=logging.DEBUG)
 
                     if (dst not in self.name 
                         or self.get_parent_name() not in src 
                         or content['msg_type'] != NodeMessageTypes.MODULE_DEACTIVATE.value):
-                        self._log('wrong message received. ignoring message...')
+                        self.log('wrong message received. ignoring message...')
                     else:
-                        self._log('deactivate module message received! ending simulation...')
+                        self.log('deactivate module message received! ending simulation...')
                         break
 
             except asyncio.CancelledError:
-                self._log(f'`_listen()` interrupted. {e}')
+                self.log(f'`_listen()` interrupted. {e}')
                 return
             except Exception as e:
-                self._log(f'`_listen()` failed. {e}')
+                self.log(f'`_listen()` failed. {e}')
                 raise e
             
         async def routine(self):
             try:
                 # do some 'work'
-                self._log('doing some work...')
+                self.log('doing some work...')
                 while True:
                     await asyncio.sleep(2)
                    
             except asyncio.CancelledError:
-                self._log(f'`_routine()` interrupted. {e}')
+                self.log(f'`_routine()` interrupted. {e}')
                 return
             except Exception as e:
-                self._log(f'`_routine()` failed. {e}')
+                self.log(f'`_routine()` failed. {e}')
                 raise e
 
     def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING, logger : logging.Logger = None):
