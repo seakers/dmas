@@ -61,7 +61,7 @@ class TestSimulationNode(unittest.TestCase):
     class DummyManager(AbstractManager):
         def __init__(self, clock_config, simulation_element_name_list : list, port : int, level : int = logging.INFO, logger : logging.Logger = None) -> None:
             network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {
+                                            manager_address_map = {
                                                                     zmq.REP: [f'tcp://*:{port}'],
                                                                     zmq.PUB: [f'tcp://*:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
@@ -98,18 +98,30 @@ class TestSimulationNode(unittest.TestCase):
                 return
 
     class NonModularTestNode(DummyNode):
-        def __init__(self, id: int, port : int, level: int = logging.INFO, logger:logging.Logger=None) -> None:
-            network_config = NetworkConfig('TEST_NETWORK',
+        def __init__(   self, 
+                        id: int, 
+                        port : int, 
+                        manager_network_config : NetworkConfig,
+                        level: int = logging.INFO, 
+                        logger:logging.Logger=None) -> None:
+            node_network_config = NetworkConfig('TEST_NETWORK',
                                             external_address_map = {
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
 
 
-            super().__init__(f'NODE_{id}', network_config, [], level, logger)
+            super().__init__(f'NODE_{id}', node_network_config, manager_network_config, [], level, logger)
         
     class ModularTestNode(DummyNode):
-        def __init__(self, id: int, port : int, n_modules : int = 1, level: int = logging.INFO, logger:logging.Logger=None) -> None:
+        def __init__(   self, 
+                        id: int, 
+                        port : int, 
+                        manager_network_config : NetworkConfig,
+                        n_modules : int = 1, 
+                        level: int = logging.INFO, 
+                        logger:logging.Logger=None
+                    ) -> None:
             
             module_ports = []
             for i in range(n_modules):
@@ -134,9 +146,9 @@ class TestSimulationNode(unittest.TestCase):
             else:
                 internal_address_map = dict()
 
-            network_config = NetworkConfig('TEST_NETWORK',
+            node_network_config = NetworkConfig('TEST_NETWORK',
                                             internal_address_map=internal_address_map,
-                                            external_address_map={
+                                            manager_address_map={
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
@@ -150,39 +162,31 @@ class TestSimulationNode(unittest.TestCase):
                 module_sub_ports.append(node_pub_port)
 
                 submodule_network_config = NetworkConfig(f'NODE_{id}',
-                                            internal_address_map = {
+                                                            manager_address_map = {
                                                                     zmq.REQ: [f'tcp://localhost:{node_rep_port}'],
                                                                     zmq.PUB: [f'tcp://*:{module_port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{module_sub_port}' for module_sub_port in module_sub_ports]})
                 
-                submodules.append( TestSimulationNode.DummyModule(f'MODULE_{i}', submodule_network_config, logger) )
+                submodules.append( TestSimulationNode.DummyModule(f'MODULE_{i}', submodule_network_config, node_network_config, logger) )
 
-            super().__init__(f'NODE_{id}', network_config, submodules, level, logger)
+            super().__init__(f'NODE_{id}', node_network_config, manager_network_config, submodules, level, logger)
 
     class DummyModule(InternalModule):
-        def __init__(self, module_name: str, network_config: NetworkConfig, logger: logging.Logger = None) -> None:
-            super().__init__(module_name, network_config, [], logger=logger)
+        def __init__(self, module_name: str, network_config: NetworkConfig, parent_network_config : NetworkConfig, logger: logging.Logger = None) -> None:
+            super().__init__(module_name, network_config, parent_network_config, [], logger=logger)
 
         async def listen(self):
             try:
-                self.log(f'waiting for parent module to deactivate me...')
+                # do some 'listening'
+                self.log('listening...')
                 while True:
-                    dst, src, content = await self._receive_internal_msg(zmq.SUB)
-                    self.log(f'message received: {content}', level=logging.DEBUG)
-
-                    if (dst not in self.name 
-                        or self.get_parent_name() not in src 
-                        or content['msg_type'] != NodeMessageTypes.MODULE_DEACTIVATE.value):
-                        self.log('wrong message received. ignoring message...')
-                    else:
-                        self.log('deactivate module message received! ending simulation...')
-                        break
-
+                    await asyncio.sleep(2)
+                   
             except asyncio.CancelledError:
-                self.log(f'`_listen()` interrupted. {e}')
+                self.log(f'`routine()` interrupted.')
                 return
             except Exception as e:
-                self.log(f'`_listen()` failed. {e}')
+                self.log(f'`routine()` failed. {e}')
                 raise e
             
         async def routine(self):
@@ -193,10 +197,10 @@ class TestSimulationNode(unittest.TestCase):
                     await asyncio.sleep(2)
                    
             except asyncio.CancelledError:
-                self.log(f'`_routine()` interrupted. {e}')
+                self.log(f'`routine()` interrupted.')
                 return
             except Exception as e:
-                self.log(f'`_routine()` failed. {e}')
+                self.log(f'`routine()` failed. {e}')
                 raise e
 
     def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING, logger : logging.Logger = None):
@@ -206,15 +210,17 @@ class TestSimulationNode(unittest.TestCase):
         
         logger = monitor.get_logger() if logger is None else logger
 
-        nodes = []
         simulation_element_name_list = []
         for i in range(n_nodes):            
-            node = TestSimulationNode.ModularTestNode(i, port, n_modules, level, logger=logger)
-            nodes.append(node)
-            simulation_element_name_list.append(node.name)
+            simulation_element_name_list.append(f'{monitor.get_network_name()}/NODE_{i}')
 
         manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
-        
+
+        nodes = []
+        for i in range(n_nodes):            
+            node = TestSimulationNode.ModularTestNode(i, port, manager.get_network_config(), n_modules, level=level, logger=logger)
+            nodes.append(node)
+
         with concurrent.futures.ThreadPoolExecutor(len(nodes) + 2) as pool:
             pool.submit(monitor.run, *[])
             pool.submit(manager.run, *[])
@@ -227,36 +233,40 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_init(self):
         port = 5555
-        network_config = NetworkConfig('TEST', {}, external_address_map={
+        network_config = NetworkConfig('TEST', manager_address_map={
                                                                 zmq.REQ: [f'tcp://localhost:{port}'],
                                                                 zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                 zmq.PUSH: [f'tcp://localhost:{port+2}']})
         node = TestSimulationNode.DummyNode('NAME', network_config, [])
 
+        # with self.assertRaises(AttributeError):
+        #     network_config = NetworkConfig('TEST', 
+        #                                     internal_address_map = {
+        #                                                         zmq.REP: [f'tcp://*:{port + 3}'],
+        #                                                         zmq.PUB: [f'tcp://*:{port + 5}'],
+        #                                                         zmq.SUB: [f'tcp://localhost:{port + 6}']
+        #                                                         }, 
+        #                                     manager_address_map={
+        #                                                         zmq.REQ: [f'tcp://localhost:{port}'],
+        #                                                         zmq.SUB: [f'tcp://localhost:{port+1}'],
+        #                                                         zmq.PUSH: [f'tcp://localhost:{port+2}']})
+
         with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', 
-                                            internal_address_map = {
-                                                                zmq.REP: [f'tcp://*:{port + 3}'],
-                                                                zmq.PUB: [f'tcp://*:{port + 5}'],
-                                                                zmq.SUB: [f'tcp://localhost:{port + 6}']
-                                                                }, 
-                                            external_address_map={
-                                                                zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                zmq.PUSH: [f'tcp://localhost:{port+2}']})
-
-
-            network_config = NetworkConfig('TEST', {}, {})
+            network_config = NetworkConfig('TEST', {})
             TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-            network_config = NetworkConfig('TEST', {}, external_address_map={
+
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map={
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
             TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-            network_config = NetworkConfig('TEST', {}, external_address_map={
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map={
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
             TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-            network_config = NetworkConfig('TEST', {}, external_address_map={
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map={
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}']})
             TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())

@@ -18,25 +18,27 @@ class Node(SimulationElement):
     """
     __doc__ += SimulationElement.__doc__
     def __init__(self, 
-                 name: str, 
-                 network_config: NetworkConfig, 
+                 node_name: str, 
+                 node_network_config: NetworkConfig, 
+                 manager_network_config : NetworkConfig,
                  modules : list = [], 
                  level: int = logging.INFO, 
                  logger : logging.Logger = None
                  ) -> None:
-        super().__init__(name, network_config, level, logger)   
+        super().__init__(node_name, node_network_config, level, logger)   
+        self._manager_address_ledger = {SimulationElementRoles.MANAGER.name : manager_network_config}
 
-        if zmq.REQ not in network_config.get_external_addresses():
+        if zmq.REQ not in node_network_config.get_manager_addresses():
             raise AttributeError(f'`network_config` must contain a REQ port and an address to parent node within external address map.')
-        if zmq.SUB not in network_config.get_external_addresses():
+        if zmq.SUB not in node_network_config.get_manager_addresses():
             raise AttributeError(f'`network_config` must contain a SUB port and an address to parent node within external address map.')
-        if zmq.PUSH not in network_config.get_external_addresses():
+        if zmq.PUSH not in node_network_config.get_manager_addresses():
             raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within external address map.')
 
         if len(modules) > 0:
-            if zmq.REP not in network_config.get_internal_addresses():
+            if zmq.REP not in node_network_config.get_internal_addresses():
                 raise AttributeError(f'`network_config` must contain a REP port and an address to parent node within internal address map.')
-            if zmq.PUB not in network_config.get_internal_addresses():
+            if zmq.PUB not in node_network_config.get_internal_addresses():
                 raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within internal address map.')
         
         self.internal_inbox = None
@@ -92,10 +94,9 @@ class Node(SimulationElement):
             self.log('syncing with simulation manager...', level=logging.INFO) 
             while True:
                 # send sync request from REQ socket
-                msg = NodeSyncRequestMessage(self.name, self._network_config.to_dict())
+                msg = NodeSyncRequestMessage(self.get_element_name(), self._network_config.to_dict())
 
-                print(self.name)
-                dst, src, content = await self._send_external_request_message(msg)
+                dst, src, content = await self._send_manager_request_message(msg)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
@@ -115,7 +116,7 @@ class Node(SimulationElement):
             # wait for external address ledger from manager
             while True:
                 # listen for any incoming broadcasts through PUB socket
-                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                dst, src, content = await self._receive_manager_msg(zmq.SUB)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
@@ -223,8 +224,8 @@ class Node(SimulationElement):
         self.log('informing manager of ready state...', level=logging.INFO) 
         while True:
             # send ready announcement from REQ socket
-            ready_msg = NodeReadyMessage(self.name)
-            dst, src, content = await self._send_external_request_message(ready_msg)
+            ready_msg = NodeReadyMessage(self.get_element_name())
+            dst, src, content = await self._send_manager_request_message(ready_msg)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
@@ -247,7 +248,7 @@ class Node(SimulationElement):
         """
         while True:
             # listen for any incoming broadcasts through SUB socket
-            dst, src, content = await self._receive_external_msg(zmq.SUB)
+            dst, src, content = await self._receive_manager_msg(zmq.SUB)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
@@ -306,7 +307,7 @@ class Node(SimulationElement):
         try:
             self.log(f'waiting for manager to end simulation...')
             while True:
-                dst, src, content = await self._receive_external_msg(zmq.SUB)
+                dst, src, content = await self._receive_manager_msg(zmq.SUB)
                 self.log(f'message received: {content}', level=logging.DEBUG)
 
                 if (dst not in self.name 
@@ -318,7 +319,11 @@ class Node(SimulationElement):
                     break
 
         except asyncio.CancelledError:
+            self.log(f'`__listen_for_manager()` interrupted.')
             return
+        except Exception as e:
+            self.log(f'`__listen_for_manager()` failed. {e}')
+            raise e
 
     @abstractmethod
     async def live(self) -> None:
@@ -360,10 +365,6 @@ class Node(SimulationElement):
                     resp = NodeReceptionAckMessage(self._element_name, src)
                 else:
                     # ignore message
-                    print(dst in self.name)
-                    print(src in module_names, src, module_names)
-                    print(msg_type == target_type.value)
-                    print(src not in responses)
                     resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
                 # respond to module
@@ -374,14 +375,14 @@ class Node(SimulationElement):
             # inform monitor that I am deactivated
             self.log(f'informing monitor of offline status...')
             msg = NodeDeactivatedMessage(self.name)
-            await self._send_external_msg(msg, zmq.PUSH)
+            await self._send_manager_msg(msg, zmq.PUSH)
             self.log(f'informed monitor of offline status. informing manager of offline status...')
 
             # inform manager that I am deactivated
             while True:
                 # send ready announcement from REQ socket
                 msg = NodeDeactivatedMessage(self.name)
-                dst, src, content = await self._send_external_request_message(msg)
+                dst, src, content = await self._send_manager_request_message(msg)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 

@@ -22,6 +22,7 @@ class TestInternalModule(unittest.TestCase):
     class TestModule(InternalModule):
         def __init__(self, 
                     parent_name : str, 
+                    parent_network_config : NetworkConfig,
                     module_name: str, 
                     node_rep_port : int, 
                     node_pub_port : int, 
@@ -32,8 +33,8 @@ class TestInternalModule(unittest.TestCase):
                                     zmq.REQ: [f'tcp://localhost:{node_rep_port}'],
                                     zmq.SUB: [f'tcp://localhost:{node_pub_port}']
                                     }
-            network_config = NetworkConfig(parent_name, manager_address_map=manager_address_map)
-            super().__init__(module_name, network_config, [], level, logger)
+            module_network_config = NetworkConfig(parent_name, manager_address_map=manager_address_map)
+            super().__init__(module_name, module_network_config, parent_network_config, [], level, logger)
 
         async def listen(self):
             try:
@@ -42,7 +43,7 @@ class TestInternalModule(unittest.TestCase):
                     await asyncio.sleep(1e6)
                    
             except asyncio.CancelledError:
-                self.log(f'`listen()` interrupted. {e}')
+                self.log(f'`listen()` interrupted.')
                 return
             except Exception as e:
                 self.log(f'`listen()` failed. {e}')
@@ -55,7 +56,7 @@ class TestInternalModule(unittest.TestCase):
                     await asyncio.sleep(1e6)
                    
             except asyncio.CancelledError:
-                self.log(f'`routine()` interrupted. {e}')
+                self.log(f'`routine()` interrupted.')
                 return
             except Exception as e:
                 self.log(f'`routine()` failed. {e}')
@@ -73,14 +74,15 @@ class TestInternalModule(unittest.TestCase):
             internal_address_map = {zmq.REP : [f'tcp://*:{port}'],
                                     zmq.PUB : [f'tcp://*:{port+1}']}
 
-            network_config = NetworkConfig('TEST_NETWORK', internal_address_map=internal_address_map)
+            module_network_config = NetworkConfig('TEST_NETWORK', internal_address_map=internal_address_map)
 
-            super().__init__(element_name, network_config, level, logger)
+            super().__init__(element_name, module_network_config, level, logger)
 
             self.__modules = []
             for i in range(n_modules):
                 self.__modules.append(TestInternalModule.TestModule(element_name, 
-                                                                    f'MODULE_{i}', 
+                                                                    module_network_config, 
+                                                                    f'MODULE_{i}',
                                                                     port, 
                                                                     port+1, 
                                                                     level,
@@ -261,7 +263,7 @@ class TestInternalModule(unittest.TestCase):
         port = 5555
         n_modules = 1
 
-        module = TestInternalModule.TestModule('TEST_NODE', 'MODULE_0', port, port+1)
+        module = TestInternalModule.TestModule('TEST_NODE', None, 'MODULE_0', port, port+1)
         self.assertTrue(isinstance(module, TestInternalModule.TestModule))
 
         node = TestInternalModule.DummyNode('NODE_0', n_modules, port, logger=module.get_logger())
@@ -269,18 +271,19 @@ class TestInternalModule(unittest.TestCase):
 
         with self.assertRaises(AttributeError):
             network_config = NetworkConfig('TEST', {}, {})
-            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
+            TestInternalModule.DummyModule('TEST', network_config, None, logger=module.get_logger())
         with self.assertRaises(AttributeError):
             network_config = NetworkConfig('TEST', {zmq.REQ: [f'tcp://localhost:{port+2}']}, {})
-            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
+            TestInternalModule.DummyModule('TEST', network_config, None, logger=module.get_logger())
         with self.assertRaises(AttributeError):
             network_config = NetworkConfig('TEST', {}, {zmq.SUB: [f'tcp://localhost:{port+3}']})
-            TestInternalModule.DummyModule('TEST', network_config, logger=module.get_logger())
+            TestInternalModule.DummyModule('TEST', network_config, None, logger=module.get_logger())
 
     def test_module(self):
         port = 5555
         n_modules = [1, 3, 10]
-        level = logging.DEBUG
+        # n_modules = [1]
+        level = logging.WARNING
 
         prev_logger = None
         prev_n = 0

@@ -192,6 +192,164 @@ class TestNetworkElement(unittest.TestCase):
         def __init__(self, src: str, dst: str, msg_type: str, id: str = None):
             super().__init__(src, dst, msg_type, id)
 
+    class PeerSender(TestElement):
+        def __init__(self, t_type, port : int, n : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+            network_name = 'TEST_NETWORK'
+            if t_type is TestNetworkElement.TransmissionTypes.MGR:   
+                manager_address_map = {zmq.REQ: []}
+                internal_address_map = dict()
+                external_address_map = dict()
+                          
+            elif t_type is TestNetworkElement.TransmissionTypes.INT:   
+                manager_address_map = dict()
+                internal_address_map = {zmq.REQ: []}
+                external_address_map = dict()
+
+            elif t_type is TestNetworkElement.TransmissionTypes.EXT:
+                manager_address_map = dict()
+                internal_address_map = dict()
+                external_address_map = {zmq.REQ: []}
+
+            network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+
+            super().__init__('SENDER', network_config, level, logger)
+            self.t_type = t_type
+            self.port = port
+            self.msgs = []
+            self.n = n
+
+        def activate(self) -> dict:
+            super().activate()
+
+            network_name = 'TEST_NETWORK'
+            if self.t_type is TestNetworkElement.TransmissionTypes.MGR:   
+                manager_address_map = {zmq.REP: [f'tcp://*:{self.port}']}
+                internal_address_map = dict()
+                external_address_map = dict()
+                          
+            elif self.t_type is TestNetworkElement.TransmissionTypes.INT:   
+                manager_address_map = dict()
+                internal_address_map = {zmq.REP: [f'tcp://*:{self.port}']}
+                external_address_map = dict()
+
+            elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
+                manager_address_map = dict()
+                internal_address_map = dict()
+                external_address_map = {zmq.REP: [f'tcp://*:{self.port}']}
+            network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+
+            if self.t_type is TestNetworkElement.TransmissionTypes.MGR:   
+                self._manager_address_ledger = {'RECEIVER' : network_config}
+                self._internal_address_ledger = {}
+                self._external_address_ledger = {}
+                          
+            elif self.t_type is TestNetworkElement.TransmissionTypes.INT:   
+                self._manager_address_ledger = {}
+                self._internal_address_ledger = {'RECEIVER' : network_config}
+                self._external_socket_map = {}
+
+            elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
+                self._manager_address_ledger = {}
+                self._internal_address_ledger = {}
+                self._external_address_ledger = {'RECEIVER' : network_config}
+
+        async def routine(self):
+            try:
+                dt = 0.01
+                await asyncio.sleep(dt*10)
+                for _ in tqdm (range (self.n), desc="SENDER: Transmitting..."):
+                    await asyncio.sleep(dt)
+
+                    src = self.name
+                    dst = 'RECEIVER'
+
+                    msg = SimulationMessage(src, dst, 'TEST')
+                    self.log(f'sending message through port of type {zmq.REQ}...')
+                    if self.t_type is TestNetworkElement.TransmissionTypes.INT:   
+                        _, _, content = await self._send_internal_request_message(msg)
+                        status = 'successful!' if content is not None else 'failed.'
+
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
+                        _, _, content = await self._send_external_request_message(msg)
+                        status = 'successful!' if content is not None else 'failed.'
+
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.MGR:
+                        _, _, content = await self._send_manager_request_message(msg)
+                        status = 'successful!' if content is not None else 'failed.'
+
+                    self.msgs.append(msg)
+                    self.log(f'finished sending message! Transmission status: {status}')
+
+            except asyncio.CancelledError:
+                return
+
+    class PeerReceiver(TestElement):
+        def __init__(self, t_type, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
+            network_name = 'TEST_NETWORK'
+            if t_type is TestNetworkElement.TransmissionTypes.MGR:   
+                manager_address_map = {zmq.REP: [f'tcp://*:{port}']}
+                internal_address_map = dict()
+                external_address_map = dict()
+                          
+            elif t_type is TestNetworkElement.TransmissionTypes.INT:   
+                manager_address_map = dict()
+                internal_address_map = {zmq.REP: [f'tcp://*:{port}']}
+                external_address_map = dict()
+
+            elif t_type is TestNetworkElement.TransmissionTypes.EXT:
+                manager_address_map = dict()
+                internal_address_map = dict()
+                external_address_map = {zmq.REP: [f'tcp://*:{port}']}
+            network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
+            
+            super().__init__('RECEIVER', network_config, level, logger)
+            self.n = n
+            self.t_type = t_type  
+            self.msgs = [] 
+
+        async def routine(self):
+            try:
+                for _ in tqdm (range (self.n), desc="RECEIVER:  Listening..."):
+                    self.log(f'waiting for incoming messages...')
+                    
+                    resp = SimulationMessage(self.name, 'SENDER', 'OK')
+                    if self.t_type is TestNetworkElement.TransmissionTypes.MGR:   
+                        dst, src, content = await self._receive_manager_msg(zmq.REP)
+                        await self._send_manager_msg(resp, zmq.REP)
+                                
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.INT:   
+                        dst, src, content = await self._receive_internal_msg(zmq.REP)
+                        await self._send_internal_msg(resp, zmq.REP)
+
+                    elif self.t_type is TestNetworkElement.TransmissionTypes.EXT:
+                        dst, src, content = await self._receive_external_msg(zmq.REP)
+                        await self._send_external_msg(resp, zmq.REP)
+
+                    if content is None:
+                        break
+                    
+                    self.msgs.append(SimulationMessage(**content))
+                    self.log(f'received a message from {src} intended for {dst}! Reception status: {len(self.msgs)}/{self.n}')
+
+            except asyncio.CancelledError:
+                return 
+
+    def peer_transmission_tester(self, t_type : TransmissionTypes, port : int, n : int, level : int = logging.DEBUG):
+        sender = TestNetworkElement.PeerSender(t_type, port, n, level)
+        logger = sender.get_logger()
+        receiver = TestNetworkElement.PeerReceiver(t_type, port, n, level, logger)
+
+        sender.activate()
+        receiver.activate()
+        
+        with concurrent.futures.ThreadPoolExecutor(2) as pool:
+            pool.submit(receiver.run, *[])
+            pool.submit(sender.run, *[])
+
+        self.assertEqual(len(sender.msgs), len(receiver.msgs))
+        for msg in sender.msgs:
+            self.assertTrue(msg in receiver.msgs)
+
     class Sender(TestElement):
         def __init__(self, t_type, socket_type : zmq.SocketType, port : int, n :int, level=logging.INFO, logger : logging.Logger = None) -> None:
             network_name = 'TEST_NETWORK'    
@@ -199,7 +357,7 @@ class TestNetworkElement(unittest.TestCase):
             if t_type is TestNetworkElement.TransmissionTypes.MGR:   
                 if socket_type is zmq.PUB:
                     manager_address_map = {socket_type: [f'tcp://*:{port}']}
-                elif socket_type is zmq.PUSH:
+                else:
                     manager_address_map = {socket_type: [f'tcp://*:{port}']}
                     manager_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
                 internal_address_map = dict()
@@ -208,7 +366,7 @@ class TestNetworkElement(unittest.TestCase):
             elif t_type is TestNetworkElement.TransmissionTypes.INT:   
                 if socket_type is zmq.PUB:
                     internal_address_map = {socket_type: [f'tcp://*:{port}']}
-                elif socket_type is zmq.PUSH:
+                else:
                     internal_address_map = {socket_type: [f'tcp://*:{port}']}
                     internal_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
                 manager_address_map = dict()
@@ -217,7 +375,7 @@ class TestNetworkElement(unittest.TestCase):
             elif t_type is TestNetworkElement.TransmissionTypes.EXT:
                 if socket_type is zmq.PUB:
                     external_address_map = {socket_type: [f'tcp://*:{port}']}
-                elif socket_type is zmq.PUSH:
+                else:
                     external_address_map = {socket_type: [f'tcp://*:{port}']}
                     external_address_map[zmq.PUB] = [f'tcp://*:{port+1}']
                 manager_address_map = dict()
@@ -279,7 +437,7 @@ class TestNetworkElement(unittest.TestCase):
             if t_type is TestNetworkElement.TransmissionTypes.MGR: 
                 if socket_type is zmq.SUB:
                     manager_address_map = {socket_type: [f'tcp://localhost:{port}']}
-                elif socket_type is zmq.PULL:
+                else:
                     manager_address_map = {socket_type: [f'tcp://localhost:{port}']}
                     manager_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
                 internal_address_map = dict()
@@ -288,7 +446,7 @@ class TestNetworkElement(unittest.TestCase):
             elif t_type is TestNetworkElement.TransmissionTypes.INT: 
                 if socket_type is zmq.SUB:
                     internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
-                elif socket_type is zmq.PULL:
+                else:
                     internal_address_map = {socket_type: [f'tcp://localhost:{port}']}
                     internal_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
                 manager_address_map = dict()
@@ -297,7 +455,7 @@ class TestNetworkElement(unittest.TestCase):
             elif t_type is TestNetworkElement.TransmissionTypes.EXT:
                 if socket_type is zmq.SUB:
                     external_address_map = {socket_type: [f'tcp://localhost:{port}']}
-                elif socket_type is zmq.PULL:
+                else:
                     external_address_map = {socket_type: [f'tcp://localhost:{port}']}
                     external_address_map[zmq.SUB] = [f'tcp://localhost:{port+1}']
                 manager_address_map = dict()
@@ -500,3 +658,20 @@ class TestNetworkElement(unittest.TestCase):
             print(f'Number of listeners: {n_listeners}')
             self.transmission_tester(TestNetworkElement.TransmissionTypes.MGR, zmq.PUSH, zmq.PULL, port, n_listeners, n_messages)
             print('\n')
+
+    def test_p2p_message(self):
+        port = 5555
+        n_messages = 20
+        level=logging.WARNING
+
+        # INTERNAL MESSAGING
+        print('\nTEST: Internal Peer-to-Peer Message (REQ-REP)')
+        self.peer_transmission_tester(TestNetworkElement.TransmissionTypes.INT, port, n_messages, level)
+            
+        # EXTERNAL MESSAGING
+        print('\n\nTEST: External Peer-to-Peer Message (REQ-REP)')
+        self.peer_transmission_tester(TestNetworkElement.TransmissionTypes.EXT, port, n_messages, level)
+
+        # MANAGER MESSAGING
+        print('\n\nTEST: Manager-to-Peer Message (REQ-REP)')
+        self.peer_transmission_tester(TestNetworkElement.TransmissionTypes.MGR, port, n_messages, level)

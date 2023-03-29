@@ -46,7 +46,11 @@ class SimulationElement(NetworkElement):
     +--------------------+   
     """
     __doc__ += NetworkElement.__doc__       
-    def __init__(self, element_name : str, network_config : NetworkConfig, level : int = logging.INFO, logger : logging.Logger = None) -> None:
+    def __init__(   self, 
+                    element_name : str, 
+                    element_network_config : NetworkConfig, 
+                    level : int = logging.INFO, 
+                    logger : logging.Logger = None) -> None:
         """
         Initiates a new simulation element
 
@@ -57,8 +61,7 @@ class SimulationElement(NetworkElement):
             - level (`int`): logging level for this simulation element. Level set to INFO by defauly
             - logger (`logging.Logger`) : logger for this simulation element. If none is given, a new one will be generated
         """
-        super().__init__(element_name, network_config, level, logger)
-
+        super().__init__(element_name, element_network_config, level, logger)
         self._status = SimulationElementStatus.INIT
         self._clock_config : ClockConfig = None     
 
@@ -172,6 +175,8 @@ class SimulationElement(NetworkElement):
                 elements' names to the addresses pointing to their respective connecting ports    
         """
         try:
+
+
             # sync external network
             external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
             timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')

@@ -54,6 +54,7 @@ class AbstractManager(SimulationElement):
         # initialize constants and parameters
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
+        self._manager_address_ledger = {SimulationElementRoles.MANAGER.name : network_config}
         
         # check elements in list
         self._check_element_list()

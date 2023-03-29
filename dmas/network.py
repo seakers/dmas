@@ -224,6 +224,7 @@ class NetworkElement(ABC):
         super().__init__()      
         # initialize attributes with `None` values
         self._manager_socket_map = None
+        self._manager_address_ledger = None
         self._internal_socket_map = None
         self._internal_address_ledger = None
         self._external_socket_map = None
@@ -244,7 +245,6 @@ class NetworkElement(ABC):
 
         # initialize attributes with parameters
         self._network_config = network_config
-        self._manager_address_ledger = {SimulationElementRoles.MANAGER.value : network_config.get_manager_addresses()}
         self._network_name = network_config.network_name
         self._element_name = element_name
         self.name = network_config.network_name + '/' + element_name
@@ -273,6 +273,9 @@ class NetworkElement(ABC):
         Returns the full name of this network element
         """
         return self.name
+
+    def get_network_config(self) -> NetworkConfig:
+        return self._network_config
     
     def get_logger(self) -> logging.Logger:
         """
@@ -991,13 +994,13 @@ class NetworkElement(ABC):
                 socket_lock.release()
                 self.log(f'lock released!')
 
-    async def __send_request_message(self, msg : SimulationMessage, address_ledger : dict, socket_map : dict) -> list:
+    async def _send_request_message(self, msg : SimulationMessage, dst_address : str, socket_map : dict) -> list:
         """
         Sends a message through one of this node's request socket
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
-            - address_ledger (`dict`): address ledger containing the destinations address
+            - dst_address (`str`): destinations address to be connected to
             - socket_map (`dict`): list mapping de the desired type of socket to a socket contained by the node
 
         ### Returns:
@@ -1024,26 +1027,6 @@ class NetworkElement(ABC):
             acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {zmq.SocketType.REQ.name} acquired! connecting to {msg.dst}...')
 
-            # get destination's socket address            
-            if SimulationElementRoles.MANAGER.value in msg.dst:
-                dst_addresses = self._network_config.get_manager_addresses().get(zmq.REQ)
-                dst_address = dst_addresses[-1]
-
-            elif self._network_name in msg.dst:
-                dst_addresses = self._network_config.get_internal_addresses().get(zmq.REQ)
-                dst_address = dst_addresses[-1]
-
-            else:
-                dst_network_config : NetworkConfig = address_ledger.get(msg.dst, None)
-
-                dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)[-1]
-                if '*' in dst_address:
-                    dst_address : str
-                    dst_address = dst_address.replace('*', 'localhost')
-                        
-            if dst_address is None:
-                raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
-            
             # connect to destination's socket
             self.log(f'connecting to {msg.dst} via `{dst_address}`...')
             socket.connect(dst_address)
@@ -1068,8 +1051,6 @@ class NetworkElement(ABC):
             raise e
 
         except Exception as e:
-            self.log(f'address ledger: {address_ledger}')
-            self.log(f'socket map: {socket_map}')
             self.log(f'message request failed. {e}')
             raise e
         
@@ -1106,7 +1087,28 @@ class NetworkElement(ABC):
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
         """
-        return await self.__send_request_message(msg, self._manager_address_ledger, self._manager_socket_map)
+        try:
+            self._manager_address_ledger : dict
+            dst_network_config : NetworkConfig = self._manager_address_ledger.get(msg.dst, None)
+            if dst_network_config is None:
+                raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
+
+            dst_address = dst_network_config.get_manager_addresses().get(zmq.REP, None)[-1]
+            if '*' in dst_address:
+                dst_address : str
+                dst_address = dst_address.replace('*', 'localhost')
+                    
+            if dst_address is None:
+                raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
+                
+            return await self._send_request_message(msg, dst_address, self._manager_socket_map)
+        except Exception as e:
+            self.log(f'request message to manager failed. {e}')
+            self.log(f'Address Ledger: {self._manager_address_ledger}')
+            self.log(f'Manager Network Config: {dst_network_config}')
+            self.log(f'Manager Addresses: {dst_network_config.get_manager_addresses()}')
+            self.log(f'Manager REP address: {dst_address}')
+            raise e
 
     async def _send_external_request_message(self, msg : SimulationMessage) -> list:
         """
@@ -1121,7 +1123,20 @@ class NetworkElement(ABC):
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
         """
-        return await self.__send_request_message(msg, self._external_address_ledger, self._external_socket_map)
+        self._external_address_ledger : dict
+        dst_network_config : NetworkConfig = self._external_address_ledger.get(msg.dst, None)
+        if dst_network_config is None:
+            raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
+
+        dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)[-1]
+        if '*' in dst_address:
+            dst_address : str
+            dst_address = dst_address.replace('*', 'localhost')
+                
+        if dst_address is None:
+            raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
+            
+        return await self._send_request_message(msg, dst_address, self._external_socket_map)
     
     async def _send_internal_request_message(self, msg : SimulationMessage) -> list:
         """
@@ -1136,5 +1151,18 @@ class NetworkElement(ABC):
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
         """
-        return await self.__send_request_message(msg, self._internal_address_ledger, self._internal_socket_map)
+        self._internal_address_ledger : dict
+        dst_network_config : NetworkConfig = self._internal_address_ledger.get(msg.dst, None)
+        if dst_network_config is None:
+            raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
+
+        dst_address = dst_network_config.get_internal_addresses().get(zmq.REP, None)[-1]
+        if '*' in dst_address:
+            dst_address : str
+            dst_address = dst_address.replace('*', 'localhost')
+                
+        if dst_address is None:
+            raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
+            
+        return await self._send_request_message(msg, dst_address, self._internal_socket_map)
     
