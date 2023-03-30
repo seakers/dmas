@@ -17,6 +17,7 @@ class PlanningModule(Module):
         parent_agent = self.get_top_module()
         mission_profiles = dict()
         preplans = dict()
+        self.duration = float(parent_agent.mission_dict.get('duration'))*86400.0
         spacecraft_list = parent_agent.mission_dict.get('spacecraft')
         for spacecraft in spacecraft_list:
             name = spacecraft.get('name')
@@ -29,6 +30,17 @@ class PlanningModule(Module):
         self.mission_profile = mission_profiles[parent_agent.name]
         self.preplan = preplans[parent_agent.name]
 
+        if "scenario1a" in self.scenario_dir:
+            self.points = self.load_points_scenario1a()
+            self.log(f'Scenario 1a points loaded!',level=logging.INFO)
+        elif "scenario1b" in self.scenario_dir:
+            self.points = self.load_points_scenario1b()
+            self.log(f'Scenario 1b points loaded!',level=logging.INFO)
+        elif "scenario2" in self.scenario_dir:
+            self.points = self.load_events_scenario2()
+            self.log(f'Scenario 2 points loaded!',level=logging.INFO)
+
+
         
         self.submodules = [
             InstrumentCapabilityModule(self),
@@ -37,6 +49,54 @@ class PlanningModule(Module):
             #PredictiveModelsModule(self),
             #MeasurementPerformanceModule(self)
         ]
+
+    def load_points_scenario1a(self):
+        points = np.zeros(shape=(1000,4))
+        with open(self.scenario_dir+'resources/riverATLAS.csv') as csvfile:
+            reader = csv.reader(csvfile)
+            count = 0
+            for row in reader:
+                if count == 0:
+                    count = 1
+                    continue
+                points[count-1,:] = [row[0], row[1], row[2], row[3]]
+                count = count + 1
+        return points
+
+    def load_points_scenario1b(self):
+        points = []
+        with open(self.scenario_dir+'resources/one_year_floods_multiday.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                if len(points) > 0:
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60,1))
+                else:
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60,1))
+        with open(self.scenario_dir+'resources/flow_events_75_multiday.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                if len(points) > 0:
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400,0))
+                else:
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400,0))
+        points = np.asfarray(points)
+        self.log(f'Loaded scenario 1b points',level=logging.INFO)
+        return points
+
+    def load_events_scenario2(self):
+        points = []
+        # 0 is height, 1 is temperature
+        with open(self.scenario_dir+'resources/grealm.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                points.append((line["lat"],line["lon"],line["avg"],line["std"],line["date"],line["value"],0))
+        with open(self.scenario_dir+'resources/laketemps.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                points.append((line["lat"],line["lon"],line["avg"],line["std"],line["date"],line["value"],1))
+        points = np.asfarray(points)
+        self.log(f'Loaded scenario 2 points',level=logging.INFO)
+        return points
 
     def check_maneuver_feasibility(self,curr_angle,new_angle,curr_time,new_time):
         """
@@ -93,8 +153,14 @@ class InstrumentCapabilityModule(Module):
         try:
             if(isinstance(msg.content, MeasurementRequest)):
                 parent_agent = self.get_top_module()
-                instrument = parent_agent.payload[parent_agent.name]["name"]
-                if self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", instrument, msg):
+                payload = parent_agent.payload[parent_agent.name]
+                instruments = []
+                if isinstance(payload, list):
+                    for i in range(len(payload)):
+                        instruments.append(payload[i]["name"])
+                else:
+                    instruments.append(payload["name"])
+                if self.queryGraphDatabase("bolt://localhost:7687", "neo4j", "ceosdb", instruments, msg):
                     msg.dst_module = PlanningSubmoduleTypes.OBSERVATION_PLANNER.value
                     await self.send_internal_message(msg)
             else:
@@ -102,16 +168,17 @@ class InstrumentCapabilityModule(Module):
         except asyncio.CancelledError:
             return
 
-    def queryGraphDatabase(self, uri, user, password, instrument,event_msg):
+    def queryGraphDatabase(self, uri, user, password, instruments ,event_msg):
         """
         Sends message to neo4j database with query included.
         """
         try:
             capable = False
-            self.log(f'Querying knowledge graph...', level=logging.DEBUG)
-            driver = GraphDatabase.driver(uri, auth=(user, password))
-            capable = self.can_observe(driver,instrument,event_msg)
-            driver.close()
+            for instrument in instruments:
+                self.log(f'Querying knowledge graph...', level=logging.DEBUG)
+                driver = GraphDatabase.driver(uri, auth=(user, password))
+                capable = self.can_observe(driver,instrument,event_msg)
+                driver.close()
             return capable
         except Exception as e:
             print(e)
@@ -126,10 +193,12 @@ class InstrumentCapabilityModule(Module):
         capable = False
         with driver.session() as session:
             products = ["None"]
-            if "tss" in event_msg.content._type:
+            if "visible" in event_msg.content._type:
                 products.append("Ocean chlorophyll concentration")
             if "altimetry" in event_msg.content._type:
                 products.append("Sea level")
+            if "thermal" in event_msg.content._type:
+                products.append("Sea surface temperature")
             if len(products) == 0:
                 self.log(f'Unsupported observable type.',level=logging.INFO)
             for product in products:
@@ -139,7 +208,7 @@ class InstrumentCapabilityModule(Module):
                     #self.log(f'Observer: {observer.get("name")}',level=logging.INFO)
                     #self.log(f'Instrument: {instrument}',level=logging.INFO)
                     if(observer.get("name") == instrument):
-                        self.log(f'Matching instrument in knowledge graph!', level=logging.DEBUG)
+                        self.log(f'Matching instrument in knowledge graph!', level=logging.INFO)
                         capable = True
             if capable is False:
                 self.log(f'The instruments onboard cannot observe the requested observables.',level=logging.DEBUG)
@@ -181,44 +250,31 @@ class ObservationPlanningModule(Module):
         """
         if (self.parent_module.mission_profile=="3D-CHESS" and self.parent_module.preplan=="True") or self.parent_module.mission_profile=="agile":
             parent_agent = self.get_top_module()
-            instrument = parent_agent.payload[parent_agent.name]["name"]
-            # points = np.zeros(shape=(2000, 5))
-            # with open(self.parent_module.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
-            #     reader = csv.reader(csvfile)
-            #     count = 0
-            #     for row in reader:
-            #         if count == 0:
-            #             count = 1
-            #             continue
-            #         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
-            #         count = count + 1
-            points = np.zeros(shape=(1000, 4))
-            with open(self.parent_module.scenario_dir+'resources/riverATLAS.csv') as csvfile:
-                reader = csv.reader(csvfile)
-                count = 0
-                for row in reader:
-                    if count == 0:
-                        count = 1
-                        continue
-                    points[count-1,:] = [row[0], row[1], row[2], row[3]]
-                    count = count + 1
+            payload = parent_agent.payload[parent_agent.name]
+            instruments = []
+            if isinstance(payload, list):
+                for i in range(len(payload)):
+                    instruments.append(payload[i]["name"])
+            else:
+                instruments.append(payload["name"])
+            points = self.parent_module.points
             obs_list = []
             for i in range(len(points[:, 0])):
                 lat = points[i, 0]
                 lon = points[i, 1]
-                obs = ObservationPlannerTask(lat,lon,1.0,[instrument],0.0,1.0)
+                obs = ObservationPlannerTask(lat,lon,1.0,[instruments[0]],0.0,1.0) # TODO fix to support multiple insturments
                 obs_list.append(obs)
             for obs in obs_list:
                     # estimate next observation opportunities
-                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
+                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/100) # TODO get rid of hardcoded timestep size
                     #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
                         gp_access_list.append(row)
                     #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
-                        self.log(f'Adding observation candidate!',level=logging.DEBUG)
-                        obs.start = gp_access_list[0]['time index']
+                        self.log(f'Adding observation candidate!',level=logging.INFO)
+                        obs.start = gp_access_list[0]['time index']*100 # TODO get rid of hardcoded timestep size
                         obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
                         unique_location = True
@@ -239,40 +295,27 @@ class ObservationPlanningModule(Module):
                 await self.parent_module.send_internal_message(plan_msg)
         elif self.parent_module.mission_profile=="nadir":
             parent_agent = self.get_top_module()
-            instrument = parent_agent.payload[parent_agent.name]["name"]
-            # points = np.zeros(shape=(2000, 5))
-            # with open(self.parent_module.scenario_dir+'resources/chlorophyll_baseline.csv') as csvfile:
-            #     reader = csv.reader(csvfile)
-            #     count = 0
-            #     for row in reader:
-            #         if count == 0:
-            #             count = 1
-            #             continue
-            #         points[count-1,:] = [row[0], row[1], row[2], row[3], row[4]]
-            #         count = count + 1
-            points = np.zeros(shape=(1000, 4))
-            with open(self.parent_module.scenario_dir+'resources/riverATLAS.csv') as csvfile:
-                reader = csv.reader(csvfile)
-                count = 0
-                for row in reader:
-                    if count == 0:
-                        count = 1
-                        continue
-                    points[count-1,:] = [row[0], row[1], row[2], row[3]]
-                    count = count + 1
+            payload = parent_agent.payload[parent_agent.name]
+            instruments = []
+            if isinstance(payload, list):
+                for i in range(len(payload)):
+                    instruments.append(payload[i]["name"])
+            else:
+                instruments.append(payload["name"])
+            points = self.parent_module.points
             obs_list = []
             for i in range(len(points[:, 0])):
                 lat = points[i, 0]
                 lon = points[i, 1]
-                obs = ObservationPlannerTask(lat,lon,1.0,[instrument],0.0,1.0)
-                gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
+                obs = ObservationPlannerTask(lat,lon,1.0,[instruments[0]],0.0,1.0) # TODO fix to support multiple insturments
+                gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/100)
                 gp_access_list = []
                 for _, row in gp_accesses.iterrows():
                     gp_access_list.append(row)
                 #print(gp_accesses)
                 if(len(gp_accesses) != 0):
                     self.log(f'Adding observation candidate!',level=logging.DEBUG)
-                    obs.start = gp_access_list[0]['time index']
+                    obs.start = gp_access_list[0]['time index']*100
                     obs.end = obs.start # TODO change this hardcode
                     obs.angle = gp_access_list[0]['look angle [deg]']
                     obs_list.append(obs)
@@ -344,14 +387,14 @@ class ObservationPlanningModule(Module):
                 self.log(f'Length of obs list: {len(obs_list)}',level=logging.INFO)
                 for obs in obs_list:
                     # estimate next observation opportunities
-                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time())
-                    self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
+                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/100)
+                    #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
                         gp_access_list.append(row)
-                    self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
+                    #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
-                        obs.start = gp_access_list[0]['time index']
+                        obs.start = gp_access_list[0]['time index']*100
                         obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
                         # unique_location = True
@@ -400,10 +443,10 @@ class ObservationPlanningModule(Module):
                 if(len(actions) == 0):
                     break
                 for action in actions:
-                    duration = 86400.0*16.0
+                    duration = self.parent_module.duration
                     rho = (duration - action.end)/duration
                     e = rho * estimated_reward
-                    adjusted_reward = action.science_val*self.meas_perf() + e
+                    adjusted_reward = np.abs(action.science_val)*self.meas_perf() + e
                     # if action.science_val > 5.0:
                     #     self.log(f'Science value greater than 5: {action.science_val} at {action.target} with angle {action.angle} and time {action.start} when curr_angle={curr_angle} and curr_time={curr_time}, adjusted_reward = {adjusted_reward} and maximum = {maximum}',level=logging.DEBUG)
                     if(adjusted_reward > maximum):
@@ -429,7 +472,7 @@ class ObservationPlanningModule(Module):
         more_actions = True
         curr_time = 0.0
         while more_actions:
-            soonest = 100000
+            soonest = 10000000
             soonest_action = None
             actions = self.get_action_space_nadir(curr_time,obs_list)
             if(len(actions) == 0):
@@ -469,8 +512,15 @@ class ObservationPlanningModule(Module):
         c = 6.1e-3
         d = 0.85
         parent_agent = self.get_top_module()
-        instrument = parent_agent.payload[parent_agent.name]["name"]
-        if(instrument=="VIIRS" or instrument=="OLI"):
+        payload = parent_agent.payload[parent_agent.name]
+        instruments = []
+        if isinstance(payload, list):
+            return 1.0 # TODO fix this hardcode
+            for i in range(len(payload)):
+                instruments.append(payload[i]["name"])
+        else:
+            instruments.append(payload["name"])
+        if("VIIRS" in instruments or "OLI" in instruments):
             x = parent_agent.payload[parent_agent.name]["snr"]
             y = parent_agent.payload[parent_agent.name]["spatial_res"]
             z = parent_agent.payload[parent_agent.name]["spectral_res"]

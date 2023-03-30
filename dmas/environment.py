@@ -1236,20 +1236,20 @@ if __name__ == '__main__':
     scenario_dir = "./scenarios/"+sys.argv[1]+"/"
     dt = 4.6656879355937875
     # duration = 6048
-    duration = 86400*16.0
+    
     # duration = 70
     # duration = 537 * dt 
-    print(f'Simulation duration: {duration}[s]')
+    
     spacecraft_str_list = []
     with open("./scenarios/"+sys.argv[1]+"/" +'MissionSpecs.json', 'r') as scenario_specs:
         # load json file as dictionary
         mission_dict = json.load(scenario_specs)
-
+        duration = float(mission_dict.get('duration'))*86400.0
         data = dict()
         spacecraft_list = mission_dict.get('spacecraft')
         for spacecraft in spacecraft_list:
             spacecraft_str_list.append(spacecraft.get('name'))
-
+    print(f'Simulation duration: {duration}[s]')
     # environment = EnvironmentServer(scenario_dir, [], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.SERVER_EVENTS)
     # environment = EnvironmentServer(scenario_dir, ['Mars1'], duration, clock_type=SimClocks.REAL_TIME_FAST, simulation_frequency=10)

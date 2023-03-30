@@ -369,7 +369,6 @@ class OrbitData:
                 epoc = float(epoc)
                 _, _, _, _, time_step = time_data.at[1,time_data.axes[1][0]].split(' ')
                 time_step = float(time_step)
-
                 time_data = { "epoc": epoc, 
                             "epoc type": epoc_type, 
                             "time step": time_step }
@@ -435,9 +434,8 @@ class OrbitData:
                     i_ins = payload.index(instrument)
                     gp_acces_by_mode = []
 
-                    modes = spacecraft.get('instrument', None)
-                    if not isinstance(modes, list):
-                        modes = [0]
+                    #modes = spacecraft.get('instrument', None)
+                    modes = [0]
 
                     gp_acces_by_mode = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]','instrument',
                                                                 'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
@@ -476,7 +474,8 @@ class OrbitData:
                     if len(gp_access_data) == 0:
                         gp_access_data = gp_acces_by_mode
                     else:
-                        gp_access_data = pd.concat([gp_access_data, gp_acces_by_mode])
+                        #gp_access_data = pd.concat([gp_access_data, gp_acces_by_mode])
+                        gp_access_data = gp_acces_by_mode # currently environment does not support multiple instruments having different coverages
                 
                 nrows, _ = gp_access_data.shape
                 gp_access_data['agent name'] = [spacecraft['name']] * nrows

@@ -2,7 +2,7 @@ import json
 from copy import deepcopy
 
 
-def add_sats(base_satellite, satellite_name):
+def add_sats(base_satellite, satellite_name, raan_offset):
     satellites = []
     r = 2; # number of planes
     s = 2; # number of satellites per plane
@@ -28,7 +28,7 @@ def add_sats(base_satellite, satellite_name):
             new_satellite["orbitState"]["state"]["sma"] = altitude+re
             new_satellite["orbitState"]["state"]["ecc"] = ecc
             new_satellite["orbitState"]["state"]["inc"] = inc
-            new_satellite["orbitState"]["state"]["raan"] = RAAN
+            new_satellite["orbitState"]["state"]["raan"] = RAAN + raan_offset
             new_satellite["orbitState"]["state"]["aop"] = argper
             new_satellite["orbitState"]["state"]["ta"] = anom
             satellites.append(deepcopy(new_satellite))
@@ -47,10 +47,10 @@ with open('./utils/base_tir_sat.json', 'r') as openfile:
 with open('./utils/base_alt_sat.json', 'r') as openfile:
     base_alt_satellite = json.load(openfile)
 
-vnir_satellites = add_sats(base_vnir_satellite,"vnir_sat")
-vnirtir_satellites = add_sats(base_vnirtir_satellite,"vnirtir_sat")
-tir_satellites = add_sats(base_tir_satellite,"tir_sat")
-alt_satellites = add_sats(base_alt_satellite,"alt_sat")
+vnir_satellites = add_sats(base_vnir_satellite,"vnir_sat",0)
+vnirtir_satellites = add_sats(base_vnirtir_satellite,"vnirtir_sat",45)
+tir_satellites = add_sats(base_tir_satellite,"tir_sat",90)
+alt_satellites = add_sats(base_alt_satellite,"alt_sat",135)
 all_satellites = vnir_satellites + vnirtir_satellites + tir_satellites + alt_satellites
 
 json_object = json.dumps(all_satellites, indent=4)
