@@ -15,7 +15,7 @@ class TestSimulationElement(unittest.TestCase):
         async def _internal_sync(self, _) -> dict:
             return dict()
 
-        async def _sim_wait(self, delay: float) -> None:
+        async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
         async def setup(self) -> None:

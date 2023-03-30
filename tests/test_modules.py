@@ -87,7 +87,7 @@ class TestInternalModule(unittest.TestCase):
                                                                     port+1, 
                                                                     level,
                                                                     self.get_logger()))
-        async def _sim_wait(self, delay: float) -> None:
+        async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
         async def setup(self) -> None:

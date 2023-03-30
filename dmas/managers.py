@@ -106,7 +106,7 @@ class AbstractManager(SimulationElement):
 
         # wait for simulation duration to pass
         self.log('starting simulation timer...')
-        timer_task = asyncio.create_task( self._sim_wait(self._clock_config.get_total_seconds()) )
+        timer_task = asyncio.create_task( self.sim_wait(self._clock_config.get_total_seconds()) )
         timer_task.set_name('Simulation timer')
         await timer_task
 
@@ -278,7 +278,7 @@ class AbstractManager(SimulationElement):
         self.log(f'All elements deactivated!')
         return
 
-    async def _sim_wait(self, delay : float) -> None:
+    async def sim_wait(self, delay : float) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
 

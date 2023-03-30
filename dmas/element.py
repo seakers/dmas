@@ -288,7 +288,7 @@ class SimulationElement(NetworkElement):
         await self._publish_deactivate()
 
     @abstractmethod
-    async def _sim_wait(self, delay : float) -> None:
+    async def sim_wait(self, delay : float) -> None:
         """
         Simulation element waits for a given delay to occur according to the clock configuration being used
 

@@ -16,7 +16,7 @@ class TestSimulationNode(unittest.TestCase):
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
 
-        async def _sim_wait(self, delay: float) -> None:
+        async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
         async def setup(self) -> None:
@@ -78,7 +78,7 @@ class TestSimulationNode(unittest.TestCase):
             return
 
     class DummyNode(Node):
-        async def _sim_wait(self, delay: float) -> None:
+        async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
         async def setup(self) -> None:
@@ -97,22 +97,6 @@ class TestSimulationNode(unittest.TestCase):
                 self.log('work being done was cancelled!')
                 return
 
-    class NonModularTestNode(DummyNode):
-        def __init__(   self, 
-                        id: int, 
-                        port : int, 
-                        manager_network_config : NetworkConfig,
-                        level: int = logging.INFO, 
-                        logger:logging.Logger=None) -> None:
-            node_network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {
-                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
-
-
-            super().__init__(f'NODE_{id}', node_network_config, manager_network_config, [], level, logger)
-        
     class ModularTestNode(DummyNode):
         def __init__(   self, 
                         id: int, 

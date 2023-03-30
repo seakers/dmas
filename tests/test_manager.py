@@ -30,7 +30,7 @@ class TestSimulationManager(unittest.TestCase):
             # perform activation routine
             await super()._activate()
 
-        async def _sim_wait(self, delay: float) -> None:
+        async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
         async def setup(self) -> None:
@@ -189,7 +189,7 @@ class TestSimulationManager(unittest.TestCase):
             super().__init__('MONITOR', network_config, level, logger)
             self._clock_config = clock_config
 
-        async def _sim_wait(self, delay: float) -> None:
+        async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
         async def setup(self) -> None:
