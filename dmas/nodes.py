@@ -407,4 +407,74 @@ class Node(SimulationElement):
         """
         return len(self.__modules) > 0
 
+    async def send_peer_message(self, msg : SimulationMessage) -> tuple:
+        """
+        Sends a peer-to-peer message and returns the destination's response
+        """
+        return await self._send_external_request_message(msg)
+
+    async def listen_peer_message(self) -> tuple:
+        """
+        Listens for any incoming peer-to-peer message
+        """
+        return await self._receive_external_msg(zmq.REP)
+
+    async def respond_peer_message(self, resp : SimulationMessage) -> None:
+        """
+        Responds to any incoming peer-to-peer message
+        """
+        return await self._send_external_msg(resp, zmq.REP)
+
+    async def send_peer_broadcast(self, msg : SimulationMessage) -> None:
+        """
+        Broadcasts message to all peers currently connected to this network node
+        """
+        return await self._send_external_msg(msg, zmq.PUB)
     
+    async def listen_peer_broadcast(self) -> None:
+        """
+        Listens for any broadcast messages from every peer that this network node is connected to
+        """
+        return await self._receive_external_msg(zmq.PUB)
+
+    async def subscribe_to_broadcasts(self, dst : str) -> None:
+        """
+        Connects this network node's subscribe port to the destination's publish port
+        """
+        # get the destination's publish port 
+        dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
+        if dst_network_config is None: 
+            raise 
+            
+        dst_addresses = dst_network_config.get_external_addresses().get(zmq.PUB, None)
+        if dst_addresses is None or len(dst_addresses) < 1:
+            pass
+        dst_address = dst_addresses[-1]
+        
+        # get own sub port
+        socket, _ = self._external_socket_map.get(zmq.SUB)
+        socket : zmq.Socket
+
+        # conenct to destiation
+        socket.connect(dst_address)
+
+    async def unsubscribe_to_broadcasts(self, dst) -> None:
+        """
+        Disconnects this network node's subscribe port to the destination's publish port
+        """
+        # get the destination's publish port 
+        dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
+        if dst_network_config is None: 
+            raise 
+            
+        dst_addresses = dst_network_config.get_external_addresses().get(zmq.PUB, None)
+        if dst_addresses is None or len(dst_addresses) < 1:
+            pass
+        dst_address = dst_addresses[-1]
+        
+        # get own sub port
+        socket, _ = self._external_socket_map.get(zmq.SUB)
+        socket : zmq.Socket
+
+        # conenct to destiation
+        socket.disconnect(dst_address)

@@ -249,12 +249,18 @@ class NetworkElement(ABC):
         self._element_name = element_name
         self.name = network_config.network_name + '/' + element_name
         self._logger : logging.Logger = self.__set_up_logger(level) if logger is None else logger
+        self.__topics = [  self._network_name.encode('ascii'), 
+                        self.name.encode('ascii')
+                        ]
 
     def __del__(self):
         """
         Closes all open network connections in case any are open when deleting an instance of this class
         """
         self._deactivate_network() if self._network_activated else None
+
+    def get_subscription_topics(self) -> list:
+        return self.__topics
 
     def get_network_name(self) -> str:
         """
@@ -466,10 +472,7 @@ class NetworkElement(ABC):
 
         elif socket_type is zmq.SUB:
             # subscribe to messages addressed to this element or to all elements in the network
-            topics = [  self._network_name.encode('ascii'), 
-                        self.name.encode('ascii')
-                    ]
-            for topic in topics:
+            for topic in self.__topics:
                 socket.setsockopt(zmq.SUBSCRIBE, topic)
                 self.log(f'PUB port subscribed to topic `{topic}`!')
         
