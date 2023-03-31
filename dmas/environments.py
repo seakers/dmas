@@ -24,16 +24,7 @@ class EnvironmentNode(Node):
                         level, 
                         logger)
     
-        
-
-    async def setup():
-        pass
-
-    async def live(self):
-        pass
-
-    async def teardown(self) -> None:
-        pass
-
-    async def sim_wait(self, delay: float) -> None:
-        return await super().sim_wait(delay)
+        if zmq.REQ not in env_network_config.get_external_addresses():
+            pass
+        if zmq.PUB not in env_network_config.get_external_addresses():
+            pass

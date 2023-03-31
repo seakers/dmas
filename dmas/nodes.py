@@ -96,7 +96,7 @@ class Node(SimulationElement):
                 # send sync request from REQ socket
                 msg = NodeSyncRequestMessage(self.get_element_name(), self._network_config.to_dict())
 
-                dst, src, content = await self._send_manager_request_message(msg)
+                dst, src, content = await self.send_manager_message(msg)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
@@ -225,7 +225,7 @@ class Node(SimulationElement):
         while True:
             # send ready announcement from REQ socket
             ready_msg = NodeReadyMessage(self.get_element_name())
-            dst, src, content = await self._send_manager_request_message(ready_msg)
+            dst, src, content = await self.send_manager_message(ready_msg)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
@@ -382,7 +382,7 @@ class Node(SimulationElement):
             while True:
                 # send ready announcement from REQ socket
                 msg = NodeDeactivatedMessage(self.name)
-                dst, src, content = await self._send_manager_request_message(msg)
+                dst, src, content = await self.send_manager_message(msg)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
@@ -410,30 +410,63 @@ class Node(SimulationElement):
     async def send_peer_message(self, msg : SimulationMessage) -> tuple:
         """
         Sends a peer-to-peer message and returns the destination's response
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.send_peer_message(msg)`
         """
         return await self._send_external_request_message(msg)
 
     async def listen_peer_message(self) -> tuple:
         """
         Listens for any incoming peer-to-peer message
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.listen_peer_message(msg)`
         """
         return await self._receive_external_msg(zmq.REP)
 
     async def respond_peer_message(self, resp : SimulationMessage) -> None:
         """
         Responds to any incoming peer-to-peer message
+
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
         """
         return await self._send_external_msg(resp, zmq.REP)
 
     async def send_peer_broadcast(self, msg : SimulationMessage) -> None:
         """
         Broadcasts message to all peers currently connected to this network node
+
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
         """
         return await self._send_external_msg(msg, zmq.PUB)
     
-    async def listen_peer_broadcast(self) -> None:
+    async def listen_peer_broadcast(self) -> tuple:
         """
         Listens for any broadcast messages from every peer that this network node is connected to
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.listen_peer_broadcast(msg)`
         """
         return await self._receive_external_msg(zmq.SUB)
 

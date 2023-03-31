@@ -76,7 +76,7 @@ class InternalModule(NetworkElement):
         while True:
             # send sync request from REQ socket
             sync_req = ModuleSyncRequestMessage(self.get_module_name(), self.get_parent_name())
-            dst, _, content = await self._send_manager_request_message(sync_req)
+            dst, _, content = await self.send_manager_message(sync_req)
             dst : str; content : dict
             msg_type = content['msg_type']
 
@@ -211,7 +211,7 @@ class InternalModule(NetworkElement):
         while True:
             # send sync request from REQ socket
             sync_req = ModuleReadyMessage(self.get_module_name(), self.get_parent_name())
-            dst, _, content = await self._send_manager_request_message(sync_req)
+            dst, _, content = await self.send_manager_message(sync_req)
             dst : str; _ : str; content : dict
             msg_type = content['msg_type']
 
@@ -262,7 +262,7 @@ class InternalModule(NetworkElement):
         while True:
             # send sync request from REQ socket
             terminated_msg = ModuleDeactivatedMessage(self.name, self.get_parent_name())
-            dst, _, content = await self._send_manager_request_message(terminated_msg)
+            dst, _, content = await self.send_manager_message(terminated_msg)
             dst : str; content : dict
             msg_type = content['msg_type']
 
@@ -329,9 +329,9 @@ class InternalModule(NetworkElement):
             self.log(f'`_listen()` failed. {e}')
             raise e
 
-    async def _send_manager_request_message(self, msg : SimulationMessage) -> list:
+    async def send_manager_message(self, msg : SimulationMessage) -> tuple:
         """
-        Sends a message through this node's external request socket
+        Sends a message through this module's manager request socket
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
@@ -341,6 +341,9 @@ class InternalModule(NetworkElement):
                 name of the intended destination as `dst` (`str`) 
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
+        
+        ### Usage:
+            `dst, src, msg_dict = await self.send_manager_message(msg)`
         """
         try:
             self._manager_address_ledger : dict
@@ -362,6 +365,72 @@ class InternalModule(NetworkElement):
         except Exception as e:
             self.log(f'request message to manager failed. {e}')
             raise e
+
+    async def send_module_message(self, msg : SimulationMessage) -> tuple:
+        """
+        Sends a module-to-module message and returns the destination's response
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.send_module_message(msg)`
+        """
+        return await self._send_internal_request_message(msg)
+
+    async def listen_module_message(self) -> tuple:
+        """
+        Listens for any incoming module-to-module messages
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.listen_module_message(msg)`
+        """
+        return await self._receive_internal_msg(zmq.REP)
+
+    async def respond_module_message(self, resp : SimulationMessage) -> None:
+        """
+        Sends a response to an incoming module-to-module message
+
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.        
+        """
+        return await self._send_internal_msg(resp, zmq.REP)
+
+    async def send_module_broadcast(self, msg : SimulationMessage) -> None:
+        """
+        Broadcasts message to all modules currently connected to this module
+
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        """
+        return await self._send_internal_msg(msg, zmq.PUB)
+    
+    async def listen_module_broadcast(self) -> tuple:
+        """
+        Listens for any broadcast messages from every module that this module is connected to
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.listen_module_broadcast(msg)`
+        """
+        return await self._receive_internal_msg(zmq.SUB)
 
 class InternalSubmodule(ABC):
     def __init__(self, name : str, parent_module_name : str, submodules : list = []) -> None:

@@ -48,7 +48,7 @@ class TestSimulationManager(unittest.TestCase):
                 while True:
                     msg = NodeSyncRequestMessage(self.name, self._network_config.to_dict())
                     self.log('sending sync request to manager...')
-                    dst, src, content = await self._send_manager_request_message(msg)
+                    dst, src, content = await self.send_manager_message(msg)
 
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
@@ -107,7 +107,7 @@ class TestSimulationManager(unittest.TestCase):
             while True:
                 msg = NodeReadyMessage(self.name)
                 self.log('sending ready message to manager...')
-                dst, src, content = await self._send_manager_request_message(msg)
+                dst, src, content = await self.send_manager_message(msg)
 
                 if (dst not in self.name 
                     or SimulationElementRoles.MANAGER.value not in src 
@@ -158,7 +158,7 @@ class TestSimulationManager(unittest.TestCase):
                 while True:
                     msg = NodeDeactivatedMessage(self.name)
                     self.log('sending node deactivated message to manager...')
-                    dst, src, content = await self._send_manager_request_message(msg)
+                    dst, src, content = await self.send_manager_message(msg)
 
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 

@@ -187,33 +187,33 @@ class TestSimulationNode(unittest.TestCase):
                 self.log(f'`routine()` failed. {e}')
                 raise e
 
-    # def test_init(self):
-    #     port = 5555
-    #     network_config = NetworkConfig('TEST', manager_address_map={
-    #                                                             zmq.REQ: [f'tcp://localhost:{port}'],
-    #                                                             zmq.SUB: [f'tcp://localhost:{port+1}'],
-    #                                                             zmq.PUSH: [f'tcp://localhost:{port+2}']})
-    #     node = TestSimulationNode.DummyNode('NAME', network_config, [])
+    def test_init(self):
+        port = 5555
+        network_config = NetworkConfig('TEST', manager_address_map={
+                                                                zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                zmq.PUSH: [f'tcp://localhost:{port+2}']})
+        node = TestSimulationNode.DummyNode('NAME', network_config, [])
 
-    #     with self.assertRaises(AttributeError):
-    #         network_config = NetworkConfig('TEST', {})
-    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', {})
+            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
 
-    #     with self.assertRaises(AttributeError):
-    #         network_config = NetworkConfig('TEST', manager_address_map={
-    #                                                                 zmq.SUB: [f'tcp://localhost:{port+1}'],
-    #                                                                 zmq.PUSH: [f'tcp://localhost:{port+2}']})
-    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-    #     with self.assertRaises(AttributeError):
-    #         network_config = NetworkConfig('TEST', manager_address_map={
-    #                                                                 zmq.REQ: [f'tcp://localhost:{port}'],
-    #                                                                 zmq.PUSH: [f'tcp://localhost:{port+2}']})
-    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-    #     with self.assertRaises(AttributeError):
-    #         network_config = NetworkConfig('TEST', manager_address_map={
-    #                                                                 zmq.REQ: [f'tcp://localhost:{port}'],
-    #                                                                 zmq.SUB: [f'tcp://localhost:{port+1}']})
-    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map={
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map={
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
+            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+        with self.assertRaises(AttributeError):
+            network_config = NetworkConfig('TEST', manager_address_map={
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}']})
+            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
            
     def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING, logger : logging.Logger = None):
         print(f'TESTING {n_nodes} NODES WITH {n_modules} MODULES')
@@ -243,37 +243,37 @@ class TestSimulationNode(unittest.TestCase):
 
         return logger
 
-    # def test_sync_routine(self):
-    #     print('\nTESTING SYNC ROUTINE')
-    #     n_nodes = [10]
-    #     n_modules = [4]
-    #     port = 5555
-    #     level=logging.WARNING
+    def test_sync_routine(self):
+        print('\nTESTING SYNC ROUTINE')
+        n_nodes = [10]
+        n_modules = [4]
+        port = 5555
+        level=logging.WARNING
 
-    #     year = 2023
-    #     month = 1
-    #     day = 1
-    #     hh = 12
-    #     mm = 00
-    #     ss = 00
-    #     start_date = datetime(year, month, day, hh, mm, ss)
-    #     end_date = datetime(year, month, day, hh, mm, ss+1)
+        year = 2023
+        month = 1
+        day = 1
+        hh = 12
+        mm = 00
+        ss = 00
+        start_date = datetime(year, month, day, hh, mm, ss)
+        end_date = datetime(year, month, day, hh, mm, ss+1)
 
-    #     print('Real-time Clock Config:')
-    #     clock_config = RealTimeClockConfig(start_date, end_date)
+        print('Real-time Clock Config:')
+        clock_config = RealTimeClockConfig(start_date, end_date)
 
-    #     logger = None
-    #     for n in n_nodes:
-    #         for m in n_modules:
-    #             logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
+        logger = None
+        for n in n_nodes:
+            for m in n_modules:
+                logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
     
-    #     print('\nAccelerated Real-time Clock Config:')
-    #     clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
+        print('\nAccelerated Real-time Clock Config:')
+        clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
 
-    #     logger = None
-    #     for n in n_nodes:
-    #         for m in n_modules:
-    #             logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
+        logger = None
+        for n in n_nodes:
+            for m in n_modules:
+                logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
 
     class TransmissionTypes(Enum):
         DIRECT = 'DIRECT'
@@ -334,7 +334,7 @@ class TestSimulationNode(unittest.TestCase):
                     self.msgs.append(msg.to_dict())      
 
                     # do some 'work'
-                    await asyncio.sleep(random.random())
+                    await asyncio.sleep(0.1*random.random())
 
             except asyncio.CancelledError:
                 return
@@ -392,9 +392,8 @@ class TestSimulationNode(unittest.TestCase):
         clock_config = RealTimeClockConfig(start_date, end_date)
 
         logger = None
-        # for t_type in TestSimulationNode.TransmissionTypes:
-        for t_type in [TestSimulationNode.TransmissionTypes.BROADCAST]:
-            print(f'Transmission Type: {t_type.value}')
+        for t_type in TestSimulationNode.TransmissionTypes:
+            print(f'\nTransmission Type: {t_type.value}')
             monitor = TestSimulationNode.DummyMonitor(clock_config, port, level, logger)
             
             logger = monitor.get_logger() if logger is None else logger
@@ -437,4 +436,3 @@ class TestSimulationNode(unittest.TestCase):
                     pool.submit(node.run, *[])
                     
             self.assertEqual(ping.msgs, pong.msgs)
-            print('\n')

@@ -274,7 +274,7 @@ class TestNetworkElement(unittest.TestCase):
                         status = 'successful!' if content is not None else 'failed.'
 
                     elif self.t_type is TestNetworkElement.TransmissionTypes.MGR:
-                        _, _, content = await self._send_manager_request_message(msg)
+                        _, _, content = await self.send_manager_message(msg)
                         status = 'successful!' if content is not None else 'failed.'
 
                     self.msgs.append(msg)

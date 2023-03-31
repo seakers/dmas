@@ -1077,7 +1077,7 @@ class NetworkElement(ABC):
                 socket_lock.release()
                 self.log(f'lock released!')
 
-    async def _send_manager_request_message(self, msg : SimulationMessage) -> list:
+    async def send_manager_message(self, msg : SimulationMessage) -> list:
         """
         Sends a message through this node's external request socket
 
