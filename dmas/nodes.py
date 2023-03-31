@@ -29,17 +29,17 @@ class Node(SimulationElement):
         self._manager_address_ledger = {SimulationElementRoles.MANAGER.name : manager_network_config}
 
         if zmq.REQ not in node_network_config.get_manager_addresses():
-            raise AttributeError(f'`network_config` must contain a REQ port and an address to parent node within external address map.')
+            raise AttributeError(f'`node_network_config` must contain a REQ port and an address to parent node within external address map.')
         if zmq.SUB not in node_network_config.get_manager_addresses():
-            raise AttributeError(f'`network_config` must contain a SUB port and an address to parent node within external address map.')
+            raise AttributeError(f'`node_network_config` must contain a SUB port and an address to parent node within external address map.')
         if zmq.PUSH not in node_network_config.get_manager_addresses():
-            raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within external address map.')
+            raise AttributeError(f'`node_network_config` must contain a PUSH port and an address to parent node within external address map.')
 
         if len(modules) > 0:
             if zmq.REP not in node_network_config.get_internal_addresses():
-                raise AttributeError(f'`network_config` must contain a REP port and an address to parent node within internal address map.')
+                raise AttributeError(f'`node_network_config` must contain a REP port and an address to parent node within internal address map.')
             if zmq.PUB not in node_network_config.get_internal_addresses():
-                raise AttributeError(f'`network_config` must contain a PUB port and an address to parent node within internal address map.')
+                raise AttributeError(f'`node_network_config` must contain a PUB port and an address to parent node within internal address map.')
         
         self.internal_inbox = None
         self.external_inbox = None

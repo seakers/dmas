@@ -24,7 +24,7 @@ class EnvironmentNode(Node):
                         level, 
                         logger)
     
-        if zmq.REQ not in env_network_config.get_external_addresses():
-            pass
+        if zmq.REP not in env_network_config.get_external_addresses() and zmq.ROUTER not in env_network_config.get_external_addresses():
+            raise AttributeError(f'`node_network_config` must contain a REP or ROUTER port and an address within its external address map.')
         if zmq.PUB not in env_network_config.get_external_addresses():
-            pass
+            raise AttributeError(f'`node_network_config` must contain a PUB port and an address within its external address map.')
