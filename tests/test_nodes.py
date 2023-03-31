@@ -187,6 +187,34 @@ class TestSimulationNode(unittest.TestCase):
                 self.log(f'`routine()` failed. {e}')
                 raise e
 
+    # def test_init(self):
+    #     port = 5555
+    #     network_config = NetworkConfig('TEST', manager_address_map={
+    #                                                             zmq.REQ: [f'tcp://localhost:{port}'],
+    #                                                             zmq.SUB: [f'tcp://localhost:{port+1}'],
+    #                                                             zmq.PUSH: [f'tcp://localhost:{port+2}']})
+    #     node = TestSimulationNode.DummyNode('NAME', network_config, [])
+
+    #     with self.assertRaises(AttributeError):
+    #         network_config = NetworkConfig('TEST', {})
+    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+
+    #     with self.assertRaises(AttributeError):
+    #         network_config = NetworkConfig('TEST', manager_address_map={
+    #                                                                 zmq.SUB: [f'tcp://localhost:{port+1}'],
+    #                                                                 zmq.PUSH: [f'tcp://localhost:{port+2}']})
+    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+    #     with self.assertRaises(AttributeError):
+    #         network_config = NetworkConfig('TEST', manager_address_map={
+    #                                                                 zmq.REQ: [f'tcp://localhost:{port}'],
+    #                                                                 zmq.PUSH: [f'tcp://localhost:{port+2}']})
+    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+    #     with self.assertRaises(AttributeError):
+    #         network_config = NetworkConfig('TEST', manager_address_map={
+    #                                                                 zmq.REQ: [f'tcp://localhost:{port}'],
+    #                                                                 zmq.SUB: [f'tcp://localhost:{port+1}']})
+    #         TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
+           
     def run_tester(self, clock_config : ClockConfig, n_nodes : int = 1, n_modules : int = 0, port : int = 5556, level : int = logging.WARNING, logger : logging.Logger = None):
         print(f'TESTING {n_nodes} NODES WITH {n_modules} MODULES')
         
@@ -215,54 +243,144 @@ class TestSimulationNode(unittest.TestCase):
 
         return logger
 
-    def test_init(self):
+    # def test_sync_routine(self):
+    #     print('\nTESTING SYNC ROUTINE')
+    #     n_nodes = [10]
+    #     n_modules = [4]
+    #     port = 5555
+    #     level=logging.WARNING
+
+    #     year = 2023
+    #     month = 1
+    #     day = 1
+    #     hh = 12
+    #     mm = 00
+    #     ss = 00
+    #     start_date = datetime(year, month, day, hh, mm, ss)
+    #     end_date = datetime(year, month, day, hh, mm, ss+1)
+
+    #     print('Real-time Clock Config:')
+    #     clock_config = RealTimeClockConfig(start_date, end_date)
+
+    #     logger = None
+    #     for n in n_nodes:
+    #         for m in n_modules:
+    #             logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
+    
+    #     print('\nAccelerated Real-time Clock Config:')
+    #     clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
+
+    #     logger = None
+    #     for n in n_nodes:
+    #         for m in n_modules:
+    #             logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
+
+    class TransmissionTypes(Enum):
+        DIRECT = 'DIRECT'
+        BROADCAST = 'BROADCAST'
+
+    class PeerNode(Node):
+        def __init__(   self, 
+                        node_name : str, 
+                        t_type,
+                        node_network_config: NetworkConfig, 
+                        manager_network_config: NetworkConfig, 
+                        level: int = logging.INFO, 
+                        logger: logging.Logger = None
+                    ) -> None:
+            super().__init__(node_name, node_network_config, manager_network_config, [], level, logger)
+            self.t_type : TestSimulationNode.TransmissionTypes = t_type
+            self.msgs = []
+
+        async def sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
+        
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
+
+    class PingNode(PeerNode):
+        def __init__(   self, 
+                        t_type, 
+                        node_network_config: NetworkConfig,
+                        manager_network_config: NetworkConfig, 
+                        level: int = logging.INFO, 
+                        logger: logging.Logger = None
+                    ) -> None:
+            super().__init__('PING', t_type, node_network_config, manager_network_config, level, logger)
+
+        async def live(self):
+            try:
+                if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
+                    # wait for pong to be ready for boradcasts
+                    await self.listen_peer_message()
+                    resp = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PONG', 'OK')
+                    await self.respond_peer_message(resp)
+
+                while True:
+                    msg = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PONG', 'PING')
+                    if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
+                        # broadcast ping message 
+                        await self.send_peer_broadcast(msg)
+
+                    elif self.t_type is TestSimulationNode.TransmissionTypes.DIRECT:
+                        # send ping message
+                        await self.send_peer_message(msg)
+
+                    # register sent message
+                    # print('PING: ', msg)
+                    self.msgs.append(msg.to_dict())      
+
+                    # do some 'work'
+                    await asyncio.sleep(random.random())
+
+            except asyncio.CancelledError:
+                return
+
+    class PongNode(PeerNode):
+        def __init__(   self, 
+                        t_type, 
+                        node_network_config: NetworkConfig,
+                        manager_network_config: NetworkConfig, 
+                        level: int = logging.INFO, 
+                        logger: logging.Logger = None
+                    ) -> None:
+            super().__init__('PONG', t_type, node_network_config, manager_network_config, level, logger)
+
+        async def live(self):
+            try:
+                if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
+                        # tell ping im ready for broadcasts
+                        ready_msg = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PING', 'READY')
+                        await self.send_peer_message(ready_msg)
+
+                while True:
+                    if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
+                        # wait for ping message 
+                        _, _, msg = await self.listen_peer_broadcast()
+
+                    elif self.t_type is TestSimulationNode.TransmissionTypes.DIRECT:
+                        # wait for ping message 
+                        _, _, msg = await self.listen_peer_message()
+                        
+                        # respond to message
+                        resp = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PING', 'PONG')
+                        await self.respond_peer_message(resp)
+
+                    # register received message
+                    # print('PONG: ', msg)
+                    self.msgs.append(msg)
+
+            except asyncio.CancelledError as e:
+                raise e
+
+    def test_ping_pong(self):
+        print(f'PING-PONG TEST')
         port = 5555
-        network_config = NetworkConfig('TEST', manager_address_map={
-                                                                zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                zmq.PUSH: [f'tcp://localhost:{port+2}']})
-        node = TestSimulationNode.DummyNode('NAME', network_config, [])
-
-        # with self.assertRaises(AttributeError):
-        #     network_config = NetworkConfig('TEST', 
-        #                                     internal_address_map = {
-        #                                                         zmq.REP: [f'tcp://*:{port + 3}'],
-        #                                                         zmq.PUB: [f'tcp://*:{port + 5}'],
-        #                                                         zmq.SUB: [f'tcp://localhost:{port + 6}']
-        #                                                         }, 
-        #                                     manager_address_map={
-        #                                                         zmq.REQ: [f'tcp://localhost:{port}'],
-        #                                                         zmq.SUB: [f'tcp://localhost:{port+1}'],
-        #                                                         zmq.PUSH: [f'tcp://localhost:{port+2}']})
-
-        with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', {})
-            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-
-        with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', manager_address_map={
-                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
-            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-        with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', manager_address_map={
-                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']})
-            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-        with self.assertRaises(AttributeError):
-            network_config = NetworkConfig('TEST', manager_address_map={
-                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
-                                                                    zmq.SUB: [f'tcp://localhost:{port+1}']})
-            TestSimulationNode.DummyNode('NAME', network_config, [], logger=node.get_logger())
-            
-
-    def test_realtime_run(self):
-        print('\nTESTING REAL-TIME CLOCK MANAGER')
-        n_nodes = [1, 20]
-        n_modules = [1, 4]
-        port = 5555
-        level=logging.WARNING
-
+        level = logging.WARNING
+        
         year = 2023
         month = 1
         day = 1
@@ -271,33 +389,52 @@ class TestSimulationNode(unittest.TestCase):
         ss = 00
         start_date = datetime(year, month, day, hh, mm, ss)
         end_date = datetime(year, month, day, hh, mm, ss+1)
-
         clock_config = RealTimeClockConfig(start_date, end_date)
 
         logger = None
-        for n in n_nodes:
-            for m in n_modules:
-                logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
-    
-    def test_accelerated_realtime_run(self):
-        print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')
-        n_nodes = [1, 20]
-        n_modules = [1, 4]
-        port = 5555
-        level=logging.WARNING
+        # for t_type in TestSimulationNode.TransmissionTypes:
+        for t_type in [TestSimulationNode.TransmissionTypes.BROADCAST]:
+            print(f'Transmission Type: {t_type.value}')
+            monitor = TestSimulationNode.DummyMonitor(clock_config, port, level, logger)
+            
+            logger = monitor.get_logger() if logger is None else logger
 
-        year = 2023
-        month = 1
-        day = 1
-        hh = 12
-        mm = 00
-        ss = 00
-        start_date = datetime(year, month, day, hh, mm, ss)
-        end_date = datetime(year, month, day, hh, mm, ss+1)
+            simulation_element_name_list = [f'{monitor.get_network_name()}/PING', f'{monitor.get_network_name()}/PONG']
+            manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
 
-        clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
+            ping_network_config = NetworkConfig(manager.get_network_name(),
+                                                manager_address_map = {
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']
+                                                                    },
+                                                external_address_map={
+                                                                    zmq.REQ: [],
+                                                                    zmq.PUB: [f'tcp://*:{port+3}'],
+                                                                    zmq.REP: [f'tcp://*:{port+5}']
+                                                                    })
+            pong_network_config = NetworkConfig(manager.get_network_name(),
+                                                manager_address_map = {
+                                                                    zmq.REQ: [f'tcp://localhost:{port}'],
+                                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']
+                                                                    },
+                                                external_address_map={
+                                                                    zmq.REQ: [f'tcp://localhost:{port+5}'],
+                                                                    zmq.REP: [f'tcp://*:{port+4}'],
+                                                                    zmq.SUB: [f'tcp://localhost:{port+3}']
+                                                                    })
 
-        logger = None
-        for n in n_nodes:
-            for m in n_modules:
-                logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
+            ping = TestSimulationNode.PingNode(t_type, ping_network_config, manager.get_network_config(), level, logger)
+            pong = TestSimulationNode.PongNode(t_type, pong_network_config, manager.get_network_config(), level, logger)
+            nodes = [ping, pong]
+
+            with concurrent.futures.ThreadPoolExecutor(len(nodes) + 2) as pool:
+                pool.submit(monitor.run, *[])
+                pool.submit(manager.run, *[])
+                node : TestSimulationNode.ModularTestNode
+                for node in nodes:                
+                    pool.submit(node.run, *[])
+                    
+            self.assertEqual(ping.msgs, pong.msgs)
+            print('\n')

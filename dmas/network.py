@@ -794,7 +794,7 @@ class NetworkElement(ABC):
             return dst, src, content
 
         except asyncio.CancelledError as e:
-            self.log(f'message reception on socket {socket} interrupted. {e}', level=logging.WARNING)
+            # self.log(f'message reception on socket {socket} interrupted. {e}', level=logging.WARNING)
             raise e
             
         except Exception as e:

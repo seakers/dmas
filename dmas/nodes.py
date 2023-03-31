@@ -435,7 +435,7 @@ class Node(SimulationElement):
         """
         Listens for any broadcast messages from every peer that this network node is connected to
         """
-        return await self._receive_external_msg(zmq.PUB)
+        return await self._receive_external_msg(zmq.SUB)
 
     async def subscribe_to_broadcasts(self, dst : str) -> None:
         """
