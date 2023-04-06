@@ -222,6 +222,7 @@ class NetworkElement(ABC):
             - network_config (:obj:`NetworkConfig`): description of the addresses pointing to this nmetwork element
         """
         super().__init__()      
+
         # initialize attributes with `None` values
         self._manager_socket_map = None
         self._manager_address_ledger = None
@@ -295,13 +296,15 @@ class NetworkElement(ABC):
 
         TODO add save to file capabilities
         """
-        logger = logging.getLogger()
-        logger.propagate = False
-        logger.setLevel(level)
+        logger = logging.getLogger(self.name)
+        if not logger.hasHandlers():
+            logger.propagate = False
+            logger.setLevel(level)
 
-        c_handler = logging.StreamHandler()
-        c_handler.setLevel(level)
-        logger.addHandler(c_handler)
+            c_handler = logging.StreamHandler()
+            c_handler.setLevel(level)
+            logger.addHandler(c_handler)
+            logger.setLevel(level)
 
         return logger 
     
@@ -847,11 +850,11 @@ class NetworkElement(ABC):
             return  await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
-            self._log(f'message reception interrupted. {e}', level=logging.DEBUG)
+            self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
-            self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self.log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
@@ -912,11 +915,11 @@ class NetworkElement(ABC):
             return  await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
-            self._log(f'message reception interrupted. {e}', level=logging.DEBUG)
+            self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
-            self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self.log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
@@ -978,11 +981,11 @@ class NetworkElement(ABC):
             return  await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
-            self._log(f'message reception interrupted. {e}', level=logging.DEBUG)
+            self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
-            self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self.log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:

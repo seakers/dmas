@@ -16,6 +16,76 @@ from dmas.messages import *
 from dmas.network import NetworkConfig
 
 class TestMultiagentSim(unittest.TestCase): 
+	class DummyMonitor(SimulationElement):
+		def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+			network_config = NetworkConfig('TEST_NETWORK',
+                                            external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                                    zmq.PULL: [f'tcp://*:{port+2}']})
+		
+			super().__init__('MONITOR', network_config, level, logger)
+			self._clock_config = clock_config
+
+		async def sim_wait(self, delay: float) -> None:
+			return asyncio.sleep(delay)
+        
+		async def setup(self) -> None:
+			return
+
+		async def teardown(self) -> None:
+			return
+		
+		async def _external_sync(self) -> dict:
+			return self._clock_config, dict()
+		
+		async def _internal_sync(self, _ : ClockConfig) -> dict:
+			return dict()
+		
+		async def _wait_sim_start(self) -> None:
+			return
+
+		async def _execute(self) -> None:
+			try:
+				self.log('executing...')
+				while True:
+					dst, src, content = await self._receive_external_msg(zmq.PULL)
+					
+					self.log(f'message received: {content}', level=logging.DEBUG)
+
+					if (dst not in self.name 
+						or SimulationElementRoles.MANAGER.value not in src 
+						or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
+						self.log('wrong message received. ignoring message...')
+					else:
+						self.log('simulation end message received! ending simulation...')
+						break
+			except asyncio.CancelledError:
+				return
+
+			except Exception as e:
+				raise e
+
+		async def _publish_deactivate(self) -> None:
+			return 
+
+	class DummyManager(AbstractManager):
+		def __init__(self, clock_config, simulation_element_name_list : list, port : int, level : int = logging.INFO, logger : logging.Logger = None) -> None:
+			network_config = NetworkConfig('TEST_NETWORK',
+											manager_address_map = {
+																	zmq.REP: [f'tcp://*:{port}'],
+																	zmq.PUB: [f'tcp://*:{port+1}'],
+																	zmq.PUSH: [f'tcp://localhost:{port+2}']})
+			
+			super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
+
+		def _check_element_list(self):
+			return
+		
+		async def setup(self) -> None:
+			return
+
+		async def teardown(self) -> None:
+			return
+
 	class TestAgentState(AgentState):
 		def __init__(self, 
 	       				x0 : float = None, y0 : float = None, z0 : float = None,
@@ -139,7 +209,7 @@ class TestMultiagentSim(unittest.TestCase):
 			env = TestMultiagentSim.TestEnvironment(
 													env_network_config, 
 													manager_network_config,
-													level=level)
+													logger=env.get_logger())
 		
 		with self.assertRaises(AttributeError):
 			env_network_config = NetworkConfig( network_name,
@@ -155,7 +225,8 @@ class TestMultiagentSim(unittest.TestCase):
 			env = TestMultiagentSim.TestEnvironment(
 													env_network_config, 
 													manager_network_config,
-													level=level)
+													level=level,
+													logger=env.get_logger())
 
 	class TestAgent(Agent):
 		def __init__(self, 
@@ -225,11 +296,11 @@ class TestMultiagentSim(unittest.TestCase):
 														zmq.PUSH: [f'tcp://localhost:{port+2}']
 												})
 			
-		TestMultiagentSim.TestAgent('TEST_AGENT', 
-									agent_network_config, 
-									manager_network_config, 
-									initial_state, 
-									level=level)
+		agent = TestMultiagentSim.TestAgent('TEST_AGENT', 
+											agent_network_config, 
+											manager_network_config, 
+											initial_state, 
+											level=level)
 		
 		with self.assertRaises(AttributeError):
 			agent_network_config = NetworkConfig( network_name,
@@ -245,7 +316,7 @@ class TestMultiagentSim(unittest.TestCase):
 										agent_network_config, 
 										manager_network_config, 
 										initial_state, 
-										level=level)
+										logger=agent.get_logger())
 		
 		with self.assertRaises(AttributeError):
 			agent_network_config = NetworkConfig( network_name,
@@ -261,7 +332,7 @@ class TestMultiagentSim(unittest.TestCase):
 										agent_network_config, 
 										manager_network_config, 
 										initial_state, 
-										level=level)
+										logger=agent.get_logger())
 			
 		with self.assertRaises(AttributeError):
 			agent_network_config = NetworkConfig( network_name,
@@ -277,82 +348,12 @@ class TestMultiagentSim(unittest.TestCase):
 										agent_network_config, 
 										manager_network_config, 
 										initial_state, 
-										level=level)
-	
-	class DummyMonitor(SimulationElement):
-		def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
-			network_config = NetworkConfig('TEST_NETWORK',
-                                            external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                    zmq.PULL: [f'tcp://*:{port+2}']})
+										logger=agent.get_logger())
 		
-			super().__init__('MONITOR', network_config, level, logger)
-			self._clock_config = clock_config
-
-		async def sim_wait(self, delay: float) -> None:
-			return asyncio.sleep(delay)
-        
-		async def setup(self) -> None:
-			return
-
-		async def teardown(self) -> None:
-			return
-		
-		async def _external_sync(self) -> dict:
-			return self._clock_config, dict()
-		
-		async def _internal_sync(self, _ : ClockConfig) -> dict:
-			return dict()
-		
-		async def _wait_sim_start(self) -> None:
-			return
-
-		async def _execute(self) -> None:
-			try:
-				self.log('executing...')
-				while True:
-					dst, src, content = await self._receive_external_msg(zmq.PULL)
-					
-					self.log(f'message received: {content}', level=logging.DEBUG)
-
-					if (dst not in self.name 
-						or SimulationElementRoles.MANAGER.value not in src 
-						or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-						self.log('wrong message received. ignoring message...')
-					else:
-						self.log('simulation end message received! ending simulation...')
-						break
-			except asyncio.CancelledError:
-				return
-
-			except Exception as e:
-				raise e
-
-		async def _publish_deactivate(self) -> None:
-			return 
-
-	class DummyManager(AbstractManager):
-		def __init__(self, clock_config, simulation_element_name_list : list, port : int, level : int = logging.INFO, logger : logging.Logger = None) -> None:
-			network_config = NetworkConfig('TEST_NETWORK',
-											manager_address_map = {
-																	zmq.REP: [f'tcp://*:{port}'],
-																	zmq.PUB: [f'tcp://*:{port+1}'],
-																	zmq.PUSH: [f'tcp://localhost:{port+2}']})
-			
-			super().__init__(simulation_element_name_list, clock_config, network_config, level, logger)
-
-		def _check_element_list(self):
-			return
-		
-		async def setup(self) -> None:
-			return
-
-		async def teardown(self) -> None:
-			return
-	
 	def test_multiagent(self):
 		print(f'AGENT-ENV TEST:')
 		port = 5555
-		level = logging.DEBUG
+		level = logging.WARNING
 		
 		year = 2023
 		month = 1
@@ -368,12 +369,15 @@ class TestMultiagentSim(unittest.TestCase):
 		monitor = TestMultiagentSim.DummyMonitor(clock_config, port, level)
 		logger = monitor.get_logger()
 		print(logger)
+		print(level)
+		print(logger.level == level)
 		
 		# set up simulation manager
 		simulation_element_name_list = [
 										SimulationElementRoles.ENVIRONMENT.value,
 										# TestMultiagentSim.AgentNames.AGENT_1.value
 										]
+
 		manager = TestMultiagentSim.DummyManager(	clock_config, 
 					   								simulation_element_name_list, 
 													port, 
@@ -394,30 +398,28 @@ class TestMultiagentSim(unittest.TestCase):
 														[], 
 														logger=logger)
 		
-		# # set up agent
-		# agent_network_config = NetworkConfig( 	manager.get_network_config().network_name,
-		# 										manager_address_map = {
-		# 												zmq.REQ: [f'tcp://localhost:{port}'],
-		# 												zmq.SUB: [f'tcp://localhost:{port+1}'],
-		# 												zmq.PUSH: [f'tcp://localhost:{port+2}']},
-		# 										external_address_map = {
-		# 												zmq.REQ: [f'tcp://*:{port+5}'],
-		# 												zmq.PUB: [f'tcp://*:{port+6}'],
-		# 												zmq.SUB: [f'tcp://*:{port+7}']
-		# 									})
-		# initial_state = TestMultiagentSim.TestAgentState(x0 = 0, y0 = 0, z0 = 0)
-		# agent = TestMultiagentSim.TestAgent(TestMultiagentSim.AgentNames.AGENT_1.value,
-		# 									agent_network_config,
-		# 									manager.get_network_config(),
-		# 									initial_state,
-		# 									logger=logger)
+		# set up agent
+		agent_network_config = NetworkConfig( 	manager.get_network_config().network_name,
+												manager_address_map = {
+														zmq.REQ: [f'tcp://localhost:{port}'],
+														zmq.SUB: [f'tcp://localhost:{port+1}'],
+														zmq.PUSH: [f'tcp://localhost:{port+2}']},
+												external_address_map = {
+														zmq.REQ: [f'tcp://*:{port+5}'],
+														zmq.PUB: [f'tcp://*:{port+6}'],
+														zmq.SUB: [f'tcp://*:{port+7}']
+											})
+		initial_state = TestMultiagentSim.TestAgentState(x0 = 0, y0 = 0, z0 = 0)
+		agent = TestMultiagentSim.TestAgent(TestMultiagentSim.AgentNames.AGENT_1.value,
+											agent_network_config,
+											manager.get_network_config(),
+											initial_state,
+											logger=logger)
 		
 		# sim_elements = [monitor, manager, environment, agent]
-		sim_elements = [monitor, manager]
+		sim_elements = [monitor, manager, environment]
 		with concurrent.futures.ThreadPoolExecutor(len(sim_elements)) as pool:
-			pool.submit(monitor.run, *[])
-			pool.submit(manager.run, *[])
-			# for sim_element in sim_elements:                
-			# 	sim_element : SimulationElement
-			# 	pool.submit(sim_element.run, *[])
+			for sim_element in sim_elements:                
+				sim_element : SimulationElement
+				pool.submit(sim_element.run, *[])
 		print('\n')
