@@ -576,7 +576,7 @@ class NetworkElement(ABC):
             return True
         
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.ERROR)
+            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
@@ -625,7 +625,7 @@ class NetworkElement(ABC):
             return await self.__send_msg(msg, socket)
             
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.ERROR)
+            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
@@ -686,7 +686,7 @@ class NetworkElement(ABC):
             return await self.__send_msg(msg, socket)
             
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.ERROR)
+            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
@@ -747,7 +747,7 @@ class NetworkElement(ABC):
             return await self.__send_msg(msg, socket)
             
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.ERROR)
+            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
@@ -794,7 +794,7 @@ class NetworkElement(ABC):
             return dst, src, content
 
         except asyncio.CancelledError as e:
-            # self.log(f'message reception on socket {socket} interrupted. {e}', level=logging.WARNING)
+            self.log(f'message reception on socket {socket} interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
@@ -847,11 +847,11 @@ class NetworkElement(ABC):
             return  await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
-            # self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            self._log(f'message reception interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
-            # self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self._log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
@@ -912,11 +912,11 @@ class NetworkElement(ABC):
             return  await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
-            # self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            self._log(f'message reception interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
-            # self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self._log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
@@ -978,11 +978,11 @@ class NetworkElement(ABC):
             return  await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
-            # self._log(f'message reception interrupted. {e}', level=logging.WARNING)
+            self._log(f'message reception interrupted. {e}', level=logging.DEBUG)
             raise e
             
         except Exception as e:
-            # self._log(f'message reception failed. {e}', level=logging.ERROR)
+            self._log(f'message reception failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
@@ -1050,11 +1050,11 @@ class NetworkElement(ABC):
             return receive_task.result()
         
         except asyncio.CancelledError as e:
-            self.log(f'message request interrupted.')
+            self.log(f'message request interrupted.', level=logging.DEBUG)
             raise e
 
         except Exception as e:
-            self.log(f'message request failed. {e}')
+            self.log(f'message request failed. {e}', level=logging.ERROR)
             raise e
         
         finally:
