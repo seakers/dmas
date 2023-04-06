@@ -367,9 +367,6 @@ class TestMultiagentSim(unittest.TestCase):
 		# set up simulation monitor
 		monitor = TestMultiagentSim.DummyMonitor(clock_config, port, level)
 		logger = monitor.get_logger()
-		print(logger)
-		print(level)
-		print(logger.level == level)
 		
 		# set up simulation manager
 		simulation_element_name_list = [

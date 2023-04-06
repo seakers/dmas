@@ -662,7 +662,7 @@ class TestNetworkElement(unittest.TestCase):
     def test_p2p_message(self):
         port = 5555
         n_messages = 20
-        level=logging.WARNING
+        level=logging.DEBUG
 
         # INTERNAL MESSAGING
         print('\nTEST: Internal Peer-to-Peer Message (REQ-REP)')

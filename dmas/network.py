@@ -1130,15 +1130,14 @@ class NetworkElement(ABC):
                 and the message contents `content` (`dict`)
         """
         self._external_address_ledger : dict
-        if f'{self.get_network_name()}/' not in msg.dst:
-            dst = f'{self.get_network_name()}/{msg.dst}'
-            dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
-        else:
-            dst_network_config : NetworkConfig = self._external_address_ledger.get(msg.dst, None)
-
-        if dst_network_config is None:
-            print(self._external_address_ledger)
-            raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
+        dst_network_config : NetworkConfig = self._external_address_ledger.get(msg.dst, None)
+        if dst_network_config is None: 
+            if f'{self.get_network_name()}/' not in msg.dst:
+                dst = f'{self.get_network_name()}/{msg.dst}'
+                dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
+                
+            if dst_network_config is None:
+                raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
 
         dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)[-1]
         if '*' in dst_address:
