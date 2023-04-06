@@ -136,6 +136,8 @@ class TestMultiagentSim(unittest.TestCase):
 			return f'pos: {self.pos}\nvel: {self.vel}\nacc: {self.acc}\n'
 
 	
+	# class 
+
 	def test_agent_state_init(self):
 		pos = [1, 1, 1]
 		vel = [2, 2, 2]
