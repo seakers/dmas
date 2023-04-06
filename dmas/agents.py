@@ -11,6 +11,9 @@ class AgentState(ABC):
     """
     @abstractmethod
     def update_state(self, **kwargs):
+        """
+        Updates the state of this agent
+        """
         pass
 
     @abstractmethod
@@ -19,8 +22,8 @@ class AgentState(ABC):
 
 class Agent(Node):
     def __init__(self, 
-                    node_name: str, 
-                    node_network_config: NetworkConfig, 
+                    agent_name: str, 
+                    agent_network_config: NetworkConfig, 
                     manager_network_config: NetworkConfig, 
                     initial_state: AgentState,
                     modules: list = [], 
@@ -28,18 +31,18 @@ class Agent(Node):
                     logger: logging.Logger = None
                 ) -> None:
 
-        super().__init__(   node_name, 
-                            node_network_config, 
+        super().__init__(   agent_name, 
+                            agent_network_config, 
                             manager_network_config, 
                             modules, 
                             level, 
                             logger)
         
-        if zmq.REQ not in node_network_config.get_external_addresses() and zmq.DEALER not in node_network_config.get_external_addresses():
+        if zmq.REQ not in agent_network_config.get_external_addresses() and zmq.DEALER not in agent_network_config.get_external_addresses():
             raise AttributeError(f'`node_network_config` must contain a REQ or DEALER port and an address within its external address map.')
-        if zmq.PUB not in node_network_config.get_external_addresses():
+        if zmq.PUB not in agent_network_config.get_external_addresses():
             raise AttributeError(f'`node_network_config` must contain a PUB port and an address within its external address map.')
-        if zmq.SUB not in node_network_config.get_external_addresses():
+        if zmq.SUB not in agent_network_config.get_external_addresses():
             raise AttributeError(f'`node_network_config` must contain a SUB port and an address within its external address map.')
 
         self.state : AgentState = initial_state
