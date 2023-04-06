@@ -477,7 +477,7 @@ class NetworkElement(ABC):
             # subscribe to messages addressed to this element or to all elements in the network
             for topic in self.__topics:
                 socket.setsockopt(zmq.SUBSCRIBE, topic)
-                self.log(f'PUB port subscribed to topic `{topic}`!')
+                self.log(f'SUB port subscribed to topic `{topic}`!')
         
         return (socket, asyncio.Lock())
 
@@ -1130,8 +1130,14 @@ class NetworkElement(ABC):
                 and the message contents `content` (`dict`)
         """
         self._external_address_ledger : dict
-        dst_network_config : NetworkConfig = self._external_address_ledger.get(msg.dst, None)
+        if f'{self.get_network_name()}/' not in msg.dst:
+            dst = f'{self.get_network_name()}/{msg.dst}'
+            dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
+        else:
+            dst_network_config : NetworkConfig = self._external_address_ledger.get(msg.dst, None)
+
         if dst_network_config is None:
+            print(self._external_address_ledger)
             raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
 
         dst_address = dst_network_config.get_external_addresses().get(zmq.REP, None)[-1]
@@ -1158,6 +1164,13 @@ class NetworkElement(ABC):
                 and the message contents `content` (`dict`)
         """
         self._internal_address_ledger : dict
+        
+        # if f'{self.get_element_name()}/' not in msg.dst:
+        #     dst = f'{self.get_element_name()}/{msg.dst}'
+        #     dst_network_config : NetworkConfig = self._internal_address_ledger.get(dst, None)
+        # else:
+        #     dst_network_config : NetworkConfig = self._internal_address_ledger.get(msg.dst, None)
+
         dst_network_config : NetworkConfig = self._internal_address_ledger.get(msg.dst, None)
         if dst_network_config is None:
             raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')

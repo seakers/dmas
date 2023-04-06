@@ -246,14 +246,13 @@ class TestMultiagentSim(unittest.TestCase):
 				t_0 = time.time()
 				
 				while True:
-					dt = random.random()
+					dt = 0.25
 					await self.sim_wait(dt)
 					pos_msg = TestMultiagentSim.AgentPositionMessage(self.name,
 																	SimulationElementRoles.ENVIRONMENT.value, 
 																	self.state.pos)
-					await self.send_peer_message(pos_msg)
+					_, _, msg_dict = await self.send_peer_message(pos_msg)
 
-					_, _, msg_dict = await self.listen_peer_message()
 					response = TestMultiagentSim.AgentPositionMessage(**msg_dict)
 
 					self.pos = response.pos
@@ -271,7 +270,7 @@ class TestMultiagentSim(unittest.TestCase):
 	def test_agent_init(self):
 		port = 5555
 		network_name = 'TEST_NETWORK'
-		level = logging.DEBUG
+		level = logging.WARNING
 
 		initial_state = TestMultiagentSim.TestAgentState()
 		pos = [1.0, 1.0, 1.0]
@@ -375,7 +374,7 @@ class TestMultiagentSim(unittest.TestCase):
 		# set up simulation manager
 		simulation_element_name_list = [
 										SimulationElementRoles.ENVIRONMENT.value,
-										# TestMultiagentSim.AgentNames.AGENT_1.value
+										TestMultiagentSim.AgentNames.AGENT_1.value
 										]
 
 		manager = TestMultiagentSim.DummyManager(	clock_config, 
@@ -416,8 +415,7 @@ class TestMultiagentSim(unittest.TestCase):
 											initial_state,
 											logger=logger)
 		
-		# sim_elements = [monitor, manager, environment, agent]
-		sim_elements = [monitor, manager, environment]
+		sim_elements = [monitor, manager, environment, agent]
 		with concurrent.futures.ThreadPoolExecutor(len(sim_elements)) as pool:
 			for sim_element in sim_elements:                
 				sim_element : SimulationElement
