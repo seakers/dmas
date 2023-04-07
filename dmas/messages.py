@@ -101,7 +101,7 @@ class ManagerMessageTypes(Enum):
 
 class ManagerMessage(SimulationMessage):
     """
-    ## Abstract Simulation Message 
+    ## Abstract Simulation Manager Message 
 
     Describes a message to be sent between simulation elements
 

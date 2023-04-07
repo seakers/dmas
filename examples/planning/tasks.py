@@ -1,5 +1,8 @@
+from enum import Enum
 import json
 import uuid
+
+from dmas.messages import SimulationMessage
 
 
 class Task(object):
@@ -78,7 +81,7 @@ class Task(object):
         Creates a string representing the contents of this task
         """
         return str(self.to_dict())
-    
+
 if __name__ == '__main__':
     src = 'TEST_SRC'
     dst = 'TEST_DST'
