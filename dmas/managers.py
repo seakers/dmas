@@ -296,3 +296,51 @@ class AbstractManager(SimulationElement):
         
         except asyncio.CancelledError:
             return  
+
+    async def send_manager_broadcast(self, msg : SimulationMessage) -> None:
+        """
+        Broadcasts message to all simulation elements currently connected to this manager
+
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        """
+        return await self._send_manager_msg(msg, zmq.PUB)
+
+    async def listen_for_requests(self):
+        """
+        Listens for any incoming request message from any simulation element
+
+        ### Returns:
+            - `list` containing the received information:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the body of the message as `content` (`dict`)
+
+        ### Usage:
+            - dst, src, content = await self._receive_external_msg(socket_type)
+        """
+        try:
+            # reset tasks
+            read_task = None
+
+            # wait for incoming messages
+            read_task = asyncio.create_task( self._receive_manager_msg(zmq.REP) )
+            await read_task
+            return read_task.result()
+
+        except asyncio.CancelledError:
+            if read_task is not None and not read_task.done():
+                read_task.cancel()
+                await read_task
+    
+    async def respond_to_request(self, resp : SimulationMessage):
+        """
+        Responds to a request message with the appropriate response
+
+        ### Arguments:
+            - resp (obj:`SimulationMessage`): response message
+
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        """
+        self._send_manager_msg(resp, zmq.REP)

@@ -14,6 +14,7 @@ class ClockTypes(Enum):
     TEST = 'TEST'
     REAL_TIME = 'REAL_TIME'                             # runs simulations in real-time 
     ACCELERATED_REAL_TIME = 'ACCELERATED_REAL_TIME'     # each real time second represents a user-given amount of simulation seconds
+    FIXED_TIME_STEP = 'FIXED_TIME_STEP'                 # fixed step for everyone
 
 class ClockConfig(ABC):
     """
@@ -34,7 +35,7 @@ class ClockConfig(ABC):
                 clock_type : str,
                 simulation_runtime_start : float = -1.0,
                 simulation_runtime_end : float = -1.0,
-                **kwargs
+                **_
                 ) -> None:
         """
         Initializes an instance of a clock configuration object
@@ -204,3 +205,36 @@ class RealTimeClockConfig(AcceleratedRealTimeClockConfig):
             - end_date (:obj:`datetime`): simulation end date
         """
         super().__init__(start_date, end_date, 1.0)
+
+class FixedTimesStepClockConfig(ClockConfig):
+    """
+    ## Fixed Time-step Clock Configuration
+
+    Describes a clock that steps forward in fixed time-steps
+    
+    ### Attributes:
+        - start_date (`str` or `datetime`): simulation start date
+        - end_date (`str` or `datetime`): simulation end date
+        - dt (`float` or `int`) : time step in [s]
+        - clock_type (`str`): type of clock to be used in the simulation
+        - simulation_runtime_start (`float`): real-clock start time of the simulation
+        - simulation_runtime_end (`float`): real-clock end time of the simulation
+    """
+    def __init__(   self, 
+                    start_date: Union[str, datetime], 
+                    end_date: Union[str, datetime], 
+                    dt : Union[float, int],
+                    **_) -> None:
+        super().__init__(start_date, end_date, ClockTypes.FIXED_TIME_STEP.value)
+
+        if not isinstance(dt, float) and not isinstance(dt, int):
+            raise TypeError(f'`dt` must be of type `float` or `int`. is of type {type(dt)}.')
+        
+        self.dt = dt
+
+    def get_total_seconds(self):
+        delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
+        return delta.total_seconds()
+
+    def get_time_step(self):
+        return self.dt
