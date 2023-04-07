@@ -3,7 +3,6 @@ from dmas.managers import *
 from examples.planning.messages import *
 
 class PlanningSimulationManager(AbstractManager):
-
     def _check_element_list(self):
         for sim_element_name in self._simulation_element_name_list:
             if SimulationElementRoles.ENVIRONMENT.value in sim_element_name:
@@ -30,9 +29,12 @@ class PlanningSimulationManager(AbstractManager):
                 desc = f'{self.name}: Simulating for {delay}[s]'
                 
                 for t in tqdm (range (n_steps), desc=desc):
-                    # announce new time
+                    # announce new time to simulation elements
                     toc = TocMessage(self.name, self.get_network_name(), t)
                     await self.send_manager_broadcast(toc)
+
+                    # announce new time to simulation monitor
+                    await self.send_monitor_message(toc)
 
                     # wait for everyone to ask to fast forward
                     await self.wait_for_tic_requests()
@@ -132,4 +134,3 @@ class PlanningSimulationManager(AbstractManager):
             if send_task is not None and not send_task.done(): 
                 send_task.cancel()
                 await send_task
-                

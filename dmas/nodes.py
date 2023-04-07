@@ -268,7 +268,7 @@ class Node(SimulationElement):
 
     async def _execute(self) -> None:
         # activate concurrent tasks to be performed by node
-        offline_manager_task = asyncio.create_task(self.__listen_for_manager(), name='offline_manager_task')     # listen if manager becomes offline       
+        offline_manager_task = asyncio.create_task(self.listen_for_manager(), name='offline_manager_task')     # listen if manager becomes offline       
         live_task = asyncio.create_task(self.live(), name='live_task')                               # execute live routine
         tasks = [offline_manager_task, live_task]
 
@@ -303,7 +303,7 @@ class Node(SimulationElement):
         await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
         self.log(f'all pending tasks cancelled and terminated!')
 
-    async def __listen_for_manager(self):
+    async def listen_for_manager(self):
         try:
             self.log(f'waiting for manager to end simulation...')
             while True:
@@ -469,6 +469,21 @@ class Node(SimulationElement):
             `dst, src, msg_dict = await self.listen_peer_broadcast(msg)`
         """
         return await self._receive_external_msg(zmq.SUB)
+    
+    async def listen_manager_broadcast(self) -> tuple:
+        """
+        Listens for any broadcast messages from the simulation manager that this network node is connected to
+
+        ### Returns:
+            - `list` containing the received response from the request:  
+                name of the intended destination as `dst` (`str`) 
+                name of sender as `src` (`str`) 
+                and the message contents `content` (`dict`)
+
+        ### Usage:
+            `dst, src, msg_dict = await self.listen_manager_broadcast(msg)`
+        """
+        return await self._receive_manager_msg(zmq.SUB)
 
     async def subscribe_to_broadcasts(self, dst : str) -> None:
         """

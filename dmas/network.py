@@ -1184,3 +1184,15 @@ class NetworkElement(ABC):
             
         return await self._send_request_message(msg, dst_address, self._internal_socket_map)
     
+    async def send_monitor_message(self, msg : SimulationMessage):
+        """
+        Sends a message to the simulation monitor 
+
+        ### Arguments:
+            - msg (:obj:`SimulationMessage`): message being sent
+        
+        ### Returns:
+            - `bool` representing a successful transmission if True or False if otherwise.
+        
+        """
+        return await self._send_manager_msg(msg, zmq.PUSH)
