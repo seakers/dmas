@@ -230,12 +230,12 @@ class TestMultiagentSim(unittest.TestCase):
 
 	class UpdatePositionAction(AgentAction):
 		def __init__(self, pos : list) -> None:
-			super().__init__()
+			super().__init__(-1, -1)
 			self.pos = pos
 
 	class IdleAction(AgentAction):
 		def __init__(self, dt : float) -> None:
-			super().__init__()
+			super().__init__(-1, -1)
 			self.dt = dt
 
 	class TestAgent(Agent):
@@ -250,7 +250,7 @@ class TestMultiagentSim(unittest.TestCase):
 		async def setup(self):
 			return
 
-		async def sense(self, _ : list) -> list:
+		async def sense(self, _ : dict) -> list:
 			try:
 				pos_msg = TestMultiagentSim.AgentPositionMessage(self.name,
 																		SimulationElementRoles.ENVIRONMENT.value, 
