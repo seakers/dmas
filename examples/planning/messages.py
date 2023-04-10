@@ -1,6 +1,7 @@
 
 from enum import Enum
 from typing import Union
+from examples.planning.states import SimulationAgentState
 
 from tasks import Task
 from dmas.messages import SimulationMessage, SimulationElementRoles
@@ -9,6 +10,29 @@ class SimulationMessageTypes(Enum):
     TASK_REQ = 'TASK_REQUEST'
     TIC_REQ = 'TIC_REQUEST'
     TOC = 'TOC'
+    AGENT_STATE = 'AGENT_STATE'
+
+class AgentStateMessage(SimulationMessage):
+    """
+    ## Tic Request Message
+
+    Request from agents indicating that they are waiting for the next time-step advance
+
+    ### Attributes:
+        - src (`str`): name of the agent sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+        - state (`dict`): dictionary discribing the state of the agent sending this message
+    """
+    def __init__(self, 
+                src: str, 
+                dst: str, 
+                state : dict,
+                id: str = None, 
+                **kwargs):
+        super().__init__(src, dst, SimulationMessageTypes.AGENT_STATE.value, id)
+        self.state = SimulationAgentState(**state)
 
 class TicRequest(SimulationMessage):
     """

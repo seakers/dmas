@@ -7,7 +7,7 @@ import unittest
 import concurrent.futures
 
 import zmq
-from dmas.agents import Agent, AgentState
+from dmas.agents import Agent, AgentState, AgentAction
 from dmas.element import SimulationElement
 from dmas.environments import EnvironmentNode
 from dmas.managers import AbstractManager
@@ -228,6 +228,16 @@ class TestMultiagentSim(unittest.TestCase):
 													level=level,
 													logger=env.get_logger())
 
+	class UpdatePositionAction(AgentAction):
+		def __init__(self, pos : list) -> None:
+			super().__init__()
+			self.pos = pos
+
+	class IdleAction(AgentAction):
+		def __init__(self, dt : float) -> None:
+			super().__init__()
+			self.dt = dt
+
 	class TestAgent(Agent):
 		def __init__(self, 
 	       				agent_name: str, 
@@ -240,26 +250,42 @@ class TestMultiagentSim(unittest.TestCase):
 		async def setup(self):
 			return
 
-		async def live(self):
+		async def sense(self, _ : list) -> list:
 			try:
-				self.state : TestMultiagentSim.TestAgentState
-				t_0 = time.time()
-				
-				while True:
-					dt = 0.25
-					await self.sim_wait(dt)
-					pos_msg = TestMultiagentSim.AgentPositionMessage(self.name,
-																	SimulationElementRoles.ENVIRONMENT.value, 
-																	self.state.pos)
-					_, _, msg_dict = await self.send_peer_message(pos_msg)
+				pos_msg = TestMultiagentSim.AgentPositionMessage(self.name,
+																		SimulationElementRoles.ENVIRONMENT.value, 
+																		self.state.pos)
+				_, _, msg_dict = await self.send_peer_message(pos_msg)
+				return [TestMultiagentSim.AgentPositionMessage(**msg_dict)]
+			except asyncio.CancelledError as e:
+				raise e
 
-					response = TestMultiagentSim.AgentPositionMessage(**msg_dict)
+		async def think(self, senses: list) -> list:
+			try:
+				actions = []
+				for sense in senses:
+					if isinstance(sense, TestMultiagentSim.AgentPositionMessage):
+						actions.append(TestMultiagentSim.UpdatePositionAction(sense.pos))
+						actions.append(TestMultiagentSim.IdleAction(dt=0.25))
 
-					self.pos = response.pos
-					self.log(f'position = {self.pos}', level=logging.WARNING)
-			
-			except asyncio.CancelledError:
-				return
+				return actions
+			except asyncio.CancelledError as e:
+				raise e
+
+		async def do(self, actions : list) -> list:
+			try:
+				statuses = dict()
+				for action in actions:
+					if isinstance(action, TestMultiagentSim.UpdatePositionAction):
+						self.pos = action.pos
+						statuses[action] = True
+						self.log(f'position = {self.pos}', level=logging.WARNING)
+					elif isinstance(action, TestMultiagentSim.IdleAction):
+						await self.sim_wait(action.dt)
+
+				return statuses
+			except asyncio.CancelledError as e:
+				raise e
 			
 		async def teardown(self):
 			pass

@@ -84,8 +84,11 @@ class SimulationEnvironment(EnvironmentNode):
                 
                 # if agent message is received:
                 if socket_agents in socks:
-                    # update state tracker
+                    # unpack message
                     dst, src, content = await self.listen_peer_message()
+                    msg = AgentState
+
+                    # update state tracker
 
                     # send confirmation response
                     resp : SimulationMessage
