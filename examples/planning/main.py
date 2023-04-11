@@ -129,7 +129,7 @@ if __name__ == '__main__':
 													zmq.PUB: [f'tcp://*:{port+4}']
 											})
     
-    # environment = SimulationEnvironment(env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, tasks, logger=logger)
+    environment = SimulationEnvironment(env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, tasks, logger=logger)
 
     # create simulation agents
     agents = []
@@ -147,10 +147,6 @@ if __name__ == '__main__':
 											})
         # agent = 
 
-    agent_names = ['AGENT_0', 'AGENT_1', 'AGENT_2', 'AGENT_3']
-    for i in range(len(agent_names)):
-        for j in range(i+1, len(agent_names)+1):
-            print(i,j)
 
     # run simulation
     # with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:

@@ -184,6 +184,12 @@ class SimulationEnvironment(EnvironmentNode):
 
         return range_updates
 
+    def get_current_time(self) -> float:
+        if isinstance(self._clock_config, FixedTimesStepClockConfig):
+            return self.t
+        else:
+            raise NotImplementedError(f'clock of config of type {type(self._clock_config)} not yet supported by environment.')
+
     async def teardown(self) -> None:
         # nothing to tear-down
         return
