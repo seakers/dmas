@@ -1,4 +1,5 @@
 
+import random
 import unittest
 import concurrent.futures
 
@@ -240,6 +241,19 @@ class TestSimulationManager(unittest.TestCase):
 
         async def teardown(self) -> None:
             return
+
+        async def sim_wait(self, delay: float) -> None:
+            try:
+                if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                    desc = f'{self.name}: Simulating for {delay}[s]'
+                    for _ in tqdm (range (10), desc=desc):
+                        await asyncio.sleep(delay/10)
+
+                else:
+                    raise NotImplemented(f'clock configuration of type {type(self._clock_config)} not yet supported.')
+
+            except asyncio.CancelledError:
+                return
         
     class TestManager(DummyManager):
         def __init__(self, clock_config, simulation_element_name_list: list,port : int, level: int = logging.INFO, logger = None) -> None:
@@ -342,7 +356,7 @@ class TestSimulationManager(unittest.TestCase):
 
         for n in n_clients:
             clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-            self.run_tester(clock_config, n, level=logging.WARNING)
+            self.run_tester(clock_config, n, level=logging.INFO)
 
     def test_accelerated_clock_run(self):
         print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')

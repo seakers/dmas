@@ -7,8 +7,9 @@ import unittest
 import concurrent.futures
 
 import zmq
+from tqdm import tqdm
 from dmas.agents import Agent, AgentState, AgentAction
-from dmas.element import SimulationElement
+from dmas.elements import SimulationElement
 from dmas.environments import EnvironmentNode
 from dmas.managers import AbstractManager
 from dmas.messages import *
@@ -86,6 +87,19 @@ class TestMultiagentSim(unittest.TestCase):
 		async def teardown(self) -> None:
 			return
 
+		async def sim_wait(self, delay: float) -> None:
+			try:
+				if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+					desc = f'{self.name}: Simulating for {delay}[s]'
+					for _ in tqdm (range (10), desc=desc):
+						await asyncio.sleep(delay/10)
+
+				else:
+					raise NotImplemented(f'clock configuration of type {type(self._clock_config)} not yet supported.')
+
+			except asyncio.CancelledError:
+				return
+
 	class TestAgentState(AgentState):
 		def __init__(self, 
 	       				x0 : float = None, y0 : float = None, z0 : float = None,
@@ -125,6 +139,9 @@ class TestMultiagentSim(unittest.TestCase):
 	class TestEnvironment(EnvironmentNode):
 		async def setup(self) -> None:
 			return
+
+		def get_current_time(self) -> float:
+			return -1
 
 		def kinematic_model(self, pos : list, dt : float):
 			"""
@@ -250,13 +267,22 @@ class TestMultiagentSim(unittest.TestCase):
 		async def setup(self):
 			return
 
+		def get_current_time(self) -> float:
+			return -1
+
 		async def sense(self, _ : dict) -> list:
 			try:
-				pos_msg = TestMultiagentSim.AgentPositionMessage(self.name,
+				# send current state to environment 
+				self.state : TestMultiagentSim.TestAgentState
+				curr_state_msg = TestMultiagentSim.AgentPositionMessage(self.name,
 																		SimulationElementRoles.ENVIRONMENT.value, 
 																		self.state.pos)
-				_, _, msg_dict = await self.send_peer_message(pos_msg)
-				return [TestMultiagentSim.AgentPositionMessage(**msg_dict)]
+				
+				# "sense" new state from environment
+				_, _, sensed_msg = await self.send_peer_message(curr_state_msg)
+
+				# return sensed information
+				return [TestMultiagentSim.AgentPositionMessage(**sensed_msg)]
 			except asyncio.CancelledError as e:
 				raise e
 
@@ -274,15 +300,18 @@ class TestMultiagentSim(unittest.TestCase):
 
 		async def do(self, actions : list) -> list:
 			try:
-				statuses = dict()
+				statuses = {action : AgentAction.PENDING for action in actions}
 				for action in actions:
 					if isinstance(action, TestMultiagentSim.UpdatePositionAction):
 						self.pos = action.pos
-						statuses[action] = True
-						self.log(f'position = {self.pos}', level=logging.WARNING)
+						statuses[action] = AgentAction.COMPLETED
+						self.log(f'position = {self.pos}', level=logging.INFO)
 					elif isinstance(action, TestMultiagentSim.IdleAction):
 						await self.sim_wait(action.dt)
-
+						statuses[action] = AgentAction.COMPLETED
+					else:
+						statuses[action] = AgentAction.ABORTED
+				
 				return statuses
 			except asyncio.CancelledError as e:
 				raise e

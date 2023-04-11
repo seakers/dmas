@@ -4,7 +4,7 @@ import random
 import zmq
 from tqdm import tqdm
 import concurrent.futures
-from dmas.element import *
+from dmas.elements import *
 from dmas.messages import *
 from dmas.modules import InternalModule
 from dmas.network import NetworkConfig
@@ -49,6 +49,7 @@ class Node(SimulationElement):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
         
         self.__modules = modules.copy()
+        self.t = None
 
     def run(self) -> int:
         """
@@ -201,6 +202,8 @@ class Node(SimulationElement):
         try:
             task = asyncio.create_task(subroutine())
             await asyncio.wait_for(task, timeout=100)
+
+            self.t = self.get_current_time()
             
         except asyncio.TimeoutError as e:
             self.log(f'Wait for simulation start timed out. Aborting. {e}')
@@ -210,6 +213,13 @@ class Node(SimulationElement):
             await task
 
             raise e
+
+    @abstractmethod
+    async def get_current_time(self) -> float:
+        """
+        Returns the current simulation time in [s]
+        """
+        pass
         
     async def __wait_for_ready_modules(self) -> None:
         """
@@ -268,9 +278,8 @@ class Node(SimulationElement):
 
     async def _execute(self) -> None:
         # activate concurrent tasks to be performed by node
-        offline_manager_task = asyncio.create_task(self.listen_for_manager(), name='offline_manager_task')     # listen if manager becomes offline       
         live_task = asyncio.create_task(self.live(), name='live_task')                               # execute live routine
-        tasks = [offline_manager_task, live_task]
+        tasks = [live_task]
 
         if self.has_modules():
             # listen for modules becoming offline
@@ -287,10 +296,6 @@ class Node(SimulationElement):
         if live_task in pending:
             live_task.cancel()
             self.log(f'cancelling `{live_task.get_name()}` task...')
-        
-        if offline_manager_task in pending:
-            offline_manager_task.cancel()
-            self.log(f'cancelling `{offline_manager_task.get_name()}` task...')
 
         if self.has_modules() and offline_modules_task in pending:
             # internal modules are not yet disabled. inform modules that the node is terminating
@@ -303,7 +308,15 @@ class Node(SimulationElement):
         await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
         self.log(f'all pending tasks cancelled and terminated!')
 
-    async def listen_for_manager(self):
+    async def live(self) -> None:
+        """
+        Routine to be performed by simulation node during when the node is executing. 
+        
+        By default, it only listens for the manager to end the simulation but may be overriden
+        to extend functionality.
+
+        Must be able to handle `asyncio.CancelledError` exceptions.
+        """
         try:
             self.log(f'waiting for manager to end simulation...')
             while True:
@@ -319,20 +332,11 @@ class Node(SimulationElement):
                     break
 
         except asyncio.CancelledError:
-            self.log(f'`__listen_for_manager()` interrupted.')
+            self.log(f'`live()` interrupted.')
             return
         except Exception as e:
-            self.log(f'`__listen_for_manager()` failed. {e}')
+            self.log(f'`live()` failed. {e}')
             raise e
-
-    @abstractmethod
-    async def live(self) -> None:
-        """
-        Routine to be performed by simulation node during when the node is executing. 
-
-        Must be able to handle `asyncio.CancelledError` exceptions.
-        """
-        pass
 
     async def __wait_for_offline_modules(self) -> None:
         """

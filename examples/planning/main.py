@@ -22,12 +22,29 @@ def setup_results_directory(scenario_name) -> str:
             except Exception as e:
                 print('Failed to delete %s. Reason: %s' % (file_path, e))
 
+def create_tasks():
+    pass
+
 if __name__ == '__main__':
     """
     Wrapper for asynchronous MCCBBA simulation using DMAS
     """    
+    # create 
     scenario_name = 'TEST'
     results_path = setup_results_directory(scenario_name)
     
+    # define simulation config
 
-    task_creation_rate = 1.0
+    # create simulation manager and monitor
+    monitor = 0
+
+    # create simulation environment
+
+    # create simulation agents
+
+    # run simulation
+
+    # compile results from monitor
+
+    # print results
+

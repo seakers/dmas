@@ -53,12 +53,12 @@ class SimulationMessage(object):
         if not isinstance(self.id , str):
             raise TypeError(f'Message id `id` must be of type `str`. Is of type {type(self.id)}')
         
-    def __eq__(self, other : object) -> bool:
+    def __eq__(self, other) -> bool:
         """
         Compares two instances of a simulation message. Returns True if they represent the same message.
         """
         other : SimulationMessage
-        return self.to_dict() == dict(other.__dict__)
+        return self.to_dict() == other.to_dict()
 
     def to_dict(self) -> dict:
         """

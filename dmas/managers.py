@@ -1,8 +1,8 @@
 from datetime import timedelta
 import logging
-import random
+import math
 from dmas.clocks import ClockConfig
-from dmas.element import *
+from dmas.elements import *
 from dmas.utils import *
 from tqdm import tqdm
 
@@ -281,21 +281,6 @@ class AbstractManager(SimulationElement):
         await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
         self.log(f'All elements deactivated!')
         return
-
-    async def sim_wait(self, delay : float) -> None:
-        """
-        Simulation element waits for a given delay to occur according to the clock configuration being used
-
-        ### Arguments:
-            - delay (`float`): number of seconds to be waited
-        # """
-        try:
-            desc = f'{self.name}: Simulating for {delay}[s]'
-            for _ in tqdm (range (10), desc=desc):
-                await asyncio.sleep(delay/10)
-        
-        except asyncio.CancelledError:
-            return  
 
     async def send_manager_broadcast(self, msg : SimulationMessage) -> None:
         """

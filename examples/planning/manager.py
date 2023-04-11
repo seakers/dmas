@@ -1,22 +1,29 @@
 import math
 from dmas.managers import *
 from examples.planning.messages import *
+from messages import *
 
 class PlanningSimulationManager(AbstractManager):
     def _check_element_list(self):
+        env_count = 0
         for sim_element_name in self._simulation_element_name_list:
             if SimulationElementRoles.ENVIRONMENT.value in sim_element_name:
-                return
-
-        raise AttributeError(f'`simulation_element_name_list` must contain {SimulationElementRoles.ENVIRONMENT.value}.')
+                env_count += 1
+        
+        if env_count > 1:
+            raise AttributeError(f'`simulation_element_name_list` must only contain one {SimulationElementRoles.ENVIRONMENT.value}. contains {env_count}')
+        elif env_count < 1:
+            raise AttributeError(f'`simulation_element_name_list` must contain {SimulationElementRoles.ENVIRONMENT.value}.')
         
     async def setup(self) -> None:
-        return
-
-    async def teardown(self) -> None:
+        # nothing to set-up
         return
 
     async def sim_wait(self, delay: float) -> None:
+        """
+        Waits for the total number of seconds in the simulation.
+        Time waited depends on length of simulation and clock type in use.
+        """
         try:
             if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
                 desc = f'{self.name}: Simulating for {delay}[s]'
@@ -44,6 +51,10 @@ class PlanningSimulationManager(AbstractManager):
 
         except asyncio.CancelledError:
             return
+
+    async def teardown(self) -> None:
+        # nothing to tear-down
+        return
         
     async def wait_for_tic_requests(self):
         """

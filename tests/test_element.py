@@ -3,7 +3,7 @@ import unittest
 import concurrent.futures
 
 from tqdm import tqdm
-from dmas.element import *
+from dmas.elements import *
 
 
 class TestSimulationElement(unittest.TestCase): 

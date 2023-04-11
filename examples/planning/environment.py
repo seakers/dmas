@@ -18,48 +18,19 @@ class SimulationEnvironment(EnvironmentNode):
     def __init__(self, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
-                sim_config : SimulationConfig,
+                bounds : list,
+                tasks : list,
                 level: int = logging.INFO, 
                 logger: logging.Logger = None) -> None:
         super().__init__(env_network_config, manager_network_config, [], level, logger)
-        self.sim_config = sim_config
+        self.bounds = bounds
         self.tasks = []
         self.t = None
-
-    async def setup(self) -> None:
-        # create initial population of tasks
-        tasks = []
-        task_types = self.sim_config.task_probability.keys()
-        t_delta : timedelta  = self.sim_config.start_date - self.sim_config.end_date
-        
-        for _ in range(len(self.sim_config.n_tasks)):
-            # select task location
-            x_max, y_max = self.sim_config.bounds
-            x = x_max * random.random()
-            y = y_max * random.random()
-
-            # select task type
-            i_rand = random.randint(0,len(task_types)-1)
-            task_type = task_type[i_rand]
-
-            # select score
-            s_max = self.sim_config.task_score[task_type]
-            
-            # select start and end time
-            t_start = t_delta.total_seconds() * random.random()
-            t_end = t_delta.total_seconds()
-
-            tasks.append(Task([x,y], s_max, task_type, t_start, t_end))
-        
         self.tasks = tasks
 
+    async def setup(self) -> None:
         # initiate state trackers
-        self.states_tracker = dict()
-        for agent_name in self._external_address_ledger:
-            if self.get_element_name() in agent_name or SimulationElementRoles.MANAGER.value in agent_name:
-                continue
-            
-            self.states_tracker[agent_name] = None
+        self.states_tracker = {agent_name : None for agent_name in self._external_address_ledger}
 
     async def live(self) -> None:
         try:
@@ -80,13 +51,13 @@ class SimulationEnvironment(EnvironmentNode):
             poller.register(socket_agents, zmq.POLLIN)
             while True:
                 # listen for messages
-                socks = dict(poller.poll())
+                socks = dict(await poller.poll())
                 
                 # if agent message is received:
                 if socket_agents in socks:
                     # unpack message
                     dst, src, content = await self.listen_peer_message()
-                    msg = AgentState
+                    # msg = AgentState
 
                     # update state tracker
 
@@ -116,7 +87,7 @@ class SimulationEnvironment(EnvironmentNode):
                             self.states_tracker[state_name] = state_updates[state_name]
 
                         # check for range 
-                        range_updates : list = check_ranges
+                        # range_updates : list = check_ranges
 
                         # announce chances in connectivity 
                         pass

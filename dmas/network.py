@@ -1,6 +1,7 @@
 from abc import ABC
 import logging
 import socket
+import time
 import zmq
 import zmq.asyncio as azmq
 import asyncio
@@ -445,41 +446,47 @@ class NetworkElement(ABC):
         ### Usage
             socket, lock = socket_factory(context, socket_type, address)
         """
+        try:
+            # create socket
+            socket : zmq.Socket = network_context.socket(socket_type)
+            self.log(f'created socket of type `{socket_type.name}`!')
 
-        # create socket
-        socket : zmq.Socket = network_context.socket(socket_type)
-        self.log(f'created socket of type `{socket_type.name}`!')
+            # connect or bind to network port
+            for address in addresses:
+                if socket_type in [zmq.PUB, zmq.SUB, zmq.REP, zmq.PUSH ,zmq.PULL]:
+                    if '*' not in address:
+                        self.log(f'connected socket to address `{address}`!')
+                        socket.connect(address)
+                    else:
+                        if self.__is_address_in_use(address):
+                            time.sleep(1.0)
 
-        # connect or bind to network port
-        for address in addresses:
-            if socket_type in [zmq.PUB, zmq.SUB, zmq.REP, zmq.PUSH ,zmq.PULL]:
-                if '*' not in address:
-                    self.log(f'connected socket to address `{address}`!')
-                    socket.connect(address)
+                            if self.__is_address_in_use(address):
+                                raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
+                        
+                        self.log(f'bound socket to address `{address}`!')
+                        socket.bind(address)
+                elif socket_type == zmq.REQ:
+                    continue
                 else:
-                    if self.__is_address_in_use(address):
-                        raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
-                    
-                    self.log(f'bound socket to address `{address}`!')
-                    socket.bind(address)
-            elif socket_type == zmq.REQ:
-                continue
-            else:
-                raise NotImplementedError(f'Socket of type `{socket_type}` not yet supported.')
+                    raise NotImplementedError(f'Socket of type `{socket_type}` not yet supported.')
 
-        # set socket options
-        socket.setsockopt(zmq.LINGER, 0)
-        if socket_type is zmq.PUB:
-            # allow for subscribers to connect to this port
-            socket.sndhwm = 1100000
+            # set socket options
+            socket.setsockopt(zmq.LINGER, 0)
+            if socket_type is zmq.PUB:
+                # allow for subscribers to connect to this port
+                socket.sndhwm = 1100000
 
-        elif socket_type is zmq.SUB:
-            # subscribe to messages addressed to this element or to all elements in the network
-            for topic in self.__topics:
-                socket.setsockopt(zmq.SUBSCRIBE, topic)
-                self.log(f'SUB port subscribed to topic `{topic}`!')
-        
-        return (socket, asyncio.Lock())
+            elif socket_type is zmq.SUB:
+                # subscribe to messages addressed to this element or to all elements in the network
+                for topic in self.__topics:
+                    socket.setsockopt(zmq.SUBSCRIBE, topic)
+                    self.log(f'SUB port subscribed to topic `{topic}`!')
+            
+            return (socket, asyncio.Lock())
+        except Exception as e:
+            self.log(f'socket creation failed. {e}')
+            raise e
 
     def __is_address_in_use(self, address : str) -> bool:
         """
@@ -628,11 +635,11 @@ class NetworkElement(ABC):
             return await self.__send_msg(msg, socket)
             
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
+            self.log(f'manager message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
-            self.log(f'message transmission failed. {e}', level=logging.ERROR)
+            self.log(f'manager message transmission failed. {e}', level=logging.ERROR)
             raise e
 
         finally:
@@ -689,11 +696,11 @@ class NetworkElement(ABC):
             return await self.__send_msg(msg, socket)
             
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
+            self.log(f'external message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
-            self.log(f'message transmission failed. {e}', level=logging.ERROR)
+            self.log(f'external message transmission failed. {e}', level=logging.ERROR)
             raise e
 
         finally:
@@ -750,11 +757,11 @@ class NetworkElement(ABC):
             return await self.__send_msg(msg, socket)
             
         except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
+            self.log(f'internal message transmission interrupted. {e}', level=logging.DEBUG)
             return False
 
         except Exception as e:
-            self.log(f'message transmission failed. {e}', level=logging.ERROR)
+            self.log(f'internal message transmission failed. {e}', level=logging.ERROR)
             raise e
 
         finally:

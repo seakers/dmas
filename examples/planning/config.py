@@ -10,17 +10,27 @@ class SimulationConfig(object):
                     start_date : datetime,
                     end_date : datetime,
                     bounds : list,
-                    agent_range : float,
+                    agent_comms_range : float,
+                    n_agents : int,
+                    planner_type : PlannerTypes,
                     n_tasks : int, 
-                    task_score : dict,
-                    task_probability : dict, 
-                    planner_type : PlannerTypes
+                    task_types : list
                 ) -> None:
+        # time config
         self.start_date = start_date
         self.end_date = end_date
+
+        # task config
+        self.n_tasks = n_tasks
+        self.task_types = task_types
+
+        # environment config
         self.bounds = bounds.copy()
-        self.agent_range = agent_range
-        self.n_tasks : float = n_tasks
-        self.task_probability : dict = task_probability
-        self.task_score : dict = task_score
-        self.planner_type : PlannerTypes = planner_type
+        self.agent_comms_range = agent_comms_range
+
+        # agent config
+        self.n_agents = n_agents
+        self.planner_type = planner_type
+
+        
+        

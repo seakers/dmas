@@ -1,10 +1,10 @@
 import logging
-import random
+import concurrent.futures
 import unittest
 from tqdm import tqdm
 
 import zmq
-from dmas.element import *
+from dmas.elements import *
 from dmas.messages import *
 
 from dmas.modules import InternalModule

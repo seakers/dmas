@@ -1,8 +1,6 @@
 import logging
 import time
 import asyncio
-import concurrent.futures
-from dmas.clocks import AcceleratedRealTimeClockConfig
 
 from dmas.network import *
 from dmas.utils import *
@@ -175,8 +173,6 @@ class SimulationElement(NetworkElement):
                 elements' names to the addresses pointing to their respective connecting ports    
         """
         try:
-
-
             # sync external network
             external_sync_task = asyncio.create_task(self._external_sync(), name='External Sync Task')
             timeout_task = asyncio.create_task( asyncio.sleep(10) , name='Timeout Task')
@@ -286,6 +282,7 @@ class SimulationElement(NetworkElement):
 
         # inform others of deactivation
         await self._publish_deactivate()
+
 
     @abstractmethod
     async def sim_wait(self, delay : float) -> None:
