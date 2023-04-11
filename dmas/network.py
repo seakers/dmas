@@ -12,8 +12,6 @@ NETWORK CONFIG
 ------------------
 """
 class NetworkConfig(ABC):
-    # TODO Add additional parameter for simulation manager address map
-
     """
     ## Network Configuration Object
 
@@ -250,8 +248,10 @@ class NetworkElement(ABC):
         self._element_name = element_name
         self.name = network_config.network_name + '/' + element_name
         self._logger : logging.Logger = self.__set_up_logger(level) if logger is None else logger
-        self.__topics = [  self._network_name.encode('ascii'), 
-                        self.name.encode('ascii')
+        self.__topics = [  
+                        self._network_name.encode('ascii'), 
+                        self._element_name.encode('ascii')
+                        # self.name.encode('ascii')
                         ]
 
     def __del__(self):
@@ -423,7 +423,7 @@ class NetworkElement(ABC):
 
         for socket_type in internal_addresses:
             address = internal_addresses[socket_type]
-            socket_type : zmq.Socket; address : str
+            socket_type : zmq.SocketType; address : str
 
             internal_socket_map[socket_type] = self.__socket_factory(network_context, socket_type, address)
 
@@ -447,7 +447,7 @@ class NetworkElement(ABC):
         """
         try:
             # create socket
-            socket : zmq.Socket = network_context.socket(socket_type)
+            socket : azmq.Socket = network_context.socket(socket_type)
             self.log(f'created socket of type `{socket_type.name}`!')
 
             # connect or bind to network port
@@ -520,7 +520,7 @@ class NetworkElement(ABC):
         for socket_type in self._manager_socket_map:
             socket_type : zmq.SocketType
             socket, _ = self._manager_socket_map[socket_type]
-            socket : zmq.Socket
+            socket : azmq.Socket
             socket.close()  
             self.log(f'closed manager socket of type {socket_type}...', level=logging.DEBUG)
 
@@ -528,7 +528,7 @@ class NetworkElement(ABC):
         for socket_type in self._external_socket_map:
             socket_type : zmq.SocketType
             socket, _ = self._external_socket_map[socket_type]
-            socket : zmq.Socket
+            socket : azmq.Socket
             socket.close()  
             self.log(f'closed external socket of type {socket_type}...', level=logging.DEBUG)
 
@@ -536,14 +536,14 @@ class NetworkElement(ABC):
         for socket_type in self._internal_socket_map:
             socket_type : zmq.SocketType
             socket, _ = self._internal_socket_map[socket_type]
-            socket : zmq.Socket
+            socket : azmq.Socket
             socket.close()  
             self.log(f'closed internal socket of type {socket_type}...', level=logging.DEBUG)
 
         # close network context
         if self._network_context is not None:
-            self._network_context : zmq.Context
-            self._network_context.term()  
+            self._network_context : azmq.Context
+            self._network_context.destroy()  
 
         self._network_activated = False
 
@@ -569,7 +569,7 @@ class NetworkElement(ABC):
         try:
             # send multi-part message
             dst : str = msg.dst
-            src : str = self.name
+            src : str = self.get_element_name()
             content : str = str(msg.to_json())
             self.log(f'sending message: {content}')
 
@@ -583,7 +583,7 @@ class NetworkElement(ABC):
         
         except asyncio.CancelledError as e:
             self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
-            return False
+            raise e
 
         except Exception as e:
             self.log(f'message transmission failed. {e}', level=logging.ERROR)
@@ -849,11 +849,11 @@ class NetworkElement(ABC):
             self.log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
 
             # send multi-part message
-            return  await self.__receive_msg(socket)
+            return await self.__receive_msg(socket)
 
         except asyncio.CancelledError as e:
             self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-            raise e
+            return None, None, None
             
         except Exception as e:
             self.log(f'message reception failed. {e}', level=logging.ERROR)
@@ -918,7 +918,7 @@ class NetworkElement(ABC):
 
         except asyncio.CancelledError as e:
             self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-            raise e
+            return None, None, None
             
         except Exception as e:
             self.log(f'message reception failed. {e}', level=logging.ERROR)
@@ -984,7 +984,7 @@ class NetworkElement(ABC):
 
         except asyncio.CancelledError as e:
             self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-            raise e
+            return None, None, None
             
         except Exception as e:
             self.log(f'message reception failed. {e}', level=logging.ERROR)
@@ -1026,8 +1026,7 @@ class NetworkElement(ABC):
             socket, socket_lock = socket_map.get(zmq.REQ, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
 
-            if (socket is None 
-                or socket_lock is None):
+            if socket is None or socket_lock is None:
                 raise KeyError(f'Socket of type {zmq.SocketType.REQ.name} not contained in this simulation element.')
             
             # acquire lock
@@ -1056,7 +1055,7 @@ class NetworkElement(ABC):
         
         except asyncio.CancelledError as e:
             self.log(f'message request interrupted.', level=logging.DEBUG)
-            raise e
+            return None, None, None
 
         except Exception as e:
             self.log(f'message request failed. {e}', level=logging.ERROR)
@@ -1084,7 +1083,7 @@ class NetworkElement(ABC):
 
     async def send_manager_message(self, msg : SimulationMessage) -> list:
         """
-        Sends a message through this node's external request socket
+        Sends a message through this node's manager request socket
 
         ### Arguments:
             - msg (:obj:`SimulationMessage`): message being sent
@@ -1095,28 +1094,20 @@ class NetworkElement(ABC):
                 name of sender as `src` (`str`) 
                 and the message contents `content` (`dict`)
         """
-        try:
-            self._manager_address_ledger : dict
-            dst_network_config : NetworkConfig = self._manager_address_ledger.get(msg.dst, None)
-            if dst_network_config is None:
-                raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
+        self._manager_address_ledger : dict
+        dst_network_config : NetworkConfig = self._manager_address_ledger.get(msg.dst, None)
+        if dst_network_config is None:
+            raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
 
-            dst_address = dst_network_config.get_manager_addresses().get(zmq.REP, None)[-1]
-            if '*' in dst_address:
-                dst_address : str
-                dst_address = dst_address.replace('*', 'localhost')
-                    
-            if dst_address is None:
-                raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
+        dst_address = dst_network_config.get_manager_addresses().get(zmq.REP, None)[-1]
+        if '*' in dst_address:
+            dst_address : str
+            dst_address = dst_address.replace('*', 'localhost')
                 
-            return await self._send_request_message(msg, dst_address, self._manager_socket_map)
-        except Exception as e:
-            self.log(f'request message to manager failed. {e}')
-            self.log(f'Address Ledger: {self._manager_address_ledger}')
-            self.log(f'Manager Network Config: {dst_network_config}')
-            self.log(f'Manager Addresses: {dst_network_config.get_manager_addresses()}')
-            self.log(f'Manager REP address: {dst_address}')
-            raise e
+        if dst_address is None:
+            raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
+            
+        return await self._send_request_message(msg, dst_address, self._manager_socket_map)
 
     async def _send_external_request_message(self, msg : SimulationMessage) -> list:
         """
