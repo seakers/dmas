@@ -17,9 +17,9 @@ class Task(object):
         - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
     """
     def __init__(self, 
-                x : list, 
+                pos : list, 
                 s_max : float, 
-                instrument : str,
+                instruments : list,
                 t_start : float,
                 t_end : float,
                 id : str = None) -> None:
@@ -34,14 +34,19 @@ class Task(object):
             - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
         """
         # check arguments
-        if not isinstance(x, list):
-            raise AttributeError(f'`x` must be of type `list`. is of type {type(x)}.')
-        elif len(x) != 2:
-            raise ValueError(f'`x` must be a list of 2 values. is of length {len(x)}.')
+        if not isinstance(pos, list):
+            raise AttributeError(f'`pos` must be of type `list`. is of type {type(pos)}.')
+        elif len(pos) != 2:
+            raise ValueError(f'`pos` must be a list of 2 values. is of length {len(pos)}.')
         if not isinstance(s_max, float) and not isinstance(s_max, int):
             raise AttributeError(f'`s_max` must be of type `float` or type `int`. is of type {type(s_max)}.')
-        if not isinstance(instrument, str):
-            raise AttributeError(f'`instrument` must be of type `str`. is of type {type(instrument)}.')
+        if not isinstance(instruments, list):
+            raise AttributeError(f'`instruments` must be of type `list`. is of type {type(instruments)}.')
+        else:
+            for instrument in instruments:
+                if not isinstance(instrument, str):
+                    raise AttributeError(f'`instruments` must a `list` of elements of type `str`. contains elements of type {type(instrument)}.')
+
         if not isinstance(t_start, float) and not isinstance(t_start, int):
             raise AttributeError(f'`t_start` must be of type `float` or type `int`. is of type {type(t_start)}.')
         elif t_start < 0:
@@ -51,9 +56,9 @@ class Task(object):
         elif t_end < 0:
             raise ValueError(f'`t_end` must be a value higher than 0. is of value {t_end}.')
         
-        self.x = x
+        self.pos = pos
         self.s_max = s_max
-        self.instrument = instrument
+        self.instruments = instruments
         self.t_start = t_start
         self.t_end = t_end
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
@@ -81,15 +86,3 @@ class Task(object):
         Creates a string representing the contents of this task
         """
         return str(self.to_dict())
-
-if __name__ == '__main__':
-    src = 'TEST_SRC'
-    dst = 'TEST_DST'
-    id = str(uuid.uuid1())
-    
-    task_1 = Task([1,1], 1.0, 'INS', 0.0, 1.0, id)
-    task_2 = Task([1,1], 1.0, 'INS', 0.0, 1.0)
-
-    assert task_1 == Task(**task_1.to_dict())
-    assert task_1 != task_2
-    

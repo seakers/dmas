@@ -142,6 +142,39 @@ class TestMultiagentSim(unittest.TestCase):
 
 		def get_current_time(self) -> float:
 			return -1
+		
+		async def listen_to_manager_cancel(self):
+			while True:
+				_, _, content = await self.listen_manager_broadcast()
+				
+				if content is not None and content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+					return
+
+		async def respond_to_agents(self):
+			try:
+				t_0 = time.time()
+				while True:
+					# listens for incoming requests
+					_, src, msg_dict = await self.listen_peer_message()
+
+					if msg_dict is None:
+						# resp = SimulationMessage(self._element_name, '', '')
+						# await self.respond_peer_message(resp)
+						return
+
+					msg = TestMultiagentSim.AgentPositionMessage(**msg_dict)
+
+					# does some work - calculate agent position
+					pos = msg.pos
+					dt = time.time() - t_0
+					x = self.kinematic_model(pos, dt)
+					resp = TestMultiagentSim.AgentPositionMessage(self.name, src, x)
+
+					# responds to request
+					await self.respond_peer_message(resp)
+			
+			except asyncio.CancelledError:
+				return
 
 		def kinematic_model(self, pos : list, dt : float):
 			"""
@@ -160,23 +193,18 @@ class TestMultiagentSim(unittest.TestCase):
 
 		async def live(self) -> None:
 			try:
-				t_0 = time.time()
-				while True:
-					# listens for incoming requests
-					_, src, msg_dict = await self.listen_peer_message()
-					msg = TestMultiagentSim.AgentPositionMessage(**msg_dict)
+				t_1 = asyncio.create_task(self.listen_to_manager_cancel())
+				t_2 = asyncio.create_task(self.respond_to_agents())
 
-					# does some work - calculate agent position
-					pos = msg.pos
-					dt = time.time() - t_0
-					x = self.kinematic_model(pos, dt)
-					resp = TestMultiagentSim.AgentPositionMessage(self.name, src, x)
+				_, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
 
-					# responds to request
-					await self.respond_peer_message(resp)
+				for task in pending:
+					task : asyncio.Task
+					task.cancel()		
+					await task	
 
 			except asyncio.CancelledError as e:
-				raise e
+				return
 
 		async def teardown(self) -> None:
 			return
@@ -270,7 +298,13 @@ class TestMultiagentSim(unittest.TestCase):
 		def get_current_time(self) -> float:
 			return -1
 
-		async def sense(self, _ : dict) -> list:
+		async def listen_to_manager_cancel(self):
+			while True:
+				_, _, content = await self.listen_manager_broadcast()
+				if content is not None and content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+					return
+
+		async def sense_state(self):
 			try:
 				# send current state to environment 
 				self.state : TestMultiagentSim.TestAgentState
@@ -283,6 +317,21 @@ class TestMultiagentSim(unittest.TestCase):
 
 				# return sensed information
 				return [TestMultiagentSim.AgentPositionMessage(**sensed_msg)]
+			except asyncio.CancelledError as e:
+				return
+
+		async def sense(self, _ : dict) -> list:
+			try:
+				t_1 = asyncio.create_task(self.listen_to_manager_cancel())
+				t_2 = asyncio.create_task(self.sense_state())
+
+				await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
+
+				if t_2.done():
+					t_1.cancel()
+					await t_1
+					raise asyncio.CancelledError()
+
 			except asyncio.CancelledError as e:
 				raise e
 
@@ -407,7 +456,7 @@ class TestMultiagentSim(unittest.TestCase):
 	def test_multiagent(self):
 		print(f'AGENT-ENV TEST:')
 		port = 5555
-		level = logging.WARNING
+		level = logging.DEBUG
 		
 		year = 2023
 		month = 1

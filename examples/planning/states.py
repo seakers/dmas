@@ -7,9 +7,18 @@ class AgentStatus(Enum):
     MEASURING = 'MEASURING'
 
 class SimulationAgentState(AgentState):
-    def __init__(self, pos : list, vel : list, tasks_performed : list, status : str) -> None:
+    def __init__(self, 
+                pos : list, 
+                vel : list, 
+                tasks_performed : list, 
+                status : str,
+                **_
+                ) -> None:
         super().__init__()
-        
+        self.pos = pos
+        self.vel = vel
+        self.tasks_performed = tasks_performed
+        self.status = status
 
     def __str__(self):
         return str(self.to_dict())

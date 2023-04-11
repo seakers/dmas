@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 
 import zmq
 from dmas.clocks import ClockConfig
@@ -7,13 +8,10 @@ from dmas.elements import SimulationElement
 from dmas.messages import ManagerMessageTypes, SimulationElementRoles
 from dmas.network import NetworkConfig
 
-class SimulationMonitor(SimulationElement):
-    def __init__(self, clock_config : ClockConfig, port : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
-        network_config = NetworkConfig('TEST_NETWORK',
-                                        external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                                zmq.PULL: [f'tcp://*:{port+2}']})
-    
-        super().__init__('MONITOR', network_config, level, logger)
+class ResultsMonitor(SimulationElement):
+    def __init__(self, clock_config : ClockConfig, monitor_network_config : int, level: int = logging.INFO, logger: logging.Logger = None) -> None:
+        
+        super().__init__(SimulationElementRoles.MONITOR.value, monitor_network_config, level, logger)
         self._clock_config = clock_config
 
     async def _external_sync(self) -> dict:
@@ -21,13 +19,34 @@ class SimulationMonitor(SimulationElement):
     
     async def _internal_sync(self, _ : ClockConfig) -> dict:
         return dict()
+
     async def setup(self) -> None:
         # nothing to set-up
         return
     
     async def _wait_sim_start(self) -> None:
-        # TODO: wait for simulation start message from the manager
-        return
+        """
+        Waits for the manager to bradcast a `SIM_START` message
+        """
+        while True:
+            # listen for any incoming broadcasts through SUB socket
+            dst, src, content = await self._receive_manager_msg(zmq.SUB)
+            dst : str; src : str; content : dict
+            msg_type = content['msg_type']
+
+            if (
+                self.get_network_name() not in dst,
+                SimulationElementRoles.MANAGER.value not in src 
+                or msg_type != ManagerMessageTypes.SIM_START.value
+                ):
+                # undesired message received. Ignoring and trying again later
+                self.log(f'received undesired message of type {msg_type}. Ignoring...')
+                await asyncio.wait(random.random())
+
+            else:
+                # manager announced the start of the simulation
+                self.log(f'received simulation start message from simulation manager!', level=logging.INFO)
+                return
 
     async def _execute(self) -> None:
         try:
@@ -51,6 +70,7 @@ class SimulationMonitor(SimulationElement):
         return
 
     async def _publish_deactivate(self) -> None:
+        # no one to report deactivation to
         return 
 
     async def sim_wait(self, delay: float) -> None:

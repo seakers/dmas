@@ -1,9 +1,8 @@
-from datetime import timedelta
-import random
 from dmas.environments import *
-from config import SimulationConfig
-from dmas.messages import ManagerMessageTypes, SimulationMessage
-from examples.planning.messages import SimulationMessageTypes, TaskRequest, TocMessage
+
+from dmas.messages import *
+
+from messages import *
 from tasks import Task
 
 class SimulationEnvironment(EnvironmentNode):
@@ -18,12 +17,16 @@ class SimulationEnvironment(EnvironmentNode):
     def __init__(self, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
-                bounds : list,
+                x_bounds : list,
+                y_bounds : list,
+                comms_range : float,
                 tasks : list,
                 level: int = logging.INFO, 
                 logger: logging.Logger = None) -> None:
         super().__init__(env_network_config, manager_network_config, [], level, logger)
-        self.bounds = bounds
+        self.x_bounds = x_bounds
+        self.y_bounds = y_bounds
+        self.comms_range = comms_range
         self.tasks = []
         self.t = None
         self.tasks = tasks
@@ -49,36 +52,56 @@ class SimulationEnvironment(EnvironmentNode):
             socket_agents, _ = self._external_socket_map.get(zmq.REQ)
             poller.register(socket_manager, zmq.POLLIN)
             poller.register(socket_agents, zmq.POLLIN)
+
+            # listen for messages
             while True:
-                # listen for messages
                 socks = dict(await poller.poll())
                 
-                # if agent message is received:
+                # check if agent message is received:
                 if socket_agents in socks:
-                    # unpack message
+                    # read message from socket
                     dst, src, content = await self.listen_peer_message()
-                    # msg = AgentState
+                    self.log(f'agent message received: {content}')
+                    
+                    if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                        # message is of type `AgentState`
+                        self.log(f"received message of type {content['msg_type']}. processing message....")
 
-                    # update state tracker
+                        # unpack message
+                        msg = AgentStateMessage(**content)
 
-                    # send confirmation response
-                    resp : SimulationMessage
+                        # update state tracker
+                        self.states_tracker[src] : AgentStateMessage = msg.state
+
+                        # send confirmation response
+                        resp = NodeReceptionAckMessage(self.get_element_name(), src)
+
+                    else:
+                        # message is of an unsopported type. send blank response
+                        self.log(f"received message of type {content['msg_type']}. ignoring message...")
+                        resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
+
+                    # respond to request
                     await self.respond_peer_message(resp)
 
-                # if manager message is received:
+                # check if manager message is received:
                 if socket_manager in socks:
+                    # read message from socket
                     dst, src, content = await self.listen_manager_broadcast()
-                    self.log(f'message received: {content}', level=logging.DEBUG)
+                    self.log(f'manager message received: {content}')
 
                     if (dst in self.name 
                         and SimulationElementRoles.MANAGER.value in src 
                         and content['msg_type'] == ManagerMessageTypes.SIM_END.value):
                         # sim end message received
-                        self.log('simulation end message received! ending simulation...')
+
+                        self.log(f"received message of type {content['msg_type']}. ending simulation...")
                         return
 
-                    # if tock is received:
                     elif content['msg_type'] == SimulationMessageTypes.TOC.value:
+                        # toc message received
+                        self.log(f"received message of type {content['msg_type']}. ending simulation...")
+
                         # wait for all agent's to send their updated states
                         state_updates = await self.wait_for_agent_updates()
 
@@ -86,19 +109,74 @@ class SimulationEnvironment(EnvironmentNode):
                         for state_name in state_updates:
                             self.states_tracker[state_name] = state_updates[state_name]
 
-                        # check for range 
-                        # range_updates : list = check_ranges
-
-                        # announce chances in connectivity 
-                        pass
+                        # check for range and announce chances in connectivity 
+                        range_updates : list = self.check_agent_distance()
+                        for range_update in range_updates:
+                            range_update : AgentConnectivityUpdate
+                            await self.send_peer_broadcast(range_update)
                     
                     else:
                         # ignore message
-                        self.log('wrong message received. ignoring message...')    
+                        self.log(f"received message of type {content['msg_type']}. ignoring message...")
                     
 
         except asyncio.CancelledError:
             return
+
+    async def wait_for_agent_updates(self) -> dict:
+        """
+        Waits for all agents to send in their state updates to the environment
+        """
+        try:
+            responses = dict()
+            while len(responses) < len(self._external_address_ledger):
+                # read message from socket
+                _, src, content = await self.listen_peer_message()
+                self.log(f'agent message received: {content}')
+                
+                if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                    # message is of type `AgentState`
+                    self.log(f"received message of type {content['msg_type']}. processing message....")
+
+                    # unpack message
+                    responses[src] = AgentStateMessage(**content)
+
+                    # send confirmation response
+                    resp = NodeReceptionAckMessage(self.get_element_name(), src)
+
+                else:
+                    # message is of an unsopported type. send blank response
+                    self.log(f"received message of type {content['msg_type']}. ignoring message...")
+                    resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
+
+                # respond to request
+                await self.respond_peer_message(resp)
+            
+            return responses
+
+        except asyncio.CancelledError as e:
+            raise e
+
+    def check_agent_distance(self) -> list:
+        """
+        Checks if agents are in range of each other or not 
+        """
+        agent_names = self._external_address_ledger.keys()
+        range_updates = []
+        for i in range(len(agent_names)):
+            for j in range(i+1, len(agent_names)+1):
+                agent_a = agent_names[i]
+                agent_b = agent_names[j]
+
+                pos_a = self.states_tracker[agent_a]
+                pos_b = self.states_tracker[agent_b]
+
+                dist = numpy.sqrt( (pos_a[0] - pos_b[0])**2 + (pos_a[1] - pos_b[1])**2 )
+                                    
+                range_updates.append(AgentConnectivityUpdate(agent_a, agent_b, dist <= self.comms_range))
+                range_updates.append(AgentConnectivityUpdate(agent_b, agent_a, dist <= self.comms_range))
+
+        return range_updates
 
     async def listen_for_manager(self):
         try:

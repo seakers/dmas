@@ -382,7 +382,7 @@ class TestSimulationNode(unittest.TestCase):
         async def send_ping(self):
             while True:
                 # send ping
-                msg = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PONG', 'PING')
+                msg = SimulationMessage(self.get_element_name(), f'PONG', 'PING')
                 self.msgs.append(msg.to_dict())
                 if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
                     # broadcast ping message 
@@ -407,7 +407,7 @@ class TestSimulationNode(unittest.TestCase):
                 if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
                     # wait for pong to be ready for boradcasts
                     await self.listen_peer_message()
-                    resp = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PONG', 'OK')
+                    resp = SimulationMessage(self.get_element_name(), f'PONG', 'OK')
                     await self.respond_peer_message(resp)
                 
                 _, pending = await asyncio.wait([asyncio.create_task(self.listen_to_manager()),
@@ -445,7 +445,7 @@ class TestSimulationNode(unittest.TestCase):
 
                 if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
                     # tell ping im ready for broadcasts
-                    ready_msg = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PING', 'READY')
+                    ready_msg = SimulationMessage(self.get_element_name(), f'PING', 'READY')
                     await self.send_peer_message(ready_msg)
                     socket_agents, _ = self._external_socket_map.get(zmq.SUB)
                 else:
@@ -480,7 +480,7 @@ class TestSimulationNode(unittest.TestCase):
                             _, _, msg = await self.listen_peer_message()
                             
                             # respond to message
-                            resp = SimulationMessage(self.get_element_name(), f'{self.get_network_name()}/PING', 'PONG')
+                            resp = SimulationMessage(self.get_element_name(), f'PING', 'PONG')
                             await self.respond_peer_message(resp)
 
                         # register received message
@@ -518,7 +518,8 @@ class TestSimulationNode(unittest.TestCase):
             
             logger = monitor.get_logger() if logger is None else logger
 
-            simulation_element_name_list = [f'{monitor.get_network_name()}/PING', f'{monitor.get_network_name()}/PONG']
+            # simulation_element_name_list = [f'{monitor.get_network_name()}/PING', f'{monitor.get_network_name()}/PONG']
+            simulation_element_name_list = ['PONG', 'PING']
             manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
 
             ping_network_config = NetworkConfig(manager.get_network_name(),
@@ -560,9 +561,9 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_ping_pong_direct(self):
         print(f'PING-PONG TEST')
-        # port = 5555 + 100
-        port = 5555
-        level = logging.WARNING
+        port = 5555 + 500
+        # port = 5555
+        level = logging.DEBUG
         
         year = 2023
         month = 1

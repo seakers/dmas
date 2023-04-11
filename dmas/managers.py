@@ -52,10 +52,6 @@ class AbstractManager(SimulationElement):
             raise AttributeError(f'`network_config` must contain a PUSH port and an address to parent node within manager address map.')
 
         # initialize constants and parameters
-        for i in range(len(simulation_element_name_list)):
-            element_name = simulation_element_name_list[i]
-            if self.get_network_name() not in element_name:
-                simulation_element_name_list[i] = f'{self.get_network_name()}/{element_name}'
         self._simulation_element_name_list = simulation_element_name_list.copy()
         self._clock_config = clock_config
         self._manager_address_ledger = {SimulationElementRoles.MANAGER.name : network_config}

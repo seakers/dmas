@@ -11,6 +11,7 @@ class SimulationMessageTypes(Enum):
     TIC_REQ = 'TIC_REQUEST'
     TOC = 'TOC'
     AGENT_STATE = 'AGENT_STATE'
+    CONNECTIVITY_UPDATE = 'CONNECTIVITY_UPDATE'
 
 class AgentStateMessage(SimulationMessage):
     """
@@ -33,6 +34,29 @@ class AgentStateMessage(SimulationMessage):
                 **kwargs):
         super().__init__(src, dst, SimulationMessageTypes.AGENT_STATE.value, id)
         self.state = SimulationAgentState(**state)
+
+class AgentConnectivityUpdate(SimulationMessage):
+    """
+    ## Agent Connectivity Update Message
+
+    Informs an agent that it's connectivity to another agent has changed
+
+    ### Attributes:
+        - src (`str`): name of the agent sending this message
+        - dst (`str`): name of the intended agent set to receive this message
+        - target (`str`): name of the agent that the destination agent will change its connectivity with
+        - connected (`bool`): status of the connection between `dst` and `target`
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+        - state (`dict`): dictionary discribing the state of the agent sending this message
+    """
+    def __init__(self, dst: str, target : str, connected : bool, id: str = None):
+        super().__init__(SimulationElementRoles.ENVIRONMENT.value, 
+                         dst, 
+                         SimulationMessageTypes.CONNECTIVITY_UPDATE.value, 
+                         id)
+        self.target = target
+        self.connected = connected
 
 class TicRequest(SimulationMessage):
     """
@@ -97,6 +121,3 @@ class TaskRequest(SimulationMessage):
     def __init__(self, src: str, dst: str, task : dict, id: str = None, **kwargs):
         super().__init__(src, dst, SimulationMessageTypes.TASK_REQ.value, id)
         self.task = Task(**task)
-
-if __name__ == '__main__':
-    pass

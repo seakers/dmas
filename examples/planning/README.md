@@ -69,7 +69,6 @@ Measurement Tasks are defined by a tuple containing their:
 2. Reward
 3. Start Time
 4. End Time
-5. Urgency Factor
 6. Instrument
 7. Task ID
 
