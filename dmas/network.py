@@ -1,7 +1,6 @@
 from abc import ABC
 import logging
 import socket
-import time
 import zmq
 import zmq.asyncio as azmq
 import asyncio
@@ -459,10 +458,7 @@ class NetworkElement(ABC):
                         socket.connect(address)
                     else:
                         if self.__is_address_in_use(address):
-                            time.sleep(1.0)
-
-                            if self.__is_address_in_use(address):
-                                raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
+                            raise ConnectionAbortedError(f'Cannot bind to address {address}. Is currently in use by another process.')
                         
                         self.log(f'bound socket to address `{address}`!')
                         socket.bind(address)
@@ -485,7 +481,7 @@ class NetworkElement(ABC):
             
             return (socket, asyncio.Lock())
         except Exception as e:
-            self.log(f'socket creation failed. {e}')
+            self.log(f'socket creation failed. {e}', level=logging.ERROR)
             raise e
 
     def __is_address_in_use(self, address : str) -> bool:
@@ -608,7 +604,6 @@ class NetworkElement(ABC):
             # get appropriate socket and lock
             socket, socket_lock = None, None
             self._manager_socket_map : dict
-
             socket, socket_lock = self._manager_socket_map.get(socket_type, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False

@@ -560,7 +560,8 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_ping_pong_direct(self):
         print(f'PING-PONG TEST')
-        port = 5655
+        # port = 5555 + 100
+        port = 5555
         level = logging.WARNING
         
         year = 2023

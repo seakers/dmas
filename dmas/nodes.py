@@ -424,7 +424,10 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.send_peer_message(msg)`
         """
-        return await self._send_external_request_message(msg)
+        try:
+            return await self._send_external_request_message(msg)
+        except asyncio.CancelledError:
+            return
 
     async def listen_peer_message(self) -> tuple:
         """
@@ -439,7 +442,10 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.listen_peer_message(msg)`
         """
-        return await self._receive_external_msg(zmq.REP)
+        try:
+            return await self._receive_external_msg(zmq.REP)
+        except asyncio.CancelledError:
+            return
 
     async def respond_peer_message(self, resp : SimulationMessage) -> None:
         """
@@ -448,7 +454,10 @@ class Node(SimulationElement):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self._send_external_msg(resp, zmq.REP)
+        try:
+            return await self._send_external_msg(resp, zmq.REP)
+        except asyncio.CancelledError:
+            return
 
     async def send_peer_broadcast(self, msg : SimulationMessage) -> None:
         """
@@ -457,7 +466,10 @@ class Node(SimulationElement):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        return await self._send_external_msg(msg, zmq.PUB)
+        try:
+            return await self._send_external_msg(msg, zmq.PUB)
+        except asyncio.CancelledError:
+            return
     
     async def listen_peer_broadcast(self) -> tuple:
         """
@@ -472,7 +484,10 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.listen_peer_broadcast(msg)`
         """
-        return await self._receive_external_msg(zmq.SUB)
+        try:
+            return await self._receive_external_msg(zmq.SUB)
+        except asyncio.CancelledError:
+            return
     
     async def listen_manager_broadcast(self) -> tuple:
         """
@@ -487,7 +502,10 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.listen_manager_broadcast(msg)`
         """
-        return await self._receive_manager_msg(zmq.SUB)
+        try:
+            return await self._receive_manager_msg(zmq.SUB)
+        except asyncio.CancelledError:
+            return
 
     async def subscribe_to_broadcasts(self, dst : str) -> None:
         """

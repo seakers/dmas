@@ -281,7 +281,8 @@ class SimulationElement(NetworkElement):
         await self.teardown()
 
         # inform others of deactivation
-        await self._publish_deactivate()
+        if self._internal_socket_map is not None:
+            await self._publish_deactivate()
 
 
     @abstractmethod
