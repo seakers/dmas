@@ -40,18 +40,19 @@ class Node(SimulationElement):
                 raise AttributeError(f'`node_network_config` must contain a REP port and an address to node within internal address map.')
             if zmq.PUB not in node_network_config.get_internal_addresses():
                 raise AttributeError(f'`node_network_config` must contain a PUB port and an address to node within internal address map.')
-            if zmq.SUB not in node_network_config.get_internal_addresses():
-                raise AttributeError(f'`node_network_config` must contain a SUB port and an address to node within internal address map.')
+            # if zmq.SUB not in node_network_config.get_internal_addresses():
+            #     raise AttributeError(f'`node_network_config` must contain a SUB port and an address to node within internal address map.')
         
-        self.internal_inbox = None
+        self.manager_inbox = None
         self.external_inbox = None
+        self.internal_inbox = None
+        self.t_start = None
+        self.t_curr = None
 
         for module in modules:
             if not isinstance(module, InternalModule):
                 raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
-        
-        self.__modules = modules.copy()
-        self.t = None
+        self.__modules = modules.copy()        
 
     def run(self) -> int:
         """
@@ -211,7 +212,8 @@ class Node(SimulationElement):
             task = asyncio.create_task(subroutine())
             await asyncio.wait_for(task, timeout=100)
 
-            self.t = self.get_current_time()
+            self.t_start = self.set_start_time()
+            self.t_curr = self.get_current_time()
             
         except asyncio.TimeoutError as e:
             self.log(f'Wait for simulation start timed out. Aborting. {e}')
@@ -221,13 +223,38 @@ class Node(SimulationElement):
             await task
 
             raise e
+        
+    def set_start_time(self) -> float:
+        """
+        Sets the initial time to be used in 
+        """
+        if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+            return time.perf_counter()
+        elif isinstance(self._clock_config, FixedTimesStepClockConfig):
+            return 0
+        else:
+            raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
 
-    @abstractmethod
-    async def get_current_time(self) -> float:
+    def get_current_time(self) -> float:
         """
         Returns the current simulation time in [s]
         """
-        pass
+        if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+            return (time.perf_counter() - self.t_start) * self._clock_config.sim_clock_freq
+        
+        elif isinstance(self._clock_config, FixedTimesStepClockConfig):
+            return self.t_curr
+        else:
+            raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
+
+    def set_current_time(self, t : float) -> None:
+        if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+            # does nothing
+            return 
+        elif isinstance(self._clock_config, FixedTimesStepClockConfig):
+            self.t = t
+        else:
+            raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
         
     async def __wait_for_ready_modules(self) -> None:
         """
@@ -357,7 +384,7 @@ class Node(SimulationElement):
         Waits for all internal modules to send a message of type `target_type` through the node's REP port
         """
         responses = []
-        module_names = [m.name for m in self.__modules]
+        module_names = [m.get_element_name() for m in self.__modules]
 
         with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
             while len(responses) < len(self.__modules):
