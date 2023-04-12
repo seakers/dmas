@@ -118,6 +118,12 @@ class TestMultiagentSim(unittest.TestCase):
 							random.random(),
 							random.random()]
 				
+		def is_critial(self) -> bool:
+			return False
+
+		def is_failure(self) -> bool:
+			return False
+				
 		def update_state(self, pos, **_):
 			self.pos = pos
 
@@ -138,7 +144,7 @@ class TestMultiagentSim(unittest.TestCase):
 
 	class TestEnvironment(EnvironmentNode):
 		async def setup(self) -> None:
-			return
+			self.pos_hist = []
 
 		def get_current_time(self) -> float:
 			return -1
@@ -160,7 +166,7 @@ class TestMultiagentSim(unittest.TestCase):
 					if msg_dict is None:
 						# resp = SimulationMessage(self._element_name, '', '')
 						# await self.respond_peer_message(resp)
-						return
+						raise asyncio.CancelledError()
 
 					msg = TestMultiagentSim.AgentPositionMessage(**msg_dict)
 
@@ -169,6 +175,8 @@ class TestMultiagentSim(unittest.TestCase):
 					dt = time.time() - t_0
 					x = self.kinematic_model(pos, dt)
 					resp = TestMultiagentSim.AgentPositionMessage(self.name, src, x)
+					self.pos_hist.append(x)
+
 
 					# responds to request
 					await self.respond_peer_message(resp)
@@ -207,7 +215,10 @@ class TestMultiagentSim(unittest.TestCase):
 				return
 
 		async def teardown(self) -> None:
-			return
+			out = 'Position history'
+			for pos in self.pos_hist:
+				out += f'\n{pos}'
+			self.log(out, level=logging.WARNING)
 
 		async def sim_wait(self, delay: float) -> None:
 			return asyncio.sleep(delay)
@@ -291,6 +302,7 @@ class TestMultiagentSim(unittest.TestCase):
 						initial_state: AgentState, 
 						level: int = logging.INFO, logger: logging.Logger = None) -> None:
 			super().__init__(agent_name, agent_network_config, manager_network_config, initial_state, [], level, logger)
+			self.pos_hist = []
 
 		async def setup(self):
 			return
@@ -298,13 +310,7 @@ class TestMultiagentSim(unittest.TestCase):
 		def get_current_time(self) -> float:
 			return -1
 
-		async def listen_to_manager_cancel(self):
-			while True:
-				_, _, content = await self.listen_manager_broadcast()
-				if content is not None and content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-					return
-
-		async def sense_state(self):
+		async def sense(self, _ : dict) -> list:
 			try:
 				# send current state to environment 
 				self.state : TestMultiagentSim.TestAgentState
@@ -317,20 +323,6 @@ class TestMultiagentSim(unittest.TestCase):
 
 				# return sensed information
 				return [TestMultiagentSim.AgentPositionMessage(**sensed_msg)]
-			except asyncio.CancelledError as e:
-				return
-
-		async def sense(self, _ : dict) -> list:
-			try:
-				t_1 = asyncio.create_task(self.listen_to_manager_cancel())
-				t_2 = asyncio.create_task(self.sense_state())
-
-				await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
-
-				if t_2.done():
-					t_1.cancel()
-					await t_1
-					raise asyncio.CancelledError()
 
 			except asyncio.CancelledError as e:
 				raise e
@@ -353,6 +345,7 @@ class TestMultiagentSim(unittest.TestCase):
 				for action in actions:
 					if isinstance(action, TestMultiagentSim.UpdatePositionAction):
 						self.pos = action.pos
+						self.pos_hist.append(action.pos)
 						statuses[action] = AgentAction.COMPLETED
 						self.log(f'position = {self.pos}', level=logging.INFO)
 					elif isinstance(action, TestMultiagentSim.IdleAction):
@@ -366,7 +359,10 @@ class TestMultiagentSim(unittest.TestCase):
 				raise e
 			
 		async def teardown(self):
-			pass
+			out = 'Position history'
+			for pos in self.pos_hist:
+				out += f'\n{pos}'
+			self.log(out, level=logging.WARNING)
 
 		async def sim_wait(self, delay: float) -> None:
 			await asyncio.sleep(delay)
@@ -456,7 +452,7 @@ class TestMultiagentSim(unittest.TestCase):
 	def test_multiagent(self):
 		print(f'AGENT-ENV TEST:')
 		port = 5555
-		level = logging.DEBUG
+		level = logging.WARNING
 		
 		year = 2023
 		month = 1
@@ -521,4 +517,6 @@ class TestMultiagentSim(unittest.TestCase):
 			for sim_element in sim_elements:                
 				sim_element : SimulationElement
 				pool.submit(sim_element.run, *[])
+
+		self.assertEqual(agent.pos_hist, environment.pos_hist)
 		print('\n')

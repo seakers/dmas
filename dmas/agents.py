@@ -6,6 +6,7 @@ from typing import Union
 import zmq
 from zmq import asyncio as azmq
 
+from dmas.messages import ManagerMessageTypes
 from dmas.network import NetworkConfig
 from dmas.nodes import Node
 
@@ -17,6 +18,20 @@ class AgentState(ABC):
     def update_state(self, **kwargs):
         """
         Updates the state of this agent
+        """
+        pass
+
+    @abstractmethod
+    def is_critial(self, **kwargs) -> bool:
+        """
+        Returns true if the state is a critical state
+        """
+        pass
+
+    @abstractmethod
+    def is_failure(self, **kwargs) -> bool:
+        """
+        Returns true if the state is a failure state
         """
         pass
 
@@ -165,7 +180,18 @@ class Agent(Node):
 
                 if manager_socket in sockets:
                     dst, src, content = await self.listen_manager_broadcast()
-                    self.manager_inbox.put( (dst, src, content) )
+
+                    # if sim-end message, end process
+                    if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+                        return
+
+                    # if toc message, update clock
+                    elif content['msg_type'] == ManagerMessageTypes.TOC.value:
+                        pass
+
+                    # else, let agent handle it
+                    else:
+                        self.manager_inbox.put( (dst, src, content) )
                 
                 if external_socket in sockets:
                     dst, src, content = await self.listen_peer_broadcast()

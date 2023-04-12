@@ -59,19 +59,17 @@ class SimulationAgent(Agent):
         return
 
     async def sense(self, statuses: dict) -> list:
-        poller = azmq.Poller()
-        socket_manager, _ = self._manager_socket_map.get(zmq.SUB)
-        socket_agents, _ = self._external_socket_map.get(zmq.REP)
-        poller.register(socket_manager, zmq.POLLIN)
-        poller.register(socket_agents, zmq.POLLIN)
+        # handle manager broadcasts
+        while not self.manager_inbox.empty():
+            
+            pass
         
-        socks = dict(await poller.poll())
-        
-        # check if agent message is received:
-        if socket_agents in socks:
-            # read message from socket
-            dst, src, content = await self.listen_peer_message()
-            self.log(f'agent message received: {content}')
+        # handle peer broadcasts
+        while not self.external_inbox.empty():
+            # if planner message, forward to planner
+            pass
+
+        # update task status
 
     async def think(self, senses: list) -> list:
         pass
