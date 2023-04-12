@@ -15,6 +15,8 @@ from tasks import Task
 from manager import PlanningSimulationManager
 from monitor import ResultsMonitor
 from environment import SimulationEnvironment
+from agent import SimulationAgent
+from planners import PlannerTypes
 
 def setup_results_directory(scenario_name) -> str:
     """
@@ -133,19 +135,13 @@ if __name__ == '__main__':
 
     # create simulation agents
     agents = []
-    for i in range(n_agents):
-        agent_name = f'AGENT_{i}'
-        agent_network_config = NetworkConfig( 	manager.get_network_config().network_name,
-												manager_address_map = {
-														zmq.REQ: [f'tcp://localhost:{port}'],
-														zmq.SUB: [f'tcp://localhost:{port+1}'],
-														zmq.PUSH: [f'tcp://localhost:{port+2}']},
-												external_address_map = {
-														zmq.REQ: [],
-														zmq.PUB: [f'tcp://*:{port+5 + i}'],
-														zmq.SUB: []
-											})
-        # agent = 
+    for id in range(n_agents):        
+        agent = SimulationAgent(    network_name,
+                                    port, 
+                                    id,
+                                    manager_network_config,
+                                    planner_type=PlannerTypes.ACCBBA
+                                    )
 
 
     # run simulation
