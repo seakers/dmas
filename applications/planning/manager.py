@@ -1,6 +1,5 @@
 import math
 from dmas.managers import *
-from examples.planning.messages import *
 from messages import *
 
 class PlanningSimulationManager(AbstractManager):
@@ -51,10 +50,6 @@ class PlanningSimulationManager(AbstractManager):
 
         except asyncio.CancelledError:
             return
-
-    async def teardown(self) -> None:
-        # nothing to tear-down
-        return
         
     async def wait_for_tic_requests(self):
         """
@@ -145,3 +140,7 @@ class PlanningSimulationManager(AbstractManager):
             if send_task is not None and not send_task.done(): 
                 send_task.cancel()
                 await send_task
+    
+    async def teardown(self) -> None:
+        # nothing to tear-down
+        return

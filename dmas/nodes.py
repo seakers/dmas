@@ -212,8 +212,7 @@ class Node(SimulationElement):
             task = asyncio.create_task(subroutine())
             await asyncio.wait_for(task, timeout=100)
 
-            self.t_start = self.set_start_time()
-            self.t_curr = self.get_current_time()
+            self.t_start, self.t_curr = self.__initialize_time()
             
         except asyncio.TimeoutError as e:
             self.log(f'Wait for simulation start timed out. Aborting. {e}')
@@ -224,14 +223,14 @@ class Node(SimulationElement):
 
             raise e
         
-    def set_start_time(self) -> float:
+    def __initialize_time(self) -> float:
         """
-        Sets the initial time to be used in 
+        Sets the initial time to be used in the simulation
         """
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-            return time.perf_counter()
+            return time.perf_counter(), 0
         elif isinstance(self._clock_config, FixedTimesStepClockConfig):
-            return 0
+            return 0, Container()
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
 
@@ -243,16 +242,19 @@ class Node(SimulationElement):
             return (time.perf_counter() - self.t_start) * self._clock_config.sim_clock_freq
         
         elif isinstance(self._clock_config, FixedTimesStepClockConfig):
-            return self.t_curr
+            self.t_curr : Container
+            return self.t_curr.level
+             
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
 
-    def set_current_time(self, t : float) -> None:
+    def update_current_time(self, t : float) -> None:
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             # does nothing
             return 
         elif isinstance(self._clock_config, FixedTimesStepClockConfig):
-            self.t = t
+            self.t_curr : Container
+            self.t_curr.set_level(t)
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
         

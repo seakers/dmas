@@ -6,7 +6,7 @@ from typing import Union
 import zmq
 from zmq import asyncio as azmq
 
-from dmas.messages import ManagerMessageTypes
+from dmas.messages import ManagerMessageTypes, TocMessage
 from dmas.network import NetworkConfig
 from dmas.nodes import Node
 
@@ -187,7 +187,8 @@ class Agent(Node):
 
                     # if toc message, update clock
                     elif content['msg_type'] == ManagerMessageTypes.TOC.value:
-                        pass
+                        msg = TocMessage(**content)
+                        self.update_current_time(msg.t)
 
                     # else, let agent handle it
                     else:

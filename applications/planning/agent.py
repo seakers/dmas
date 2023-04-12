@@ -58,13 +58,22 @@ class SimulationAgent(Agent):
     async def sense(self, statuses: dict) -> list:
         # handle manager broadcasts
         while not self.manager_inbox.empty():
-            
-            pass
+            _, _, _ = await self.manager_inbox.get()
+            # do nothing
         
         # handle peer broadcasts
         while not self.external_inbox.empty():
-            # if planner message, forward to planner
-            pass
+            _, _, content = await self.external_inbox.get()
+
+            if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                # if planner message, forward to planner
+                pass
+
+            elif content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+                pass
+
+            elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                pass
 
         # update task status
 
@@ -80,24 +89,18 @@ class SimulationAgent(Agent):
     async def sim_wait(self, delay: float) -> None:
         try:
             if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                tf = self.t + delay
-                while tf > self.t:
-                    # listen for manager's toc messages
-                    _, _, msg_dict = await self.listen_manager_broadcast()
-
-                    if msg_dict is None:
-                        raise asyncio.CancelledError()
-
-                    msg_dict : dict
-                    msg_type = msg_dict.get('msg_type', None)
-
-                    # check if message is of the desired type
-                    if msg_type != SimulationMessageTypes.TOC.value:
-                        continue
+                if delay > 0:
+                    # desired time not yet reached
+                    t0 = self.get_current_time()
+                    tf = t0 + delay
                     
-                    # update time
-                    msg = TocMessage(**msg_type)
-                    self.t = msg.t
+                    # send tic request
+                    tic_req = TicRequest(self.get_element_name(), t0, tf)
+                    await self.send_manager_message(tic_req)
+
+                    # wait for time update
+                    self.t_curr : Container
+                    await self.t_curr.when_geq_than(t0)
 
             elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
                 await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
