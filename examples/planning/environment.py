@@ -38,9 +38,6 @@ class SimulationEnvironment(EnvironmentNode):
 
     async def live(self) -> None:
         try:
-            # initiate internal clock 
-            self.t = 0
-
             # broadcast task requests
             for task in self.tasks:
                 task : AgentTask
