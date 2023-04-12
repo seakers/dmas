@@ -46,8 +46,8 @@ class Node(SimulationElement):
         self.manager_inbox = None
         self.external_inbox = None
         self.internal_inbox = None
-        self.t_start = None
-        self.t_curr = None
+        self.__t_start = None
+        self.__t_curr = None
 
         for module in modules:
             if not isinstance(module, InternalModule):
@@ -212,7 +212,7 @@ class Node(SimulationElement):
             task = asyncio.create_task(subroutine())
             await asyncio.wait_for(task, timeout=100)
 
-            self.t_start, self.t_curr = self.__initialize_time()
+            self.__t_start, self.__t_curr = self.__initialize_time()
             
         except asyncio.TimeoutError as e:
             self.log(f'Wait for simulation start timed out. Aborting. {e}')
@@ -239,11 +239,11 @@ class Node(SimulationElement):
         Returns the current simulation time in [s]
         """
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-            return (time.perf_counter() - self.t_start) * self._clock_config.sim_clock_freq
+            return (time.perf_counter() - self.__t_start) * self._clock_config.sim_clock_freq
         
         elif isinstance(self._clock_config, FixedTimesStepClockConfig):
-            self.t_curr : Container
-            return self.t_curr.level
+            self.__t_curr : Container
+            return self.__t_curr.level
              
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
@@ -253,8 +253,8 @@ class Node(SimulationElement):
             # does nothing
             return 
         elif isinstance(self._clock_config, FixedTimesStepClockConfig):
-            self.t_curr : Container
-            self.t_curr.set_level(t)
+            self.__t_curr : Container
+            self.__t_curr.set_level(t)
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
         
@@ -538,7 +538,7 @@ class Node(SimulationElement):
     async def listen_internal_broadcast(self) -> tuple:
         return await self._receive_internal_msg(zmq.SUB)
 
-    async def subscribe_to_broadcasts(self, dst : str) -> None:
+    def subscribe_to_broadcasts(self, dst : str) -> None:
         """
         Connects this network node's subscribe port to the destination's publish port
         """
@@ -554,12 +554,12 @@ class Node(SimulationElement):
         
         # get own sub port
         socket, _ = self._external_socket_map.get(zmq.SUB)
-        socket : zmq.Socket
+        socket : azmq.Socket
 
         # conenct to destiation
         socket.connect(dst_address)
 
-    async def unsubscribe_to_broadcasts(self, dst) -> None:
+    def unsubscribe_to_broadcasts(self, dst) -> None:
         """
         Disconnects this network node's subscribe port to the destination's publish port
         """
@@ -575,7 +575,7 @@ class Node(SimulationElement):
         
         # get own sub port
         socket, _ = self._external_socket_map.get(zmq.SUB)
-        socket : zmq.Socket
+        socket : azmq.Socket
 
         # conenct to destiation
         socket.disconnect(dst_address)
