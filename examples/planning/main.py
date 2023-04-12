@@ -10,7 +10,7 @@ from dmas.elements import SimulationElement
 from dmas.messages import SimulationElementRoles
 from dmas.network import NetworkConfig
 
-from tasks import Task
+from tasks import AgentTask
 from manager import PlanningSimulationManager
 from monitor import ResultsMonitor
 from environment import SimulationEnvironment
@@ -57,7 +57,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 2
+    n_agents = 0
     comms_range = 5
     max_vel = 1
 
@@ -72,6 +72,12 @@ if __name__ == '__main__':
     end_date = datetime(year, month, day, hh, mm, ss+10)
     dt = 1.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+
+    ## network
+    port = 5555
+
+    ## loggers
+    level = logging.WARNING
     
     ## create tasks
     ### random tasks 
@@ -94,12 +100,10 @@ if __name__ == '__main__':
                 i_ins = random.randint(0, len(task_types)-1)
             instruments.append(task_types[i_ins])           
 
-        task = Task(pos, s_max, instruments, t_start, t_end)
-        tasks.append(Task(pos, s_max, instruments, t_start, t_end))
+        task = AgentTask(pos, s_max, instruments, t_start, t_end)
+        tasks.append(AgentTask(pos, s_max, instruments, t_start, t_end))
 
     # create simulation manager
-    port = 5555
-    level = logging.WARNING
     network_name = 'PLANNING_NETWORK'
     manager_network_config = NetworkConfig( network_name,
 											manager_address_map = {
@@ -152,13 +156,13 @@ if __name__ == '__main__':
 
 
     # run simulation
-    # with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
-    #     pool.submit(monitor.run, *[])
-    #     pool.submit(manager.run, *[])
-    #     pool.submit(environment.run, *[])
-    #     for agent in agents:                
-    #         agent : SimulationElement
-    #         pool.submit(agent.run, *[])
+    with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
+        pool.submit(monitor.run, *[])
+        pool.submit(manager.run, *[])
+        pool.submit(environment.run, *[])
+        for agent in agents:                
+            agent : SimulationElement
+            pool.submit(agent.run, *[])
 
     # compile results from monitor
 

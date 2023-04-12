@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Union
 from states import SimulationAgentState
 
-from tasks import Task
+from tasks import AgentTask
 from dmas.messages import SimulationMessage, SimulationElementRoles
 
 class SimulationMessageTypes(Enum):
@@ -120,4 +120,4 @@ class TaskRequest(SimulationMessage):
     """
     def __init__(self, src: str, dst: str, task : dict, id: str = None, **kwargs):
         super().__init__(src, dst, SimulationMessageTypes.TASK_REQ.value, id)
-        self.task = Task(**task)
+        self.task = task

@@ -5,7 +5,7 @@ import uuid
 from dmas.messages import SimulationMessage
 
 
-class Task(object):
+class AgentTask(object):
     """
     Describes a task to be performed by the agents in the simulation
 

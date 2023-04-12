@@ -4,6 +4,7 @@ import datetime
 import logging
 from typing import Union
 import zmq
+from zmq import asyncio as azmq
 
 from dmas.network import NetworkConfig
 from dmas.nodes import Node
@@ -113,6 +114,24 @@ class Agent(Node):
 
     async def live(self):
         try:
+            t_1 = asyncio.create_task(self.routine(), name='routine()')
+            t_2 = asyncio.create_task(self.listen_to_broadcasts(), name='listen()')
+
+            _, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
+
+            for task in pending:
+                task : asyncio.Task
+                task.cancel()
+                await task
+        
+        except asyncio.CancelledError:
+            return
+
+    async def routine(self):
+        """
+        Performs agent routine or sensing, thinkging, and doing. 
+        """
+        try:
             statuses = dict()
             while True:
                 # sense environment
@@ -125,7 +144,39 @@ class Agent(Node):
                 statuses = await self.do(actions)
         
         except asyncio.CancelledError:
-            return
+            return        
+
+    async def listen_to_broadcasts(self):
+        """
+        Listens for any incoming broadcasts and classifies them in their respective inbox
+        """
+        try:
+            manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
+            external_socket, _ = self._external_socket_map.get(zmq.SUB)
+            internal_socket, _ = self._external_socket_map.get(zmq.SUB)
+
+            poller = azmq.Poller()
+            poller.register(manager_socket, zmq.POLLIN)
+            poller.register(external_socket, zmq.POLLIN)
+            poller.register(internal_socket, zmq.POLLIN)
+
+            while True:
+                sockets = dict(await poller.poll())
+
+                if manager_socket in sockets:
+                    dst, src, content = await self.listen_manager_broadcast()
+                    self.manager_inbox.put( (dst, src, content) )
+                
+                if external_socket in sockets:
+                    dst, src, content = await self.listen_peer_broadcast()
+                    self.external_inbox.put( (dst, src, content) )
+
+                if internal_socket in sockets: 
+                    dst, src, content = await self.listen_internal_broadcast()
+                    self.internal_inbox.put( (dst, src, content) )
+
+        except asyncio.CancelledError:
+            return  
 
     @abstractmethod
     async def sense(self, statuses : dict) -> list:

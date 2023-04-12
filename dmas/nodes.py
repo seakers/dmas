@@ -29,17 +29,19 @@ class Node(SimulationElement):
         self._manager_address_ledger = {SimulationElementRoles.MANAGER.name : manager_network_config}
 
         if zmq.REQ not in node_network_config.get_manager_addresses():
-            raise AttributeError(f'`node_network_config` must contain a REQ port and an address to parent node within external address map.')
+            raise AttributeError(f'`node_network_config` must contain a REQ port and an address to node within external address map.')
         if zmq.SUB not in node_network_config.get_manager_addresses():
-            raise AttributeError(f'`node_network_config` must contain a SUB port and an address to parent node within external address map.')
+            raise AttributeError(f'`node_network_config` must contain a SUB port and an address to node within external address map.')
         if zmq.PUSH not in node_network_config.get_manager_addresses():
-            raise AttributeError(f'`node_network_config` must contain a PUSH port and an address to parent node within external address map.')
+            raise AttributeError(f'`node_network_config` must contain a PUSH port and an address to node within external address map.')
 
         if len(modules) > 0:
             if zmq.REP not in node_network_config.get_internal_addresses():
-                raise AttributeError(f'`node_network_config` must contain a REP port and an address to parent node within internal address map.')
+                raise AttributeError(f'`node_network_config` must contain a REP port and an address to node within internal address map.')
             if zmq.PUB not in node_network_config.get_internal_addresses():
-                raise AttributeError(f'`node_network_config` must contain a PUB port and an address to parent node within internal address map.')
+                raise AttributeError(f'`node_network_config` must contain a PUB port and an address to node within internal address map.')
+            if zmq.SUB not in node_network_config.get_internal_addresses():
+                raise AttributeError(f'`node_network_config` must contain a SUB port and an address to node within internal address map.')
         
         self.internal_inbox = None
         self.external_inbox = None
@@ -81,6 +83,7 @@ class Node(SimulationElement):
         # initiate inboxes
         self.internal_inbox = asyncio.Queue()
         self.external_inbox = asyncio.Queue()
+        self.manager_inbox = asyncio.Queue()
     
         # check for correct socket initialization
         if self._internal_socket_map is None:
@@ -138,7 +141,9 @@ class Node(SimulationElement):
                     external_ledger = dict()
                     ledger_dicts : dict = msg.get_address_ledger()
                     for node in ledger_dicts:
-                        external_ledger[node] = NetworkConfig(**ledger_dicts[node])
+                        if self.get_element_name() not in node:
+                            # only save network configs of other nodes that are not me
+                            external_ledger[node] = NetworkConfig(**ledger_dicts[node])
 
                     clock_config = msg.get_clock_info()
                     clock_type = clock_config['clock_type']
@@ -147,6 +152,9 @@ class Node(SimulationElement):
                         
                     elif clock_type == ClockTypes.ACCELERATED_REAL_TIME.value:
                         return AcceleratedRealTimeClockConfig(**clock_config), external_ledger
+
+                    elif clock_type == ClockTypes.FIXED_TIME_STEP.value:
+                        return FixedTimesStepClockConfig(**clock_config), external_ledger
 
                     else:
                         raise NotImplementedError(f'clock type {clock_type} not yet implemented.')
@@ -424,10 +432,7 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.send_peer_message(msg)`
         """
-        try:
-            return await self._send_external_request_message(msg)
-        except asyncio.CancelledError:
-            return
+        return await self._send_external_request_message(msg)
 
     async def listen_peer_message(self) -> tuple:
         """
@@ -442,10 +447,7 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.listen_peer_message(msg)`
         """
-        try:
-            return await self._receive_external_msg(zmq.REP)
-        except asyncio.CancelledError:
-            return
+        return await self._receive_external_msg(zmq.REP)
 
     async def respond_peer_message(self, resp : SimulationMessage) -> None:
         """
@@ -454,10 +456,7 @@ class Node(SimulationElement):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        try:
-            return await self._send_external_msg(resp, zmq.REP)
-        except asyncio.CancelledError:
-            return
+        return await self._send_external_msg(resp, zmq.REP)
 
     async def send_peer_broadcast(self, msg : SimulationMessage) -> None:
         """
@@ -466,10 +465,7 @@ class Node(SimulationElement):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        try:
-            return await self._send_external_msg(msg, zmq.PUB)
-        except asyncio.CancelledError:
-            return
+        return await self._send_external_msg(msg, zmq.PUB)
     
     async def listen_peer_broadcast(self) -> tuple:
         """
@@ -484,11 +480,8 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.listen_peer_broadcast(msg)`
         """
-        try:
-            return await self._receive_external_msg(zmq.SUB)
-        except asyncio.CancelledError:
-            return
-    
+        return await self._receive_external_msg(zmq.SUB)
+        
     async def listen_manager_broadcast(self) -> tuple:
         """
         Listens for any broadcast messages from the simulation manager that this network node is connected to
@@ -502,10 +495,19 @@ class Node(SimulationElement):
         ### Usage:
             `dst, src, msg_dict = await self.listen_manager_broadcast(msg)`
         """
-        try:
-            return await self._receive_manager_msg(zmq.SUB)
-        except asyncio.CancelledError:
-            return
+        return await self._receive_manager_msg(zmq.SUB)
+
+    async def listen_internal_message(self):
+        return await self._receive_internal_msg(zmq.REP)
+
+    async def respond_internal_message(self, msg : SimulationMessage):
+        return await self._send_internal_msg(msg, zmq.REP)
+
+    async def send_internal_message(self, msg : SimulationMessage) -> tuple:
+        return await self._send_internal_msg(msg, zmq.PUB)
+
+    async def listen_internal_broadcast(self) -> tuple:
+        return await self._receive_internal_msg(zmq.SUB)
 
     async def subscribe_to_broadcasts(self, dst : str) -> None:
         """

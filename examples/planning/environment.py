@@ -3,7 +3,8 @@ from dmas.environments import *
 from dmas.messages import *
 
 from messages import *
-from tasks import Task
+from tasks import AgentTask
+from zmq import asyncio as azmq
 
 class SimulationEnvironment(EnvironmentNode):
     """
@@ -42,14 +43,14 @@ class SimulationEnvironment(EnvironmentNode):
 
             # broadcast task requests
             for task in self.tasks:
-                task : Task
-                task_req = TaskRequest(self.name, self.get_network_name(), task)
+                task : AgentTask
+                task_req = TaskRequest(self.name, self.get_network_name(), task.to_dict())
                 await self.send_peer_broadcast(task_req)
 
             # track agent and simulation states
-            poller = zmq.Poller()
+            poller = azmq.Poller()
             socket_manager, _ = self._manager_socket_map.get(zmq.SUB)
-            socket_agents, _ = self._external_socket_map.get(zmq.REQ)
+            socket_agents, _ = self._external_socket_map.get(zmq.REP)
             poller.register(socket_manager, zmq.POLLIN)
             poller.register(socket_agents, zmq.POLLIN)
 
@@ -135,7 +136,7 @@ class SimulationEnvironment(EnvironmentNode):
         """
         try:
             updates = dict()
-            while len(updates) < len(self._external_address_ledger):
+            while len(updates) < len(self._external_address_ledger) - 1:
                 # read message from socket
                 _, src, content = await self.listen_peer_message()
                 self.log(f'agent message received: {content}')
@@ -167,12 +168,23 @@ class SimulationEnvironment(EnvironmentNode):
         """
         Checks if agents are in range of each other or not 
         """
-        agent_names = self._external_address_ledger.keys()
+        # get list of agents
+        agent_names = list(self._external_address_ledger.keys())
+
+        if len(agent_names) < 2:
+            return []
+
         range_updates = []
         for i in range(len(agent_names)):
+            if agent_a == self.get_element_name():
+                continue
+            
             for j in range(i+1, len(agent_names)+1):
                 agent_a = agent_names[i]
                 agent_b = agent_names[j]
+
+                if agent_b == self.get_element_name():
+                    continue
 
                 pos_a = self.states_tracker[agent_a]
                 pos_b = self.states_tracker[agent_b]

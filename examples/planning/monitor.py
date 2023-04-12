@@ -30,7 +30,7 @@ class ResultsMonitor(SimulationElement):
         """
         while True:
             # listen for any incoming broadcasts through SUB socket
-            dst, src, content = await self._receive_manager_msg(zmq.SUB)
+            dst, src, content = await self._receive_external_msg(zmq.SUB)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
