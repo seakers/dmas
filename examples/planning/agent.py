@@ -51,9 +51,6 @@ class SimulationAgent(Agent):
                         level, 
                         logger)
 
-    async def get_current_time(self) -> float:
-        return await super().get_current_time()
-
     async def setup(self) -> None:
         # nothing to set-up
         return

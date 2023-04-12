@@ -100,9 +100,6 @@ class TestSimulationNode(unittest.TestCase):
         async def teardown(self) -> None:
             return
 
-        def get_current_time(self) -> float:
-            return -1
-
         async def work_routine(self) -> None:
             try:
                 self.log(f'doing some work...')
@@ -282,7 +279,7 @@ class TestSimulationNode(unittest.TestCase):
 
         simulation_element_name_list = []
         for i in range(n_nodes):            
-            simulation_element_name_list.append(f'{monitor.get_network_name()}/NODE_{i}')
+            simulation_element_name_list.append(f'NODE_{i}')
 
         manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
 
@@ -305,7 +302,7 @@ class TestSimulationNode(unittest.TestCase):
         print('\nTESTING SYNC ROUTINE')
         n_nodes = [10]
         n_modules = [4]
-        port = 5555 + 200
+        port = 5555 + 100
         level=logging.WARNING
 
         year = 2023
@@ -349,9 +346,6 @@ class TestSimulationNode(unittest.TestCase):
             super().__init__(node_name, node_network_config, manager_network_config, [], level, logger)
             self.t_type : TestSimulationNode.TransmissionTypes = t_type
             self.msgs = []
-
-        def get_current_time(self) -> float:
-            return -1
 
         async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
@@ -474,18 +468,20 @@ class TestSimulationNode(unittest.TestCase):
                         if self.t_type is TestSimulationNode.TransmissionTypes.BROADCAST:
                             # wait for ping message 
                             _, _, msg = await self.listen_peer_broadcast()
+                            
+                            # register received message
+                            self.msgs.append(msg)
 
                         elif self.t_type is TestSimulationNode.TransmissionTypes.DIRECT:
                             # wait for ping message 
                             _, _, msg = await self.listen_peer_message()
                             
+                            # register received message
+                            self.msgs.append(msg)
+                            
                             # respond to message
                             resp = SimulationMessage(self.get_element_name(), f'PING', 'PONG')
                             await self.respond_peer_message(resp)
-
-                        # register received message
-                        # print('PONG: ', msg)
-                        self.msgs.append(msg)
 
             except asyncio.CancelledError:
                 self.log(f'`live()` interrupted.', level=logging.INFO)
@@ -563,7 +559,7 @@ class TestSimulationNode(unittest.TestCase):
         print(f'PING-PONG TEST')
         port = 5555 + 500
         # port = 5555
-        level = logging.DEBUG
+        level = logging.WARNING
         
         year = 2023
         month = 1
@@ -582,7 +578,7 @@ class TestSimulationNode(unittest.TestCase):
             
             logger = monitor.get_logger() if logger is None else logger
 
-            simulation_element_name_list = [f'{monitor.get_network_name()}/PING', f'{monitor.get_network_name()}/PONG']
+            simulation_element_name_list = [f'PING', f'PONG']
             manager = TestSimulationNode.DummyManager(clock_config, simulation_element_name_list, port, level, logger)
 
             ping_network_config = NetworkConfig(manager.get_network_name(),

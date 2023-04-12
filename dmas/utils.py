@@ -10,7 +10,8 @@ class Container:
     """
     ## Container Object
 
-    Holds a numerical value ('float' or 'int') 
+    Holds a numerical value ('float' or 'int'). 
+    Offers asynchronous events when the value is modified
     """
     def __init__(self, level: float = 0, capacity: float = numpy.Infinity):
         if level > capacity:

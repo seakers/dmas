@@ -145,9 +145,6 @@ class TestMultiagentSim(unittest.TestCase):
 	class TestEnvironment(EnvironmentNode):
 		async def setup(self) -> None:
 			self.pos_hist = []
-
-		def get_current_time(self) -> float:
-			return -1
 		
 		async def listen_to_manager_cancel(self):
 			while True:
@@ -306,9 +303,6 @@ class TestMultiagentSim(unittest.TestCase):
 
 		async def setup(self):
 			return
-
-		def get_current_time(self) -> float:
-			return -1
 
 		async def sense(self, _ : dict) -> list:
 			try:
