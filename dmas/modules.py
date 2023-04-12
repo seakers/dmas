@@ -286,7 +286,7 @@ class InternalModule(NetworkElement):
                 await asyncio.wait(random.random())
 
     @abstractmethod
-    async def routine():
+    async def routine(self) -> None:
         """
         Routine to be performed by the module during when the parent node is executing.
 
@@ -295,7 +295,7 @@ class InternalModule(NetworkElement):
         pass
 
     @abstractmethod
-    async def listen(self):
+    async def listen(self) -> None:
         """
         Listens for messages from the parent node or other internal modules.
 
@@ -303,7 +303,7 @@ class InternalModule(NetworkElement):
         """
         pass
 
-    async def listen_for_manager(self):
+    async def listen_for_manager(self) -> None:
         """
         Listens for any messages from the parent node. 
 

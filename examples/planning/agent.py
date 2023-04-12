@@ -2,29 +2,8 @@ import logging
 from dmas.agents import *
 from dmas.network import NetworkConfig
 
+from states import *
 from planners import *
-
-class AgentStatus(Enum):
-    IDLING = 'IDLING'
-    TRAVELING = 'TRAVELING'
-    MEASURING = 'MEASURING'
-
-class SimulationAgentState(AgentState):
-    def __init__(self, 
-                pos : list, 
-                vel : list, 
-                tasks_performed : list, 
-                status : str,
-                **_
-                ) -> None:
-        super().__init__()
-        self.pos = pos
-        self.vel = vel
-        self.tasks_performed = tasks_performed
-        self.status = status
-
-    def __str__(self):
-        return str(self.to_dict())
 
 class SimulationAgent(Agent):
     def __init__(   self, 
@@ -70,3 +49,51 @@ class SimulationAgent(Agent):
                         level, 
                         logger)
 
+    async def get_current_time(self) -> float:
+        return await super().get_current_time()
+
+    async def setup(self) -> None:
+        pass
+
+    async def sense(self, statuses: dict) -> list:
+        pass
+
+    async def think(self, senses: list) -> list:
+        pass
+
+    async def do(self, actions: list) -> dict:
+        pass
+
+    async def teardown(self) -> None:
+        pass
+
+    async def sim_wait(self, delay: float) -> None:
+        try:
+            if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                tf = self.t + delay
+                while tf > self.t:
+                    # listen for manager's toc messages
+                    _, _, msg_dict = await self.listen_manager_broadcast()
+
+                    if msg_dict is None:
+                        raise asyncio.CancelledError()
+
+                    msg_dict : dict
+                    msg_type = msg_dict.get('msg_type', None)
+
+                    # check if message is of the desired type
+                    if msg_type != SimulationMessageTypes.TOC.value:
+                        continue
+                    
+                    # update time
+                    msg = TocMessage(**msg_type)
+                    self.t = msg.t
+
+            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
+
+            else:
+                raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
+                
+        except asyncio.CancelledError:
+            return

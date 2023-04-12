@@ -1,7 +1,7 @@
 
 from enum import Enum
 from typing import Union
-from examples.planning.states import SimulationAgentState
+from states import SimulationAgentState
 
 from tasks import Task
 from dmas.messages import SimulationMessage, SimulationElementRoles

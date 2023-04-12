@@ -29,6 +29,7 @@ class PlannerModule(InternalModule):
             raise NotImplementedError(f'planner of type {planner_type} not yet supported.')
         self.planner_type = planner_type
 
+    
 class PlannerResults(ABC):
     @abstractmethod
     def __eq__(self, __o: object) -> bool:
@@ -49,3 +50,13 @@ class ACCBBAPlannerModule(PlannerModule):
                             PlannerTypes.ACCBBA, 
                             level, 
                             logger)
+    
+    async def listen(self):
+        # listen for any messages from the agent and adjust results ledger
+
+        # if changes are made that affect the bundle, inform `routine()`
+        pass
+
+    async def routine(self) -> None:
+        # waits for changes in the ledger that may affect the current bundle
+        pass

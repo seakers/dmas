@@ -2,7 +2,6 @@ from datetime import datetime
 import logging
 import os, shutil
 import random
-import numpy as np
 import zmq
 import concurrent.futures
 
@@ -17,6 +16,7 @@ from monitor import ResultsMonitor
 from environment import SimulationEnvironment
 from agent import SimulationAgent
 from planners import PlannerTypes
+from states import *
 
 def setup_results_directory(scenario_name) -> str:
     """
@@ -55,10 +55,11 @@ if __name__ == '__main__':
     ## environment bounds
     x_bounds = [0, 10]
     y_bounds = [0, 10]
-    comms_range = 5
 
     ## agents
     n_agents = 2
+    comms_range = 5
+    max_vel = 1
 
     ## clock configuration
     year = 2023
@@ -136,11 +137,17 @@ if __name__ == '__main__':
     # create simulation agents
     agents = []
     for id in range(n_agents):        
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        pos = [x, y]
+        vel = [0, 0]
+        initial_state = SimulationAgentState(pos, x_bounds, y_bounds, vel, [], AgentStatus.IDLING.value)
         agent = SimulationAgent(    network_name,
                                     port, 
                                     id,
                                     manager_network_config,
-                                    planner_type=PlannerTypes.ACCBBA
+                                    PlannerTypes.ACCBBA,
+                                    initial_state
                                     )
 
 

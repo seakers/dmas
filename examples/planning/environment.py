@@ -196,20 +196,31 @@ class SimulationEnvironment(EnvironmentNode):
 
     async def sim_wait(self, delay: float) -> None:
         try:
-            tf = self.t + delay
-            while tf > self.t:
-                # listen for manager's toc messages
-                _, _, msg_dict = await self.listen_manager_broadcast()
-                msg_dict : dict
-                msg_type = msg_dict.get('msg_type', None)
+            if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                tf = self.t + delay
+                while tf > self.t:
+                    # listen for manager's toc messages
+                    _, _, msg_dict = await self.listen_manager_broadcast()
 
-                # check if message is of the desired type
-                if msg_type != SimulationMessageTypes.TOC.value:
-                    continue
-                
-                # update time
-                msg = TocMessage(**msg_type)
-                self.t = msg.t
+                    if msg_dict is None:
+                        raise asyncio.CancelledError()
+
+                    msg_dict : dict
+                    msg_type = msg_dict.get('msg_type', None)
+
+                    # check if message is of the desired type
+                    if msg_type != SimulationMessageTypes.TOC.value:
+                        continue
+                    
+                    # update time
+                    msg = TocMessage(**msg_type)
+                    self.t = msg.t
+
+            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
+
+            else:
+                raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
                 
         except asyncio.CancelledError:
             return
