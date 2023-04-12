@@ -3,7 +3,7 @@ from dmas.environments import *
 from dmas.messages import *
 
 from messages import *
-from tasks import AgentTask
+from tasks import MeasurementTask
 from zmq import asyncio as azmq
 
 class SimulationEnvironment(EnvironmentNode):
@@ -40,7 +40,7 @@ class SimulationEnvironment(EnvironmentNode):
         try:
             # broadcast task requests
             for task in self.tasks:
-                task : AgentTask
+                task : MeasurementTask
                 task_req = TaskRequest(self.name, self.get_network_name(), task.to_dict())
                 await self.send_peer_broadcast(task_req)
 

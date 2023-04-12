@@ -1,7 +1,6 @@
 import logging
 from dmas.agents import *
 from dmas.network import NetworkConfig
-from zmq import asyncio as azmq
 
 from messages import *
 from states import *
@@ -56,26 +55,55 @@ class SimulationAgent(Agent):
         return
 
     async def sense(self, statuses: dict) -> list:
+        senses = []
+
         # handle manager broadcasts
         while not self.manager_inbox.empty():
+            # do nothing; empty maanger inbox
             _, _, _ = await self.manager_inbox.get()
-            # do nothing
         
         # handle peer broadcasts
         while not self.external_inbox.empty():
             _, _, content = await self.external_inbox.get()
 
             if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                # if planner message, forward to planner
-                pass
+                # forward to planner
+                senses.append(AgentStateMessage(**content))
 
             elif content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
-                pass
+                # update connectivity
+                msg = AgentConnectivityUpdate(**msg)
+                if msg.connected:
+                    self.subscribe_to_broadcasts(msg.target)
+                else:
+                    self.unsubscribe_to_broadcasts(msg.target)
 
             elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                pass
+                # forward to planner
+                senses.append(TaskRequest(**content))
 
-        # update task status
+            elif content['msg_type'] == SimulationMessageTypes.PLANNER_UPDATE.value:
+                # forward to planner
+                senses.append(PlannerUpdate(**content))
+
+        # forward updated task status to planner
+        completed = []
+        for action in statuses:
+            action : AgentAction
+            status = statuses[action]
+            msg = AgentActionMessage(   self.get_element_name(), 
+                                        self.get_element_name(), 
+                                        action.to_dict(),
+                                        status)
+            senses.append(msg)      
+
+            if status == AgentAction.COMPLETED:
+                self.state : SimulationAgentState
+                completed.append(action)
+
+        # update state
+        t = self.get_current_time()
+        self.state.update_state(t, completed)
 
     async def think(self, senses: list) -> list:
         pass

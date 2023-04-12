@@ -3,13 +3,15 @@ from enum import Enum
 from typing import Union
 from states import SimulationAgentState
 
-from tasks import AgentTask
+from tasks import MeasurementTask
 from dmas.messages import SimulationMessage, SimulationElementRoles
 
 class SimulationMessageTypes(Enum):
     TASK_REQ = 'TASK_REQUEST'
+    AGENT_ACTION = 'AGENT_ACTION'
     AGENT_STATE = 'AGENT_STATE'
     CONNECTIVITY_UPDATE = 'CONNECTIVITY_UPDATE'
+    PLANNER_UPDATE = 'PLANNER_UPDATE'
 
 class AgentStateMessage(SimulationMessage):
     """
@@ -67,7 +69,35 @@ class TaskRequest(SimulationMessage):
         - dst (`str`): name of the intended simulation element to receive this message
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
+        - task (`dict`) : task request to be performed
     """
     def __init__(self, src: str, dst: str, task : dict, id: str = None, **kwargs):
         super().__init__(src, dst, SimulationMessageTypes.TASK_REQ.value, id)
         self.task = task
+
+class PlannerUpdate(SimulationMessage):
+    """
+    ## Planner Update Message 
+
+    Informs another agent of the current or proposed plan to be executed by the sender
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
+    def __init__(self, src: str, dst: str, planner_results : dict, id: str = None, **kwargs):
+        super().__init__(src, dst, SimulationMessageTypes.PLANNER_UPDATE.value, id)
+        self.planner_results = planner_results
+
+class AgentActionMessage(SimulationMessage):
+    """
+    ## Agent Action Message
+
+    Informs the receiver of a action to be performed and its completion status
+    """
+    def __init__(self, src: str, dst: str, action : dict, status : str, id: str = None):
+        super().__init__(src, dst, SimulationMessageTypes.AGENT_ACTION.value, id)
+        self.action = action
+        self.status = status

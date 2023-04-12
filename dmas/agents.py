@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 import asyncio
 import datetime
+import json
 import logging
 from typing import Union
+import uuid
 import zmq
 from zmq import asyncio as azmq
 
@@ -61,25 +63,67 @@ class AgentAction(ABC):
     Describes an action to be performed by an agent
 
     ### Attributes:
-        - t_start (`float` or `int`): start time of the action in [s] 
-        - t_end (`float` or `int`): end time of the action in [s] 
+        - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
+        - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+        - id (`str`) : identifying number for this task in uuid format
     """
     PENDING = 'PENDING'
     COMPLETED = 'COMPLETED'
     ABORTED = 'ABORTED'
 
-    def __init__(self, t_start : Union[float, int], t_end : Union[float, int]) -> None:
+    def __init__(   self, 
+                    t_start : Union[float, int],
+                    t_end : Union[float, int], 
+                    id : str = None,
+                    **_
+                ) -> None:
         """
         Creates an instance of an agent action
 
         ### Arguments:
-            - t_start (`float` or `int`): start time of the action in [s] 
-            - t_end (`float` or `int`): end time of the action in [s] 
+            - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
+            - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+            - id (`str`) : identifying number for this task in uuid format
         """
         super().__init__()
+
+        if not isinstance(t_start, float) and not isinstance(t_start, int):
+            raise AttributeError(f'`t_start` must be of type `float` or type `int`. is of type {type(t_start)}.')
+        elif t_start < 0:
+            raise ValueError(f'`t_start` must be a value higher than 0. is of value {t_start}.')
+        if not isinstance(t_end, float) and not isinstance(t_end, int):
+            raise AttributeError(f'`t_end` must be of type `float` or type `int`. is of type {type(t_end)}.')
+        elif t_end < 0:
+            raise ValueError(f'`t_end` must be a value higher than 0. is of value {t_end}.')
+                
         self.t_start = t_start
         self.t_end = t_end
+        self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
 
+    def __eq__(self, other) -> bool:
+        """
+        Compares two instances of a task. Returns True if they represent the same task.
+        """
+        return self.to_dict() == dict(other.__dict__)
+
+    def to_dict(self) -> dict:
+        """
+        Crates a dictionary containing all information contained in this task object
+        """
+        return dict(self.__dict__)
+    
+    def to_json(self) -> str:
+        """
+        Creates a json file from this task 
+        """
+        return json.dumps(self.to_dict())
+
+    def __str__(self) -> str:
+        """
+        Creates a string representing the contents of this task
+        """
+        return str(self.to_dict())
+    
 class Agent(Node):
     """
     ## Agent Node
