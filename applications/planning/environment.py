@@ -90,13 +90,13 @@ class SimulationEnvironment(EnvironmentNode):
 
                     if (dst in self.name 
                         and SimulationElementRoles.MANAGER.value in src 
-                        and content['msg_type'] == ManagerMessageTypes.SIM_END.value):
+                        and content['msg_type'] == ManagerMessageTypes.SIM_END.value
+                        ):
                         # sim end message received
-
                         self.log(f"received message of type {content['msg_type']}. ending simulation...")
                         return
 
-                    elif content['msg_type'] == SimulationMessageTypes.TOC.value:
+                    elif content['msg_type'] == ManagerMessageTypes.TOC.value:
                         # toc message received
                         self.log(f"received message of type {content['msg_type']}. ending simulation...")
 
@@ -104,7 +104,7 @@ class SimulationEnvironment(EnvironmentNode):
                         msg = TocMessage(**content)
 
                         # update internal clock
-                        self.t = msg.t
+                        await self.update_current_time(msg.t)
 
                         # wait for all agent's to send their updated states
                         state_updates = await self.wait_for_agent_updates()

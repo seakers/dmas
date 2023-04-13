@@ -15,6 +15,7 @@ class ClockTypes(Enum):
     REAL_TIME = 'REAL_TIME'                             # runs simulations in real-time 
     ACCELERATED_REAL_TIME = 'ACCELERATED_REAL_TIME'     # each real time second represents a user-given amount of simulation seconds
     FIXED_TIME_STEP = 'FIXED_TIME_STEP'                 # fixed step for everyone
+    EVENT_DRIVEN = 'EVENT_DRIVEN'                       # event-driven clock that fast-forwards to the next upcoming event
 
 class ClockConfig(ABC):
     """
@@ -238,3 +239,26 @@ class FixedTimesStepClockConfig(ClockConfig):
 
     def get_time_step(self):
         return self.dt
+    
+class EventDrivenClockConfig(ClockConfig):
+    """
+    ## Event-driven Clock Configuration
+
+    Describes a clock that steps forward to the next scheduled event
+    
+    ### Attributes:
+        - start_date (`str` or `datetime`): simulation start date
+        - end_date (`str` or `datetime`): simulation end date
+        - clock_type (`str`): type of clock to be used in the simulation
+        - simulation_runtime_start (`float`): real-clock start time of the simulation
+        - simulation_runtime_end (`float`): real-clock end time of the simulation
+    """
+    def __init__(   self, 
+                    start_date: Union[str, datetime], 
+                    end_date: Union[str, datetime],
+                    **_) -> None:
+        super().__init__(start_date, end_date, ClockTypes.EVENT_DRIVEN.value)
+
+    def get_total_seconds(self):
+        delta : timedelta = ClockConfig.str_to_datetime(self.end_date) - ClockConfig.str_to_datetime(self.start_date)
+        return delta.total_seconds()

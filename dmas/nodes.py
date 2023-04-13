@@ -248,13 +248,13 @@ class Node(SimulationElement):
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
 
-    def update_current_time(self, t : float) -> None:
+    async def update_current_time(self, t : float) -> None:
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             # does nothing
             return 
         elif isinstance(self._clock_config, FixedTimesStepClockConfig):
             self.__t_curr : Container
-            self.__t_curr.set_level(t)
+            await self.__t_curr.set_level(t)
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
         

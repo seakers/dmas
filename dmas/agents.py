@@ -12,6 +12,9 @@ from dmas.messages import ManagerMessageTypes, TocMessage
 from dmas.network import NetworkConfig
 from dmas.nodes import Node
 
+class FailureStateException(Exception):
+    pass
+
 class AgentState(ABC):
     """
     Describes the state of an agent
@@ -188,11 +191,11 @@ class Agent(Node):
 
     async def routine(self):
         """
-        Performs agent routine or sensing, thinkging, and doing. 
+        Agent performs sense, thinkg, and do loop while state is . 
         """
         try:
             statuses = dict()
-            while True:
+            while not self.state.is_failure():
                 # sense environment
                 senses = await self.sense(statuses)
 
@@ -204,6 +207,9 @@ class Agent(Node):
         
         except asyncio.CancelledError:
             return        
+        
+        except FailureStateException:
+            return
 
     async def listen_to_broadcasts(self):
         """
@@ -232,7 +238,7 @@ class Agent(Node):
                     # if toc message, update clock
                     elif content['msg_type'] == ManagerMessageTypes.TOC.value:
                         msg = TocMessage(**content)
-                        self.update_current_time(msg.t)
+                        await self.update_current_time(msg.t)
 
                     # else, let agent handle it
                     else:

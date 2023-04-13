@@ -26,7 +26,7 @@ class SimulationAgent(Agent):
 												external_address_map = {
 														zmq.REQ: [],
 														zmq.PUB: [f'tcp://*:{manager_port+5 + 4*id}'],
-														zmq.SUB: []},
+														zmq.SUB: [f'tcp://localhost:{manager_port+4}']},
                                                 internal_address_map = {
 														zmq.REP: [f'tcp://*:{manager_port+5 + 4*id + 1}'],
 														zmq.PUB: [f'tcp://*:{manager_port+5 + 4*id + 2}'],
@@ -55,7 +55,35 @@ class SimulationAgent(Agent):
         return
 
     async def sense(self, statuses: dict) -> list:
+        # initiate senses array
         senses = []
+
+        # check status of previously performed tasks
+        completed = []
+        for action in statuses:
+            # sense and compile updated task status for planner 
+            action : AgentAction
+            status = statuses[action]
+            msg = AgentActionMessage(   self.get_element_name(), 
+                                        self.get_element_name(), 
+                                        action.to_dict(),
+                                        status)
+            senses.append(msg)      
+
+            # compile completed tasks for state tracking
+            if status == AgentAction.COMPLETED:
+                self.state : SimulationAgentState
+                completed.append(action)
+
+        # update state
+        t = self.get_current_time()
+        self.state.update_state(t, completed)
+
+        # inform environment of new state
+        state_msg = AgentStateMessage(  self.get_element_name(), 
+                                        SimulationElementRoles.ENVIRONMENT.value,
+                                        self.state.to_dict())
+        await self.send_peer_message(state_msg)
 
         # handle manager broadcasts
         while not self.manager_inbox.empty():
@@ -66,17 +94,19 @@ class SimulationAgent(Agent):
         while not self.external_inbox.empty():
             _, _, content = await self.external_inbox.get()
 
-            if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                # forward to planner
-                senses.append(AgentStateMessage(**content))
-
-            elif content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+            if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
                 # update connectivity
                 msg = AgentConnectivityUpdate(**msg)
                 if msg.connected:
                     self.subscribe_to_broadcasts(msg.target)
                 else:
                     self.unsubscribe_to_broadcasts(msg.target)
+
+                # udpate state
+
+            elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                # forward to planner
+                senses.append(AgentStateMessage(**content))
 
             elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                 # forward to planner
@@ -86,29 +116,29 @@ class SimulationAgent(Agent):
                 # forward to planner
                 senses.append(PlannerUpdate(**content))
 
-        # forward updated task status to planner
-        completed = []
-        for action in statuses:
-            action : AgentAction
-            status = statuses[action]
-            msg = AgentActionMessage(   self.get_element_name(), 
-                                        self.get_element_name(), 
-                                        action.to_dict(),
-                                        status)
-            senses.append(msg)      
-
-            if status == AgentAction.COMPLETED:
-                self.state : SimulationAgentState
-                completed.append(action)
-
-        # update state
-        t = self.get_current_time()
-        self.state.update_state(t, completed)
+        return senses
 
     async def think(self, senses: list) -> list:
-        pass
+        # send all sensed messages to planner
+        for sense in senses:
+            sense : SimulationMessage
+            await self.send_internal_message(sense)
+
+        # wait for planner to send list of tasks to perform
+        return await self.internal_inbox.get()
 
     async def do(self, actions: list) -> dict:
+        # update state
+
+        # for every state action
+        #   do action
+        #   update state
+        #   inform environment
+
+        # for every measurement action
+        #   do action
+        #   update state
+        #   inform environment 
         pass
 
     async def teardown(self) -> None:
@@ -128,7 +158,7 @@ class SimulationAgent(Agent):
 
                     # wait for time update
                     self.t_curr : Container
-                    await self.t_curr.when_geq_than(t0)
+                    await self.t_curr.when_geq_than(tf)
 
             elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
                 await asyncio.sleep(delay / self._clock_config.sim_clock_freq)

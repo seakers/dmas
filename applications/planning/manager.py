@@ -24,15 +24,14 @@ class PlanningSimulationManager(AbstractManager):
         Time waited depends on length of simulation and clock type in use.
         """
         try:
+            desc = f'{self.name}: Simulating for {delay}[s]'
             if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-                desc = f'{self.name}: Simulating for {delay}[s]'
                 for _ in tqdm (range (10), desc=desc):
                     await asyncio.sleep(delay/10)
 
             elif isinstance(self._clock_config, FixedTimesStepClockConfig):
                 dt = self._clock_config.dt
                 n_steps = math.ceil(delay/dt)
-                desc = f'{self.name}: Simulating for {delay}[s]'
                 
                 for t in tqdm (range (n_steps), desc=desc):
                     # announce new time to simulation elements
@@ -44,6 +43,23 @@ class PlanningSimulationManager(AbstractManager):
 
                     # wait for everyone to ask to fast forward
                     await self.wait_for_tic_requests()
+            
+            # elif isinstance(self._clock_config, EventDrivenClockConfig):  
+            #     with tqdm(total=delay , desc=f'{self.name}: {desc}') as pbar:
+            #         t = 0
+                    
+            #         while t <= delay:
+            #             # announce new time to simulation elements
+            #             toc = TocMessage(self.name, self.get_network_name(), t)
+            #             await self.send_manager_broadcast(toc)
+
+            #             # announce new time to simulation monitor
+            #             await self.send_monitor_message(toc)
+
+            #             # wait for everyone to ask to fast forward
+            #             tic_reqs = await self.wait_for_tic_requests()
+
+            #             # sort and get next best 
 
             else:
                 raise NotImplemented(f'clock configuration of type {type(self._clock_config)} not yet supported.')
@@ -77,7 +93,7 @@ class PlanningSimulationManager(AbstractManager):
                 _, src, msg_dict = read_task.result()
                 msg_type = msg_dict['msg_type']
 
-                if (SimulationMessageTypes[msg_type] != SimulationMessageTypes.TIC_REQ
+                if (NodeMessageTypes[msg_type] != NodeMessageTypes.TIC_REQ
                     or SimulationElementRoles.ENVIRONMENT.value in src):
                     # ignore all incoming messages that are not of the desired type 
                     self.log(f'Received {msg_type} message from node {src}! Ignoring message...')
