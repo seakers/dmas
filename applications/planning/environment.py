@@ -33,7 +33,7 @@ class SimulationEnvironment(EnvironmentNode):
         self.tasks = tasks
 
     async def setup(self) -> None:
-        # initiate state trackers
+        # initiate state trackers   
         self.states_tracker = {agent_name : None for agent_name in self._external_address_ledger}
 
     async def live(self) -> None:
@@ -69,10 +69,35 @@ class SimulationEnvironment(EnvironmentNode):
                         msg = AgentStateMessage(**content)
 
                         # update state tracker
-                        self.states_tracker[src] : AgentStateMessage = msg.state
+                        self.states_tracker[src] = SimulationAgentState(**msg.state)
 
                         # send confirmation response
                         resp = NodeReceptionAckMessage(self.get_element_name(), src)
+
+                        ## Check if all states are of the same time
+                        while not self.same_state_times():
+                            # read message from socket
+                            dst, src, content = await self.listen_peer_message()
+                            self.log(f'agent message received: {content}')
+
+                            if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                                # message is of type `AgentState`
+                                self.log(f"received message of type {content['msg_type']}. processing message....")
+
+                                # unpack message
+                                msg = AgentStateMessage(**content)
+
+                                # update state tracker
+                                self.states_tracker[src] = SimulationAgentState(**msg.state)
+
+                                # send confirmation response
+                            resp = NodeReceptionAckMessage(self.get_element_name(), src)                       
+
+                        # check for range and announce chances in connectivity 
+                        range_updates : list = self.check_agent_distance()
+                        for range_update in range_updates:
+                            range_update : AgentConnectivityUpdate
+                            await self.send_peer_broadcast(range_update)
 
                     else:
                         # message is of an unsopported type. send blank response
@@ -98,26 +123,16 @@ class SimulationEnvironment(EnvironmentNode):
 
                     elif content['msg_type'] == ManagerMessageTypes.TOC.value:
                         # toc message received
-                        self.log(f"received message of type {content['msg_type']}. ending simulation...")
 
                         # unpack message
                         msg = TocMessage(**content)
 
                         # update internal clock
+                        self.log(f"received message of type {content['msg_type']}. updating internal clock to {msg.t}[s]...")
                         await self.update_current_time(msg.t)
 
                         # wait for all agent's to send their updated states
-                        state_updates = await self.wait_for_agent_updates()
-
-                        # update state trackers
-                        for state_name in state_updates:
-                            self.states_tracker[state_name] = state_updates[state_name]
-
-                        # check for range and announce chances in connectivity 
-                        range_updates : list = self.check_agent_distance()
-                        for range_update in range_updates:
-                            range_update : AgentConnectivityUpdate
-                            await self.send_peer_broadcast(range_update)
+                        self.log(f"internal clock uptated to time {self.get_current_time()}[s]!")
                     
                     else:
                         # ignore message
@@ -127,39 +142,70 @@ class SimulationEnvironment(EnvironmentNode):
         except asyncio.CancelledError:
             return
 
-    async def wait_for_agent_updates(self) -> dict:
+    def same_state_times(self) -> bool:
         """
-        Waits for all agents to send in their state updates to the environment
+        Checks if all agents' states being tracked are of the same time-step
         """
-        try:
-            updates = dict()
-            while len(updates) < len(self._external_address_ledger) - 1:
-                # read message from socket
-                _, src, content = await self.listen_peer_message()
-                self.log(f'agent message received: {content}')
+        t = -1
+        for agent in self.states_tracker:
+            state : SimulationAgentState = self.states_tracker[agent]
+
+            if state is None:
+                if t == -1:
+                    t = None
+                    continue
+
+                elif t is None:
+                    continue
+
+                elif t != None:
+                    return False                    
+            else:
+                if t == -1:
+                    t = state.t 
+                    continue
                 
-                if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                    # message is of type `AgentState`
-                    self.log(f"received message of type {content['msg_type']}. processing message....")
+                elif t is None:
+                    return False
 
-                    # unpack message
-                    updates[src] = AgentStateMessage(**content)
+                if abs(t - state.t) > 1e-6:
+                    return False
 
-                    # send confirmation response
-                    resp = NodeReceptionAckMessage(self.get_element_name(), src)
+        return True
 
-                else:
-                    # message is of an unsopported type. send blank response
-                    self.log(f"received message of type {content['msg_type']}. ignoring message...")
-                    resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
+    # async def wait_for_agent_updates(self) -> dict:
+    #     """
+    #     Waits for all agents to send in their state updates to the environment
+    #     """
+    #     try:
+    #         updates = dict()
+    #         while len(updates) < len(self._external_address_ledger) - 1:
+    #             # read message from socket
+    #             _, src, content = await self.listen_peer_message()
+    #             self.log(f'agent message received: {content}')
+                
+    #             if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+    #                 # message is of type `AgentState`
+    #                 self.log(f"received message of type {content['msg_type']}. processing message....")
 
-                # respond to request messages
-                await self.respond_peer_message(resp)
+    #                 # unpack message
+    #                 updates[src] = AgentStateMessage(**content)
+
+    #                 # send confirmation response
+    #                 resp = NodeReceptionAckMessage(self.get_element_name(), src)
+
+    #             else:
+    #                 # message is of an unsopported type. send blank response
+    #                 self.log(f"received message of type {content['msg_type']}. ignoring message...")
+    #                 resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
+
+    #             # respond to request messages
+    #             await self.respond_peer_message(resp)
             
-            return updates
+    #         return updates
 
-        except asyncio.CancelledError as e:
-            raise e
+    #     except asyncio.CancelledError as e:
+    #         raise e
 
     def check_agent_distance(self) -> list:
         """

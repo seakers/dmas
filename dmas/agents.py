@@ -81,7 +81,7 @@ class AgentAction(ABC):
                     status : str = 'PENDING',
                     id : str = None,
                     **a2016761
-                    
+
                 ) -> None:
         """
         Creates an instance of an agent action
@@ -244,6 +244,11 @@ class Agent(Node):
                     # if sim-end message, end process
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
                         return
+                    
+                    # elif content['msg_type'] == ManagerMessageTypes.TOC.value:
+                    #     # if toc message, update clock
+                    #     msg = TocMessage(**content)
+                    #     await self.update_current_time(msg.t)
 
                     # else, let agent handle it
                     else:

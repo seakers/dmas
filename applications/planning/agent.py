@@ -140,8 +140,8 @@ class SimulationAgent(Agent):
                         logger)
 
     async def setup(self) -> None:
-        # initiate state
-        self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
+        # nothing to set up
+        return
 
     async def sense(self, statuses: dict) -> list:
         # initiate senses array
@@ -165,8 +165,9 @@ class SimulationAgent(Agent):
                 completed.append(action)
 
         # update state
-        t = self.get_current_time()
-        self.state.update_state(t, completed)
+        self.state.update_state(self.get_current_time(), 
+                                tasks_performed=completed, 
+                                status=SimulationAgentState.SENSING)
 
         # inform environment of new state
         state_msg = AgentStateMessage(  self.get_element_name(), 
@@ -175,49 +176,66 @@ class SimulationAgent(Agent):
                                     )
         await self.send_peer_message(state_msg)
 
-        # wait for environment updates
-        while True:
-            _, _, content = await self.environment_inbox.get()
+        # check if there is more than one agent in the simulation
+        if len(self._external_address_ledger) > 1:
+            # if so, wait for environment updates
+            while True:
+                # wait for environment updates
+                _, _, content = await self.environment_inbox.get()
 
-            if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
-                # update connectivity
-                msg = AgentConnectivityUpdate(**msg)
-                if msg.connected:
-                    self.subscribe_to_broadcasts(msg.target)
-                else:
-                    self.unsubscribe_to_broadcasts(msg.target)
+                if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+                    # update connectivity
+                    msg = AgentConnectivityUpdate(**msg)
+                    if msg.connected:
+                        self.subscribe_to_broadcasts(msg.target)
+                    else:
+                        self.unsubscribe_to_broadcasts(msg.target)
 
-            elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                # forward to planner
-                senses.append(TaskRequest(**content))
+                elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                    # save as senses to forward to planner
+                    senses.append(TaskRequest(**content))
+                    
+                # give environment time to continue sending any pending messages if any are yet to be transmitted
+                await asyncio.sleep(0.01)
 
-            if self.environment_inbox.empty():
-                # continue until no more environment messages are received
-                break        
+                if self.environment_inbox.empty():
+                    # continue until no more environment messages are received
+                    break        
+        else:
+            # else check if environment updates exist, if not skip
+            while not self.environment_inbox.empty():
+                # wait for environment updates
+                _, _, content = await self.environment_inbox.get()
 
-        # handle manager broadcasts
-        while not self.manager_inbox.empty():
-            _, _, content = await self.manager_inbox.get()
-            
-            if content['msg_type'] == ManagerMessageTypes.TOC.value:
-                # if toc message, update clock
-                msg = TocMessage(**content)
-                await self.update_current_time(msg.t)
+                if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+                    # update connectivity
+                    msg = AgentConnectivityUpdate(**msg)
+                    if msg.connected:
+                        self.subscribe_to_broadcasts(msg.target)
+                    else:
+                        self.unsubscribe_to_broadcasts(msg.target)
+
+                elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                    # save as senses to forward to planner
+                    senses.append(TaskRequest(**content))
+                    
+                # give environment time to continue sending any pending messages if any are yet to be transmitted
+                await asyncio.sleep(0.01)
         
         # handle peer broadcasts
         while not self.external_inbox.empty():
             _, _, content = await self.external_inbox.get()
 
             if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                # forward to planner
+                # save as senses to forward to planner
                 senses.append(AgentStateMessage(**content))
 
             elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                # forward to planner
+                # save as senses to forward to planner
                 senses.append(TaskRequest(**content))
 
             elif content['msg_type'] == SimulationMessageTypes.PLANNER_UPDATE.value:
-                # forward to planner
+                # save as senses to forward to planner
                 senses.append(PlannerUpdate(**content))
 
         return senses
@@ -226,19 +244,35 @@ class SimulationAgent(Agent):
         # send all sensed messages to planner
         for sense in senses:
             sense : SimulationMessage
+            sense.src = self.get_element_name()
+            sense.dst = self.get_element_name()
             await self.send_internal_message(sense)
 
         # wait for planner to send list of tasks to perform
-        return await self.internal_inbox.get()
+        actions = []
+        while True:
+            _, _, content = await self.internal_inbox.get()
+            if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                msg = AgentActionMessage(**content)
+                actions.append(msg.action)
+
+            # give planner time to continue sending any pending messages if any are yet to be transmitted
+            await asyncio.sleep(0.01)
+
+            if self.internal_inbox.empty():
+                break
+
+        return actions
 
     async def do(self, actions: list) -> dict:
         # only do one action at a time and discard the rest
-        done = []
+        statuses = {}
 
         # do fist action on the list
         action_msg : AgentActionMessage = actions.pop()
         action_dict = action_msg.action
         action = AgentAction(action_dict)
+
         # check if action can be performed at this time
         if action.t_start <= self.get_current_time() <= action.t_end:
             if action_dict['action_type'] == ActionTypes.PEER_MSG.value:
@@ -277,7 +311,12 @@ class SimulationAgent(Agent):
 
                 norm = math.sqrt(dx**2 + dy**2 + dz**2)
 
-                if norm <= numpy.finfo(float).eps:
+                if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                    eps = self.state.v_max * self._clock_config.dt
+                else:
+                    eps = 1e-6
+
+                if norm < eps:
                     ### agent has reached its desired position
                     ## stop agent 
                     new_vel = [ 0, 
@@ -304,7 +343,7 @@ class SimulationAgent(Agent):
                     await self.sim_wait(norm / self.state.v_max)
                     
                     # update action completion status
-                    action.status = AgentAction.ABORTED
+                    action.status = AgentAction.PENDING
 
             elif action_msg['action_type'] == ActionTypes.MEASURE.value:
                 # unpack action 
@@ -321,7 +360,12 @@ class SimulationAgent(Agent):
 
                 norm = math.sqrt(dx**2 + dy**2 + dz**2)
 
-                if norm <= numpy.finfo(float).eps:
+                if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                    eps = self.state.v_max * self._clock_config.dt
+                else:
+                    eps = 1e-6
+
+                if norm < eps:
                     ### agent has reached its desired position
                     self.state.update_state(self.get_current_time(), tasks_performed=[task], status=SimulationAgentState.IDLING)
 
@@ -332,7 +376,7 @@ class SimulationAgent(Agent):
                     self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
 
                     # update action completion status
-                    action.status = AgentAction.ABORTED              
+                    action.status = AgentAction.PENDING              
 
             elif action_msg['action_type'] == ActionTypes.IDLE.value:
                 # unpack action 
@@ -346,7 +390,7 @@ class SimulationAgent(Agent):
                 if self.get_current_time() >= action.t_end:
                     action.status = AgentAction.COMPLETED
                 else:
-                    action.status = AgentAction.ABORTED
+                    action.status = AgentAction.PENDING
 
             else:
                 # ignore action
@@ -356,17 +400,17 @@ class SimulationAgent(Agent):
             await self.sim_wait(action.t_start - self.get_current_time())
 
             # update action completion status
-            action.status = AgentAction.ABORTED
+            action.status = AgentAction.PENDING
         
-        done.append(action)
+        statuses[action] = action.status
 
         # discard the remaining actions
         for action_msg in actions:
             action = AgentAction(action_dict)
-            action.status = AgentAction.ABORTED
-            done.append(action)
+            action.status = AgentAction.PENDING
+            statuses[action] = action.status
 
-        return done
+        return statuses
 
     async def teardown(self) -> None:
         # print state history
@@ -385,13 +429,23 @@ class SimulationAgent(Agent):
                     t0 = self.get_current_time()
                     tf = t0 + delay
                     
-                    # send tic request
-                    tic_req = TicRequest(self.get_element_name(), t0, tf)
-                    await self.send_manager_message(tic_req)
+                    # wait for time update                    
+                    while self.get_current_time() <= t0:
+                        # send tic request
+                        tic_req = TicRequest(self.get_element_name(), t0, tf)
+                        await self.send_manager_message(tic_req)
 
-                    # wait for time update
-                    self.t_curr : Container
-                    await self.t_curr.when_greater_than(self.t_curr)
+                        dst, src, content = await self.manager_inbox.get()
+                        
+                        if content['msg_type'] == ManagerMessageTypes.TOC.value:
+                            # update clock
+                            msg = TocMessage(**content)
+                            await self.update_current_time(msg.t)
+
+                        else:
+                            # ignore message
+                            self.manager_inbox.put( (dst, src, content) )
+
 
             elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
                 await asyncio.sleep(delay / self._clock_config.sim_clock_freq)

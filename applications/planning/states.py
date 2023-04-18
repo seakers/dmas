@@ -5,7 +5,9 @@ class SimulationAgentState(AgentState):
     IDLING = 'IDLING'
     TRAVELING = 'TRAVELING'
     MEASURING = 'MEASURING'
-    MESSAGEING = 'MESSAGING'
+    MESSAGING = 'MESSAGING'
+    SENSING = 'SENSING'
+    THINKING = 'THINKING'
 
     def __init__(self, 
                 pos : list, 

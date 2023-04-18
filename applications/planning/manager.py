@@ -34,6 +34,10 @@ class PlanningSimulationManager(AbstractManager):
                 n_steps = math.ceil(delay/dt)
                 
                 for t in tqdm (range (n_steps), desc=desc):
+                    if t == 0:
+                        # skip first tic broadcast; everyone already starts their clocks at 0
+                        continue
+
                     # announce new time to simulation elements
                     toc = TocMessage(self.name, self.get_network_name(), t)
                     await self.send_manager_broadcast(toc)
@@ -60,7 +64,7 @@ class PlanningSimulationManager(AbstractManager):
             #             # wait for everyone to ask to fast forward
             #             tic_reqs = await self.wait_for_tic_requests()
 
-            #             # sort and get next best 
+            #             # sort and get next closest time
 
             else:
                 raise NotImplemented(f'clock configuration of type {type(self._clock_config)} not yet supported.')
