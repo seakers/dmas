@@ -5,12 +5,14 @@ class SimulationAgentState(AgentState):
     IDLING = 'IDLING'
     TRAVELING = 'TRAVELING'
     MEASURING = 'MEASURING'
+    MESSAGEING = 'MESSAGING'
 
     def __init__(self, 
                 pos : list, 
                 x_bounds : list,
                 y_bounds : list,
                 vel : list, 
+                v_max : float, 
                 tasks_performed : list, 
                 status : str,
                 t : Union[float, int]=0,
@@ -21,12 +23,15 @@ class SimulationAgentState(AgentState):
         self.x_bounds = x_bounds
         self.y_bounds = y_bounds
         self.vel = vel
+        self.v_max = v_max
         self.tasks_performed = tasks_performed
         self.status = status
         self.t = t
 
+        self.history = []
+
     def update_state(self, t : Union[float, int], vel : list=None, tasks_performed : list=[], status : str=None):
-        if t >= self.t:        
+        if t > self.t:        
             # update position with previous state info and new time jump
             x, y = self.pos
             vx, vy = self.vel
@@ -55,6 +60,11 @@ class SimulationAgentState(AgentState):
         # update status
         if status is not None:
             self.status = status
+
+        # update last updated time
+        self.t = t
+        
+        self.history.append(self.to_dict())
 
     def __str__(self):
         return str(self.to_dict())

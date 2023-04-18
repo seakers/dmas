@@ -24,7 +24,7 @@ The simulation environment is in charge of outlining the space in which the agen
 It may create new tasks and publish them to the agents and it may also inform agents that they are no longer in range of one and other and thus are unable to communicate until they are back in range. This range is defined within the environment. 
 
 ## Agent:
-Agents exist in a 2D environment with defined borders. They may move in any direction within said 2D space at a fixed velocity. Agents may also perform measurement tasks if they possess the proper insturments and share information with other agents. 
+Agents exist in a 2D environment with defined borders. They may move in any direction within said 2D space at a fixed speed. Agents may also perform measurement tasks if they possess the proper insturments and share information with other agents. 
     
 Tasks do NOT require collaboration between agents in this example. 
 

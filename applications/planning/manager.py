@@ -44,6 +44,7 @@ class PlanningSimulationManager(AbstractManager):
                     # wait for everyone to ask to fast forward
                     await self.wait_for_tic_requests()
             
+            # TODO Implement Event-driven Clock
             # elif isinstance(self._clock_config, EventDrivenClockConfig):  
             #     with tqdm(total=delay , desc=f'{self.name}: {desc}') as pbar:
             #         t = 0

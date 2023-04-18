@@ -8,7 +8,7 @@ import uuid
 import zmq
 from zmq import asyncio as azmq
 
-from dmas.messages import ManagerMessageTypes, TocMessage
+from dmas.messages import ManagerMessageTypes, SimulationElementRoles, TocMessage
 from dmas.network import NetworkConfig
 from dmas.nodes import Node
 
@@ -75,10 +75,13 @@ class AgentAction(ABC):
     ABORTED = 'ABORTED'
 
     def __init__(   self, 
+                    action_type : str,
                     t_start : Union[float, int],
                     t_end : Union[float, int], 
+                    status : str = 'PENDING',
                     id : str = None,
-                    **_
+                    **a2016761
+                    
                 ) -> None:
         """
         Creates an instance of an agent action
@@ -98,9 +101,11 @@ class AgentAction(ABC):
             raise AttributeError(f'`t_end` must be of type `float` or type `int`. is of type {type(t_end)}.')
         elif t_end < 0:
             raise ValueError(f'`t_end` must be a value higher than 0. is of value {t_end}.')
-                
+        
+        self.action_type = action_type
         self.t_start = t_start
         self.t_end = t_end
+        self.status = status
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
 
     def __eq__(self, other) -> bool:
@@ -174,6 +179,11 @@ class Agent(Node):
 
         self.state : AgentState = initial_state
 
+    async def _activate(self) -> None:
+        await super()._activate()
+
+        self.environment_inbox = asyncio.Queue()
+
     async def live(self):
         try:
             t_1 = asyncio.create_task(self.routine(), name='routine()')
@@ -235,18 +245,17 @@ class Agent(Node):
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
                         return
 
-                    # if toc message, update clock
-                    elif content['msg_type'] == ManagerMessageTypes.TOC.value:
-                        msg = TocMessage(**content)
-                        await self.update_current_time(msg.t)
-
                     # else, let agent handle it
                     else:
                         self.manager_inbox.put( (dst, src, content) )
                 
                 if external_socket in sockets:
                     dst, src, content = await self.listen_peer_broadcast()
-                    self.external_inbox.put( (dst, src, content) )
+
+                    if src == SimulationElementRoles.ENVIRONMENT.value:
+                        self.environment_inbox.put( (dst, src, content) )
+                    else:
+                        self.external_inbox.put( (dst, src, content) )
 
                 if internal_socket in sockets: 
                     dst, src, content = await self.listen_internal_broadcast()
