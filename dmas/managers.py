@@ -215,9 +215,6 @@ class AbstractManager(SimulationElement):
                 
                 return received_messages
         
-        except asyncio.CancelledError:            
-            return
-
         except Exception as e:
             self.log(f'wait failed. {e}', level=logging.ERROR)
             raise e

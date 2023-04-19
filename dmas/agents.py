@@ -241,14 +241,9 @@ class Agent(Node):
                 if manager_socket in sockets:
                     dst, src, content = await self.listen_manager_broadcast()
 
-                    # if sim-end message, end process
+                    # if sim-end message, end agent `live()`
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
                         return
-                    
-                    # elif content['msg_type'] == ManagerMessageTypes.TOC.value:
-                    #     # if toc message, update clock
-                    #     msg = TocMessage(**content)
-                    #     await self.update_current_time(msg.t)
 
                     # else, let agent handle it
                     else:

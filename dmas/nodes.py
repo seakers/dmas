@@ -195,20 +195,24 @@ class Node(SimulationElement):
 
     async def _wait_sim_start(self) -> None:
         async def subroutine():
-            # wait for all modules to become online
-            await self.__wait_for_ready_modules()
+            try:
+                # wait for all modules to become online
+                await self.__wait_for_ready_modules()
 
-            # inform manager that I am ready for the simulation to start
-            await self.__broadcast_ready()
+                # inform manager that I am ready for the simulation to start
+                await self.__broadcast_ready()
 
-            # wait for message from manager
-            await self.__wait_for_manager_ready()
+                # wait for message from manager
+                await self.__wait_for_manager_ready()
 
-            # inform module of simulation start
-            if self.has_modules():
-                self.log('Informing internal modules of simulation start...')
-                sim_start = ActivateInternalModuleMessage(self._element_name, self._element_name)
-                await self._send_internal_msg(sim_start, zmq.PUB)
+                # inform module of simulation start
+                if self.has_modules():
+                    self.log('Informing internal modules of simulation start...')
+                    sim_start = ActivateInternalModuleMessage(self._element_name, self._element_name)
+                    await self._send_internal_msg(sim_start, zmq.PUB)
+            
+            except asyncio.CancelledError:
+                return
 
         try:
             task = asyncio.create_task(subroutine())
@@ -414,35 +418,31 @@ class Node(SimulationElement):
                 await self._send_internal_msg(resp, zmq.REP)
 
     async def _publish_deactivate(self) -> None:
-        try:
-            # inform monitor that I am deactivated
-            self.log(f'informing monitor of offline status...')
+        # inform monitor that I am deactivated
+        self.log(f'informing monitor of offline status...')
+        msg = NodeDeactivatedMessage(self.name)
+        await self._send_manager_msg(msg, zmq.PUSH)
+        self.log(f'informed monitor of offline status. informing manager of offline status...')
+
+        # inform manager that I am deactivated
+        while True:
+            # send ready announcement from REQ socket
             msg = NodeDeactivatedMessage(self.name)
-            await self._send_manager_msg(msg, zmq.PUSH)
-            self.log(f'informed monitor of offline status. informing manager of offline status...')
+            dst, src, content = await self.send_manager_message(msg)
+            dst : str; src : str; content : dict
+            msg_type = content['msg_type']
 
-            # inform manager that I am deactivated
-            while True:
-                # send ready announcement from REQ socket
-                msg = NodeDeactivatedMessage(self.name)
-                dst, src, content = await self.send_manager_message(msg)
-                dst : str; src : str; content : dict
-                msg_type = content['msg_type']
-
-                if (dst not in self.name 
-                    or SimulationElementRoles.MANAGER.value not in src
-                    or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
-                    ):
-                    # if the manager did not acknowledge the request, try again later
-                    self.log(f'manager did not accept my message. trying again...')
-                    await asyncio.wait(random.random())
-                else:
-                    # if the manager acknowledge the message, stop trying
-                    self.log(f'manager accepted my message! informing monitor of offline status....')
-                    break
-
-        except asyncio.CancelledError:
-            return
+            if (dst not in self.name 
+                or SimulationElementRoles.MANAGER.value not in src
+                or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
+                ):
+                # if the manager did not acknowledge the request, try again later
+                self.log(f'manager did not accept my message. trying again...')
+                await asyncio.wait(random.random())
+            else:
+                # if the manager acknowledge the message, stop trying
+                self.log(f'manager accepted my message! informing monitor of offline status....')
+                break
 
     def has_modules(self) -> bool:
         """
