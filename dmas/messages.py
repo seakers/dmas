@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 import uuid
 from typing import Union
 from enum import Enum
@@ -143,10 +142,9 @@ class TocMessage(ManagerMessage):
         - id (`str`) : Universally Unique IDentifier for this message
         - t (`float` or `int`): new current simulation time
     """        
-    def __init__(self, dst: str, t: Union[float, int], id: str = None, **kwargs):
-        super().__init__(dst, ManagerMessageTypes.TOC.value, t, id, **kwargs)
+    def __init__(self, dst: str, t: Union[float, int], id: str = None, **_):
+        super().__init__(dst, ManagerMessageTypes.TOC.value, t, id)
 
-        # check type
         if not isinstance(t , float) and not isinstance(t , int):
             raise TypeError(f'`t` must be of type `float` or `int`. Is of type {type(t)}')
         
@@ -455,6 +453,9 @@ class NodeInfoMessage(SimulationMessage):
         elif clock_type == ClockTypes.REAL_TIME.value:
             clock_config = RealTimeClockConfig(**self.clock_config)
 
+        elif clock_type == ClockTypes.FIXED_TIME_STEP.value:
+            clock_config = FixedTimesStepClockConfig(**self.clock_config)
+            
         else:
             raise NotImplemented(f'Clock Configuration of type {clock_type} not yet supported')
 

@@ -1,99 +1,12 @@
 import logging
 import math
+from tasks import *
 from dmas.agents import *
 from dmas.network import NetworkConfig
 
 from messages import *
 from states import *
 from planners import *
-
-
-class ActionTypes(Enum):
-    PEER_MSG = 'PEER_MSG'
-    BROADCAST_MSG = 'BROADCAST_MSG'
-    MOVE = 'MOVE'
-    MEASURE = 'MEASURE'
-    IDLE = 'IDLE'
-
-class PeerMessageAction(AgentAction):
-    """
-    ## Peer-Message Action 
-
-    Instructs an agent to send a message directly to a peer
-    """
-    def __init__(self, 
-                msg : SimulationMessage,
-                t_start : Union[float, int],
-                t_end : Union[float, int], 
-                status : str = 'PENDING',
-                id: str = None, 
-                **_) -> None:
-        super().__init__(ActionTypes.PEER_MSG.value, t_start, t_end, status, id, **_)
-        self.msg = msg
-
-class BroadcastMessageAction(AgentAction):
-    """
-    ## Broadcast Message Action 
-
-    Instructs an agent to broadcast a message to all of its peers
-    """
-    def __init__(self, 
-                msg : SimulationMessage,
-                t_start : Union[float, int],
-                t_end : Union[float, int], 
-                status : str = 'PENDING',
-                id: str = None, 
-                **_) -> None:
-        super().__init__(ActionTypes.BROADCAST_MSG.value, t_start, t_end, status, id, **_)
-        self.msg = msg
-
-class MoveAction(AgentAction):
-    """
-    ## Move Action
-
-    Instructs an agent to move to a particular position
-    """
-    def __init__(self,
-                pos : list, 
-                t_start : Union[float, int],
-                t_end : Union[float, int], 
-                status : str = 'PENDING',
-                id: str = None, 
-                **_) -> None:
-        super().__init__(ActionTypes.MOVE.value, t_start, t_end, status, id, **_)
-        self.pos = pos
-
-class MeasurementAction(AgentAction):
-    """
-    ## Measuremet Action
-
-    Instructs an agent to perform a measurement
-    """
-    def __init__(self, 
-                task : MeasurementTask,
-                instruments : list,
-                t_start : Union[float, int],
-                t_end : Union[float, int], 
-                status : str = 'PENDING',
-                id: str = None, 
-                **_) -> None:
-        super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id, **_)
-        self.task = task
-        self.instruments = instruments
-
-class IdleAction(AgentAction):
-    """
-    ## Idle Action
-
-    Instructs an agent to idle for a given amount of time
-    """
-    def __init__(self, 
-                t_start : Union[float, int],
-                t_end : Union[float, int], 
-                status : str = 'PENDING',
-                id: str = None, 
-                **_) -> None:
-        super().__init__(ActionTypes.IDLE.value, t_start, t_end, status, id, **_)
 
 class SimulationAgent(Agent):
     def __init__(   self, 
@@ -128,6 +41,12 @@ class SimulationAgent(Agent):
                                                     agent_network_config,
                                                     level,
                                                     logger)
+        elif planner_type is PlannerTypes.FIXED:
+            planning_module = FixedPlannerModule(manager_port,
+                                                 id,
+                                                 agent_network_config,
+                                                 level,
+                                                 logger)
         else:
             raise NotImplementedError(f'planner of type {planner_type} not yet supported.')
 
@@ -149,10 +68,10 @@ class SimulationAgent(Agent):
 
         # check status of previously performed tasks
         completed = []
-        for action in statuses:
+        for action, status in statuses:
             # sense and compile updated task status for planner 
             action : AgentAction
-            status = statuses[action]
+            status : str
             msg = AgentActionMessage(   self.get_element_name(), 
                                         self.get_element_name(), 
                                         action.to_dict(),
@@ -162,7 +81,7 @@ class SimulationAgent(Agent):
             # compile completed tasks for state tracking
             if status == AgentAction.COMPLETED:
                 self.state : SimulationAgentState
-                completed.append(action)
+                completed.append(action.id)
 
         # update state
         self.state.update_state(self.get_current_time(), 
@@ -175,6 +94,10 @@ class SimulationAgent(Agent):
                                         self.state.to_dict()
                                     )
         await self.send_peer_message(state_msg)
+
+        # save state as sensed state
+        state_msg.dst = self.get_element_name()
+        senses.append(state_msg)
 
         # check if there is more than one agent in the simulation
         if len(self._external_address_ledger) > 1:
@@ -242,6 +165,7 @@ class SimulationAgent(Agent):
 
     async def think(self, senses: list) -> list:
         # send all sensed messages to planner
+        self.log(f'sending {len(senses)} senses to planning module...')
         for sense in senses:
             sense : SimulationMessage
             sense.src = self.get_element_name()
@@ -249,29 +173,30 @@ class SimulationAgent(Agent):
             await self.send_internal_message(sense)
 
         # wait for planner to send list of tasks to perform
+        self.log(f'senses sent! waiting on plan to perform...')
         actions = []
-        while True:
-            _, _, content = await self.internal_inbox.get()
-            if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-                msg = AgentActionMessage(**content)
-                actions.append(msg.action)
 
-            # give planner time to continue sending any pending messages if any are yet to be transmitted
-            await asyncio.sleep(0.01)
+        _, _, content = await self.listen_internal_broadcast()
+        self.log(f"plan received from planner module!")
+        
+        if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+            msg = AgentActionMessage(**content)
+            self.log(f"received an action of type {msg.action['action_type']}")
+            actions.append(msg.action)
 
-            if self.internal_inbox.empty():
-                break
-
+        
+        self.log(f'received {len(actions)} actions to perform.')
         return actions
 
     async def do(self, actions: list) -> dict:
         # only do one action at a time and discard the rest
-        statuses = {}
+        statuses = []
 
         # do fist action on the list
-        action_msg : AgentActionMessage = actions.pop()
-        action_dict = action_msg.action
-        action = AgentAction(action_dict)
+        self.log(f'performing {len(actions)} actions')
+        action_dict : dict = actions.pop(0)     
+        action = AgentAction(**action_dict)
+        self.log(f"performing action of type {action_dict['action_type']}...")
 
         # check if action can be performed at this time
         if action.t_start <= self.get_current_time() <= action.t_end:
@@ -287,7 +212,7 @@ class SimulationAgent(Agent):
                 # update action completion status
                 action.status = AgentAction.COMPLETED
 
-            elif action_msg['action_type'] == ActionTypes.BROADCAST_MSG.value:
+            elif action_dict['action_type'] == ActionTypes.BROADCAST_MSG.value:
                 # unpack action
                 action = BroadcastMessageAction(**action_dict)
 
@@ -299,7 +224,7 @@ class SimulationAgent(Agent):
                 # update action completion status
                 action.status = AgentAction.COMPLETED
 
-            elif action_msg['action_type'] == ActionTypes.MOVE.value:
+            elif action_dict['action_type'] == ActionTypes.MOVE.value:
                 # unpack action 
                 action = MoveAction(**action_dict)
 
@@ -345,10 +270,9 @@ class SimulationAgent(Agent):
                     # update action completion status
                     action.status = AgentAction.PENDING
 
-            elif action_msg['action_type'] == ActionTypes.MEASURE.value:
+            elif action_dict['action_type'] == ActionTypes.MEASURE.value:
                 # unpack action 
-                action = MeasurementAction(**action_dict)
-                task : MeasurementTask = action.task
+                task = MeasurementTask(**action_dict)
 
                 # perform action
                 self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
@@ -378,7 +302,7 @@ class SimulationAgent(Agent):
                     # update action completion status
                     action.status = AgentAction.PENDING              
 
-            elif action_msg['action_type'] == ActionTypes.IDLE.value:
+            elif action_dict['action_type'] == ActionTypes.IDLE.value:
                 # unpack action 
                 action = IdleAction(**action_dict)
 
@@ -402,14 +326,19 @@ class SimulationAgent(Agent):
             # update action completion status
             action.status = AgentAction.PENDING
         
-        statuses[action] = action.status
+        self.log(f"finished performing action of type {action_dict['action_type']}! action completion status: {action.status}")
+        statuses.append( (action, action.status) )
 
         # discard the remaining actions
-        for action_msg in actions:
-            action = AgentAction(action_dict)
+        if len(actions) > 0:
+            self.log(f"setting all other actions as PENDING...")
+        for action_dict in actions:
+            action_dict : dict
+            action = AgentAction(**action_dict)
             action.status = AgentAction.PENDING
-            statuses[action] = action.status
+            statuses.append( (action, action.status) )
 
+        self.log(f'return {len(statuses)} statuses')
         return statuses
 
     async def teardown(self) -> None:
@@ -429,6 +358,10 @@ class SimulationAgent(Agent):
                     t0 = self.get_current_time()
                     tf = t0 + delay
                     
+                    if tf > self._clock_config.get_total_seconds():
+                        self.log('waiting forever...')
+                        raise asyncio.CancelledError('waiting forever...')
+
                     # wait for time update                    
                     while self.get_current_time() <= t0:
                         # send tic request
@@ -444,7 +377,7 @@ class SimulationAgent(Agent):
 
                         else:
                             # ignore message
-                            self.manager_inbox.put( (dst, src, content) )
+                            await self.manager_inbox.put( (dst, src, content) )
 
 
             elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
@@ -453,5 +386,5 @@ class SimulationAgent(Agent):
             else:
                 raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
                 
-        except asyncio.CancelledError:
-            return
+        except asyncio.CancelledError as e:
+            raise e

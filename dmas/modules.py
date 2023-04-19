@@ -21,11 +21,6 @@ class InternalModule(NetworkElement):
     ## Internal Module
 
     Controls independent internal processes performed by a simulation node
-
-    #### Attributes:
-        - _submodules (`list`): submodules contained by this module
-        - _internal_inbox (`asyncio.Queue()`):    
-        - _external_inbox (`asyncio.Queue()`):
     ####
     """
     def __init__(self, module_name: str, module_network_config: NetworkConfig, parent_network_config: NetworkConfig, submodules : list = [], level : int = logging.INFO, logger: logging.Logger = None) -> None:
@@ -150,6 +145,13 @@ class InternalModule(NetworkElement):
             self._clock_config, _, _ = await self._network_sync()
             self.log(f'NETWORK SYNCED!', level = logging.INFO)
 
+            # setup
+            self.log(f'setting up module...')
+            await self.setup()
+            self.manager_inbox = asyncio.Queue()
+            self.internal_inbox = asyncio.Queue()
+            self.log(f'MODULE SET UP...', level = logging.INFO)
+
             # wait for sim start
             self.log(f'waiting on sim start...')
             await self._wait_sim_start()
@@ -170,13 +172,17 @@ class InternalModule(NetworkElement):
             # wait for a process to terminate
             self.log(f'running...')
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            
+    
             return 1
         
-        except :
+        except Exception as e:
+            self.log(f'ERROR: {e}', level=logging.ERROR)
             return 0
         
         finally:
+            # perform teardown procedure
+            await self.teardown()
+
             # cancel all non-terminated tasks
             if done is not None and pending is not None:
                 for task in done:
@@ -286,6 +292,15 @@ class InternalModule(NetworkElement):
                 await asyncio.wait(random.random())
 
     @abstractmethod
+    async def setup(self) -> None:
+        """
+        Performs user-defined set up instructions to be done before the simulation is started.
+
+        Nothing is done by default but functionality may be expanded by the user.
+        """
+        return
+
+    @abstractmethod
     async def routine(self) -> None:
         """
         Routine to be performed by the module during when the parent node is executing.
@@ -303,6 +318,15 @@ class InternalModule(NetworkElement):
         """
         pass
 
+    @abstractmethod
+    async def teardown(self) -> None:
+        """
+        Performs user-defined tear-down instructions to be performed after the simulation has been terminated.
+
+        Nothing is done by default but functionality may be expanded by the user.
+        """
+        return
+
     async def listen_for_manager(self) -> None:
         """
         Listens for any messages from the parent node. 
@@ -314,21 +338,27 @@ class InternalModule(NetworkElement):
             while True:
                 dst, src, content = await self._receive_manager_msg(zmq.SUB)
 
-                if (dst not in self.name 
+                if dst is None or src is None or content is None:
+                    raise RuntimeError('listen to manager reception failed.')
+
+                elif (dst not in self.name 
                     or self.get_parent_name() not in src 
-                    or content['msg_type'] != NodeMessageTypes.MODULE_DEACTIVATE.value):
-                    self.log('wrong message received. ignoring message...')
+                    or content['msg_type'] != NodeMessageTypes.MODULE_DEACTIVATE.value
+                    ):                    
+                    self.log('manager message received! sending to handler...')
+                    await self.manager_inbox.put((dst, src, content))
+
                 else:
                     self.log('deactivate module message received! ending simulation...')
                     break
 
         except asyncio.CancelledError:
-            self.log(f'`_listen()` interrupted. {e}')
+            self.log(f'`_listen_to_manager()` interrupted. {e}')
             return
         except Exception as e:
-            self.log(f'`_listen()` failed. {e}')
+            self.log(f'`_listen_to_manager()` failed. {e}')
             raise e
-
+        
     async def send_manager_message(self, msg : SimulationMessage) -> tuple:
         """
         Sends a message through this module's manager request socket
@@ -351,8 +381,6 @@ class InternalModule(NetworkElement):
             if dst_network_config is None:
                 raise RuntimeError(f'Could not find network config for simulation element of name {msg.dst}.')
 
-            self.log('parent network config:', dst_network_config)
-
             dst_address = dst_network_config.get_internal_addresses().get(zmq.REP, None)[-1]
             if '*' in dst_address:
                 dst_address : str
@@ -362,6 +390,7 @@ class InternalModule(NetworkElement):
                 raise RuntimeError(f'Could not find address for simulation element of name {msg.dst}.')
                 
             return await self._send_request_message(msg, dst_address, self._manager_socket_map)
+        
         except Exception as e:
             self.log(f'request message to manager failed. {e}')
             raise e

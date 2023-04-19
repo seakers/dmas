@@ -80,7 +80,7 @@ class AgentAction(ABC):
                     t_end : Union[float, int], 
                     status : str = 'PENDING',
                     id : str = None,
-                    **a2016761
+                    **_
 
                 ) -> None:
         """
@@ -204,7 +204,7 @@ class Agent(Node):
         Agent performs sense, thinkg, and do loop while state is . 
         """
         try:
-            statuses = dict()
+            statuses = []
             while not self.state.is_failure():
                 # sense environment
                 senses = await self.sense(statuses)
@@ -220,7 +220,7 @@ class Agent(Node):
         
         except FailureStateException:
             return
-
+        
     async def listen_to_broadcasts(self):
         """
         Listens for any incoming broadcasts and classifies them in their respective inbox
@@ -252,19 +252,19 @@ class Agent(Node):
 
                     # else, let agent handle it
                     else:
-                        self.manager_inbox.put( (dst, src, content) )
+                        await self.manager_inbox.put( (dst, src, content) )
                 
                 if external_socket in sockets:
                     dst, src, content = await self.listen_peer_broadcast()
 
                     if src == SimulationElementRoles.ENVIRONMENT.value:
-                        self.environment_inbox.put( (dst, src, content) )
+                        await self.environment_inbox.put( (dst, src, content) )
                     else:
-                        self.external_inbox.put( (dst, src, content) )
+                        await self.external_inbox.put( (dst, src, content) )
 
                 if internal_socket in sockets: 
                     dst, src, content = await self.listen_internal_broadcast()
-                    self.internal_inbox.put( (dst, src, content) )
+                    await self.internal_inbox.put( (dst, src, content) )
 
         except asyncio.CancelledError:
             return  

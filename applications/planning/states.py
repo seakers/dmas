@@ -1,4 +1,4 @@
-from ctypes import Union
+from typing import Union
 from dmas.agents import AgentState
 
 class SimulationAgentState(AgentState):
@@ -66,7 +66,19 @@ class SimulationAgentState(AgentState):
         # update last updated time
         self.t = t
         
-        self.history.append(self.to_dict())
+        out = self.to_dict()
+        self.history.append(out)
 
     def __str__(self):
         return str(self.to_dict())
+    
+    def to_dict(self) -> dict:
+        out = super().to_dict().copy()
+        out.pop('history')
+        return out
+    
+    def is_critial(self) -> bool:
+        False
+
+    def is_failure(self) -> bool:
+        return False

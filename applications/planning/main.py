@@ -57,9 +57,9 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 0
+    n_agents = 1
     comms_range = 5
-    max_vel = 1
+    v_max = 1
 
     ## clock configuration
     year = 2023
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     mm = 00
     ss = 00
     start_date = datetime(year, month, day, hh, mm, ss)
-    end_date = datetime(year, month, day, hh, mm, ss+10)
+    end_date = datetime(year, month, day, hh, mm, ss+3)
     dt = 1.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
 
@@ -77,12 +77,13 @@ if __name__ == '__main__':
     port = 5555
 
     ## loggers
-    level = logging.WARNING
-    
-    ## create tasks
+    level = logging.DEBUG
+
     ### random tasks 
-    n_tasks = 10
+    n_tasks = 0
     task_types = ['VNIR', 'MWR', 'LIDAR']
+    
+    # create tasks
     tasks = []
     for i in range(n_tasks):
         t_start = random.random() * clock_config.get_total_seconds()
@@ -114,6 +115,7 @@ if __name__ == '__main__':
                                             )
     node_names = [f'AGENT_{i}' for i in range(n_agents)]
     node_names.append(SimulationElementRoles.ENVIRONMENT.value)
+    print(node_names)
     manager = PlanningSimulationManager(node_names, clock_config, manager_network_config, level)
     logger = manager.get_logger()
 
@@ -143,17 +145,20 @@ if __name__ == '__main__':
     for id in range(n_agents):        
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        pos = [x, y]
+        # pos = [x, y]
+        pos = [0, 0]
         vel = [0, 0]
-        initial_state = SimulationAgentState(pos, x_bounds, y_bounds, vel, [], SimulationAgentState.IDLING)
+        initial_state = SimulationAgentState(pos, x_bounds, y_bounds, vel, v_max, [],  status=SimulationAgentState.IDLING)
         agent = SimulationAgent(    network_name,
                                     port, 
                                     id,
                                     manager_network_config,
-                                    PlannerTypes.ACCBBA,
-                                    initial_state
+                                    PlannerTypes.FIXED,
+                                    initial_state,
+                                    level,
+                                    logger
                                     )
-
+        agents.append(agent)
 
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:

@@ -33,38 +33,26 @@ class PlanningSimulationManager(AbstractManager):
                 dt = self._clock_config.dt
                 n_steps = math.ceil(delay/dt)
                 
-                for t in tqdm (range (n_steps), desc=desc):
-                    if t == 0:
-                        # skip first tic broadcast; everyone already starts their clocks at 0
-                        continue
+                for t in tqdm (range (1, n_steps+1), desc=desc):
+                    # wait for everyone to ask to fast forward            
+                    self.log(f'waiting for tic requests...')
+                    await self.wait_for_tic_requests()
+                    self.log(f'tic requests received!')
 
                     # announce new time to simulation elements
-                    toc = TocMessage(self.name, self.get_network_name(), t)
+                    self.log(f'sending toc for time {t}[s]...', level=logging.INFO)
+                    toc = TocMessage(self.get_network_name(), t)
+
                     await self.send_manager_broadcast(toc)
 
                     # announce new time to simulation monitor
-                    await self.send_monitor_message(toc)
+                    self.log(f'sending toc for time {t}[s] to monitor')
+                    toc.dst = SimulationElementRoles.MONITOR.value
+                    await self.send_monitor_message(toc)                    
 
-                    # wait for everyone to ask to fast forward
-                    await self.wait_for_tic_requests()
-            
+                self.log('TIMER DONE!', level=logging.INFO)
             # TODO Implement Event-driven Clock
             # elif isinstance(self._clock_config, EventDrivenClockConfig):  
-            #     with tqdm(total=delay , desc=f'{self.name}: {desc}') as pbar:
-            #         t = 0
-                    
-            #         while t <= delay:
-            #             # announce new time to simulation elements
-            #             toc = TocMessage(self.name, self.get_network_name(), t)
-            #             await self.send_manager_broadcast(toc)
-
-            #             # announce new time to simulation monitor
-            #             await self.send_monitor_message(toc)
-
-            #             # wait for everyone to ask to fast forward
-            #             tic_reqs = await self.wait_for_tic_requests()
-
-            #             # sort and get next closest time
 
             else:
                 raise NotImplemented(f'clock configuration of type {type(self._clock_config)} not yet supported.')
@@ -93,7 +81,7 @@ class PlanningSimulationManager(AbstractManager):
                 send_task = None
 
                 # wait for incoming messages
-                read_task = asyncio.create_task( self.listen_for_requests(zmq.REP) )
+                read_task = asyncio.create_task( self.listen_for_requests() )
                 await read_task
                 _, src, msg_dict = read_task.result()
                 msg_type = msg_dict['msg_type']
@@ -118,7 +106,7 @@ class PlanningSimulationManager(AbstractManager):
                 # log subscriber confirmation
                 if src not in self._simulation_element_name_list and self.get_network_name() + '/' + src not in self._simulation_element_name_list:
                     # node is not a part of the simulation
-                    self.log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                    self.log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
                     # inform agent that its message was not accepted
                     msg_resp = ManagerReceptionIgnoredMessage(src, -1)
@@ -126,7 +114,7 @@ class PlanningSimulationManager(AbstractManager):
 
                 elif src in received_messages:
                     # node is a part of the simulation but has already communicated with me
-                    self.log(f'{src} has already reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                    self.log(f'{src} has already reported its tic request to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
                     # inform agent that its message request was not accepted
                     msg_resp = ManagerReceptionIgnoredMessage(src, -1)
@@ -136,7 +124,7 @@ class PlanningSimulationManager(AbstractManager):
 
                     # inform agent that its message request was not accepted
                     msg_resp = ManagerReceptionAckMessage(src, -1)
-                    self.log(f'{src} has now reported to be online to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                    self.log(f'{src} has now reported reported its tic request  to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
                 # send response
                 send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )

@@ -570,8 +570,9 @@ class NetworkElement(ABC):
             # send multi-part message
             dst : str = msg.dst
             src : str = self.get_element_name()
+
             content : str = str(msg.to_json())
-            self.log(f'sending message: {content}')
+            self.log(f'sending message json: {content}')
 
             await socket.send_multipart([dst.encode('ascii'), 
                                          src.encode('ascii'), 
@@ -792,7 +793,7 @@ class NetworkElement(ABC):
             dst : str = b_dst.decode('ascii')
             src : str = b_src.decode('ascii')
             content : dict = json.loads(b_content.decode('ascii'))
-            self.log(f'message received from {src} intended for {dst}! Releasing lock...')
+            self.log(f'message received from {src} intended for {dst} through socket {socket}! Releasing lock...')
             self.log(f'message received: {content}')
 
             # return received message
@@ -1156,12 +1157,6 @@ class NetworkElement(ABC):
                 and the message contents `content` (`dict`)
         """
         self._internal_address_ledger : dict
-        
-        # if f'{self.get_element_name()}/' not in msg.dst:
-        #     dst = f'{self.get_element_name()}/{msg.dst}'
-        #     dst_network_config : NetworkConfig = self._internal_address_ledger.get(dst, None)
-        # else:
-        #     dst_network_config : NetworkConfig = self._internal_address_ledger.get(msg.dst, None)
 
         dst_network_config : NetworkConfig = self._internal_address_ledger.get(msg.dst, None)
         if dst_network_config is None:

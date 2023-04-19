@@ -102,6 +102,7 @@ class AbstractManager(SimulationElement):
 
         # push simulation start to monitor
         self.log('informing monitor of simulation start...')
+        sim_start_msg.dst = SimulationElementRoles.MONITOR.value
         await self._send_manager_msg(sim_start_msg, zmq.PUSH)
 
         # wait for simulation duration to pass

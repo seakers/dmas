@@ -1,24 +1,86 @@
+from enum import Enum
+from typing import Union
+
+import numpy
 from dmas.agents import AgentAction
+from dmas.messages import SimulationMessage
+   
+class ActionTypes(Enum):
+    PEER_MSG = 'PEER_MSG'
+    BROADCAST_MSG = 'BROADCAST_MSG'
+    MOVE = 'MOVE'
+    MEASURE = 'MEASURE'
+    IDLE = 'IDLE'
+
+class PeerMessageAction(AgentAction):
+    """
+    ## Peer-Message Action 
+
+    Instructs an agent to send a message directly to a peer
+    """
+    def __init__(self, 
+                msg : SimulationMessage,
+                t_start : Union[float, int],
+                t_end : Union[float, int], 
+                status : str = 'PENDING',
+                id: str = None, 
+                **_) -> None:
+        super().__init__(ActionTypes.PEER_MSG.value, t_start, t_end, status, id)
+        self.msg = msg
+
+class BroadcastMessageAction(AgentAction):
+    """
+    ## Broadcast Message Action 
+
+    Instructs an agent to broadcast a message to all of its peers
+    """
+    def __init__(self, 
+                msg : SimulationMessage,
+                t_start : Union[float, int],
+                t_end : Union[float, int], 
+                status : str = 'PENDING',
+                id: str = None, 
+                **_) -> None:
+        super().__init__(ActionTypes.BROADCAST_MSG.value, t_start, t_end, status, id)
+        self.msg = msg
+
+class MoveAction(AgentAction):
+    """
+    ## Move Action
+
+    Instructs an agent to move to a particular position
+    """
+    def __init__(self,
+                pos : list, 
+                t_start : Union[float, int],
+                t_end : Union[float, int] = numpy.Inf, 
+                status : str = 'PENDING',
+                id: str = None, 
+                **_) -> None:
+        super().__init__(ActionTypes.MOVE.value, t_start, t_end, status, id)
+        self.pos = pos
 
 class MeasurementTask(AgentAction):
     """
-    Describes a measurement task to be performed by the agents in the simulation
+    Describes a measurement task to be performed by agents in the simulation
 
     ### Attributes:
         - x (`list`): cartesian coordinates of the location of this task
         - s_max (`float`): maximum score attained from performing this task
-        - instrument (`str`): name of the instrument that can perform this task
+        - instruments (`list`): name of the instruments that can perform this task
         - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
         - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
         - id (`str`) : identifying number for this task in uuid format
     """        
     def __init__(self, 
                 pos : list, 
-                s_max : float, 
+                s_max : float,
                 instruments : list,
-                t_start : float,
-                t_end : float,
-                id : str = None) -> None:
+                t_start: Union[float, int], 
+                t_end: Union[float, int], 
+                status: str = 'PENDING', 
+                id: str = None, **_
+                ) -> None:
         """
         Creates an instance of a task 
 
@@ -30,7 +92,7 @@ class MeasurementTask(AgentAction):
             - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
             - id (`str`) : identifying number for this task in uuid format
         """
-        super().__init__(t_start, t_end, id)
+        super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id)
 
         # check arguments
         if not isinstance(pos, list):
@@ -49,4 +111,17 @@ class MeasurementTask(AgentAction):
         self.pos = pos
         self.s_max = s_max
         self.instruments = instruments    
-    
+
+class IdleAction(AgentAction):
+    """
+    ## Idle Action
+
+    Instructs an agent to idle for a given amount of time
+    """
+    def __init__(self, 
+                t_start : Union[float, int],
+                t_end : Union[float, int], 
+                status : str = 'PENDING',
+                id: str = None, 
+                **_) -> None:
+        super().__init__(ActionTypes.IDLE.value, t_start, t_end, status, id)

@@ -1,10 +1,5 @@
-
 from enum import Enum
-from typing import Union
-from states import SimulationAgentState
-
-from tasks import MeasurementTask
-from dmas.messages import SimulationMessage, SimulationElementRoles
+from dmas.messages import *
 
 class SimulationMessageTypes(Enum):
     TASK_REQ = 'TASK_REQUEST'
@@ -33,7 +28,7 @@ class AgentStateMessage(SimulationMessage):
                 id: str = None, 
                 **_):
         super().__init__(src, dst, SimulationMessageTypes.AGENT_STATE.value, id)
-        self.state = SimulationAgentState(**state)
+        self.state = state
 
 class AgentConnectivityUpdate(SimulationMessage):
     """
@@ -97,7 +92,7 @@ class AgentActionMessage(SimulationMessage):
 
     Informs the receiver of a action to be performed and its completion status
     """
-    def __init__(self, src: str, dst: str, action : dict, status : str, id: str = None):
+    def __init__(self, src: str, dst: str, action : dict, status : str=None, id: str = None, **kwargs):
         super().__init__(src, dst, SimulationMessageTypes.AGENT_ACTION.value, id)
         self.action = action
-        self.status = status
+        self.status = status if status is not None else action.get('status')

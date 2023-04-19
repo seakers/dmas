@@ -179,6 +179,8 @@ class Node(SimulationElement):
                 msg = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
                 await self._send_internal_msg(msg, zmq.PUB)
 
+            # TODO include internal ledger within modules for inter-module communication
+
             # return ledger
             return internal_address_ledger
         
@@ -526,7 +528,7 @@ class Node(SimulationElement):
         """
         return await self._receive_manager_msg(zmq.SUB)
 
-    async def listen_internal_message(self):
+    async def listen_internal_message(self) -> tuple:
         return await self._receive_internal_msg(zmq.REP)
 
     async def respond_internal_message(self, msg : SimulationMessage):
