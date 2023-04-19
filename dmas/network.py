@@ -480,6 +480,7 @@ class NetworkElement(ABC):
                     self.log(f'SUB port subscribed to topic `{topic}`!')
             
             return (socket, asyncio.Lock())
+
         except Exception as e:
             self.log(f'socket creation failed. {e}', level=logging.ERROR)
             raise e
@@ -566,29 +567,20 @@ class NetworkElement(ABC):
         ### Returns:
             - `bool` representing a successful transmission if True or False if otherwise.
         """
-        try:
-            # send multi-part message
-            dst : str = msg.dst
-            src : str = self.get_element_name()
+        # send multi-part message
+        dst : str = msg.dst
+        src : str = self.get_element_name()
 
-            content : str = str(msg.to_json())
-            self.log(f'sending message json: {content}')
+        content : str = str(msg.to_json())
+        self.log(f'sending message json: {content}')
 
-            await socket.send_multipart([dst.encode('ascii'), 
-                                         src.encode('ascii'), 
-                                         content.encode('ascii')])
-            
-            # return sucessful transmission flag
-            self.log('message sent!')
-            return True
+        await socket.send_multipart([dst.encode('ascii'), 
+                                        src.encode('ascii'), 
+                                        content.encode('ascii')])
         
-        except asyncio.CancelledError as e:
-            self.log(f'message transmission interrupted. {e}', level=logging.DEBUG)
-            raise e
-
-        except Exception as e:
-            self.log(f'message transmission failed. {e}', level=logging.ERROR)
-            raise e
+        # return sucessful transmission flag
+        self.log('message sent!')
+        return True
 
     async def _send_manager_msg(self, msg : SimulationMessage, socket_type : zmq.SocketType) -> bool:
         """
@@ -630,13 +622,13 @@ class NetworkElement(ABC):
             # send message
             return await self.__send_msg(msg, socket)
             
-        except asyncio.CancelledError as e:
-            self.log(f'manager message transmission interrupted. {e}', level=logging.DEBUG)
-            return False
+        # except asyncio.CancelledError as e:
+        #     self.log(f'manager message transmission interrupted. {e}', level=logging.DEBUG)
+        #     return False
 
-        except Exception as e:
-            self.log(f'manager message transmission failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'manager message transmission failed. {e}', level=logging.ERROR)
+        #     raise e
 
         finally:
             if (
@@ -691,13 +683,13 @@ class NetworkElement(ABC):
             # send message
             return await self.__send_msg(msg, socket)
             
-        except asyncio.CancelledError as e:
-            self.log(f'external message transmission interrupted. {e}', level=logging.DEBUG)
-            return False
+        # except asyncio.CancelledError as e:
+        #     self.log(f'external message transmission interrupted. {e}', level=logging.DEBUG)
+        #     return False
 
-        except Exception as e:
-            self.log(f'external message transmission failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'external message transmission failed. {e}', level=logging.ERROR)
+        #     raise e
 
         finally:
             if (
@@ -752,13 +744,13 @@ class NetworkElement(ABC):
             # send message
             return await self.__send_msg(msg, socket)
             
-        except asyncio.CancelledError as e:
-            self.log(f'internal message transmission interrupted. {e}', level=logging.DEBUG)
-            return False
+        # except asyncio.CancelledError as e:
+        #     self.log(f'internal message transmission interrupted. {e}', level=logging.DEBUG)
+        #     return False
 
-        except Exception as e:
-            self.log(f'internal message transmission failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'internal message transmission failed. {e}', level=logging.ERROR)
+        #     raise e
 
         finally:
             if (
@@ -785,27 +777,18 @@ class NetworkElement(ABC):
                 name of sender as `src` (`str`) 
                 and the body of the message as `content` (`dict`)
         """
-        try:        
-            # send multi-part message
-            b_dst, b_src, b_content = await socket.recv_multipart()
-            b_dst : bytes; b_src : bytes; b_content : bytes
+        # send multi-part message
+        b_dst, b_src, b_content = await socket.recv_multipart()
+        b_dst : bytes; b_src : bytes; b_content : bytes
 
-            dst : str = b_dst.decode('ascii')
-            src : str = b_src.decode('ascii')
-            content : dict = json.loads(b_content.decode('ascii'))
-            self.log(f'message received from {src} intended for {dst} through socket {socket}! Releasing lock...')
-            self.log(f'message received: {content}')
+        dst : str = b_dst.decode('ascii')
+        src : str = b_src.decode('ascii')
+        content : dict = json.loads(b_content.decode('ascii'))
+        self.log(f'message received from {src} intended for {dst} through socket {socket}! Releasing lock...')
+        self.log(f'message received: {content}')
 
-            # return received message
-            return dst, src, content
-
-        except asyncio.CancelledError as e:
-            self.log(f'message reception on socket {socket} interrupted. {e}', level=logging.DEBUG)
-            raise e
-            
-        except Exception as e:
-            self.log(f'message reception on socket {socket} failed. {e}', level=logging.ERROR)
-            raise e
+        # return received message
+        return dst, src, content
 
     async def _receive_manager_msg(self, socket_type : zmq.SocketType) -> list:
         """
@@ -852,13 +835,13 @@ class NetworkElement(ABC):
             # send multi-part message
             return await self.__receive_msg(socket)
 
-        except asyncio.CancelledError as e:
-            self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-            return None, None, None
+        # except asyncio.CancelledError as e:
+        #     self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
+        #     return None, None, None
             
-        except Exception as e:
-            self.log(f'message reception failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'message reception failed. {e}', level=logging.ERROR)
+        #     raise e
         
         finally:
             if (
@@ -915,15 +898,15 @@ class NetworkElement(ABC):
             self.log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
 
             # send multi-part message
-            return  await self.__receive_msg(socket)
+            return await self.__receive_msg(socket)
 
-        except asyncio.CancelledError as e:
-            self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-            return None, None, None
+        # except asyncio.CancelledError as e:
+        #     self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
+        #     return None, None, None
             
-        except Exception as e:
-            self.log(f'message reception failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'message reception failed. {e}', level=logging.ERROR)
+        #     raise e
         
         finally:
             if (
@@ -981,15 +964,15 @@ class NetworkElement(ABC):
 
 
             # send multi-part message
-            return  await self.__receive_msg(socket)
+            return await self.__receive_msg(socket)
 
-        except asyncio.CancelledError as e:
-            self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-            return None, None, None
+        # except asyncio.CancelledError as e:
+        #     self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
+        #     return None, None, None
             
-        except Exception as e:
-            self.log(f'message reception failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'message reception failed. {e}', level=logging.ERROR)
+        #     raise e
         
         finally:
             if (
@@ -1054,13 +1037,13 @@ class NetworkElement(ABC):
 
             return receive_task.result()
         
-        except asyncio.CancelledError as e:
-            self.log(f'message request interrupted.', level=logging.DEBUG)
-            return None, None, None
+        # except asyncio.CancelledError as e:
+        #     self.log(f'message request interrupted.', level=logging.DEBUG)
+        #     return None, None, None
 
-        except Exception as e:
-            self.log(f'message request failed. {e}', level=logging.ERROR)
-            raise e
+        # except Exception as e:
+        #     self.log(f'message request failed. {e}', level=logging.ERROR)
+        #     raise e
         
         finally:
             if send_task is not None and not send_task.done():

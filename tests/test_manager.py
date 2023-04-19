@@ -54,11 +54,6 @@ class TestSimulationManager(unittest.TestCase):
                     if (dst not in self.name 
                         or SimulationElementRoles.MANAGER.value not in src 
                         or content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value):
-                        
-                        print(dst not in self.name)
-                        print(SimulationElementRoles.MANAGER.value not in src)
-                        print(content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value)
-
                         self.log('wrong message received. ignoring message...')
                         continue
                     else:
@@ -209,25 +204,19 @@ class TestSimulationManager(unittest.TestCase):
             return
 
         async def _execute(self) -> None:
-            try:
-                self.log('executing...')
-                while True:
-                    dst, src, content = await self._receive_manager_msg(zmq.PULL)
-                    
-                    self.log(f'message received: {content}', level=logging.DEBUG)
+            self.log('executing...')
+            while True:
+                dst, src, content = await self._receive_manager_msg(zmq.PULL)
+                
+                self.log(f'message received: {content}', level=logging.DEBUG)
 
-                    if (dst not in self.name 
-                        or SimulationElementRoles.MANAGER.value not in src 
-                        or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                        self.log('wrong message received. ignoring message...')
-                    else:
-                        self.log('simulation end message received! ending simulation...')
-                        break
-            except asyncio.CancelledError:
-                return
-
-            except Exception as e:
-                raise e
+                if (dst not in self.name 
+                    or SimulationElementRoles.MANAGER.value not in src 
+                    or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
+                    self.log('wrong message received. ignoring message...')
+                else:
+                    self.log('simulation end message received! ending simulation...')
+                    break
 
         async def _publish_deactivate(self) -> None:
             return 
@@ -322,7 +311,7 @@ class TestSimulationManager(unittest.TestCase):
 
         simulation_element_name_list = []
         for i in range(n_clients):
-            simulation_element_name_list.append(f'TEST_NETWORK/CLIENT_{i}')
+            simulation_element_name_list.append(f'CLIENT_{i}')
 
         manager = TestSimulationManager.TestManager(clock_config, simulation_element_name_list, port, level, logger)
 
@@ -356,7 +345,7 @@ class TestSimulationManager(unittest.TestCase):
 
         for n in n_clients:
             clock_config = RealTimeClockConfig(str(start_date), str(end_date))
-            self.run_tester(clock_config, n, level=logging.INFO)
+            self.run_tester(clock_config, n, level=logging.WARNING)
 
     def test_accelerated_clock_run(self):
         print('\nTESTING ACCELERATED REAL-TIME CLOCK MANAGER')

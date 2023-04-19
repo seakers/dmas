@@ -56,8 +56,7 @@ class SimulationMessage(object):
         """
         Compares two instances of a simulation message. Returns True if they represent the same message.
         """
-        other : SimulationMessage
-        return self.to_dict() == other.to_dict()
+        return self.to_dict() == dict(other.__dict__)
 
     def to_dict(self) -> dict:
         """
@@ -75,6 +74,9 @@ class SimulationMessage(object):
         """
         Creates a string representing the contents of this message
         """
+        return str(self.to_dict())
+
+    def __repr__(self) -> str:
         return str(self.to_dict())
 
 """

@@ -33,6 +33,7 @@ class TestSimulationElement(unittest.TestCase):
             super().__init__(f'SERVER', network_config, level, logger)
             self.n_clients = n_clients
             self.dt = dt
+            self.msgs = []
 
         async def _external_sync(self) -> dict:
             try:
@@ -82,16 +83,18 @@ class TestSimulationElement(unittest.TestCase):
             await asyncio.sleep(0.1)
             msg = SimulationMessage(self.name, self._network_name, 'START')
             await self._send_manager_msg(msg, zmq.PUB)
+            self.msgs.append(msg)
 
         async def _execute(self):
             # wait for dt seconds
-            desc = f'{self.name}: Working      '
+            desc = f'{self.name}: `Working`    '
             for _ in tqdm (range (10), desc=desc):
                 await asyncio.sleep(self.dt/10)
 
             # publish sim is over
             msg = SimulationMessage(self.name, self._network_name, 'END')
             await self._send_manager_msg(msg, zmq.PUB)
+            self.msgs.append(msg)
 
             # wait for response
             deactivated = []
@@ -130,6 +133,7 @@ class TestSimulationElement(unittest.TestCase):
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}']})
             super().__init__(f'CLIENT_{id}', network_config, level, logger)
+            self.msgs = []
 
         async def _external_sync(self) -> dict:   
             try:         
@@ -179,6 +183,8 @@ class TestSimulationElement(unittest.TestCase):
 
                 self.log(content, level=logging.DEBUG)
 
+                self.msgs.append(msg)
+
                 if (dst not in self.name 
                     or 'SERVER' not in src 
                     or msg.msg_type != 'START'):
@@ -192,6 +198,8 @@ class TestSimulationElement(unittest.TestCase):
                 msg = SimulationMessage(**content)
 
                 self.log(content, level=logging.DEBUG)
+
+                self.msgs.append(msg)
 
                 if (dst not in self.name 
                     or 'SERVER' not in src 
@@ -232,7 +240,7 @@ class TestSimulationElement(unittest.TestCase):
                 raise e
 
     def test_run(self):
-        print('TEST: Simulation Element Sync Routine')
+        print('\nTESTING SIMULATION ELEMENT SYNC ROUTINE')
         port = 5556
         n_clients = 10
 
@@ -241,11 +249,23 @@ class TestSimulationElement(unittest.TestCase):
         clients = []
         for id in range(n_clients):
             clients.append(TestSimulationElement.Client(id, port,logger=logger))
-
-        print('\n')
         with concurrent.futures.ThreadPoolExecutor(len(clients) + 1) as pool:
             client : TestSimulationElement.Client
             for client in clients:                
                 pool.submit(client.run, *[])
             pool.submit(server.run, *[])
-    
+        
+        for client in clients:
+            client : TestSimulationElement.Client    
+            self.assertEqual(len(client.msgs), len(server.msgs))
+
+            for msg_client in client.msgs:
+                msg_client : SimulationMessage
+                found = False
+                for msg_server in server.msgs:
+                    msg_server : SimulationMessage
+                    if msg_client.to_dict() == msg_server.to_dict():
+                        found = True
+                        break
+                
+                self.assertTrue(found)

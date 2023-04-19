@@ -19,6 +19,12 @@ class TestInternalModule(unittest.TestCase):
         async def routine(self):
             return
 
+        async def setup(self):
+            return
+
+        async def teardown(self) -> None:
+            return
+
     class TestModule(InternalModule):
         def __init__(self, 
                     parent_name : str, 
@@ -35,6 +41,12 @@ class TestInternalModule(unittest.TestCase):
                                     }
             module_network_config = NetworkConfig(parent_name, manager_address_map=manager_address_map)
             super().__init__(module_name, module_network_config, parent_network_config, [], level, logger)
+
+        async def setup(self):
+            return
+
+        async def teardown(self) -> None:
+            return
 
         async def listen(self):
             try:
@@ -158,7 +170,7 @@ class TestInternalModule(unittest.TestCase):
             """
             responses = []
             m : InternalModule
-            module_names = [f'{self._element_name}/{m.get_element_name()}' for m in self.__modules]
+            module_names = [f'{m.get_element_name()}' for m in self.__modules]
 
             with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
                 while len(responses) < len(self.__modules):
@@ -177,10 +189,6 @@ class TestInternalModule(unittest.TestCase):
                         pbar.update(1)
                         resp = NodeReceptionAckMessage(self._element_name, src)
                     else:
-                        print(dst in self.name, dst, self.name)
-                        print(src in module_names, src, module_names)
-                        print(msg_type == target_type.value, msg_type, target_type.value)
-                        print(src not in responses, src, responses)
                         # ignore message
                         resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
@@ -208,7 +216,7 @@ class TestInternalModule(unittest.TestCase):
             """
             # send terminate message to all modules
             responses = []
-            module_names = [m.name for m in self.__modules]
+            module_names = [m.get_element_name() for m in self.__modules]
 
             with tqdm(total=len(self.__modules) , desc=f'{self.name} Offline Internal Modules') as pbar:
                 while len(responses) < len(self.__modules):

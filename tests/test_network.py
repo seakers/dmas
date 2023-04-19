@@ -335,6 +335,7 @@ class TestNetworkElement(unittest.TestCase):
                 return 
 
     def peer_transmission_tester(self, t_type : TransmissionTypes, port : int, n : int, level : int = logging.DEBUG):
+        print('TESTING PEER TRANSMISSION')
         sender = TestNetworkElement.PeerSender(t_type, port, n, level)
         logger = sender.get_logger()
         receiver = TestNetworkElement.PeerReceiver(t_type, port, n, level, logger)

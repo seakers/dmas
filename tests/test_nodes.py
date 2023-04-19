@@ -214,6 +214,12 @@ class TestSimulationNode(unittest.TestCase):
         def __init__(self, module_name: str, network_config: NetworkConfig, parent_network_config : NetworkConfig, logger: logging.Logger = None) -> None:
             super().__init__(module_name, network_config, parent_network_config, [], logger=logger)
 
+        async def setup(self) -> None:
+            return
+
+        async def teardown(self) -> None:
+            return
+
         async def listen(self):
             try:
                 # do some 'listening'

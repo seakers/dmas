@@ -282,13 +282,22 @@ class TestMultiagentSim(unittest.TestCase):
 													logger=env.get_logger())
 
 	class UpdatePositionAction(AgentAction):
-		def __init__(self, pos : list) -> None:
-			super().__init__(-1, -1)
+		def __init__(self, 
+					pos: list, 
+					status: str = 'PENDING', 
+					id: str = None, 
+					**_) -> None:
+			super().__init__('UPDATE_POS', 0, 1, status, id)
 			self.pos = pos
 
 	class IdleAction(AgentAction):
-		def __init__(self, dt : float) -> None:
-			super().__init__(-1, -1)
+		def __init__(self, 
+					dt : Union[float, int], 
+					status: str = 'PENDING', 
+					id: str = None, 
+					**_) -> None:
+
+			super().__init__('IDLE', 0, 1, status, id)
 			self.dt = dt
 
 	class TestAgent(Agent):
@@ -335,18 +344,18 @@ class TestMultiagentSim(unittest.TestCase):
 
 		async def do(self, actions : list) -> list:
 			try:
-				statuses = {action : AgentAction.PENDING for action in actions}
+				statuses = []
 				for action in actions:
 					if isinstance(action, TestMultiagentSim.UpdatePositionAction):
 						self.pos = action.pos
 						self.pos_hist.append(action.pos)
-						statuses[action] = AgentAction.COMPLETED
+						statuses.append((action, AgentAction.COMPLETED))
 						self.log(f'position = {self.pos}', level=logging.INFO)
 					elif isinstance(action, TestMultiagentSim.IdleAction):
 						await self.sim_wait(action.dt)
-						statuses[action] = AgentAction.COMPLETED
+						statuses.append((action, AgentAction.COMPLETED))
 					else:
-						statuses[action] = AgentAction.ABORTED
+						statuses.append((action, AgentAction.ABORTED))
 				
 				return statuses
 			except asyncio.CancelledError as e:
