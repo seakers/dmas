@@ -552,14 +552,19 @@ class Node(SimulationElement):
         dst_addresses = dst_network_config.get_external_addresses().get(zmq.PUB, None)
         if dst_addresses is None or len(dst_addresses) < 1:
             pass
-        dst_address = dst_addresses[-1]
+        dst_address : str = dst_addresses[-1]
+
+        if 'localhost' not in dst_address:
+            dst_address = dst_address.replace('*', 'localhost')
         
         # get own sub port
         socket, _ = self._external_socket_map.get(zmq.SUB)
         socket : azmq.Socket
 
         # conenct to destiation
+        self.log(f'connecting to {dst} via {dst_address}...')
         socket.connect(dst_address)
+        self.log(f'successfully disconnected from {dst}!')
 
     def unsubscribe_to_broadcasts(self, dst) -> None:
         """
@@ -573,11 +578,16 @@ class Node(SimulationElement):
         dst_addresses = dst_network_config.get_external_addresses().get(zmq.PUB, None)
         if dst_addresses is None or len(dst_addresses) < 1:
             pass
-        dst_address = dst_addresses[-1]
+        dst_address : str = dst_addresses[-1]
+
+        if 'localhost' not in dst_address:
+            dst_address = dst_address.replace('*', 'localhost')
         
         # get own sub port
         socket, _ = self._external_socket_map.get(zmq.SUB)
         socket : azmq.Socket
 
         # conenct to destiation
+        self.log(f'disconnecting to {dst} via {dst_address}...')
         socket.disconnect(dst_address)
+        self.log(f'successfully disconnected from {dst}!')

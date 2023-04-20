@@ -59,7 +59,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 1
+    n_agents = 2
     comms_range = 5
     v_max = 1
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     port = 5555
 
     ## loggers
-    level = logging.INFO
+    level = logging.DEBUG
 
     ### random tasks 
     n_tasks = 0

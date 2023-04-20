@@ -186,11 +186,16 @@ class Agent(Node):
 
     async def live(self):
         try:
+            # subscribe to environment broadcasts
+            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
+
+            # run `routine()` and `listen()` until the one terminates
             t_1 = asyncio.create_task(self.routine(), name='routine()')
             t_2 = asyncio.create_task(self.listen_to_broadcasts(), name='listen()')
 
             _, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
 
+            # cancel pending task
             for task in pending:
                 task : asyncio.Task
                 task.cancel()
@@ -240,6 +245,7 @@ class Agent(Node):
 
                 if manager_socket in sockets:
                     dst, src, content = await self.listen_manager_broadcast()
+                    self.log('received manager broadcast! sending to inbox...')
 
                     # if sim-end message, end agent `live()`
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
@@ -253,12 +259,15 @@ class Agent(Node):
                     dst, src, content = await self.listen_peer_broadcast()
 
                     if src == SimulationElementRoles.ENVIRONMENT.value:
+                        self.log('received environment broadcast! sending to inbox...')
                         await self.environment_inbox.put( (dst, src, content) )
                     else:
+                        self.log('received peer broadcast! sending to inbox...')
                         await self.external_inbox.put( (dst, src, content) )
 
                 if internal_socket in sockets: 
                     dst, src, content = await self.listen_internal_broadcast()
+                    self.log('received internal broadcast! sending to inbox...')
                     await self.internal_inbox.put( (dst, src, content) )
 
         except asyncio.CancelledError:

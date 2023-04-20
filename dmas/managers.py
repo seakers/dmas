@@ -207,7 +207,7 @@ class AbstractManager(SimulationElement):
 
                         # inform agent that its message request was not accepted
                         msg_resp = ManagerReceptionAckMessage(src, -1)
-                        self.log(f'{src} has now reported to be online to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
+                        self.log(f'{src} has now reported to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list)})')
 
                     # send response
                     send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )

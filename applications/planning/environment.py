@@ -35,6 +35,7 @@ class SimulationEnvironment(EnvironmentNode):
     async def setup(self) -> None:
         # initiate state trackers   
         self.states_tracker = {agent_name : None for agent_name in self._external_address_ledger}
+        self.in_range = {agent_name : {target_name : 1 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
 
     async def live(self) -> None:
         try:
@@ -68,7 +69,7 @@ class SimulationEnvironment(EnvironmentNode):
 
                         # unpack message
                         msg = AgentStateMessage(**content)
-                        self.log(f'state received: {msg}. updating state tracker...')
+                        self.log(f'state received from {msg.src}. updating state tracker...')
 
                         # update state tracker
                         self.states_tracker[src] = SimulationAgentState(**msg.state)
@@ -105,10 +106,15 @@ class SimulationEnvironment(EnvironmentNode):
                         self.log('states are all from the same time! checking agent connectivity...')
                         range_updates : list = self.check_agent_distance()
 
-                        self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
-                        for range_update in range_updates:
-                            range_update : AgentConnectivityUpdate
-                            await self.send_peer_broadcast(range_update)
+                        if len(range_updates) > 0:
+                            self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
+                            for range_update in range_updates:
+                                range_update : AgentConnectivityUpdate
+                                await self.send_peer_broadcast(range_update)
+                        else:
+                            self.log(f'connectivity checked. no connectivity updates...')
+                            ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
+                            await self.send_peer_broadcast(ok_msg)
                         self.log('connectivity updates sent!')
 
                     else:
@@ -130,7 +136,7 @@ class SimulationEnvironment(EnvironmentNode):
                         ):
                         # sim end message received
                         self.log(f"received message of type {content['msg_type']}. ending simulation...")
-                        return
+                        raise asyncio.CancelledError(f"received message of type {content['msg_type']}")
 
                     elif content['msg_type'] == ManagerMessageTypes.TOC.value:
                         # toc message received
@@ -152,6 +158,10 @@ class SimulationEnvironment(EnvironmentNode):
 
         except asyncio.CancelledError:
             return
+
+        except Exception as e:
+            self.log(f'`live()` failed. {e}', level=logging.ERROR)
+            raise e
 
     def same_state_times(self) -> bool:
         """
@@ -196,23 +206,32 @@ class SimulationEnvironment(EnvironmentNode):
 
         range_updates = []
         for i in range(len(agent_names)):
+            agent_a = agent_names[i]
             if agent_a == self.get_element_name():
                 continue
             
-            for j in range(i+1, len(agent_names)+1):
-                agent_a = agent_names[i]
+            for j in range(i+1, len(agent_names)):
                 agent_b = agent_names[j]
 
                 if agent_b == self.get_element_name():
                     continue
-
-                pos_a = self.states_tracker[agent_a]
-                pos_b = self.states_tracker[agent_b]
+                
+                state_a : SimulationAgentState = self.states_tracker[agent_a]
+                pos_a = state_a.pos
+                state_b : SimulationAgentState = self.states_tracker[agent_b]
+                pos_b = state_b.pos
 
                 dist = numpy.sqrt( (pos_a[0] - pos_b[0])**2 + (pos_a[1] - pos_b[1])**2 )
-                                    
-                range_updates.append(AgentConnectivityUpdate(agent_a, agent_b, dist <= self.comms_range))
-                range_updates.append(AgentConnectivityUpdate(agent_b, agent_a, dist <= self.comms_range))
+                
+                connected = 1 if dist <= self.comms_range else 0
+
+                if self.in_range[agent_a][agent_b] != connected:
+                    range_updates.append(AgentConnectivityUpdate(agent_a, agent_b, connected))
+                    self.in_range[agent_a][agent_b] = connected
+
+                if self.in_range[agent_b][agent_a] != connected:
+                    range_updates.append(AgentConnectivityUpdate(agent_b, agent_a, connected))
+                    self.in_range[agent_b][agent_a] = connected
 
         return range_updates
 

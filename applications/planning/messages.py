@@ -45,7 +45,7 @@ class AgentConnectivityUpdate(SimulationMessage):
         - id (`str`) : Universally Unique IDentifier for this message
         - state (`dict`): dictionary discribing the state of the agent sending this message
     """
-    def __init__(self, dst: str, target : str, connected : bool, id: str = None):
+    def __init__(self, dst: str, target : str, connected : int, id: str = None, **_):
         super().__init__(SimulationElementRoles.ENVIRONMENT.value, 
                          dst, 
                          SimulationMessageTypes.CONNECTIVITY_UPDATE.value, 

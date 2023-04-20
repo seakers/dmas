@@ -60,12 +60,12 @@ class FixedPlannerModule(PlannerModule):
         
     async def setup(self) -> None:
         # create an initial plan
-        move_right = MoveAction([2,0], 0)
+        move_right = MoveAction([10,0], 0)
         move_left = MoveAction([0,0], 0)
 
         self.plan = [
-                    move_right
-                    ,
+                    # move_right
+                    # ,
                     move_left
                     ]
         
@@ -91,7 +91,7 @@ class FixedPlannerModule(PlannerModule):
             #     await self._send_manager_msg(msg, zmq.PUB)
 
             self.log('initial plan sent!')
-            t_curr = -1
+            t_curr = 0
             while True:
                 # listen for agent to send new senses
                 self.log('waiting for incoming agent senses...')
@@ -99,26 +99,26 @@ class FixedPlannerModule(PlannerModule):
 
                 self.log(f'received {len(senses)} senses from agent! processing senses...')
                 new_plan = []
-                for sense in senses:
-                    sense : dict
-                    if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-                        # unpack message 
-                        msg = AgentActionMessage(**sense)
+                # for sense in senses:
+                #     sense : dict
+                #     if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                #         # unpack message 
+                #         msg = AgentActionMessage(**sense)
                         
-                        # if action wasn't completed, re-try
-                        if msg.status != AgentAction.COMPLETED:
-                            self.log(f'action {msg.action} not completed yet! trying again...')
-                            msg.dst = self.get_parent_name()
-                            new_plan.append(msg)
+                #         # if action wasn't completed, re-try
+                #         if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
+                #             self.log(f'action {msg.action} not completed yet! trying again...')
+                #             msg.dst = self.get_parent_name()
+                #             new_plan.append(msg)
 
-                    elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                        # unpack message 
-                        msg : AgentStateMessage = AgentStateMessage(**sense)
-                        state = SimulationAgentState(**msg.state)
+                #     elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                #         # unpack message 
+                #         msg : AgentStateMessage = AgentStateMessage(**sense)
+                #         state = SimulationAgentState(**msg.state)
 
-                        # update current simulation time
-                        if t_curr < state.t:
-                            t_curr = state.t               
+                #         # update current simulation time
+                #         if t_curr < state.t:
+                #             t_curr = state.t               
 
                 if len(new_plan) < 1:
                     if len(self.plan) > 0:
@@ -130,7 +130,7 @@ class FixedPlannerModule(PlannerModule):
                     else:
                         # if no plan left, just idle for a time-step
                         self.log('no more actions to perform. instruct agent to idle for one time-step.')
-                        idle = IdleAction(t_curr, t_curr+1)
+                        idle = IdleAction(t_curr, t_curr+1000000)
                         msg = AgentActionMessage(self.get_element_name(),
                                                 self.get_parent_name(),
                                                 idle.to_dict())

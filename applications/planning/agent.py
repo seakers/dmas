@@ -57,6 +57,7 @@ class SimulationAgent(Agent):
                         [planning_module], 
                         level, 
                         logger)
+        self.in_range = {}
 
     async def setup(self) -> None:
         # nothing to set up
@@ -108,11 +109,13 @@ class SimulationAgent(Agent):
 
                 if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
                     # update connectivity
-                    msg = AgentConnectivityUpdate(**msg)
-                    if msg.connected:
+                    msg = AgentConnectivityUpdate(**content)
+                    if (msg.target not in self.in_range or self.in_range[msg.target] == 0) and msg.connected == 1:
                         self.subscribe_to_broadcasts(msg.target)
-                    else:
+                        self.in_range[msg.target] = 1
+                    elif (msg.target not in self.in_range or self.in_range[msg.target] == 1) and msg.connected == 0:
                         self.unsubscribe_to_broadcasts(msg.target)
+                        self.in_range[msg.target] = 0
 
                 elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                     # save as senses to forward to planner
@@ -176,7 +179,7 @@ class SimulationAgent(Agent):
         self.log(f'senses sent! waiting on plan to perform...')
         actions = []
 
-        _, _, content = await self.listen_internal_broadcast()
+        _, _, content = await self.internal_inbox.get()
         self.log(f"plan received from planner module!")
         
         if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
@@ -366,17 +369,19 @@ class SimulationAgent(Agent):
                         tic_req = TicRequest(self.get_element_name(), t0, tf)
                         await self.send_manager_message(tic_req)
 
+                        self.log(f'tic request for {tf}[s] sent! waiting on toc....')
                         dst, src, content = await self.manager_inbox.get()
                         
                         if content['msg_type'] == ManagerMessageTypes.TOC.value:
                             # update clock
                             msg = TocMessage(**content)
                             await self.update_current_time(msg.t)
-
+                            self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
                         else:
                             # ignore message
+                            self.log(f'some other message was received. ignoring...')
                             await self.manager_inbox.put( (dst, src, content) )
-
+                        x = 1
 
             elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
                 await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
