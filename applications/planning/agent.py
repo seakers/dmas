@@ -378,13 +378,8 @@ class SimulationAgent(Agent):
 
             else:
                 raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
-
-        except asyncio.CancelledError as e:
-            raise e
         
         finally:
-            if send_task is not None and not send_task.done():
-                await self._receive_manager_msg(zmq.REQ)
-                
+
             for dst, src, content in ignored:
                 await self.manager_inbox.put((dst,src,content))
