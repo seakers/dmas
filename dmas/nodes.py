@@ -427,10 +427,9 @@ class Node(SimulationElement):
         self.log(f'cleansing manager REQ port...')
         poller = azmq.Poller()
         socket, _ = self._manager_socket_map.get(zmq.REQ)
-        socket : azmq.Socket
         poller.register(socket, zmq.POLLIN)
 
-        socks = await poller.poll(timeout=0.1)
+        socks = await poller.poll(timeout=0.001)
         if len(socks) > 0:
             msg = await self._receive_manager_msg(zmq.REQ)
 
