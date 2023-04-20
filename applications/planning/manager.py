@@ -48,7 +48,12 @@ class PlanningSimulationManager(AbstractManager):
                     # announce new time to simulation monitor
                     self.log(f'sending toc for time {t}[s] to monitor')
                     toc.dst = SimulationElementRoles.MONITOR.value
-                    await self.send_monitor_message(toc)                    
+                    await self.send_monitor_message(toc)     
+
+                # # wait for everyone to ask to fast forward            
+                # self.log(f'waiting for tic requests...')
+                # await self.wait_for_tic_requests()
+                # self.log(f'tic requests received!')
 
                 self.log('TIMER DONE!', level=logging.INFO)
             # TODO Implement Event-driven Clock

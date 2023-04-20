@@ -60,13 +60,16 @@ class FixedPlannerModule(PlannerModule):
         
     async def setup(self) -> None:
         # create an initial plan
-        move_right = MoveAction([1,0,0], 0)
-        move_left = MoveAction([0,0,0], 0)
+        move_right = MoveAction([2,0], 0)
+        move_left = MoveAction([0,0], 0)
 
-        # self.plan = [move_right,
-        #              move_left]
+        self.plan = [
+                    move_right
+                    ,
+                    move_left
+                    ]
         
-        self.plan = [move_right]
+        # self.plan = [move_right]
 
         # self.plan = []
     
@@ -81,11 +84,11 @@ class FixedPlannerModule(PlannerModule):
         
     async def routine(self) -> None:
         try:
-            self.log('sending initial plan...')
-            for action in self.plan:
-                action : AgentAction
-                msg = AgentActionMessage(self.get_element_name(), self.get_parent_name(), action.to_dict())
-                await self.send_manager_message(msg)
+            # self.log('sending initial plan...')
+            # for action in self.plan:
+            #     action : AgentAction
+            #     msg = AgentActionMessage(self.get_element_name(), self.get_parent_name(), action.to_dict())
+            #     await self._send_manager_msg(msg, zmq.PUB)
 
             self.log('initial plan sent!')
             t_curr = -1
@@ -118,14 +121,21 @@ class FixedPlannerModule(PlannerModule):
                             t_curr = state.t               
 
                 if len(new_plan) < 1:
-                    # if no plan left, just idle for a time-step
-                    self.log('no more actions to perform. instruct agent to idle for one time-step.')
-                    idle = IdleAction(t_curr, t_curr+1)
-                    msg = AgentActionMessage(self.get_element_name(),
-                                            self.get_parent_name(),
-                                            idle.to_dict())
-                    # await self.send_manager_message(msg)
-                    new_plan.append(msg)
+                    if len(self.plan) > 0:
+                        action : AgentAction = self.plan.pop(0)
+                        msg = AgentActionMessage(self.get_element_name(),
+                                                self.get_parent_name(),
+                                                action.to_dict())
+                        new_plan.append(msg)
+                    else:
+                        # if no plan left, just idle for a time-step
+                        self.log('no more actions to perform. instruct agent to idle for one time-step.')
+                        idle = IdleAction(t_curr, t_curr+1)
+                        msg = AgentActionMessage(self.get_element_name(),
+                                                self.get_parent_name(),
+                                                idle.to_dict())
+                        # await self.send_manager_message(msg)
+                        new_plan.append(msg)
 
                 self.log(f'sending {len(new_plan)} actions to agent...')
                 for msg in new_plan:

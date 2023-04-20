@@ -40,6 +40,8 @@ def setup_results_directory(scenario_name) -> str:
             except Exception as e:
                 print('Failed to delete %s. Reason: %s' % (file_path, e))
 
+    return results_path
+
 def create_tasks():
     pass
 
@@ -62,6 +64,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
+    T = 10
     year = 2023
     month = 1
     day = 1
@@ -69,7 +72,7 @@ if __name__ == '__main__':
     mm = 00
     ss = 00
     start_date = datetime(year, month, day, hh, mm, ss)
-    end_date = datetime(year, month, day, hh, mm, ss+3)
+    end_date = datetime(year, month, day, hh, mm, ss+T)
     dt = 1.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
 
@@ -77,7 +80,7 @@ if __name__ == '__main__':
     port = 5555
 
     ## loggers
-    level = logging.DEBUG
+    level = logging.INFO
 
     ### random tasks 
     n_tasks = 0

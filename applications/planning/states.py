@@ -33,7 +33,7 @@ class SimulationAgentState(AgentState):
         self.history = []
 
     def update_state(self, t : Union[float, int], vel : list=None, tasks_performed : list=[], status : str=None):
-        if t > self.t:        
+        if t >= self.t:        
             # update position with previous state info and new time jump
             x, y = self.pos
             vx, vy = self.vel
@@ -52,9 +52,11 @@ class SimulationAgentState(AgentState):
             elif y > max(self.y_bounds):
                 y = max(self.y_bounds)
 
+            self.pos = [x, y]
+
             # update velocity for future update
             if vel is not None:
-                self.vel = vel
+                self.vel = vel  
 
         # update tasks performed
         self.tasks_performed.extend(tasks_performed)
@@ -69,8 +71,11 @@ class SimulationAgentState(AgentState):
         out = self.to_dict()
         self.history.append(out)
 
-    def __str__(self):
+    def __repr__(self) -> str:
         return str(self.to_dict())
+
+    def __str__(self):
+        return str(dict(self.__dict__))
     
     def to_dict(self) -> dict:
         out = super().to_dict().copy()

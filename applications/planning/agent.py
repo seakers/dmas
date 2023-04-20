@@ -196,10 +196,11 @@ class SimulationAgent(Agent):
         self.log(f'performing {len(actions)} actions')
         action_dict : dict = actions.pop(0)     
         action = AgentAction(**action_dict)
-        self.log(f"performing action of type {action_dict['action_type']}...")
 
         # check if action can be performed at this time
         if action.t_start <= self.get_current_time() <= action.t_end:
+            self.log(f"performing action of type {action_dict['action_type']}...", level=logging.INFO)
+            
             if action_dict['action_type'] == ActionTypes.PEER_MSG.value:
                 # unpack action
                 action = PeerMessageAction(**action_dict)
@@ -232,9 +233,8 @@ class SimulationAgent(Agent):
                 ## calculate new direction 
                 dx = action.pos[0] - self.state.pos[0]
                 dy = action.pos[1] - self.state.pos[1]
-                dz = action.pos[2] - self.state.pos[2]
 
-                norm = math.sqrt(dx**2 + dy**2 + dz**2)
+                norm = math.sqrt(dx**2 + dy**2)
 
                 if isinstance(self._clock_config, FixedTimesStepClockConfig):
                     eps = self.state.v_max * self._clock_config.dt
@@ -242,26 +242,23 @@ class SimulationAgent(Agent):
                     eps = 1e-6
 
                 if norm < eps:
-                    ### agent has reached its desired position
+                    self.log('agent has reached its desired position. stopping.', level=logging.DEBUG)
                     ## stop agent 
                     new_vel = [ 0, 
-                                0, 
                                 0]
                     self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.IDLING)
 
                     # update action completion status
                     action.status = AgentAction.COMPLETED
                 else:
-                    ### agent has NOT reached its desired position
                     ## change velocity towards destination
                     dx = dx / norm
                     dy = dy / norm
-                    dz = dz / norm
 
                     new_vel = [ dx*self.state.v_max, 
-                                dy*self.state.v_max, 
-                                dz*self.state.v_max]
+                                dy*self.state.v_max]
 
+                    self.log(f'agent has NOT reached its desired position. updating velocity to {new_vel}', level=logging.DEBUG)
                     self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
 
                     ## wait until destination is reached
@@ -280,9 +277,8 @@ class SimulationAgent(Agent):
                 ## TODO get information from environment
                 dx = task.pos[0] - self.state.pos[0]
                 dy = task.pos[1] - self.state.pos[1]
-                dz = task.pos[2] - self.state.pos[2]
 
-                norm = math.sqrt(dx**2 + dy**2 + dz**2)
+                norm = math.sqrt(dx**2 + dy**2)
 
                 if isinstance(self._clock_config, FixedTimesStepClockConfig):
                     eps = self.state.v_max * self._clock_config.dt
@@ -318,15 +314,17 @@ class SimulationAgent(Agent):
 
             else:
                 # ignore action
+                self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
                 action.status = AgentAction.ABORTED    
         else:
             # wait for start time 
+            self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
             await self.sim_wait(action.t_start - self.get_current_time())
 
             # update action completion status
             action.status = AgentAction.PENDING
         
-        self.log(f"finished performing action of type {action_dict['action_type']}! action completion status: {action.status}")
+        self.log(f"finished performing action of type {action_dict['action_type']}! action completion status: {action.status}", level=logging.INFO)
         statuses.append( (action, action.status) )
 
         # discard the remaining actions
@@ -343,11 +341,11 @@ class SimulationAgent(Agent):
 
     async def teardown(self) -> None:
         # print state history
-        out = ''
+        out = '\nt, pos, vel, status\n'
         for state_dict in self.state.history:
-            out += f'{state_dict}\n'
+            out += f"{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}\n"    
 
-        self.log(out)
+        self.log(out, level=logging.WARNING)
 
     async def sim_wait(self, delay: float) -> None:
         try:
