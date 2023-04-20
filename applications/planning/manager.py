@@ -46,14 +46,11 @@ class PlanningSimulationManager(AbstractManager):
                     await self.send_manager_broadcast(toc)
 
                     # announce new time to simulation monitor
-                    self.log(f'sending toc for time {t}[s] to monitor')
+                    self.log(f'sending toc for time {t}[s] to monitor...')
                     toc.dst = SimulationElementRoles.MONITOR.value
-                    await self.send_monitor_message(toc)     
+                    await self.send_monitor_message(toc) 
 
-                # # wait for everyone to ask to fast forward            
-                # self.log(f'waiting for tic requests...')
-                # await self.wait_for_tic_requests()
-                # self.log(f'tic requests received!')
+                    self.log(f'toc for time {t}[s] sent!')
 
                 self.log('TIMER DONE!', level=logging.INFO)
             # TODO Implement Event-driven Clock
@@ -115,7 +112,6 @@ class PlanningSimulationManager(AbstractManager):
 
                     # inform agent that its message was not accepted
                     msg_resp = ManagerReceptionIgnoredMessage(src, -1)
-                    print(self._simulation_element_name_list)
 
                 elif src in received_messages:
                     # node is a part of the simulation but has already communicated with me

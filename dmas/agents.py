@@ -186,12 +186,9 @@ class Agent(Node):
 
     async def live(self):
         try:
-            # subscribe to environment broadcasts
-            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
-
             # run `routine()` and `listen()` until the one terminates
-            t_1 = asyncio.create_task(self.routine(), name='routine()')
-            t_2 = asyncio.create_task(self.listen_to_broadcasts(), name='listen()')
+            t_1 = asyncio.create_task(self.reactive_routine(), name='reactive_routine()')
+            t_2 = asyncio.create_task(self.listen_to_broadcasts(), name='listen_to_broadcasts()')
 
             _, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
 
@@ -204,7 +201,7 @@ class Agent(Node):
         except asyncio.CancelledError:
             return
 
-    async def routine(self):
+    async def reactive_routine(self):
         """
         Agent performs sense, thinkg, and do loop while state is . 
         """
@@ -212,12 +209,15 @@ class Agent(Node):
             statuses = []
             while not self.state.is_failure():
                 # sense environment
+                self.log('sensing...')
                 senses = await self.sense(statuses)
 
                 # think of next action(s) to take
+                self.log('thikning...')
                 actions = await self.think(senses)
 
                 # perform action(s)
+                self.log('performing action(s)...')
                 statuses = await self.do(actions)
         
         except asyncio.CancelledError:
@@ -231,19 +231,26 @@ class Agent(Node):
         Listens for any incoming broadcasts and classifies them in their respective inbox
         """
         try:
+            # subscribe to environment broadcasts
+            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
+
+            # create poller for all broadcast sockets
+            poller = azmq.Poller()
+
             manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
             external_socket, _ = self._external_socket_map.get(zmq.SUB)
             internal_socket, _ = self._external_socket_map.get(zmq.SUB)
 
-            poller = azmq.Poller()
             poller.register(manager_socket, zmq.POLLIN)
             poller.register(external_socket, zmq.POLLIN)
             poller.register(internal_socket, zmq.POLLIN)
 
+            # listen for broadcasts and place in the appropriate inboxes
             while True:
                 sockets = dict(await poller.poll())
 
                 if manager_socket in sockets:
+                    self.log('listening to manager broadcast!')
                     dst, src, content = await self.listen_manager_broadcast()
                     self.log('received manager broadcast! sending to inbox...')
 

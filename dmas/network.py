@@ -1037,23 +1037,7 @@ class NetworkElement(ABC):
 
             return receive_task.result()
         
-        # except asyncio.CancelledError as e:
-        #     self.log(f'message request interrupted.', level=logging.DEBUG)
-        #     return None, None, None
-
-        # except Exception as e:
-        #     self.log(f'message request failed. {e}', level=logging.ERROR)
-        #     raise e
-        
         finally:
-            if send_task is not None and not send_task.done():
-                send_task.cancel()
-                await send_task
-            
-            if receive_task is not None and not receive_task.done():
-                receive_task.cancel()
-                await receive_task
-
             if (
                 socket_lock is not None
                 and isinstance(socket_lock, asyncio.Lock) 

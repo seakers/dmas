@@ -59,7 +59,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 2
+    n_agents = 1
     comms_range = 5
     v_max = 1
 
@@ -118,7 +118,6 @@ if __name__ == '__main__':
                                             )
     node_names = [f'AGENT_{i}' for i in range(n_agents)]
     node_names.append(SimulationElementRoles.ENVIRONMENT.value)
-    print(node_names)
     manager = PlanningSimulationManager(node_names, clock_config, manager_network_config, level)
     logger = manager.get_logger()
 

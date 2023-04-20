@@ -68,10 +68,6 @@ class FixedPlannerModule(PlannerModule):
                     # ,
                     move_left
                     ]
-        
-        # self.plan = [move_right]
-
-        # self.plan = []
     
     async def listen(self) -> None:
         try:
@@ -84,12 +80,6 @@ class FixedPlannerModule(PlannerModule):
         
     async def routine(self) -> None:
         try:
-            # self.log('sending initial plan...')
-            # for action in self.plan:
-            #     action : AgentAction
-            #     msg = AgentActionMessage(self.get_element_name(), self.get_parent_name(), action.to_dict())
-            #     await self._send_manager_msg(msg, zmq.PUB)
-
             self.log('initial plan sent!')
             t_curr = 0
             while True:
@@ -99,26 +89,26 @@ class FixedPlannerModule(PlannerModule):
 
                 self.log(f'received {len(senses)} senses from agent! processing senses...')
                 new_plan = []
-                # for sense in senses:
-                #     sense : dict
-                #     if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-                #         # unpack message 
-                #         msg = AgentActionMessage(**sense)
+                for sense in senses:
+                    sense : dict
+                    if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                        # unpack message 
+                        msg = AgentActionMessage(**sense)
                         
-                #         # if action wasn't completed, re-try
-                #         if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
-                #             self.log(f'action {msg.action} not completed yet! trying again...')
-                #             msg.dst = self.get_parent_name()
-                #             new_plan.append(msg)
+                        # if action wasn't completed, re-try
+                        if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
+                            self.log(f'action {msg.action} not completed yet! trying again...')
+                            msg.dst = self.get_parent_name()
+                            new_plan.append(msg)
 
-                #     elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                #         # unpack message 
-                #         msg : AgentStateMessage = AgentStateMessage(**sense)
-                #         state = SimulationAgentState(**msg.state)
+                    elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                        # unpack message 
+                        msg : AgentStateMessage = AgentStateMessage(**sense)
+                        state = SimulationAgentState(**msg.state)
 
-                #         # update current simulation time
-                #         if t_curr < state.t:
-                #             t_curr = state.t               
+                        # update current simulation time
+                        if t_curr < state.t:
+                            t_curr = state.t               
 
                 if len(new_plan) < 1:
                     if len(self.plan) > 0:

@@ -121,21 +121,6 @@ class AbstractManager(SimulationElement):
         await listen_for_deactivated_task
 
         # TODO: allow for simulation to end if all nodes are deactivated before the timer runs out
-        # await asyncio.wait([timer_task, listen_for_deactivated_task], return_when=asyncio.FIRST_COMPLETED)
-        
-        # # broadcast simulation end
-        # sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
-        # await self._send_external_msg(sim_end_msg, zmq.PUB)
-
-        # if timer_task.done():
-        #     # nodes may still be activated. wait for all simulation nodes to deactivate
-        #     await listen_for_deactivated_task
-
-        # else:                
-        #     # all nodes have already reported as deactivated before the timer ran out. Cancel timer task
-        #     timer_task.cancel()
-        #     await timer_task     
-        
         self.log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
 
     async def _publish_deactivate(self) -> None:

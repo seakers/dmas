@@ -292,5 +292,5 @@ class SimulationElement(NetworkElement):
 
         ### Arguments:
             - delay (`float`): number of seconds to be waited
-        # """
+        """
         pass

@@ -40,8 +40,6 @@ class Node(SimulationElement):
                 raise AttributeError(f'`node_network_config` must contain a REP port and an address to node within internal address map.')
             if zmq.PUB not in node_network_config.get_internal_addresses():
                 raise AttributeError(f'`node_network_config` must contain a PUB port and an address to node within internal address map.')
-            # if zmq.SUB not in node_network_config.get_internal_addresses():
-            #     raise AttributeError(f'`node_network_config` must contain a SUB port and an address to node within internal address map.')
         
         self.manager_inbox = None
         self.external_inbox = None
@@ -72,6 +70,22 @@ class Node(SimulationElement):
         except Exception as e:
             self.log(f'`run()` interrupted. {e}')
             raise e
+
+    def log(self, msg : str, level=logging.DEBUG) -> None:
+        """
+        Logs a message to the desired level.
+        """
+        if level is logging.DEBUG:
+            self._logger.debug(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
+        elif level is logging.INFO:
+            self._logger.info(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
+        elif level is logging.WARNING:
+            self._logger.warning(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
+        elif level is logging.ERROR:
+            self._logger.error(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
+        elif level is logging.CRITICAL:
+            self._logger.critical(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
+
 
     async def _activate(self) -> None:
         # give manager time to set up
@@ -244,6 +258,9 @@ class Node(SimulationElement):
         """
         Returns the current simulation time in [s]
         """
+        if self.__t_curr is None:
+            return None
+
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             return (time.perf_counter() - self.__t_start) * self._clock_config.sim_clock_freq
         
@@ -351,6 +368,7 @@ class Node(SimulationElement):
         await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
         self.log(f'all pending tasks cancelled and terminated!')
 
+    @abstractmethod
     async def live(self) -> None:
         """
         Routine to be performed by simulation node during when the node is executing. 
@@ -360,26 +378,7 @@ class Node(SimulationElement):
 
         Must be able to handle `asyncio.CancelledError` exceptions.
         """
-        try:
-            self.log(f'waiting for manager to end simulation...')
-            while True:
-                dst, src, content = await self._receive_manager_msg(zmq.SUB)
-                self.log(f'message received: {content}', level=logging.DEBUG)
-
-                if (dst not in self.name 
-                    or SimulationElementRoles.MANAGER.value not in src 
-                    or content['msg_type'] != ManagerMessageTypes.SIM_END.value):
-                    self.log('wrong message received. ignoring message...')
-                else:
-                    self.log('simulation end message received! ending simulation...')
-                    break
-
-        except asyncio.CancelledError:
-            self.log(f'`live()` interrupted.')
-            return
-        except Exception as e:
-            self.log(f'`live()` failed. {e}')
-            raise e
+        pass
 
     async def __wait_for_offline_modules(self) -> None:
         """
@@ -425,6 +424,18 @@ class Node(SimulationElement):
         self.log(f'informed monitor of offline status. informing manager of offline status...')
 
         # inform manager that I am deactivated
+        # self.log(f'cleansing REQ port...')
+        # poller = zmq.Poller()
+        # socket, _ = self._manager_socket_map.get(zmq.REQ)
+        # socket : azmq.Socket
+        # poller.register(socket, zmq.POLLIN)
+
+        # socks = poller.poll()
+        # if socks:
+        #     msg = await self._receive_manager_msg(zmq.REQ)
+        #     x = 1
+
+        self.log(f'informing manager of offline status...')
         while True:
             # send ready announcement from REQ socket
             msg = NodeDeactivatedMessage(self.name)
