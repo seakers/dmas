@@ -416,46 +416,7 @@ class Node(SimulationElement):
                 # respond to module
                 await self._send_internal_msg(resp, zmq.REP)
 
-    async def _publish_deactivate(self) -> None:
-        # # inform manager that I am deactivated
-        # self.log(f'cleansing manager REQ port...')
-        # poller = azmq.Poller()
-        # socket, _ = self._manager_socket_map.get(zmq.REQ)
-        # poller.register(socket, zmq.POLLIN)
-
-        # socks = dict(await poller.poll(timeout=0.01))
-        # for socket in socks:
-        #     self.log('REQ port contains irrelevant response. ignoring message...')
-        #     # msg = await self._receive_manager_msg(zmq.REQ)
-        #     socket : zmq.Socket
-        #     socket.close()
-
-        #     new_socket = self._network_context.socket(zmq.REQ)
-        #     new_socket.setsockopt(zmq.LINGER, 0)
-        #     new_lock = asyncio.Lock()  
-
-        #     self._manager_socket_map[zmq.REQ] = (new_socket, new_lock)
-
-        # self.log(f'informing manager of offline status...')
-        # while True:
-        #     # send ready announcement from REQ socket
-        #     msg = NodeDeactivatedMessage(self.get_element_name())
-        #     dst, src, content = await self.send_manager_message(msg)
-        #     dst : str; src : str; content : dict
-        #     msg_type = content['msg_type']
-
-        #     if (dst not in self.name 
-        #         or SimulationElementRoles.MANAGER.value not in src
-        #         or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
-        #         ):
-        #         # if the manager did not acknowledge the request, try again later
-        #         self.log(f'manager did not accept my message. trying again...')
-
-        #     else:
-        #         # if the manager acknowledge the message, stop trying
-        #         self.log(f'manager accepted my message! informing monitor of offline status....')
-        #         break
-        
+    async def _publish_deactivate(self) -> None:        
         # inform monitor that I am deactivated
         self.log(f'informing monitor of offline status...')
         monitor_msg = NodeDeactivatedMessage(self.get_element_name())

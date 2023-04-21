@@ -115,11 +115,6 @@ class AbstractManager(SimulationElement):
         sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
         await self._send_manager_msg(sim_end_msg, zmq.PUB)
 
-        # # wait for all nodes to report as deactivated
-        # listen_for_deactivated_task = asyncio.create_task( self.__wait_for_offline_elements() )
-        # listen_for_deactivated_task.set_name('Wait for deactivated nodes')
-        # await listen_for_deactivated_task
-
         # TODO: allow for simulation to end if all nodes are deactivated before the timer runs out
         self.log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
 
