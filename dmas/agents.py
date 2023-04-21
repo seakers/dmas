@@ -252,14 +252,15 @@ class Agent(Node):
                 if manager_socket in sockets:
                     self.log('listening to manager broadcast!')
                     dst, src, content = await self.listen_manager_broadcast()
-                    self.log('received manager broadcast! sending to inbox...')
 
                     # if sim-end message, end agent `live()`
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
                         return
 
                     # else, let agent handle it
                     else:
+                        self.log(f"received manager broadcast or type {content['msg_type']}! sending to inbox...")
                         await self.manager_inbox.put( (dst, src, content) )
                 
                 if external_socket in sockets:

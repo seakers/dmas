@@ -41,7 +41,6 @@ class ResultsMonitor(SimulationElement):
                 ):
                 # undesired message received. Ignoring and trying again later
                 self.log(f'received undesired message of type {msg_type}. Ignoring...')
-                await asyncio.sleep(random.random())
 
             else:
                 # manager announced the start of the simulation
@@ -51,16 +50,16 @@ class ResultsMonitor(SimulationElement):
     async def _execute(self) -> None:
         try:
             self.log('executing...')
-            while True:
-                dst, src, content = await self._receive_external_msg(zmq.PULL)
+            # while True:
+            #     dst, src, content = await self._receive_external_msg(zmq.PULL)
                 
-                # self.log(f'message received: {content}', level=logging.DEBUG)
+            #     # self.log(f'message received: {content}', level=logging.DEBUG)
 
-                # TODO: classify and compile incoming states and results
+            #     # TODO: classify and compile incoming states and results
 
-                # TODO Exit condition: All agents are deactivated and have reported it to the monitor
-                if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-                    return
+            #     # TODO Exit condition: All agents are deactivated and have reported it to the monitor
+            #     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+            #         return
         except asyncio.CancelledError:
             return
 

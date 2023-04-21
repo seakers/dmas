@@ -68,13 +68,77 @@ class SimulationAgent(Agent):
         try:
             while True:
                 # debug: wait one time-step
-                await self.sim_wait(1)
+                await self.sim_wait(100)
         except asyncio.CancelledError:
             return
 
+    async def teardown(self) -> None:
+        # print state history
+        out = '\nt, pos, vel, status\n'
+        for state_dict in self.state.history:
+            out += f"{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}\n"    
+
+        self.log(out, level=logging.WARNING)
+
+    async def sim_wait(self, delay: float) -> None:
+        try: 
+            ignored = []    
+            send_task = None
+            if (isinstance(self._clock_config, FixedTimesStepClockConfig)
+                or isinstance(self._clock_config, EventDrivenClockConfig)):
+                if delay > 0:
+                    # desired time not yet reached
+                    t0 = self.get_current_time()
+                    tf = t0 + delay
+                    
+                    # wait for time update        
+                    while self.get_current_time() <= tf:
+                        # send tic request
+                        tic_req = TicRequest(self.get_element_name(), t0, tf)
+                        send_task = asyncio.create_task(self.send_manager_message(tic_req))
+                        await send_task
+                        _, _, content = send_task.result()
+
+                        if content['msg_type'] == ManagerMessageTypes.RECEPTION_IGNORED.value:
+                            raise asyncio.CancelledError()
+
+                        self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
+                        dst, src, content = await self.manager_inbox.get()
+                        
+                        if content['msg_type'] == ManagerMessageTypes.TOC.value:
+                            # update clock
+                            msg = TocMessage(**content)
+                            await self.update_current_time(msg.t)
+                            self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
+                        else:
+                            # ignore message
+                            self.log(f'some other message was received. ignoring...')
+                            ignored.append((dst, src, content))
+
+            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
+
+            else:
+                raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
+        
+        finally:
+
+            for dst, src, content in ignored:
+                await self.manager_inbox.put((dst,src,content))
+
+
     async def sense(self, statuses: dict) -> list:
-        # initiate senses array
-        senses = []
+        return
+
+    async def think(self, senses: list) -> list:
+        return
+
+    async def do(self, actions: list) -> dict:
+        return
+
+    # async def sense(self, statuses: dict) -> list:
+    #     # initiate senses array
+    #     senses = []
 
         # # check status of previously performed tasks
         # completed = []
@@ -153,7 +217,7 @@ class SimulationAgent(Agent):
 
         return senses
 
-    async def think(self, senses: list) -> list:
+    # async def think(self, senses: list) -> list:
         # # send all sensed messages to planner
         # self.log(f'sending {len(senses)} senses to planning module...')
         # for sense in senses:
@@ -164,7 +228,7 @@ class SimulationAgent(Agent):
 
         # # wait for planner to send list of tasks to perform
         # self.log(f'senses sent! waiting on plan to perform...')
-        actions = []
+        # actions = []
 
         # _, _, content = await self.internal_inbox.get()
         # self.log(f"plan received from planner module!")
@@ -176,11 +240,11 @@ class SimulationAgent(Agent):
 
         
         # self.log(f'received {len(actions)} actions to perform.')
-        return actions
+        # return actions
 
-    async def do(self, actions: list) -> dict:
-        # only do one action at a time and discard the rest
-        statuses = []
+    # async def do(self, actions: list) -> dict:
+    #     # only do one action at a time and discard the rest
+    #     statuses = []
         
         # # do fist action on the list
         # self.log(f'performing {len(actions)} actions')
@@ -328,58 +392,4 @@ class SimulationAgent(Agent):
         #     statuses.append( (action, action.status) )
 
         # self.log(f'return {len(statuses)} statuses')
-        return statuses
-
-    async def teardown(self) -> None:
-        # print state history
-        out = '\nt, pos, vel, status\n'
-        for state_dict in self.state.history:
-            out += f"{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}\n"    
-
-        self.log(out, level=logging.WARNING)
-
-    async def sim_wait(self, delay: float) -> None:
-        try: 
-            ignored = []    
-            send_task = None
-            if (isinstance(self._clock_config, FixedTimesStepClockConfig)
-                or isinstance(self._clock_config, EventDrivenClockConfig)):
-                if delay > 0:
-                    # desired time not yet reached
-                    t0 = self.get_current_time()
-                    tf = t0 + delay
-                    
-                    # wait for time update        
-                    while self.get_current_time() <= t0:
-                        # send tic request
-                        tic_req = TicRequest(self.get_element_name(), t0, tf)
-                        send_task = asyncio.create_task(self.send_manager_message(tic_req))
-                        await send_task
-                        _, _, content = send_task.result()
-
-                        if content['msg_type'] == ManagerMessageTypes.RECEPTION_IGNORED.value:
-                            raise asyncio.CancelledError()
-
-                        self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
-                        dst, src, content = await self.manager_inbox.get()
-                        
-                        if content['msg_type'] == ManagerMessageTypes.TOC.value:
-                            # update clock
-                            msg = TocMessage(**content)
-                            await self.update_current_time(msg.t)
-                            self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
-                        else:
-                            # ignore message
-                            self.log(f'some other message was received. ignoring...')
-                            ignored.append((dst, src, content))
-
-            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-                await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
-
-            else:
-                raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
-        
-        finally:
-
-            for dst, src, content in ignored:
-                await self.manager_inbox.put((dst,src,content))
+        # return statuses
