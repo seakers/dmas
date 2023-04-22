@@ -59,7 +59,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 15
+    n_agents = 1
     comms_range = 5
     v_max = 1
 

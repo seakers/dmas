@@ -239,7 +239,7 @@ class Agent(Node):
 
             manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
             external_socket, _ = self._external_socket_map.get(zmq.SUB)
-            internal_socket, _ = self._external_socket_map.get(zmq.SUB)
+            internal_socket, _ = self._internal_socket_map.get(zmq.SUB)
 
             poller.register(manager_socket, zmq.POLLIN)
             poller.register(external_socket, zmq.POLLIN)
@@ -282,7 +282,7 @@ class Agent(Node):
             return  
 
     @abstractmethod
-    async def sense(self, statuses : dict) -> list:
+    async def sense(self, statuses : list) -> list:
         """
         Senses the environment and checks for any incoming messages from other agents.
         It may also check the status of the actions that were just performed.
@@ -309,7 +309,7 @@ class Agent(Node):
         pass
 
     @abstractmethod
-    async def do(self, actions : list) -> dict:
+    async def do(self, actions : list) -> list:
         """
         Performs agent actions
 

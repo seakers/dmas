@@ -35,7 +35,7 @@ class SimulationEnvironment(EnvironmentNode):
     async def setup(self) -> None:
         # initiate state trackers   
         self.states_tracker = {agent_name : None for agent_name in self._external_address_ledger}
-        self.in_range = {agent_name : {target_name : 1 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
+        self.in_range = {agent_name : {target_name : 0 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
 
     async def live(self) -> None:
         try:
