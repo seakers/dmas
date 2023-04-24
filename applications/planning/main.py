@@ -1,6 +1,5 @@
 from datetime import datetime
 import logging
-import os, shutil
 import random
 import zmq
 import concurrent.futures
@@ -10,6 +9,7 @@ from dmas.elements import SimulationElement
 from dmas.messages import SimulationElementRoles
 from dmas.network import NetworkConfig
 
+from utils import setup_results_directory
 from tasks import MeasurementTask
 from manager import PlanningSimulationManager
 from monitor import ResultsMonitor
@@ -17,30 +17,6 @@ from environment import SimulationEnvironment
 from agent import SimulationAgent
 from planners import PlannerTypes
 from states import *
-
-def setup_results_directory(scenario_name) -> str:
-    """
-    Creates an empty results directory within the `mccbba` directory
-    """
-    results_path = f'./{scenario_name}'
-
-    if not os.path.exists(results_path):
-        # create results directory if it doesn't exist
-        os.makedirs(results_path)
-    else:
-        # clear results in case it already exists
-        results_path
-        for filename in os.listdir(results_path):
-            file_path = os.path.join(results_path, filename)
-            try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            except Exception as e:
-                print('Failed to delete %s. Reason: %s' % (file_path, e))
-
-    return results_path
 
 def random_instruments(task_types : list) -> list:
     instruments = []
@@ -69,7 +45,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 5
+    n_agents = 1
     comms_range = 1
     v_max = 1
 
@@ -86,7 +62,7 @@ if __name__ == '__main__':
     dt = 1.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
 
-    # clock_config = EventDrivenClockConfig(start_date, end_date)
+    clock_config = EventDrivenClockConfig(start_date, end_date)
 
     ## network
     port = 5555
@@ -145,7 +121,7 @@ if __name__ == '__main__':
 													zmq.PUB: [f'tcp://*:{port+4}']
 											})
     
-    environment = SimulationEnvironment(env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, tasks, logger=logger)
+    environment = SimulationEnvironment(results_path, env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, tasks, logger=logger)
 
     # create simulation agents
     agents = []
@@ -164,7 +140,8 @@ if __name__ == '__main__':
                                                 v_max, 
                                                 [],  
                                                 status=SimulationAgentState.IDLING)
-        agent = SimulationAgent(    network_name,
+        agent = SimulationAgent(    results_path,
+                                    network_name,
                                     port, 
                                     id,
                                     manager_network_config,

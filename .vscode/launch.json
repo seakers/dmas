@@ -13,7 +13,7 @@
             "program": "${workspaceRoot}/applications/planning/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}",
+            "cwd": "${workspaceRoot}/applications/planning",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             }
@@ -21,11 +21,11 @@
     ],
 
     "compounds": [
-        {
-          "name": "Server/Client Test",
-          "configurations": ["Abstract Agent Client Test", "Environment Server Test"],
+        //{
+        //  "name": "Server/Client Test",
+        //  "configurations": ["Abstract Agent Client Test", "Environment Server Test"],
         //   "preLaunchTask": "${defaultBuildTask}",
-          "stopAll": true
-        }
+        //  "stopAll": true
+        //}
     ]
 }

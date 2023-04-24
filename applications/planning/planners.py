@@ -1,6 +1,6 @@
-from messages import AgentActionMessage, AgentStateMessage, SimulationMessageTypes
+from messages import PlanMessage, AgentActionMessage, AgentStateMessage, SimulationMessageTypes
 from states import SimulationAgentState
-from tasks import ActionTypes, IdleAction, MoveAction
+from tasks import IdleAction, MoveAction, MeasurementTask
 from dmas.agents import AgentAction
 from dmas.modules import *
 
@@ -8,8 +8,17 @@ class PlannerTypes(Enum):
     ACCBBA = 'ACCBBA'   # Asynchronous Consensus Constraint-Based Bundle Algorithm
     FIXED = 'FIXED'     # Fixed pre-determined plan
 
+class PlannerResults(ABC):
+    @abstractmethod
+    def __eq__(self, __o: object) -> bool:
+        """
+        Compares two results 
+        """
+        return super().__eq__(__o)
+
 class PlannerModule(InternalModule):
     def __init__(self, 
+                results_path : str, 
                 manager_port : int,
                 agent_id : int,
                 parent_network_config: NetworkConfig, 
@@ -33,25 +42,28 @@ class PlannerModule(InternalModule):
         if planner_type not in PlannerTypes:
             raise NotImplementedError(f'planner of type {planner_type} not yet supported.')
         self.planner_type = planner_type
+        self.results_path = results_path
 
-    
-class PlannerResults(ABC):
-    @abstractmethod
-    def __eq__(self, __o: object) -> bool:
-        """
-        Compares two results 
-        """
-        return super().__eq__(__o)
-    
+    async def listen(self) -> None:
+        try:
+            # listen for incoming broadcasts from other modules
+            while True:
+                await asyncio.sleep(1e6)
+
+        except asyncio.CancelledError:
+            return
+
 class FixedPlannerModule(PlannerModule):
     def __init__(self, 
+                results_path : str, 
                 manager_port: int, 
                 agent_id: int, 
                 parent_network_config: NetworkConfig, 
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
-        super().__init__(manager_port, 
+        super().__init__(results_path,
+                         manager_port, 
                          agent_id, 
                          parent_network_config, 
                          PlannerTypes.FIXED, 
@@ -60,23 +72,16 @@ class FixedPlannerModule(PlannerModule):
         
     async def setup(self) -> None:
         # create an initial plan
-        move_right = MoveAction([10,0], 0)
-        move_left = MoveAction([0,0], 0)
+        steps = 4
+        travel_to_target = MoveAction([steps, 0], t_start=0)
+        measure = MeasurementTask([steps,0], 1, ['VNIR'], t_start=steps, t_end=1e6)
+        return_to_origin = MoveAction([0,0], t_start=steps)
 
         self.plan = [
-                    # move_right
-                    # ,
-                    move_left
+                    travel_to_target,
+                    measure,
+                    return_to_origin
                     ]
-    
-    async def listen(self) -> None:
-        try:
-            # listen for incoming messages from other modules
-            while True:
-                await asyncio.sleep(1e6)
-
-        except asyncio.CancelledError:
-            return
         
     async def routine(self) -> None:
         try:
@@ -84,7 +89,7 @@ class FixedPlannerModule(PlannerModule):
             t_curr = 0
             while True:
                 # listen for agent to send new senses
-                self.log('waiting for incoming agent senses...')
+                self.log('waiting for incoming senses from parent agent...')
                 senses = await self.empty_manager_inbox()
 
                 self.log(f'received {len(senses)} senses from agent! processing senses...')
@@ -93,13 +98,26 @@ class FixedPlannerModule(PlannerModule):
                     sense : dict
                     if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
                         # unpack message 
-                        msg = AgentActionMessage(**sense)
+                        msg : AgentActionMessage = AgentActionMessage(**sense)
                         
-                        # if action wasn't completed, re-try
                         if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
-                            self.log(f'action {msg.action} not completed yet! trying again...')
+                            # if action wasn't completed, re-try
+                            action_dict : dict = msg.action
+                            self.log(f'action {action_dict} not completed yet! trying again...')
                             msg.dst = self.get_parent_name()
-                            new_plan.append(msg)
+                            new_plan.append(action_dict)
+                        elif msg.status == AgentAction.COMPLETED:
+                            # if action was completed, remove from plan
+                            action_dict : dict = msg.action
+                            completed_action = AgentAction(**action_dict)
+                            removed = None
+                            for action in self.plan:
+                                action : AgentAction
+                                if action.id == completed_action.id:
+                                    removed = action
+                                    break
+                            self.plan.remove(removed)
+                            x =1
 
                     elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                         # unpack message 
@@ -110,27 +128,30 @@ class FixedPlannerModule(PlannerModule):
                         if t_curr < state.t:
                             t_curr = state.t               
 
-                if len(new_plan) < 1:
+                if len(new_plan) == 0:
+                    # no previously submitted actions will be re-attempted
                     if len(self.plan) > 0:
-                        action : AgentAction = self.plan.pop(0)
-                        msg = AgentActionMessage(self.get_element_name(),
-                                                self.get_parent_name(),
-                                                action.to_dict())
-                        new_plan.append(msg)
+                        for action in self.plan:
+                            action : AgentAction
+                            if action.t_start <= t_curr <= action.t_end:
+                                new_plan.append(action.to_dict())
+                                break
                     else:
                         # if no plan left, just idle for a time-step
                         self.log('no more actions to perform. instruct agent to idle for one time-step.')
-                        idle = IdleAction(t_curr, t_curr+1000000)
-                        msg = AgentActionMessage(self.get_element_name(),
-                                                self.get_parent_name(),
-                                                idle.to_dict())
-                        # await self.send_manager_message(msg)
-                        new_plan.append(msg)
+                        t_idle = 1e6
+                        for action_dict in self.plan:
+                            action_dict : dict
+                            action = AgentAction(**action_dict)
+                            
+                            t_idle = action.t_start if action.t_start < t_idle else t_idle
+                        
+                        action = IdleAction(t_curr, t_idle)
+                        new_plan.append(action.to_dict())
 
                 self.log(f'sending {len(new_plan)} actions to agent...')
-                for msg in new_plan:
-                    msg : AgentActionMessage
-                    await self._send_manager_msg(msg, zmq.PUB)
+                plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), new_plan)
+                await self._send_manager_msg(plan_msg, zmq.PUB)
 
                 self.log(f'actions sent!')
 
@@ -166,13 +187,15 @@ class FixedPlannerModule(PlannerModule):
 
 class ACCBBAPlannerModule(PlannerModule):
     def __init__(self,  
+                results_path,
                 manager_port: int, 
                 agent_id: int, 
                 parent_network_config: NetworkConfig, 
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
-        super().__init__(   manager_port, 
+        super().__init__(   results_path,
+                            manager_port, 
                             agent_id, 
                             parent_network_config,
                             PlannerTypes.ACCBBA, 

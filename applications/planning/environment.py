@@ -1,3 +1,4 @@
+from utils import setup_results_directory
 from states import SimulationAgentState
 from dmas.environments import *
 
@@ -17,6 +18,7 @@ class SimulationEnvironment(EnvironmentNode):
     
     """
     def __init__(self, 
+                results_path : str, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
                 x_bounds : list,
@@ -31,6 +33,9 @@ class SimulationEnvironment(EnvironmentNode):
         self.comms_range = comms_range
         self.tasks = []
         self.tasks = tasks
+
+        # setup results folder:
+        self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
 
     async def setup(self) -> None:
         # initiate state trackers   
@@ -258,11 +263,10 @@ class SimulationEnvironment(EnvironmentNode):
         # print final time
         self.log(f'Environment shutdown with internal clock of {self.get_current_time()}[s]', level=logging.WARNING)
         
-        # print connectiviy history
+        # log connectiviy history
         out = '\nConnectivity history'
 
-        for t, agent_connectivity in self.agent_connectivity_history:
-            
+        for t, agent_connectivity in self.agent_connectivity_history:  
             connected = []
             for src in agent_connectivity:
                 for dst in agent_connectivity[src]:
@@ -276,9 +280,26 @@ class SimulationEnvironment(EnvironmentNode):
             if len(connected) > 0:
                 out += f'\nt:={t}[s]\n'
                 for src, dst in connected:
-                    out += f'\t{src}<->{dst}\n'
-
+                    out += f'\t{src} <-> {dst}\n'
         self.log(out, level=logging.WARNING)
+        
+        # print connectivity history
+        with open(f"{self.results_path}/connectivity.csv", "w") as file:
+            dsts = []
+            title = f"t, src"
+            for src in self.agent_connectivity:
+                title += f', dst:{src}'
+                dsts.append(src)
+            file.write(title)
+
+            for t, agent_connectivity in self.agent_connectivity_history:  
+                for src in agent_connectivity:
+                    line = f'\n{t}, {src}'
+                    for dst in dsts:
+                        connected = agent_connectivity[src][dst]
+                        line += f', {connected}'
+                    file.write(line)
+
 
     async def sim_wait(self, delay: float) -> None:
         try:

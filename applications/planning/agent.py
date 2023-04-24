@@ -1,5 +1,6 @@
 import logging
 import math
+from applications.planning.utils import setup_results_directory
 from tasks import *
 from dmas.agents import *
 from dmas.network import NetworkConfig
@@ -10,6 +11,7 @@ from planners import *
 
 class SimulationAgent(Agent):
     def __init__(   self, 
+                    results_path : str, 
                     network_name : str,
                     manager_port : int,
                     id : int,
@@ -37,13 +39,15 @@ class SimulationAgent(Agent):
 											})
         
         if planner_type is PlannerTypes.ACCBBA:
-            planning_module = ACCBBAPlannerModule(manager_port,
+            planning_module = ACCBBAPlannerModule(  results_path,
+                                                    manager_port,
                                                     id,
                                                     agent_network_config,
                                                     level,
                                                     logger)
         elif planner_type is PlannerTypes.FIXED:
-            planning_module = FixedPlannerModule(manager_port,
+            planning_module = FixedPlannerModule(results_path,
+                                                 manager_port,
                                                  id,
                                                  agent_network_config,
                                                  level,
@@ -55,7 +59,7 @@ class SimulationAgent(Agent):
                         agent_network_config, 
                         manager_network_config, 
                         initial_state, 
-                        #[planning_module], 
+                        [planning_module], 
                         level=level, 
                         logger=logger)
 
@@ -64,37 +68,32 @@ class SimulationAgent(Agent):
 
         self.id = id
         self.instruments : list = instruments.copy()
+        
+        # setup results folder:
+        self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
 
     async def setup(self) -> None:
         # nothing to set up
-        ##TEMPORARY: Fixed Plan
-        self.plan = []
-        
-        steps = self.id*2
-        action = MoveAction([0, steps], 0, 1e6)
-        self.plan.append(action.to_dict())
-
-        state_msg = AgentStateMessage(  
-                                        self.get_element_name(), 
-                                        self.get_network_name(),
-                                        self.state.to_dict()
-                                    )
-        action = BroadcastMessageAction(state_msg, steps, 1e6)
-        # self.plan.append(action.to_dict())
-
-        action = MeasurementTask([0, steps], 1, self.instruments, 0, 1e6)
-        self.plan.append(action.to_dict())
+        return
     
     async def teardown(self) -> None:
-        # print agent capabilities
+        # log agent capabilities
         out = f'\ninstruments: {self.instruments}'
 
-        # print state 
+        # log state 
         out += '\nt, pos, vel, status\n'
         for state_dict in self.state.history:
             out += f"{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}\n"    
 
         self.log(out, level=logging.WARNING)
+
+        # print agent states
+        with open(f"{self.results_path}/states.csv", "w") as file:
+            title = 'f, pos, vel, status'
+            file.write(title)
+
+            for state_dict in self.state.history:
+                file.write(f"\n{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}")
 
     async def sim_wait(self, delay: float) -> None:
         try:  
@@ -102,6 +101,10 @@ class SimulationAgent(Agent):
                 isinstance(self._clock_config, FixedTimesStepClockConfig) 
                 or isinstance(self._clock_config, EventDrivenClockConfig)
                 ):
+                if delay < 1e-6: 
+                    ignored = None
+                    return
+
                 # desired time not yet reached
                 t0 = self.get_current_time()
                 tf = t0 + delay
@@ -226,77 +229,35 @@ class SimulationAgent(Agent):
                 # save as senses to forward to planner
                 senses.append(TaskRequest(**content))
 
-            elif content['msg_type'] == SimulationMessageTypes.PLANNER_UPDATE.value:
+            elif content['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
                 # save as senses to forward to planner
-                senses.append(PlannerUpdate(**content))
+                senses.append(PlannerResultsMessage(**content))
 
         return senses
 
     async def think(self, senses: list) -> list:
-        # # send all sensed messages to planner
-        # self.log(f'sending {len(senses)} senses to planning module...')
-        # for sense in senses:
-        #     sense : SimulationMessage
-        #     sense.src = self.get_element_name()
-        #     sense.dst = self.get_element_name()
-        #     await self.send_internal_message(sense)
+        # send all sensed messages to planner
+        self.log(f'sending {len(senses)} senses to planning module...')
+        for sense in senses:
+            sense : SimulationMessage
+            sense.src = self.get_element_name()
+            sense.dst = self.get_element_name()
+            await self.send_internal_message(sense)
 
-        # # wait for planner to send list of tasks to perform
-        # self.log(f'senses sent! waiting on plan to perform...')
-        # actions = []
-        # _, _, content = await self.internal_inbox.get()
-        
-        # if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-        #     msg = AgentActionMessage(**content)
-        #     self.log(f"received an action of type {msg.action['action_type']}")
-        #     actions.append(msg.action)
-        
-        # while not self.internal_inbox.empty():
-        #     _, _, content = await self.internal_inbox.get()
-            
-        #     if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-        #         msg = AgentActionMessage(**content)
-        #         self.log(f"received an action of type {msg.action['action_type']}")
-        #         actions.append(msg.action)  
-        
-        # self.log(f"plan received from planner module!")
-
-        # TEMPORARY: Fixed plan execution
-        ## Remove completed or aborted tasks from plan
+        # wait for planner to send list of tasks to perform
+        self.log(f'senses sent! waiting on response from planner module...')
         actions = []
-        removed = []
-        for action_dict in self.plan:
-            action_dict : dict
-            action = AgentAction(**action_dict)
-            t_curr = self.get_current_time()
-
-            if action.t_end < t_curr and action.id not in self.state.tasks_performed:
-                # remove from plan if end time has passed and action was not performed 
-                removed.append(action_dict)
-
-            if action.id in self.state.tasks_performed:
-                # remove from plan if action was successfully performed 
-                removed.append(action_dict)
-
-            elif action.t_start <= t_curr <= action.t_end:
-                # perform action if in between the assigned time
-                actions.append(action_dict)
         
-        for action in removed:
-            self.plan.remove(action)
-
-        if len(actions) == 0:
-            t_idle = 1e6
-            for action_dict in self.plan:
-                action_dict : dict
-                action = AgentAction(**action_dict)
-                
-                t_idle = action.t_start if action.t_start < t_idle else t_idle
-
-            action = IdleAction(self.get_current_time(), t_idle)
-            actions.append(action.to_dict())
-
-        self.log(f'created {len(actions)} actions to perform.')
+        while len(actions) == 0:
+            _, _, content = await self.internal_inbox.get()
+            
+            if content['msg_type'] == SimulationMessageTypes.PLAN.value:
+                msg = PlanMessage(**content)
+                for action_dict in msg.plan:
+                    self.log(f"received an action of type {action_dict['action_type']}")
+                    actions.append(action_dict)  
+        
+        self.log(f"plan of {len(actions)} actions received from planner module!")
         return actions
 
     async def do(self, actions: list) -> dict:
@@ -419,7 +380,7 @@ class SimulationAgent(Agent):
                         # perform measurement
                         self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
                         
-                        await self.sim_wait(task.t_end - self.get_current_time())  # TODO communicate with environment and obtain measurement information
+                        await self.sim_wait(task.duration)  # TODO communicate with environment and obtain measurement information
 
                         # update action completion status
                         action.status = AgentAction.COMPLETED

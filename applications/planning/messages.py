@@ -6,7 +6,8 @@ class SimulationMessageTypes(Enum):
     AGENT_ACTION = 'AGENT_ACTION'
     AGENT_STATE = 'AGENT_STATE'
     CONNECTIVITY_UPDATE = 'CONNECTIVITY_UPDATE'
-    PLANNER_UPDATE = 'PLANNER_UPDATE'
+    PLANNER_RESULTS = 'PLANNER_RESULTS'
+    PLAN = 'PLAN'
 
 class AgentStateMessage(SimulationMessage):
     """
@@ -73,7 +74,7 @@ class TaskRequest(SimulationMessage):
             raise AttributeError(f'`task` must be of type `dict`; is of type {type(task)}.')
         self.task = task
 
-class PlannerUpdate(SimulationMessage):
+class PlannerResultsMessage(SimulationMessage):
     """
     ## Planner Update Message 
 
@@ -86,8 +87,13 @@ class PlannerUpdate(SimulationMessage):
         - id (`str`) : Universally Unique IDentifier for this message
     """
     def __init__(self, src: str, dst: str, planner_results : dict, id: str = None, **_):
-        super().__init__(src, dst, SimulationMessageTypes.PLANNER_UPDATE.value, id)
+        super().__init__(src, dst, SimulationMessageTypes.PLANNER_RESULTS.value, id)
         self.planner_results = planner_results
+
+class PlanMessage(SimulationMessage):
+    def __init__(self, src: str, dst: str, plan : list, id: str = None, **_):
+        super().__init__(src, dst, SimulationMessageTypes.PLAN.value, id)
+        self.plan = plan
 
 class AgentActionMessage(SimulationMessage):
     """
@@ -98,4 +104,5 @@ class AgentActionMessage(SimulationMessage):
     def __init__(self, src: str, dst: str, action : dict, status : str=None, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.AGENT_ACTION.value, id)
         self.action = action
-        self.status = status if status is not None else action.get('status')
+        self.status = None
+        self.status = status if status is not None else action.get('status', None)

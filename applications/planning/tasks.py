@@ -68,6 +68,7 @@ class MeasurementTask(AgentAction):
         - x (`list`): cartesian coordinates of the location of this task
         - s_max (`float`): maximum score attained from performing this task
         - instruments (`list`): name of the instruments that can perform this task
+        - duration (`float`): duration of the measurement being performed
         - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
         - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
         - id (`str`) : identifying number for this task in uuid format
@@ -78,6 +79,7 @@ class MeasurementTask(AgentAction):
                 instruments : list,
                 t_start: Union[float, int], 
                 t_end: Union[float, int], 
+                duration: Union[float, int]=0.0, 
                 status: str = 'PENDING', 
                 id: str = None, **_
                 ) -> None:
@@ -93,6 +95,7 @@ class MeasurementTask(AgentAction):
             - id (`str`) : identifying number for this task in uuid format
         """
         super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id)
+        self.duration = duration
 
         # check arguments
         if not isinstance(pos, list):
