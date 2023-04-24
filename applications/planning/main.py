@@ -149,10 +149,16 @@ if __name__ == '__main__':
     for id in range(n_agents):        
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        # pos = [x, y]
-        pos = [0.0, 0.0]
+        pos = [x, y]
+        # pos = [0.0, 0.0]
         vel = [0.0, 0.0]
-        initial_state = SimulationAgentState(pos, x_bounds, y_bounds, vel, v_max, [],  status=SimulationAgentState.IDLING)
+        initial_state = SimulationAgentState(   pos, 
+                                                x_bounds, 
+                                                y_bounds, 
+                                                vel, 
+                                                v_max, 
+                                                [],  
+                                                status=SimulationAgentState.IDLING)
         agent = SimulationAgent(    network_name,
                                     port, 
                                     id,
