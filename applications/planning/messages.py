@@ -66,8 +66,11 @@ class TaskRequest(SimulationMessage):
         - id (`str`) : Universally Unique IDentifier for this message
         - task (`dict`) : task request to be performed
     """
-    def __init__(self, src: str, dst: str, task : dict, id: str = None, **kwargs):
+    def __init__(self, src: str, dst: str, task : dict, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.TASK_REQ.value, id)
+        
+        if not isinstance(task, dict):
+            raise AttributeError(f'`task` must be of type `dict`; is of type {type(task)}.')
         self.task = task
 
 class PlannerUpdate(SimulationMessage):
@@ -82,7 +85,7 @@ class PlannerUpdate(SimulationMessage):
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
     """
-    def __init__(self, src: str, dst: str, planner_results : dict, id: str = None, **kwargs):
+    def __init__(self, src: str, dst: str, planner_results : dict, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.PLANNER_UPDATE.value, id)
         self.planner_results = planner_results
 
@@ -92,7 +95,7 @@ class AgentActionMessage(SimulationMessage):
 
     Informs the receiver of a action to be performed and its completion status
     """
-    def __init__(self, src: str, dst: str, action : dict, status : str=None, id: str = None, **kwargs):
+    def __init__(self, src: str, dst: str, action : dict, status : str=None, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.AGENT_ACTION.value, id)
         self.action = action
         self.status = status if status is not None else action.get('status')

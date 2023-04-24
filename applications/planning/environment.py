@@ -207,13 +207,20 @@ class SimulationEnvironment(EnvironmentNode):
         range_updates = []
         for i in range(len(agent_names)):
             agent_a = agent_names[i]
+
             if agent_a == self.get_element_name():
+                # agents cannot re-connect to environment
                 continue
             
             for j in range(i+1, len(agent_names)):
                 agent_b = agent_names[j]
 
                 if agent_b == self.get_element_name():
+                    # agents cannot disconnect to environment
+                    continue
+
+                if agent_b == agent_a:
+                    # agents cannot connect to themselves
                     continue
                 
                 state_a : SimulationAgentState = self.states_tracker[agent_a]

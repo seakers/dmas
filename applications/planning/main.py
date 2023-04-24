@@ -59,7 +59,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 2
+    n_agents = 50
     comms_range = 5
     v_max = 1
 
@@ -150,8 +150,8 @@ if __name__ == '__main__':
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
         # pos = [x, y]
-        pos = [0, 0]
-        vel = [0, 0]
+        pos = [0.0, 0.0]
+        vel = [0.0, 0.0]
         initial_state = SimulationAgentState(pos, x_bounds, y_bounds, vel, v_max, [],  status=SimulationAgentState.IDLING)
         agent = SimulationAgent(    network_name,
                                     port, 

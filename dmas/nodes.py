@@ -155,10 +155,15 @@ class Node(SimulationElement):
                     
                     external_ledger = dict()
                     ledger_dicts : dict = msg.get_address_ledger()
-                    for node in ledger_dicts:
-                        if self.get_element_name() not in node:
+                    for node_name in ledger_dicts:
+                        if self.get_element_name() != node_name:
                             # only save network configs of other nodes that are not me
-                            external_ledger[node] = NetworkConfig(**ledger_dicts[node])
+                            external_ledger[node_name] = NetworkConfig(**ledger_dicts[node_name])
+                        # else:
+                        #     x = 1
+
+                    # if self.get_element_name() == 'AGENT_1':
+                    #     x =1
 
                     clock_config = msg.get_clock_info()
                     clock_type = clock_config['clock_type']
@@ -530,10 +535,14 @@ class Node(SimulationElement):
         """
         Connects this network node's subscribe port to the destination's publish port
         """
+        if self.get_element_name() == dst:
+            self.log(f'cannot connect to my own broadcasts.')
+            return
+
         # get the destination's publish port 
         dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
         if dst_network_config is None: 
-            raise 
+            raise AttributeError(f'External address ledger does not contain address for node {dst}.')
             
         dst_addresses = dst_network_config.get_external_addresses().get(zmq.PUB, None)
         if dst_addresses is None or len(dst_addresses) < 1:
@@ -550,12 +559,16 @@ class Node(SimulationElement):
         # conenct to destiation
         self.log(f'connecting to {dst} via {dst_address}...')
         socket.connect(dst_address)
-        self.log(f'successfully disconnected from {dst}!')
+        self.log(f'successfully connected from {dst}!')
 
     def unsubscribe_to_broadcasts(self, dst) -> None:
         """
         Disconnects this network node's subscribe port to the destination's publish port
         """
+        if self.get_element_name() == dst:
+            self.log(f'cannot disconnect to my own broadcasts.')
+            return
+
         # get the destination's publish port 
         dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
         if dst_network_config is None: 

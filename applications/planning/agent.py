@@ -59,14 +59,15 @@ class SimulationAgent(Agent):
                         level, 
                         logger)
         self.in_range = {}
+        self.id = id
 
     async def setup(self) -> None:
         # nothing to set up
         ##TEMPORARY: Fixed Plan
         self.plan = []
         
-        steps = 3
-        action = MoveAction([0, steps], 2, 1e6)
+        steps = self.id + 1
+        action = MoveAction([0, steps], 0, 1e6)
         self.plan.append(action.to_dict())
 
         state_msg = AgentStateMessage(  
@@ -158,7 +159,6 @@ class SimulationAgent(Agent):
 
             # compile completed tasks for state tracking
             if status == AgentAction.COMPLETED:
-                self.state : SimulationAgentState
                 completed.append(action.id)
 
         # update state
@@ -279,14 +279,11 @@ class SimulationAgent(Agent):
             action = IdleAction(self.get_current_time(), t_idle)
             actions.append(action.to_dict())
 
-        # self.log(f'received {len(actions)} actions to perform.')
+        self.log(f'created {len(actions)} actions to perform.')
         return actions
 
     async def do(self, actions: list) -> dict:
-        # only do one action at a time and discard the rest
         statuses = []
-
-        # do fist action on the list
         self.log(f'performing {len(actions)} actions')
         
         for action_dict in actions:
@@ -359,8 +356,8 @@ class SimulationAgent(Agent):
                     if norm < eps:
                         self.log('agent has reached its desired position. stopping.', level=logging.DEBUG)
                         ## stop agent 
-                        new_vel = [ 0, 
-                                    0]
+                        new_vel = [ 0.0, 
+                                    0.0]
                         self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
 
                         # update action completion status
@@ -383,184 +380,48 @@ class SimulationAgent(Agent):
                         # update action completion status
                         action.status = AgentAction.PENDING
                 
-                # elif action_dict['action_type'] == ActionTypes.MEASURE.value:
-                #     # unpack action 
-                #     task = MeasurementTask(**action_dict)
+                elif action_dict['action_type'] == ActionTypes.MEASURE.value:
+                    # unpack action 
+                    task = MeasurementTask(**action_dict)
 
-                #     # perform action
-                #     self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
+                    # perform action
+                    self.state : SimulationAgentState
+                    dx = task.pos[0] - self.state.pos[0]
+                    dy = task.pos[1] - self.state.pos[1]
 
-                #     ## TODO get information from environment
-                #     dx = task.pos[0] - self.state.pos[0]
-                #     dy = task.pos[1] - self.state.pos[1]
+                    norm = math.sqrt(dx**2 + dy**2)
 
-                #     norm = math.sqrt(dx**2 + dy**2)
+                    ## Check if point has been reached
+                    if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                        eps = self.state.v_max * self._clock_config.dt
+                    else:
+                        eps = 1e-6
 
-                #     if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                #         eps = self.state.v_max * self._clock_config.dt
-                #     else:
-                #         eps = 1e-6
+                    if norm < eps:
+                        ### agent has reached its desired position
+                        # perform measurement
+                        self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
+                        ## TODO communicate with environment and obtain measurement information
+                        await self.sim_wait(task.t_end - self.get_current_time())
 
-                #     if norm < eps:
-                #         ### agent has reached its desired position
-                #         self.state.update_state(self.get_current_time(), tasks_performed=[task], status=SimulationAgentState.IDLING)
+                        # update action completion status
+                        action.status = AgentAction.COMPLETED
 
-                #         # update action completion status
-                #         action.status = AgentAction.COMPLETED
-                #     else:
-                #         ### agent has NOT reached its desired position
-                #         self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
+                    else:
+                        ### agent has NOT reached its desired position
+                        self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
 
-                #         # update action completion status
-                #         action.status = AgentAction.PENDING
+                        # update action completion status
+                        action.status = AgentAction.PENDING
 
                 else:
                     # ignore action
                     self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
                     action.status = AgentAction.ABORTED  
-                
+                    
+                self.log(f"finished performing action of type {action_dict['action_type']}! action completion status: {action.status}", level=logging.INFO)
                 statuses.append((action, action.status))
 
+        self.log(f'returning {len(statuses)} statuses')
         return statuses
-        # check if action can be performed at this time
-        if action.t_start <= self.get_current_time() <= action.t_end:
-            self.log(f"performing action of type {action_dict['action_type']}...", level=logging.INFO)
-            
-            if action_dict['action_type'] == ActionTypes.PEER_MSG.value:
-                # unpack action
-                action = PeerMessageAction(**action_dict)
-
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                await self.send_peer_message(action.msg)
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
-                
-                # update action completion status
-                action.status = AgentAction.COMPLETED
-
-            elif action_dict['action_type'] == ActionTypes.BROADCAST_MSG.value:
-                # unpack action
-                action = BroadcastMessageAction(**action_dict)
-
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                await self.send_peer_broadcast(action.msg)
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
-                
-                # update action completion status
-                action.status = AgentAction.COMPLETED
-
-            elif action_dict['action_type'] == ActionTypes.MOVE.value:
-                # unpack action 
-                action = MoveAction(**action_dict)
-
-                # perform action
-                ## calculate new direction 
-                dx = action.pos[0] - self.state.pos[0]
-                dy = action.pos[1] - self.state.pos[1]
-
-                norm = math.sqrt(dx**2 + dy**2)
-
-                if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    eps = self.state.v_max * self._clock_config.dt
-                else:
-                    eps = 1e-6
-
-                if norm < eps:
-                    self.log('agent has reached its desired position. stopping.', level=logging.DEBUG)
-                    ## stop agent 
-                    new_vel = [ 0, 
-                                0]
-                    self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.IDLING)
-
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
-                else:
-                    ## change velocity towards destination
-                    dx = dx / norm
-                    dy = dy / norm
-
-                    new_vel = [ dx*self.state.v_max, 
-                                dy*self.state.v_max]
-
-                    self.log(f'agent has NOT reached its desired position. updating velocity to {new_vel}', level=logging.DEBUG)
-                    self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
-
-                    ## wait until destination is reached
-                    await self.sim_wait(norm / self.state.v_max)
-                    
-                    # update action completion status
-                    action.status = AgentAction.PENDING
-
-            elif action_dict['action_type'] == ActionTypes.MEASURE.value:
-                # unpack action 
-                task = MeasurementTask(**action_dict)
-
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
-
-                ## TODO get information from environment
-                dx = task.pos[0] - self.state.pos[0]
-                dy = task.pos[1] - self.state.pos[1]
-
-                norm = math.sqrt(dx**2 + dy**2)
-
-                if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    eps = self.state.v_max * self._clock_config.dt
-                else:
-                    eps = 1e-6
-
-                if norm < eps:
-                    ### agent has reached its desired position
-                    self.state.update_state(self.get_current_time(), tasks_performed=[task], status=SimulationAgentState.IDLING)
-
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
-                else:
-                    ### agent has NOT reached its desired position
-                    self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
-
-                    # update action completion status
-                    action.status = AgentAction.PENDING              
-
-            elif action_dict['action_type'] == ActionTypes.IDLE.value:
-                # unpack action 
-                action = IdleAction(**action_dict)
-
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
-                delay = action.t_end - self.get_current_time()
-                await self.sim_wait(delay)
-
-                # update action completion status
-                if self.get_current_time() >= action.t_end:
-                    action.status = AgentAction.COMPLETED
-                else:
-                    action.status = AgentAction.PENDING
-
-            else:
-                # ignore action
-                self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
-                action.status = AgentAction.ABORTED    
-        else:
-            # wait for start time 
-            self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
-            await self.sim_wait(action.t_start - self.get_current_time())
-
-            # update action completion status
-            action.status = AgentAction.PENDING
         
-        self.log(f"finished performing action of type {action_dict['action_type']}! action completion status: {action.status}", level=logging.INFO)
-        statuses.append( (action, action.status) )
-
-        # discard the remaining actions
-        if len(actions) > 0:
-            self.log(f"setting all other actions as PENDING...")
-        for action_dict in actions:
-            action_dict : dict
-            action = AgentAction(**action_dict)
-            action.status = AgentAction.PENDING
-            statuses.append( (action, action.status) )
-
-        self.log(f'return {len(statuses)} statuses')
-        return statuses

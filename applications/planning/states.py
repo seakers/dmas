@@ -69,8 +69,9 @@ class SimulationAgentState(AgentState):
         # update last updated time
         self.t = t
         
-        out = self.to_dict()
-        self.history.append(out)
+        if self.status != self.SENSING:
+            out = self.to_dict()
+            self.history.append(out)
 
     def __repr__(self) -> str:
         return str(self.to_dict())
