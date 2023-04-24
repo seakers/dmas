@@ -35,7 +35,9 @@ class SimulationEnvironment(EnvironmentNode):
     async def setup(self) -> None:
         # initiate state trackers   
         self.states_tracker = {agent_name : None for agent_name in self._external_address_ledger}
-        self.in_range = {agent_name : {target_name : 0 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
+        self.agent_connectivity = {agent_name : {target_name : 0 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
+
+        self.agent_connectivity_history = []
 
     async def live(self) -> None:
         try:
@@ -104,7 +106,7 @@ class SimulationEnvironment(EnvironmentNode):
 
                         # check for range and announce chances in connectivity 
                         self.log('states are all from the same time! checking agent connectivity...')
-                        range_updates : list = self.check_agent_distance()
+                        range_updates : list = self.check_agent_connectivity()
 
                         if len(range_updates) > 0:
                             self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
@@ -117,6 +119,14 @@ class SimulationEnvironment(EnvironmentNode):
                             await self.send_peer_broadcast(ok_msg)
                         self.log('connectivity updates sent!')
 
+                        # save connectivity state to history
+                        agent_connectivity = {}
+                        for src in self.agent_connectivity:
+                            connections = {dst : self.agent_connectivity[src][dst] for dst in self.agent_connectivity[src]}
+                            agent_connectivity[src] = connections
+
+                        self.agent_connectivity_history.append((self.get_current_time(), agent_connectivity.copy()))
+                        
                     else:
                         # message is of an unsopported type. send blank response
                         self.log(f"received message of type {content['msg_type']}. ignoring message...")
@@ -194,9 +204,9 @@ class SimulationEnvironment(EnvironmentNode):
 
         return True
 
-    def check_agent_distance(self) -> list:
+    def check_agent_connectivity(self) -> list:
         """
-        Checks if agents are in range of each other or not 
+        Checks if agents are in communication range of each other
         """
         # get list of agents
         agent_names = list(self._external_address_ledger.keys())
@@ -223,6 +233,7 @@ class SimulationEnvironment(EnvironmentNode):
                     # agents cannot connect to themselves
                     continue
                 
+                # check for changes in agent connectivity based on distance and comms range
                 state_a : SimulationAgentState = self.states_tracker[agent_a]
                 pos_a = state_a.pos
                 state_b : SimulationAgentState = self.states_tracker[agent_b]
@@ -232,20 +243,42 @@ class SimulationEnvironment(EnvironmentNode):
                 
                 connected = 1 if dist <= self.comms_range else 0
 
-                if self.in_range[agent_a][agent_b] != connected:
+                # only notify agents if a change in connectivity has occurred
+                if self.agent_connectivity[agent_a][agent_b] != connected:
                     range_updates.append(AgentConnectivityUpdate(agent_a, agent_b, connected))
-                    self.in_range[agent_a][agent_b] = connected
+                    self.agent_connectivity[agent_a][agent_b] = connected
 
-                if self.in_range[agent_b][agent_a] != connected:
+                if self.agent_connectivity[agent_b][agent_a] != connected:
                     range_updates.append(AgentConnectivityUpdate(agent_b, agent_a, connected))
-                    self.in_range[agent_b][agent_a] = connected
+                    self.agent_connectivity[agent_b][agent_a] = connected
 
         return range_updates
 
     async def teardown(self) -> None:
         # print final time
         self.log(f'Environment shutdown with internal clock of {self.get_current_time()}[s]', level=logging.WARNING)
-        return
+        
+        # print connectiviy history
+        out = '\nConnectivity history'
+
+        for t, agent_connectivity in self.agent_connectivity_history:
+            
+            connected = []
+            for src in agent_connectivity:
+                for dst in agent_connectivity[src]:
+                    if src == dst:
+                        continue
+                    if (dst, src) in connected:
+                        continue
+                    if agent_connectivity[src][dst] == 1:
+                        connected.append((src, dst))
+
+            if len(connected) > 0:
+                out += f'\nt:={t}[s]\n'
+                for src, dst in connected:
+                    out += f'\t{src}<->{dst}\n'
+
+        self.log(out, level=logging.WARNING)
 
     async def sim_wait(self, delay: float) -> None:
         try:

@@ -15,6 +15,7 @@ class SimulationAgent(Agent):
                     id : int,
                     manager_network_config: NetworkConfig, 
                     planner_type: PlannerTypes,
+                    instruments: list,
                     initial_state: SimulationAgentState, 
                     level: int = logging.INFO, 
                     logger: logging.Logger = None) -> None:
@@ -49,24 +50,27 @@ class SimulationAgent(Agent):
                                                  logger)
         else:
             raise NotImplementedError(f'planner of type {planner_type} not yet supported.')
-
+        
         super().__init__(f'AGENT_{id}', 
                         agent_network_config, 
                         manager_network_config, 
                         initial_state, 
-                        # [planning_module], 
-                        [],
-                        level, 
-                        logger)
-        self.in_range = {}
+                        #[planning_module], 
+                        level=level, 
+                        logger=logger)
+
+        if not isinstance(instruments, list):
+            raise AttributeError(f'`instruments` must be of type `list`; is of type {type(instruments)}')
+
         self.id = id
+        self.instruments : list = instruments.copy()
 
     async def setup(self) -> None:
         # nothing to set up
         ##TEMPORARY: Fixed Plan
         self.plan = []
         
-        steps = self.id + 1
+        steps = self.id*2
         action = MoveAction([0, steps], 0, 1e6)
         self.plan.append(action.to_dict())
 
@@ -75,12 +79,18 @@ class SimulationAgent(Agent):
                                         self.get_network_name(),
                                         self.state.to_dict()
                                     )
-        action = BroadcastMessageAction(state_msg, 5, 1e6)
+        action = BroadcastMessageAction(state_msg, steps, 1e6)
         # self.plan.append(action.to_dict())
+
+        action = MeasurementTask([0, steps], 1, self.instruments, 0, 1e6)
+        self.plan.append(action.to_dict())
     
     async def teardown(self) -> None:
-        # print state history
-        out = '\nt, pos, vel, status\n'
+        # print agent capabilities
+        out = f'\ninstruments: {self.instruments}'
+
+        # print state 
+        out += '\nt, pos, vel, status\n'
         for state_dict in self.state.history:
             out += f"{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}\n"    
 
@@ -185,12 +195,10 @@ class SimulationAgent(Agent):
             if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
                 # update connectivity
                 msg = AgentConnectivityUpdate(**content)
-                if (msg.target not in self.in_range or self.in_range[msg.target] == 0) and msg.connected == 1:
+                if msg.connected == 1:
                     self.subscribe_to_broadcasts(msg.target)
-                    self.in_range[msg.target] = 1
-                elif (msg.target not in self.in_range or self.in_range[msg.target] == 1) and msg.connected == 0:
+                else:
                     self.unsubscribe_to_broadcasts(msg.target)
-                    self.in_range[msg.target] = 0
 
             elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                 # save as senses to forward to planner
@@ -237,13 +245,22 @@ class SimulationAgent(Agent):
         # self.log(f'senses sent! waiting on plan to perform...')
         # actions = []
         # _, _, content = await self.internal_inbox.get()
-        # self.log(f"plan received from planner module!")
         
         # if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
         #     msg = AgentActionMessage(**content)
         #     self.log(f"received an action of type {msg.action['action_type']}")
         #     actions.append(msg.action)
         
+        # while not self.internal_inbox.empty():
+        #     _, _, content = await self.internal_inbox.get()
+            
+        #     if content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+        #         msg = AgentActionMessage(**content)
+        #         self.log(f"received an action of type {msg.action['action_type']}")
+        #         actions.append(msg.action)  
+        
+        # self.log(f"plan received from planner module!")
+
         # TEMPORARY: Fixed plan execution
         ## Remove completed or aborted tasks from plan
         actions = []
@@ -401,16 +418,14 @@ class SimulationAgent(Agent):
                         ### agent has reached its desired position
                         # perform measurement
                         self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
-                        ## TODO communicate with environment and obtain measurement information
-                        await self.sim_wait(task.t_end - self.get_current_time())
+                        
+                        await self.sim_wait(task.t_end - self.get_current_time())  # TODO communicate with environment and obtain measurement information
 
                         # update action completion status
                         action.status = AgentAction.COMPLETED
 
                     else:
                         ### agent has NOT reached its desired position
-                        self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
-
                         # update action completion status
                         action.status = AgentAction.PENDING
 

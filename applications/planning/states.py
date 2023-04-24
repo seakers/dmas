@@ -30,10 +30,14 @@ class SimulationAgentState(AgentState):
         self.tasks_performed = tasks_performed
         self.status = status
         self.t = t
-
         self.history = []
 
-    def update_state(self, t : Union[float, int], vel : list=None, tasks_performed : list=[], status : str=None):
+    def update_state(self, 
+                    t : Union[float, int], 
+                    vel : list=None, 
+                    tasks_performed : list=[], 
+                    status : str=None, 
+                    agent_connectivity : list=[]):
         if t >= self.t:        
             # update position with previous state info and new time jump
             x, y = self.pos

@@ -42,6 +42,16 @@ def setup_results_directory(scenario_name) -> str:
 
     return results_path
 
+def random_instruments(task_types : list) -> list:
+    instruments = []
+    n_instruments = random.randint(1, len(task_types))
+    for _ in range(n_instruments):
+        i_ins = random.randint(0, len(task_types)-1)
+        while task_types[i_ins] in instruments:
+            i_ins = random.randint(0, len(task_types)-1)
+        instruments.append(task_types[i_ins])           
+    return instruments
+
 def create_tasks():
     pass
 
@@ -59,8 +69,8 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 50
-    comms_range = 5
+    n_agents = 5
+    comms_range = 1
     v_max = 1
 
     ## clock configuration
@@ -98,14 +108,7 @@ if __name__ == '__main__':
         pos = [x, y]
         s_max = 1.0
         
-        instruments = []
-        n_instruments = random.randint(1, len(task_types))
-        for _ in range(n_instruments):
-            i_ins = random.randint(0, len(task_types)-1)
-            while task_types[i_ins] in instruments:
-                i_ins = random.randint(0, len(task_types)-1)
-            instruments.append(task_types[i_ins])           
-
+        instruments = random_instruments(task_types)
         task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
         tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
@@ -150,8 +153,10 @@ if __name__ == '__main__':
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
         pos = [x, y]
-        # pos = [0.0, 0.0]
+        pos = [0.0, 0.0]
         vel = [0.0, 0.0]
+        instruments = task_types[:1]
+        # instruments = random_instruments(task_types)
         initial_state = SimulationAgentState(   pos, 
                                                 x_bounds, 
                                                 y_bounds, 
@@ -164,6 +169,7 @@ if __name__ == '__main__':
                                     id,
                                     manager_network_config,
                                     PlannerTypes.FIXED,
+                                    instruments,
                                     initial_state,
                                     level,
                                     logger
