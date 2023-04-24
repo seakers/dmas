@@ -457,6 +457,9 @@ class NodeInfoMessage(SimulationMessage):
 
         elif clock_type == ClockTypes.FIXED_TIME_STEP.value:
             clock_config = FixedTimesStepClockConfig(**self.clock_config)
+
+        elif clock_type == ClockTypes.EVENT_DRIVEN.value:
+            clock_config = EventDrivenClockConfig(**self.clock_config)
             
         else:
             raise NotImplemented(f'Clock Configuration of type {clock_type} not yet supported')

@@ -53,8 +53,40 @@ class PlanningSimulationManager(AbstractManager):
                     self.log(f'toc for time {t}[s] sent!')
 
                 self.log('TIMER DONE!', level=logging.INFO)
-            # TODO Implement Event-driven Clock
-            # elif isinstance(self._clock_config, EventDrivenClockConfig):  
+            
+            elif isinstance(self._clock_config, EventDrivenClockConfig):  
+                t = 0
+                tf = self._clock_config.get_total_seconds()
+                with tqdm(total=tf , desc=desc) as pbar:
+                    while t < tf:
+                        # wait for everyone to ask to fast forward            
+                        self.log(f'waiting for tic requests...')
+                        reqs = await self.wait_for_tic_requests()
+                        self.log(f'tic requests received!')
+
+                        t_next = tf
+                        for src in reqs:
+                            tic_req : TicRequest
+                            tic_req = reqs[src]
+                            if tic_req.tf < t_next:
+                                t_next = tic_req.tf
+                        
+                        # announce new time to simulation elements
+                        self.log(f'sending toc for time {t_next}[s]...', level=logging.INFO)
+                        toc = TocMessage(self.get_network_name(), t_next)
+
+                        await self.send_manager_broadcast(toc)
+
+                        # announce new time to simulation monitor
+                        self.log(f'sending toc for time {t_next}[s] to monitor...')
+                        toc.dst = SimulationElementRoles.MONITOR.value
+                        await self.send_monitor_message(toc) 
+
+                        self.log(f'toc for time {t_next}[s] sent!')
+
+                        # updete time and display
+                        pbar.update(t_next - t)
+                        t = t_next
 
             else:
                 raise NotImplemented(f'clock configuration of type {type(self._clock_config)} not yet supported.')

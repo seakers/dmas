@@ -171,6 +171,9 @@ class Node(SimulationElement):
                     elif clock_type == ClockTypes.FIXED_TIME_STEP.value:
                         return FixedTimesStepClockConfig(**clock_config), external_ledger
 
+                    elif clock_type == ClockTypes.EVENT_DRIVEN.value:
+                        return EventDrivenClockConfig(**clock_config), external_ledger
+
                     else:
                         raise NotImplementedError(f'clock type {clock_type} not yet implemented.')
         
@@ -249,7 +252,8 @@ class Node(SimulationElement):
         """
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             return time.perf_counter(), 0
-        elif isinstance(self._clock_config, FixedTimesStepClockConfig):
+        elif (isinstance(self._clock_config, FixedTimesStepClockConfig)
+                or isinstance(self._clock_config, EventDrivenClockConfig)):
             return 0, Container()
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')
@@ -264,7 +268,8 @@ class Node(SimulationElement):
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             return (time.perf_counter() - self.__t_start) * self._clock_config.sim_clock_freq
         
-        elif isinstance(self._clock_config, FixedTimesStepClockConfig):
+        elif (isinstance(self._clock_config, FixedTimesStepClockConfig)
+                or isinstance(self._clock_config, EventDrivenClockConfig)):
             self.__t_curr : Container
             return self.__t_curr.level
              
@@ -275,7 +280,8 @@ class Node(SimulationElement):
         if isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
             # does nothing
             return 
-        elif isinstance(self._clock_config, FixedTimesStepClockConfig):
+        elif (isinstance(self._clock_config, FixedTimesStepClockConfig)
+                or isinstance(self._clock_config, EventDrivenClockConfig)):
             self.__t_curr : Container
             await self.__t_curr.set_level(t)
         else:

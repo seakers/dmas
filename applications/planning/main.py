@@ -5,7 +5,7 @@ import random
 import zmq
 import concurrent.futures
 
-from dmas.clocks import FixedTimesStepClockConfig
+from dmas.clocks import EventDrivenClockConfig, FixedTimesStepClockConfig
 from dmas.elements import SimulationElement
 from dmas.messages import SimulationElementRoles
 from dmas.network import NetworkConfig
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     y_bounds = [0, 10]
 
     ## agents
-    n_agents = 1
+    n_agents = 2
     comms_range = 5
     v_max = 1
 
@@ -75,6 +75,8 @@ if __name__ == '__main__':
     end_date = datetime(year, month, day, hh, mm, ss+T)
     dt = 1.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+
+    # clock_config = EventDrivenClockConfig(start_date, end_date)
 
     ## network
     port = 5555

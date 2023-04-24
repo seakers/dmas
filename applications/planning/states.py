@@ -1,4 +1,5 @@
 from typing import Union
+import numpy as np
 from dmas.agents import AgentState
 
 class SimulationAgentState(AgentState):
@@ -83,7 +84,13 @@ class SimulationAgentState(AgentState):
         return out
     
     def is_critial(self) -> bool:
-        False
+        return False
 
     def is_failure(self) -> bool:
         return False
+
+    def predict_critical(self) -> float:
+        return np.Inf
+
+    def predict_failure(self) -> float:
+        return np.Inf

@@ -41,6 +41,24 @@ class AgentState(ABC):
         pass
 
     @abstractmethod
+    def predict_critical(self, **kwags) -> float:
+        """
+        Given the current state of the agent, this method predicts when a critical state will be reached.
+
+        Returns the time where this will ocurr in simulation seconds.
+        """
+        pass
+
+    @abstractmethod
+    def predict_failure(self, **kwags) -> float:
+        """
+        Given the current state of the agent, this method predicts when a failure state will be reached.
+
+        Returns the time where this will ocurr in simulation seconds.
+        """
+        pass
+
+    @abstractmethod
     def __str__(self) -> str:
         """
         Creates a string representing the contents of this agent state
@@ -93,6 +111,7 @@ class AgentAction(ABC):
         """
         super().__init__()
 
+        # type and value checks
         if not isinstance(t_start, float) and not isinstance(t_start, int):
             raise AttributeError(f'`t_start` must be of type `float` or type `int`. is of type {type(t_start)}.')
         elif t_start < 0:
@@ -101,7 +120,10 @@ class AgentAction(ABC):
             raise AttributeError(f'`t_end` must be of type `float` or type `int`. is of type {type(t_end)}.')
         elif t_end < 0:
             raise ValueError(f'`t_end` must be a value higher than 0. is of value {t_end}.')
-        
+        if t_start > t_end:
+            raise ValueError(f'`t_start must be lower or equal than `t_end` (t_start: {t_start}, t_end: {t_end}.')
+
+        # assign values 
         self.action_type = action_type
         self.t_start = t_start
         self.t_end = t_end

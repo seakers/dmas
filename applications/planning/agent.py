@@ -62,7 +62,20 @@ class SimulationAgent(Agent):
 
     async def setup(self) -> None:
         # nothing to set up
-        return
+        ##TEMPORARY: Fixed Plan
+        self.plan = []
+        
+        steps = 3
+        action = MoveAction([0, steps], 2, 1e6)
+        self.plan.append(action.to_dict())
+
+        state_msg = AgentStateMessage(  
+                                        self.get_element_name(), 
+                                        self.get_network_name(),
+                                        self.state.to_dict()
+                                    )
+        action = BroadcastMessageAction(state_msg, 5, 1e6)
+        # self.plan.append(action.to_dict())
     
     async def teardown(self) -> None:
         # print state history
@@ -73,38 +86,45 @@ class SimulationAgent(Agent):
         self.log(out, level=logging.WARNING)
 
     async def sim_wait(self, delay: float) -> None:
-        try: 
-            ignored = []    
-            send_task = None
-            if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                if delay > 0:
-                    # desired time not yet reached
-                    t0 = self.get_current_time()
-                    tf = t0 + delay
+        try:  
+            if (
+                isinstance(self._clock_config, FixedTimesStepClockConfig) 
+                or isinstance(self._clock_config, EventDrivenClockConfig)
+                ):
+                # desired time not yet reached
+                t0 = self.get_current_time()
+                tf = t0 + delay
+
+                # check if failure or critical state will be reached first
+                t_failure = self.state.predict_failure() 
+                t_crit = self.state.predict_critical()
+                if t_failure < tf:
+                    tf = t_failure
+                elif t_crit < tf:
+                    tf = t_crit
+                
+                # wait for time update        
+                ignored = []   
+                while self.get_current_time() <= t0:
+                    # send tic request
+                    tic_req = TicRequest(self.get_element_name(), t0, tf)
+                    _, _, content = await self.send_manager_message(tic_req)
+
+                    if content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value:
+                        raise asyncio.CancelledError()
+
+                    self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
+                    dst, src, content = await self.manager_inbox.get()
                     
-                    # wait for time update        
-                    while self.get_current_time() < tf:
-                        # send tic request
-                        tic_req = TicRequest(self.get_element_name(), t0, tf)
-                        send_task = asyncio.create_task(self.send_manager_message(tic_req))
-                        await send_task
-                        _, _, content = send_task.result()
-
-                        if content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value:
-                            raise asyncio.CancelledError()
-
-                        self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
-                        dst, src, content = await self.manager_inbox.get()
-                        
-                        if content['msg_type'] == ManagerMessageTypes.TOC.value:
-                            # update clock
-                            msg = TocMessage(**content)
-                            await self.update_current_time(msg.t)
-                            self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
-                        else:
-                            # ignore message
-                            self.log(f'some other message was received. ignoring...')
-                            ignored.append((dst, src, content))
+                    if content['msg_type'] == ManagerMessageTypes.TOC.value:
+                        # update clock
+                        msg = TocMessage(**content)
+                        await self.update_current_time(msg.t)
+                        self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
+                    else:
+                        # ignore message
+                        self.log(f'some other manager message was received. ignoring...')
+                        ignored.append((dst, src, content))
 
             elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
                 await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
@@ -113,9 +133,12 @@ class SimulationAgent(Agent):
                 raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
         
         finally:
-
-            for dst, src, content in ignored:
-                await self.manager_inbox.put((dst,src,content))
+            if (
+                isinstance(self._clock_config, FixedTimesStepClockConfig) 
+                or isinstance(self._clock_config, EventDrivenClockConfig)
+                ) and ignored is not None:
+                for dst, src, content in ignored:
+                    await self.manager_inbox.put((dst,src,content))
 
     async def sense(self, statuses: list) -> list:
         # initiate senses array
@@ -212,7 +235,7 @@ class SimulationAgent(Agent):
 
         # # wait for planner to send list of tasks to perform
         # self.log(f'senses sent! waiting on plan to perform...')
-        actions = []
+        # actions = []
         # _, _, content = await self.internal_inbox.get()
         # self.log(f"plan received from planner module!")
         
@@ -221,22 +244,41 @@ class SimulationAgent(Agent):
         #     self.log(f"received an action of type {msg.action['action_type']}")
         #     actions.append(msg.action)
         
-        t = self.get_current_time()
-        state_msg = AgentStateMessage(  
-                                        self.get_element_name(), 
-                                        self.get_network_name(),
-                                        self.state.to_dict()
-                                    )
-        action = BroadcastMessageAction(state_msg, t, 1e6)
-        # actions.append(action.to_dict())
+        # TEMPORARY: Fixed plan execution
+        ## Remove completed or aborted tasks from plan
+        actions = []
+        removed = []
+        for action_dict in self.plan:
+            action_dict : dict
+            action = AgentAction(**action_dict)
+            t_curr = self.get_current_time()
 
-        action = IdleAction(t, t+1)
-        # actions.append(action.to_dict())
+            if action.t_end < t_curr and action.id not in self.state.tasks_performed:
+                # remove from plan if end time has passed and action was not performed 
+                removed.append(action_dict)
+
+            if action.id in self.state.tasks_performed:
+                # remove from plan if action was successfully performed 
+                removed.append(action_dict)
+
+            elif action.t_start <= t_curr <= action.t_end:
+                # perform action if in between the assigned time
+                actions.append(action_dict)
         
-        steps = 3
-        action = MoveAction([0, steps], t, t+steps)
-        actions.append(action.to_dict())
-        
+        for action in removed:
+            self.plan.remove(action)
+
+        if len(actions) == 0:
+            t_idle = 1e6
+            for action_dict in self.plan:
+                action_dict : dict
+                action = AgentAction(**action_dict)
+                
+                t_idle = action.t_start if action.t_start < t_idle else t_idle
+
+            action = IdleAction(self.get_current_time(), t_idle)
+            actions.append(action.to_dict())
+
         # self.log(f'received {len(actions)} actions to perform.')
         return actions
 
@@ -272,13 +314,13 @@ class SimulationAgent(Agent):
                     # update action completion status
                     action.status = AgentAction.COMPLETED
                     
-                elif action_dict['action_type'] == ActionTypes.PEER_MSG.value:
+                elif action_dict['action_type'] == ActionTypes.BROADCAST_MSG.value:
                     # unpack action
                     action = BroadcastMessageAction(**action_dict)
 
                     # perform action
                     self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                    await self.send_peer_message(action.msg)
+                    await self.send_peer_broadcast(action.msg)
                     
                     # update action completion status
                     action.status = AgentAction.COMPLETED
@@ -319,8 +361,7 @@ class SimulationAgent(Agent):
                         ## stop agent 
                         new_vel = [ 0, 
                                     0]
-                        self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.IDLING)
-                        await self.sim_wait(1)
+                        self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
 
                         # update action completion status
                         action.status = AgentAction.COMPLETED
@@ -336,11 +377,43 @@ class SimulationAgent(Agent):
                         self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
 
                         ## wait until destination is reached
-                        await self.sim_wait(1)
+                        delay = norm / self.state.v_max
+                        await self.sim_wait(delay)
                         
                         # update action completion status
                         action.status = AgentAction.PENDING
                 
+                # elif action_dict['action_type'] == ActionTypes.MEASURE.value:
+                #     # unpack action 
+                #     task = MeasurementTask(**action_dict)
+
+                #     # perform action
+                #     self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
+
+                #     ## TODO get information from environment
+                #     dx = task.pos[0] - self.state.pos[0]
+                #     dy = task.pos[1] - self.state.pos[1]
+
+                #     norm = math.sqrt(dx**2 + dy**2)
+
+                #     if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                #         eps = self.state.v_max * self._clock_config.dt
+                #     else:
+                #         eps = 1e-6
+
+                #     if norm < eps:
+                #         ### agent has reached its desired position
+                #         self.state.update_state(self.get_current_time(), tasks_performed=[task], status=SimulationAgentState.IDLING)
+
+                #         # update action completion status
+                #         action.status = AgentAction.COMPLETED
+                #     else:
+                #         ### agent has NOT reached its desired position
+                #         self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
+
+                #         # update action completion status
+                #         action.status = AgentAction.PENDING
+
                 else:
                     # ignore action
                     self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
