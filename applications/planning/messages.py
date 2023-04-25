@@ -7,6 +7,7 @@ class SimulationMessageTypes(Enum):
     AGENT_STATE = 'AGENT_STATE'
     CONNECTIVITY_UPDATE = 'CONNECTIVITY_UPDATE'
     PLANNER_RESULTS = 'PLANNER_RESULTS'
+    TASK_BID = 'TASK_BID'
     PLAN = 'PLAN'
 
 class AgentStateMessage(SimulationMessage):
@@ -78,7 +79,7 @@ class PlannerResultsMessage(SimulationMessage):
     """
     ## Planner Update Message 
 
-    Informs another agent of the current or proposed plan to be executed by the sender
+    Informs another agents of the current or proposed plan to be executed by the sender
 
     ### Attributes:
         - src (`str`): name of the simulation element sending this message
@@ -90,8 +91,60 @@ class PlannerResultsMessage(SimulationMessage):
         super().__init__(src, dst, SimulationMessageTypes.PLANNER_RESULTS.value, id)
         self.planner_results = planner_results
 
+class TaskBidMessage(SimulationMessage):
+    """
+    ## Task Bid Message
+
+    Informs another agents of the bid information held by the sender
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - bid (`dict`): bid information being shared
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
+    def __init__(self, 
+                src: str, 
+                dst: str, 
+                bid: dict, 
+                id: str = None, **_):
+        """
+        Creates an instance of a task bid message
+
+        ### Arguments:
+            - src (`str`): name of the simulation element sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - bid (`dict`): bid information being shared
+            - id (`str`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, SimulationMessageTypes.TASK_BID.value, id)
+        self.bid = bid
+
 class PlanMessage(SimulationMessage):
+    """
+    # Plan Message
+    
+    Informs an agent of a set of tasks to perform. 
+    Sent by either an external or internal planner
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - plan (`list`): list of agent actions to perform
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
     def __init__(self, src: str, dst: str, plan : list, id: str = None, **_):
+        """
+        Creates an instance of a plan message
+
+        ### Attributes:
+            - src (`str`): name of the simulation element sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - plan (`list`): list of agent actions to perform
+            - id (`str`) : Universally Unique IDentifier for this message
+        """
         super().__init__(src, dst, SimulationMessageTypes.PLAN.value, id)
         self.plan = plan
 
