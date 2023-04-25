@@ -3,6 +3,9 @@ import logging
 import random
 import zmq
 import concurrent.futures
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import pandas
 
 from dmas.clocks import EventDrivenClockConfig, FixedTimesStepClockConfig
 from dmas.elements import SimulationElement
@@ -36,13 +39,14 @@ if __name__ == '__main__':
     Wrapper for planner simulation using DMAS
     """    
     # create results directory
+    plot_results = True
     scenario_name = 'TEST'
     results_path = setup_results_directory(scenario_name)
     
     # define simulation config
     ## environment bounds
-    x_bounds = [0, 10]
-    y_bounds = [0, 10]
+    x_bounds = [-5, 5]
+    y_bounds = [-5, 5]
 
     ## agents
     n_agents = 1
@@ -59,10 +63,10 @@ if __name__ == '__main__':
     ss = 00
     start_date = datetime(year, month, day, hh, mm, ss)
     end_date = datetime(year, month, day, hh, mm, ss+T)
-    dt = 1.0
+    dt = 1.0/2.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
 
-    clock_config = EventDrivenClockConfig(start_date, end_date)
+    # clock_config = EventDrivenClockConfig(start_date, end_date)
 
     ## network
     port = 5555
@@ -71,14 +75,14 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 0
+    n_tasks = 5
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
     tasks = []
     for i in range(n_tasks):
         t_start = random.random() * clock_config.get_total_seconds()
-        t_end = random.random() * (clock_config.get_total_seconds() - t_start)
+        t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
         pos = [x, y]
@@ -164,5 +168,56 @@ if __name__ == '__main__':
 
     # compile results from monitor
 
-    # print results
+    # plot results
+    if plot_results:
+        t = None
+        agent_data = {}
+        for id in range(n_agents):
+            df = pandas.read_csv(f"{results_path}/AGENT_{id}/states.csv")
+            agent_data[f'AGENT_{id}'] = df
+            if t is None:
+                t = df['t']
 
+        fig, ax = plt.subplots()
+        plt.grid(True)
+        ax.set_xlim(x_bounds[0], x_bounds[1]) 
+        ax.set_ylim(y_bounds[0], y_bounds[1]) 
+        ax.set_xlabel('x')
+        ax.set_ylabel('x')
+
+        # plot original lagent position
+        x = []
+        y = []
+        for agent in agent_data:
+            x.append( agent_data[agent]['x_pos'][0] )
+            y.append( agent_data[agent]['y_pos'][0] )
+        scat = ax.scatter(x, y, color='b')
+        
+        # plot task location
+        x = []
+        y = []
+        for task in tasks:
+            task : MeasurementTask
+            x_i, y_i = task.pos
+            x.append(x_i)
+            y.append(y_i)
+        ax.scatter(x, y, color='r', marker='*')
+
+        def update(frame):
+            # update agent states
+            x = []
+            y = []
+            for agent in agent_data: 
+                x.append( agent_data[agent]['x_pos'][frame] )
+                y.append( agent_data[agent]['y_pos'][frame] )
+
+            # TODO update task states
+
+            # update plots
+            data = np.stack([x,y]).T
+            scat.set_offsets(data)
+            ax.set_title(f't={t[frame]}[s]')
+            return scat
+        
+        ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
+        plt.show()

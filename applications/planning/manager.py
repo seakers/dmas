@@ -32,27 +32,35 @@ class PlanningSimulationManager(AbstractManager):
             elif isinstance(self._clock_config, FixedTimesStepClockConfig):
                 dt = self._clock_config.dt
                 n_steps = math.ceil(delay/dt)
+                t = 0
+                tf = t + delay
                 
-                for t in tqdm (range (1, n_steps+1), desc=desc):
-                    # wait for everyone to ask to fast forward            
-                    self.log(f'waiting for tic requests...')
-                    await self.wait_for_tic_requests()
-                    self.log(f'tic requests received!')
+                # for t in tqdm (range (1, n_steps+1), desc=desc):
+                with tqdm(total=n_steps + 1, desc=desc) as pbar:
+                    while t < tf:
+                        # wait for everyone to ask to fast forward            
+                        self.log(f'waiting for tic requests...')
+                        await self.wait_for_tic_requests()
+                        self.log(f'tic requests received!')
 
-                    # announce new time to simulation elements
-                    self.log(f'sending toc for time {t}[s]...', level=logging.INFO)
-                    toc = TocMessage(self.get_network_name(), t)
+                        # announce new time to simulation elements
+                        self.log(f'sending toc for time {t}[s]...', level=logging.INFO)
+                        toc = TocMessage(self.get_network_name(), t)
 
-                    await self.send_manager_broadcast(toc)
+                        await self.send_manager_broadcast(toc)
 
-                    # announce new time to simulation monitor
-                    self.log(f'sending toc for time {t}[s] to monitor...')
-                    toc.dst = SimulationElementRoles.MONITOR.value
-                    await self.send_monitor_message(toc) 
+                        # announce new time to simulation monitor
+                        self.log(f'sending toc for time {t}[s] to monitor...')
+                        toc.dst = SimulationElementRoles.MONITOR.value
+                        await self.send_monitor_message(toc) 
 
-                    self.log(f'toc for time {t}[s] sent!')
+                        self.log(f'toc for time {t}[s] sent!')
 
-                self.log('TIMER DONE!', level=logging.INFO)
+                        # updete time and display
+                        pbar.update(dt)
+                        t += dt
+
+                    self.log('TIMER DONE!', level=logging.INFO)
             
             elif isinstance(self._clock_config, EventDrivenClockConfig):  
                 t = 0

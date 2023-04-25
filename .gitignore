@@ -155,6 +155,7 @@ dmypy.json
 cython_debug/
 
 # File Backups
+TEST/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks
 orbitpy

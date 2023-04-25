@@ -1,3 +1,4 @@
+import math
 from messages import PlanMessage, AgentActionMessage, AgentStateMessage, SimulationMessageTypes
 from states import SimulationAgentState
 from tasks import IdleAction, MoveAction, MeasurementTask
@@ -43,6 +44,7 @@ class PlannerModule(InternalModule):
             raise NotImplementedError(f'planner of type {planner_type} not yet supported.')
         self.planner_type = planner_type
         self.results_path = results_path
+        self.parent_id = agent_id
 
     async def listen(self) -> None:
         try:
@@ -72,10 +74,14 @@ class FixedPlannerModule(PlannerModule):
         
     async def setup(self) -> None:
         # create an initial plan
-        steps = 4
-        travel_to_target = MoveAction([steps, 0], t_start=0)
-        measure = MeasurementTask([steps,0], 1, ['VNIR'], t_start=steps, t_end=1e6)
-        return_to_origin = MoveAction([0,0], t_start=steps)
+        dt = 1
+        steps = 1 * (self.parent_id + 1)
+        pos = [steps, steps]
+        t_start = math.sqrt( pos[0]**2 + pos[1]**2 ) + dt
+        
+        travel_to_target = MoveAction(pos, dt)
+        measure = MeasurementTask(pos, 1, ['VNIR'], t_start, t_end=1e6)
+        return_to_origin = MoveAction([0,0], t_start)
 
         self.plan = [
                     travel_to_target,
@@ -106,6 +112,7 @@ class FixedPlannerModule(PlannerModule):
                             self.log(f'action {action_dict} not completed yet! trying again...')
                             msg.dst = self.get_parent_name()
                             new_plan.append(action_dict)
+
                         elif msg.status == AgentAction.COMPLETED:
                             # if action was completed, remove from plan
                             action_dict : dict = msg.action
@@ -116,8 +123,9 @@ class FixedPlannerModule(PlannerModule):
                                 if action.id == completed_action.id:
                                     removed = action
                                     break
-                            self.plan.remove(removed)
-                            x =1
+
+                            if removed is not None:
+                                self.plan.remove(removed)
 
                     elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                         # unpack message 
@@ -130,20 +138,18 @@ class FixedPlannerModule(PlannerModule):
 
                 if len(new_plan) == 0:
                     # no previously submitted actions will be re-attempted
-                    if len(self.plan) > 0:
-                        for action in self.plan:
-                            action : AgentAction
-                            if action.t_start <= t_curr <= action.t_end:
-                                new_plan.append(action.to_dict())
-                                break
-                    else:
+                    for action in self.plan:
+                        action : AgentAction
+                        if action.t_start <= t_curr <= action.t_end:
+                            new_plan.append(action.to_dict())
+                            break
+
+                    if len(new_plan) == 0:
                         # if no plan left, just idle for a time-step
                         self.log('no more actions to perform. instruct agent to idle for one time-step.')
                         t_idle = 1e6
-                        for action_dict in self.plan:
-                            action_dict : dict
-                            action = AgentAction(**action_dict)
-                            
+                        for action in self.plan:
+                            action : AgentAction
                             t_idle = action.t_start if action.t_start < t_idle else t_idle
                         
                         action = IdleAction(t_curr, t_idle)

@@ -89,11 +89,13 @@ class SimulationAgent(Agent):
 
         # print agent states
         with open(f"{self.results_path}/states.csv", "w") as file:
-            title = 'f, pos, vel, status'
+            title = 't,x_pos,y_pos,x_vel,y_vel,status'
             file.write(title)
 
             for state_dict in self.state.history:
-                file.write(f"\n{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}")
+                pos = state_dict['pos']
+                vel = state_dict['vel']
+                file.write(f"\n{state_dict['t']},{pos[0]},{pos[1]},{vel[0]},{vel[1]},{state_dict['status']}")
 
     async def sim_wait(self, delay: float) -> None:
         try:  
@@ -191,7 +193,7 @@ class SimulationAgent(Agent):
         senses.append(state_msg)
 
         # handle environment updates
-        while len(self._external_address_ledger) > 1:
+        while True:
             # wait for environment messages
             _, _, content = await self.environment_inbox.get()
 
@@ -327,7 +329,7 @@ class SimulationAgent(Agent):
                     norm = math.sqrt(dx**2 + dy**2)
 
                     if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                        eps = self.state.v_max * self._clock_config.dt
+                        eps = self.state.v_max * self._clock_config.dt / 2.0
                     else:
                         eps = 1e-6
 
@@ -371,7 +373,7 @@ class SimulationAgent(Agent):
 
                     ## Check if point has been reached
                     if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                        eps = self.state.v_max * self._clock_config.dt
+                        eps = self.state.v_max * self._clock_config.dt / 2.0
                     else:
                         eps = 1e-6
 
@@ -400,4 +402,3 @@ class SimulationAgent(Agent):
 
         self.log(f'returning {len(statuses)} statuses')
         return statuses
-        
