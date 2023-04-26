@@ -50,7 +50,7 @@ if __name__ == '__main__':
     y_bounds = [-5, 5]
 
     ## agents
-    n_agents = 2
+    n_agents = 1
     comms_range = 10
     v_max = 1
 
@@ -152,7 +152,7 @@ if __name__ == '__main__':
                                     port, 
                                     id,
                                     manager_network_config,
-                                    PlannerTypes.FIXED,
+                                    PlannerTypes.ACCBBA,
                                     instruments,
                                     initial_state,
                                     level,
@@ -169,60 +169,60 @@ if __name__ == '__main__':
             agent : SimulationElement
             pool.submit(agent.run, *[])
 
-    # TODO compile results from monitor
+    # # TODO compile results from monitor
 
-    # plot results
-    if plot_results:
-        t = None
-        agent_data = {}
-        for id in range(n_agents):
-            df = pandas.read_csv(f"{results_path}/AGENT_{id}/states.csv")
-            agent_data[f'AGENT_{id}'] = df
-            if t is None or len(df['t']) < len(t):
-                t = df['t']
+    # # plot results
+    # if plot_results:
+    #     t = None
+    #     agent_data = {}
+    #     for id in range(n_agents):
+    #         df = pandas.read_csv(f"{results_path}/AGENT_{id}/states.csv")
+    #         agent_data[f'AGENT_{id}'] = df
+    #         if t is None or len(df['t']) < len(t):
+    #             t = df['t']
 
-        fig, ax = plt.subplots()
-        plt.grid(True)
-        ax.set_xlim(x_bounds[0], x_bounds[1]) 
-        ax.set_ylim(y_bounds[0], y_bounds[1]) 
-        ax.set_xlabel('x')
-        ax.set_ylabel('x')
+    #     fig, ax = plt.subplots()
+    #     plt.grid(True)
+    #     ax.set_xlim(x_bounds[0], x_bounds[1]) 
+    #     ax.set_ylim(y_bounds[0], y_bounds[1]) 
+    #     ax.set_xlabel('x')
+    #     ax.set_ylabel('x')
 
-        # plot original agent position
-        x = []
-        y = []
-        for agent in agent_data:
-            agent : str
-            _, id = agent.split('_')
-            x.append( agent_data[agent]['x_pos'][0] )
-            y.append( agent_data[agent]['y_pos'][0] )
-        scat = ax.scatter(x, y, color='b')
+    #     # plot original agent position
+    #     x = []
+    #     y = []
+    #     for agent in agent_data:
+    #         agent : str
+    #         _, id = agent.split('_')
+    #         x.append( agent_data[agent]['x_pos'][0] )
+    #         y.append( agent_data[agent]['y_pos'][0] )
+    #     scat = ax.scatter(x, y, color='b')
         
-        # plot task location
-        x = []
-        y = []
-        for task in tasks:
-            task : MeasurementTask
-            x_i, y_i = task.pos
-            x.append(x_i)
-            y.append(y_i)
-        ax.scatter(x, y, color='r', marker='*')
+    #     # plot task location
+    #     x = []
+    #     y = []
+    #     for task in tasks:
+    #         task : MeasurementTask
+    #         x_i, y_i = task.pos
+    #         x.append(x_i)
+    #         y.append(y_i)
+    #     ax.scatter(x, y, color='r', marker='*')
 
-        def update(frame):
-            # update agent states
-            x = []
-            y = []
-            for agent in agent_data: 
-                x.append( agent_data[agent]['x_pos'][frame] )
-                y.append( agent_data[agent]['y_pos'][frame] )
+    #     def update(frame):
+    #         # update agent states
+    #         x = []
+    #         y = []
+    #         for agent in agent_data: 
+    #             x.append( agent_data[agent]['x_pos'][frame] )
+    #             y.append( agent_data[agent]['y_pos'][frame] )
 
-            # TODO update task states
+    #         # TODO update task states
 
-            # update plots
-            data = np.stack([x,y]).T
-            scat.set_offsets(data)
-            ax.set_title(f't={t[frame]}[s]')
-            return scat
+    #         # update plots
+    #         data = np.stack([x,y]).T
+    #         scat.set_offsets(data)
+    #         ax.set_title(f't={t[frame]}[s]')
+    #         return scat
         
-        ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
-        plt.show()
+    #     ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
+    #     plt.show()

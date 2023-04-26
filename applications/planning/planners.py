@@ -103,10 +103,10 @@ class FixedPlannerModule(PlannerModule):
             msg_task = BroadcastStateAction(1, 2)
 
         self.plan = [
-                    # travel_to_target,
-                    # measure,
-                    # return_to_origin
-                    msg_task
+                    travel_to_target,
+                    measure,
+                    return_to_origin
+                    # msg_task
                     ]
         
     async def live(self) -> None:
@@ -593,66 +593,117 @@ class ACCBBAPlannerModule(PlannerModule):
 
         self.t_curr = 0.0
         self.state_curr = None
-        self.results = {}
     
     async def setup(self) -> None:
         # initialize internal messaging queues
-        self.bundle_builder_inbox = asyncio.Queue()
+        self.states_inbox = asyncio.Queue()
+        self.relevant_changes_inbox = asyncio.Queue()
+        self.action_status_inbox = asyncio.Queue()
 
-        self.alternate_outgoing = True
         self.outgoing_listen_inbox = asyncio.Queue()
         self.outgoing_bundle_builder_inbox = asyncio.Queue()
 
-        # initialize results lock
-        self.results_lock = asyncio.Lock()
-
-    async def listen(self):
-        # listen for any messages from the agent and adjust results ledger
-
-        # if changes are made that affect the bundle, inform `routine()`
+    async def live(self) -> None:
+        """
+        Performs three concurrent tasks:
+        - Listener: receives messages from the parent agent and checks results
+        - Bundle-builder: plans and bids according to local information
+        - Rebroadcaster: forwards plan to agent
+        """
         try:
+            listener_task = asyncio.create_task(self.listener(), name='listener()')
+            bundle_builder_task = asyncio.create_task(self.bundle_builder(), name='bundle_builder()')
+            rebroadcaster_task = asyncio.create_task(self.rebroadcaster(), name='rebroadcaster()')
+            
+            tasks = [listener_task, bundle_builder_task, rebroadcaster_task]
+
+            await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        finally:
+            for task in tasks:
+                task : asyncio.Task
+                if not task.done():
+                    task.cancel()
+                    await task
+
+    async def listener(self):
+        """
+        ## Listener 
+
+        Listen for any messages from the parent agent and adjust its results ledger.
+        Any relevant bids that may affect the bundle, along with any changes in state or 
+        task completion status are forwarded to the bundle builder.
+        """
+        # 
+        try:
+            # initiate results tracker
+            results = {}
+
+            # create poller for all broadcast sockets
+            poller = azmq.Poller()
+            manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
+            poller.register(manager_socket, zmq.POLLIN)
+
+            # listen for broadcasts and place in the appropriate inboxes
             while True:
-                # listen for agent to send new senses
-                self.log('waiting for incoming senses from parent agent...')
-                senses = await self.empty_manager_inbox()
+                sockets = dict(await poller.poll())
 
-                self.log(f'received {len(senses)} senses from agent! processing senses...')
-                for sense in senses:
-                    sense : dict
-                    if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                if manager_socket in sockets:
+                    self.log('listening to manager broadcast!')
+                    _, _, content = await self.listen_manager_broadcast()
+
+                    # if sim-end message, end agent `live()`
+                    if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
+                        return
+
+                    elif content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
                         # unpack message 
-                        msg : AgentActionMessage = AgentActionMessage(**sense)
+                        msg : AgentActionMessage = AgentActionMessage(**content)
                         
                         # send to bundle builder 
-                        await self.bundle_builder_inbox.put(msg)
+                        await self.action_status_inbox.put(msg)
 
-                    elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                    elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                         # unpack message 
-                        msg : AgentStateMessage = AgentStateMessage(**sense)
+                        msg : AgentStateMessage = AgentStateMessage(**content)
                         
                         # send to bundle builder 
-                        await self.bundle_builder_inbox.put(msg) 
+                        await self.states_inbox.put(msg) 
 
-                    elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                    elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                        # unpack message
+                        task_req = TaskRequest(**content)
+
+                        # create task bid from task request and add to results
+                        task_dict : dict = task_req.task
+                        task = MeasurementTask(**task_dict)
+                        bid = ACCBBATaskBid(task_dict, self.get_parent_name())
+                        results[task.id] = bid
+
+                        # send to bundle-builder and rebroadcaster
+                        out_msg = TaskBidMessage(   
+                                                    self.get_element_name(), 
+                                                    self.get_parent_name(), 
+                                                    bid.to_dict()
+                                                )
+                        await self.relevant_changes_inbox.put(out_msg)
+                        await self.outgoing_bundle_builder_inbox.put(out_msg)
+
+                    elif content['msg_type'] == SimulationMessageTypes.TASK_BID.value:
                         # unpack message 
-                        bid_msg : TaskBidMessage = TaskBidMessage(**sense)
+                        bid_msg : TaskBidMessage = TaskBidMessage(**content)
                         their_bid = ACCBBATaskBid(**bid_msg.bid)
 
-                        # acquire results lock
-                        await self.results_lock.acquire()
-
-                        if their_bid.task_id not in self.results:
+                        if their_bid.task_id not in results:
                             # bid is for a task that I was not aware of; create new empty bid for it and compare
                             my_bid = ACCBBATaskBid(their_bid.task, self.get_parent_name())
-                            self.results[their_bid.task_id] = my_bid
+                            results[their_bid.task_id] = my_bid
                         
                         # compare bid 
-                        my_bid : ACCBBATaskBid = self.results[their_bid.task_id]
+                        my_bid : ACCBBATaskBid = results[their_bid.task_id]
                         broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
                         
-                        # release results lock
-                        self.results_lock.release()
-
                         if broadcast_bid is not None:
                             # if relevant changes were made, send to bundle builder and to out-going inbox 
                             out_msg = TaskBidMessage(   
@@ -660,33 +711,13 @@ class ACCBBAPlannerModule(PlannerModule):
                                                     self.get_parent_name(), 
                                                     broadcast_bid.to_dict()
                                                 )
-                            await self.bundle_builder_inbox.put(out_msg)
+                            await self.relevant_changes_inbox.put(out_msg)
                             await self.outgoing_listen_inbox.put(out_msg) 
 
-                    elif sense['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                        # unpack message
-                        task_req = TaskRequest(**sense)
-
-                        # acquire results lock
-                        await self.results_lock.acquire()
-
-                        # create task bid from task request and add to results
-                        task_dict : dict = task_req.task
-                        task = TaskRequest(**task_dict)
-                        bid = ACCBBATaskBid(task, self.get_parent_name())
-                        self.results[task.id] = bid
-
-                        # send to bundle-builder
-                        out_msg = TaskBidMessage(   
-                                                    self.get_element_name(), 
-                                                    self.get_parent_name(), 
-                                                    bid.to_dict()
-                                                )
-                        await self.bundle_builder_inbox.put(out_msg)
-
-                        # release results lock
-                        self.results_lock.release()
-
+                    # else, let agent handle it
+                    else:
+                        self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...")
+        
         except asyncio.CancelledError:
             return
 
@@ -700,12 +731,13 @@ class ACCBBAPlannerModule(PlannerModule):
         bundle = []
         try:
             while True:
+                x = await self.states_inbox.get()
                 # wait for periodic message check
 
                 # if no messages received, wait again
 
                 # if messages exist, process all messages from listener 
-                pass
+                await asyncio.sleep(1e6)
 
         except asyncio.CancelledError:
             pass
@@ -721,7 +753,7 @@ class ACCBBAPlannerModule(PlannerModule):
 
                 # if 
                 
-                pass
+                await asyncio.sleep(1e6)
 
         except asyncio.CancelledError:
             pass

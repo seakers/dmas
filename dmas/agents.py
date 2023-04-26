@@ -293,6 +293,7 @@ class Agent(Node):
                     if src == SimulationElementRoles.ENVIRONMENT.value:
                         self.log('received environment broadcast! sending to inbox...')
                         await self.environment_inbox.put( (dst, src, content) )
+                        self.log(f'environment inbox contains {self.environment_inbox.qsize()} messages.')
                     else:
                         self.log('received peer broadcast! sending to inbox...')
                         await self.external_inbox.put( (dst, src, content) )

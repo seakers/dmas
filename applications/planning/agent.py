@@ -44,8 +44,9 @@ class SimulationAgent(Agent):
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
-                                                    level,
-                                                    logger)
+                                                    l_bundle=3,
+                                                    level=level,
+                                                    logger=logger)
         elif planner_type is PlannerTypes.FIXED:
             planning_module = FixedPlannerModule(results_path,
                                                  manager_port,
@@ -208,17 +209,20 @@ class SimulationAgent(Agent):
 
             elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                 # save as senses to forward to planner
-                senses.append(TaskRequest(**content))
+                task_msg = TaskRequest(**content)
+                task_msg.dst = self.get_element_name()
+                senses.append(task_msg)
 
             elif content['msg_type'] == NodeMessageTypes.RECEPTION_ACK.value:
                 # no relevant information was sent by the environment
                 break
                 
-            # give environment time to continue sending any pending messages if any are yet to be transmitted
-            await asyncio.sleep(0.01)
+            if self.environment_inbox.empty():
+                # give environment time to continue sending any pending messages if any are yet to be transmitted
+                await asyncio.sleep(0.01)
 
-            if self.manager_inbox.empty():
-                break
+                if self.environment_inbox.empty():
+                    break
         
         # handle peer broadcasts
         while not self.external_inbox.empty():

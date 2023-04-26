@@ -46,9 +46,6 @@ class SimulationEnvironment(EnvironmentNode):
 
     async def live(self) -> None:
         try:
-            # broadcast task requests
-            initial_tasks_sent = False
-
             # track agent and simulation states
             poller = azmq.Poller()
             socket_manager, _ = self._manager_socket_map.get(zmq.SUB)
@@ -114,20 +111,22 @@ class SimulationEnvironment(EnvironmentNode):
                             for range_update in range_updates:
                                 range_update : AgentConnectivityUpdate
                                 await self.send_peer_broadcast(range_update)
+                            self.log('connectivity updates sent!')
+
+                        elif len(self.tasks) > 0:
+                            # publish tasks
+                            self.log(f'publishing {len(self.tasks)} task requests to all agents...')
+                            while len(self.tasks) > 0:
+                                task : MeasurementTask = self.tasks.pop(0)
+                                task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
+                                await self.send_peer_broadcast(task_req)
+                                self.pulished_tasks.append(task)
+                            self.log('tasks published!')
+
                         else:
                             self.log(f'connectivity checked. no connectivity updates...')
                             ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
-                            await self.send_peer_broadcast(ok_msg)
-                        self.log('connectivity updates sent!')
-
-                        # publish tasks
-                        if len(self.tasks) > 0:
-                            self.log(f'publishing {len(self.tasks)} task requests to all agents...')
-                        while len(self.tasks):
-                            task : MeasurementTask = self.tasks.pop(0)
-                            task_req = TaskRequest(self.name, self.get_network_name(), task.to_dict())
-                            await self.send_peer_broadcast(task_req)
-                            self.pulished_tasks.append(task)
+                            await self.send_peer_broadcast(ok_msg)                        
 
                         # save connectivity state to history
                         agent_connectivity = {}
