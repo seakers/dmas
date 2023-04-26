@@ -404,6 +404,8 @@ class Node(SimulationElement):
 
             await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
         
+        done = 1
+        
     @abstractmethod
     async def live(self) -> None:
         """
@@ -466,7 +468,7 @@ class Node(SimulationElement):
     async def _publish_deactivate(self) -> None:        
         # inform monitor that I am deactivated
         self.log(f'informing monitor of offline status...')
-        monitor_msg = NodeDeactivatedMessage(self.get_element_name())
+        monitor_msg = NodeDeactivatedMessage(self.get_element_name(), SimulationElementRoles.MONITOR.value)
         await self._send_manager_msg(monitor_msg, zmq.PUSH)
         self.log(f'informed monitor of offline status. informing manager of offline status...')
 
@@ -578,6 +580,7 @@ class Node(SimulationElement):
         # get the destination's publish port 
         dst_network_config : NetworkConfig = self._external_address_ledger.get(dst, None)
         if dst_network_config is None: 
+            self.log(f'External address ledger does not contain address for node {dst}.', level=logging.ERROR)
             raise AttributeError(f'External address ledger does not contain address for node {dst}.')
             
         dst_addresses = dst_network_config.get_external_addresses().get(zmq.PUB, None)

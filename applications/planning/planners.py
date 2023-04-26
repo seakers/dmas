@@ -2,6 +2,7 @@ import math
 from messages import *
 from states import SimulationAgentState
 from tasks import IdleAction, MoveAction, MeasurementTask
+from zmq import asyncio as azmq
 from dmas.agents import AgentAction
 from dmas.modules import *
 
@@ -31,13 +32,12 @@ class PlannerModule(InternalModule):
                                                 manager_address_map = {
                                                 zmq.REQ: [],
                                                 zmq.PUB: [f'tcp://*:{manager_port+5 + 4*agent_id + 3}'],
-                                                zmq.SUB: [f'tcp://localhost:{manager_port+5 + 4*agent_id + 2}']})
+                                                zmq.SUB: [f'tcp://localhost:{manager_port+5 + 4*agent_id + 2}'],
+                                                zmq.PUSH: [f'tcp://localhost:{manager_port+2}']})
                 
         super().__init__(f'PLANNING_MODULE_{agent_id}', 
                         module_network_config, 
                         parent_network_config, 
-                        [], 
-                        parent_network_config.network_name,
                         level, 
                         logger)
         
@@ -48,10 +48,7 @@ class PlannerModule(InternalModule):
         self.parent_id = agent_id
 
     async def sim_wait(self, delay: float) -> None:
-        pass
-
-    async def live(self) -> None:
-        pass
+        return
 
     async def empty_manager_inbox(self) -> list:
         msgs = []
@@ -106,14 +103,50 @@ class FixedPlannerModule(PlannerModule):
                     return_to_origin
                     ]
         
-    async def listen(self) -> None:
+    async def live(self) -> None:
+        work_task = asyncio.create_task(self.routine())
+        listen_task = asyncio.create_task(self.listen())
+        tasks = [work_task, listen_task]
+
+        _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        for task in pending:
+            task : asyncio.Task
+            task.cancel()
+            await task
+
+    async def listen(self):
+        """
+        Listens for any incoming broadcasts and classifies them in their respective inbox
+        """
         try:
-            # does nothing
+            # create poller for all broadcast sockets
+            poller = azmq.Poller()
+
+            manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
+
+            poller.register(manager_socket, zmq.POLLIN)
+
+            # listen for broadcasts and place in the appropriate inboxes
             while True:
-                await asyncio.sleep(1e6)
+                sockets = dict(await poller.poll())
+
+                if manager_socket in sockets:
+                    self.log('listening to manager broadcast!')
+                    dst, src, content = await self.listen_manager_broadcast()
+
+                    # if sim-end message, end agent `live()`
+                    if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
+                        return
+
+                    # else, let agent handle it
+                    else:
+                        self.log(f"received manager broadcast or type {content['msg_type']}! sending to inbox...")
+                        await self.manager_inbox.put( (dst, src, content) )
 
         except asyncio.CancelledError:
-            return
+            return  
     
     async def routine(self) -> None:
         try:

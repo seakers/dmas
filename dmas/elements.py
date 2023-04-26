@@ -278,7 +278,7 @@ class SimulationElement(NetworkElement):
         Shut down procedure for this simulation entity. 
         """
         # inform others of deactivation
-        if self._internal_socket_map is not None:
+        if self._external_socket_map is not None:
             await self._publish_deactivate()
 
         # perform tear-down procedure

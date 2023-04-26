@@ -84,8 +84,10 @@ class AgentAction(ABC):
     Describes an action to be performed by an agent
 
     ### Attributes:
+        - action_type (`str`): type of action to be performed
         - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
         - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+        - status (`str`): completion status of the task
         - id (`str`) : identifying number for this task in uuid format
     """
     PENDING = 'PENDING'
