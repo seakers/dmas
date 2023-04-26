@@ -296,6 +296,7 @@ class Agent(Node):
                     else:
                         self.log('received peer broadcast! sending to inbox...')
                         await self.external_inbox.put( (dst, src, content) )
+                        self.log(f'external inbox contains {self.external_inbox.qsize()} messages.')
 
                 if internal_socket in sockets: 
                     dst, src, content = await self.listen_internal_broadcast()

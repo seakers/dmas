@@ -112,7 +112,6 @@ class PlanningSimulationManager(AbstractManager):
         try:
             received_messages = dict()
             read_task = None
-            send_task = None
 
             while(
                     len(received_messages) < len(self._simulation_element_name_list) - 1
@@ -120,7 +119,6 @@ class PlanningSimulationManager(AbstractManager):
                 ):
                 # reset tasks
                 read_task = None
-                send_task = None
 
                 # wait for incoming messages
                 read_task = asyncio.create_task( self._receive_manager_msg(zmq.SUB) )
@@ -132,44 +130,25 @@ class PlanningSimulationManager(AbstractManager):
                     or SimulationElementRoles.ENVIRONMENT.value in src):
                     # ignore all incoming messages that are not of the desired type 
                     self.log(f'Received {msg_type} message from node {src}! Ignoring message...')
-
-                    # # inform node that its message request was not accepted
-                    # msg_resp = ManagerReceptionIgnoredMessage(src, -1)
-                    # send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )
-                    # await send_task
-
                     continue
 
                 # unpack and message
                 self.log(f'Received {msg_type} message from node {src}!')
                 tic_req = TicRequest(**msg_dict)
-                msg_resp = None
 
                 # log subscriber confirmation
                 if src not in self._simulation_element_name_list and self.get_network_name() + '/' + src not in self._simulation_element_name_list:
                     # node is not a part of the simulation
                     self.log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
-                    # inform agent that its message was not accepted
-                    msg_resp = ManagerReceptionIgnoredMessage(src, -1)
-
                 elif src in received_messages:
                     # node is a part of the simulation but has already communicated with me
                     self.log(f'{src} has already reported its tic request to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
-                    # inform agent that its message request was not accepted
-                    msg_resp = ManagerReceptionIgnoredMessage(src, -1)
                 else:
                     # node is a part of the simulation and has not yet been synchronized
                     received_messages[src] = tic_req
-
-                    # inform agent that its message request was not accepted
-                    msg_resp = ManagerReceptionAckMessage(src, -1)
                     self.log(f'{src} has now reported reported its tic request  to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
-
-                # # send response
-                # send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )
-                # await send_task
 
             return received_messages
 
@@ -185,11 +164,6 @@ class PlanningSimulationManager(AbstractManager):
             if read_task is not None and not read_task.done(): 
                 read_task.cancel()
                 await read_task
-
-            # cancel send message task in case it is still being performed
-            if send_task is not None and not send_task.done(): 
-                send_task.cancel()
-                await send_task
     
     async def teardown(self) -> None:
         # nothing to tear-down

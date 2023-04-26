@@ -1,3 +1,4 @@
+import copy
 from datetime import datetime
 import logging
 import random
@@ -49,7 +50,7 @@ if __name__ == '__main__':
     y_bounds = [-5, 5]
 
     ## agents
-    n_agents = 1
+    n_agents = 2
     comms_range = 10
     v_max = 1
 
@@ -127,7 +128,7 @@ if __name__ == '__main__':
 													zmq.PUB: [f'tcp://*:{port+5}']
 											})
     
-    environment = SimulationEnvironment(results_path, env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, tasks, logger=logger)
+    environment = SimulationEnvironment(results_path, env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, copy.deepcopy(tasks), logger=logger)
 
     # create simulation agents
     agents = []
@@ -187,7 +188,7 @@ if __name__ == '__main__':
         ax.set_xlabel('x')
         ax.set_ylabel('x')
 
-        # plot original lagent position
+        # plot original agent position
         x = []
         y = []
         for agent in agent_data:
@@ -195,7 +196,6 @@ if __name__ == '__main__':
             _, id = agent.split('_')
             x.append( agent_data[agent]['x_pos'][0] )
             y.append( agent_data[agent]['y_pos'][0] )
-            print(len(agent_data[agent]['t']))
         scat = ax.scatter(x, y, color='b')
         
         # plot task location

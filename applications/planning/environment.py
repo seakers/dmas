@@ -31,8 +31,8 @@ class SimulationEnvironment(EnvironmentNode):
         self.x_bounds = x_bounds
         self.y_bounds = y_bounds
         self.comms_range = comms_range
-        self.tasks = []
-        self.tasks = tasks
+        self.pulished_tasks = []
+        self.tasks = tasks.copy()
 
         # setup results folder:
         self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
@@ -127,6 +127,7 @@ class SimulationEnvironment(EnvironmentNode):
                             task : MeasurementTask = self.tasks.pop(0)
                             task_req = TaskRequest(self.name, self.get_network_name(), task.to_dict())
                             await self.send_peer_broadcast(task_req)
+                            self.pulished_tasks.append(task)
 
                         # save connectivity state to history
                         agent_connectivity = {}
@@ -303,7 +304,6 @@ class SimulationEnvironment(EnvironmentNode):
                         connected = agent_connectivity[src][dst]
                         line += f', {connected}'
                     file.write(line)
-
 
     async def sim_wait(self, delay: float) -> None:
         try:

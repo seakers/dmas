@@ -127,9 +127,6 @@ class SimulationAgent(Agent):
                     tic_req = TicRequest(self.get_element_name(), t0, tf)
                     await self._send_manager_msg(tic_req, zmq.PUB)
 
-                    # if content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value:
-                    #     raise asyncio.CancelledError()
-
                     self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
                     dst, src, content = await self.manager_inbox.get()
                     
@@ -149,6 +146,9 @@ class SimulationAgent(Agent):
             else:
                 raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
         
+        except asyncio.CancelledError:
+            return
+
         finally:
             if (
                 isinstance(self._clock_config, FixedTimesStepClockConfig) 
@@ -427,12 +427,17 @@ class SimulationAgent(Agent):
                         # update action completion status
                         action.status = AgentAction.COMPLETED                
                     else:
-                        # timer ran out before a message was received; cancel inbox listening
-                        # receive_broadcast.cancel()
-                        # await receive_broadcast
+                        # timer ran out or time advanced
+                        try:
+                            receive_broadcast.cancel()
+                            await receive_broadcast
+                        except asyncio.CancelledError:
+                            # update action completion status
+                            if self.external_inbox.empty():
+                                action.status = AgentAction.PENDING
+                            else:
+                                action.status = AgentAction.COMPLETED
 
-                        # update action completion status
-                        action.status = AgentAction.PENDING
 
                 else:
                     # ignore action

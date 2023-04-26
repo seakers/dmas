@@ -106,7 +106,7 @@ class FixedPlannerModule(PlannerModule):
                     # travel_to_target,
                     # measure,
                     # return_to_origin
-                    # msg_task
+                    msg_task
                     ]
         
     async def live(self) -> None:
