@@ -707,7 +707,7 @@ class ACCBBAPlannerModule(PlannerModule):
                         if broadcast_bid is not None:
                             # if relevant changes were made, send to bundle builder and to out-going inbox 
                             out_msg = TaskBidMessage(   
-                                                    self.get_element_name(), 
+                                                    self.get_parent_name(), 
                                                     self.get_parent_name(), 
                                                     broadcast_bid.to_dict()
                                                 )
@@ -728,6 +728,7 @@ class ACCBBAPlannerModule(PlannerModule):
         Performs periodic checks on the received messages from the listener and
         creates a plan based.
         """
+
         bundle = []
         try:
             while True:
@@ -745,15 +746,55 @@ class ACCBBAPlannerModule(PlannerModule):
     async def rebroadcaster(self) -> None:
         try:
             while True:
-                # wait for both outgoing inboxes to not be empty
+                # wait for bundle-builder to finish processing information
+                self.log('waiting for bundle-builder...')
+                bundle_msgs = [await self.outgoing_bundle_builder_inbox.get()]
+                await asyncio.sleep(1e-2)
+                while not self.outgoing_bundle_builder_inbox.empty():
+                    bundle_msgs.append(await self.outgoing_bundle_builder_inbox.get())
+                self.log('bundle-builder sent its messages! comparing bids with listener...')
 
-                # discard all repeating bids from both inboxes, only keep the most updated one from each
+                # get all messages from listener                
+                listener_msgs = []
+                while not self.outgoing_listen_inbox.empty():
+                    listener_msgs.append(await self.outgoing_listen_inbox.get())
 
-                # compare bundle results from the builder and changes from the listener
+                # compare and classify messages
+                bid_messages = {}
+                actions = []
 
-                # if 
+                for msg in listener_msgs:
+                    if isinstance(msg, TaskBidMessage):
+                        bid_messages[msg.id] = msg
+
+                for msg in bundle_msgs:
+                    if isinstance(msg, TaskBidMessage):
+                        if msg.id not in bid_messages:
+                            bid_messages[msg.id] = msg
+                        else:
+                            # only keep most recent information for bids
+                            listener_bid_msg : TaskBidMessage = bid_messages[msg.id]
+                            bundle_bid : ACCBBATaskBid = msg.bid 
+                            listener_bid : ACCBBATaskBid = listener_bid_msg.bid
+                            if bundle_bid.t_update > listener_bid.t_update:
+                                bid_messages[msg.id] = msg
+                    elif isinstance(msg, AgentAction):
+                        actions.append(msg)                        
+        
+                # build plan
+                plan = []
+                for bid_id in bid_messages:
+                    bid_message : TaskBidMessage = bid_message[bid_id]
+                    plan.append(BroadcastMessageAction(bid_message).to_dict())
+                for action in actions:
+                    action : AgentAction
+                    plan.append(action.to_dict())
                 
-                await asyncio.sleep(1e6)
+                # send to agent
+                self.log(f'bids compared! generating plan with {len(bid_messages)} bid messages and {len(actions)} actions')
+                plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), plan)
+                await self._send_manager_msg(plan_msg, zmq.PUB)
+                self.log(f'actions sent!')
 
         except asyncio.CancelledError:
             pass

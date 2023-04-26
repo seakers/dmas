@@ -314,7 +314,9 @@ class SimulationAgent(Agent):
 
                     # perform action
                     self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                    await self.send_peer_broadcast(action.msg)
+                    msg_out = action.msg
+                    msg_out.dst = self.get_network_name()
+                    await self.send_peer_broadcast(msg_out)
                     
                     # update action completion status
                     action.status = AgentAction.COMPLETED

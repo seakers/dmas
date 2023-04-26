@@ -95,8 +95,8 @@ class BroadcastMessageAction(AgentAction):
     """
     def __init__(self, 
                 msg : SimulationMessage,
-                t_start : Union[float, int],
-                t_end : Union[float, int], 
+                t_start : Union[float, int] = 0.0,
+                t_end : Union[float, int] = numpy.Inf, 
                 status : str = 'PENDING',
                 id: str = None, 
                 **_) -> None:
