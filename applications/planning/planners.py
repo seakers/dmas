@@ -568,6 +568,10 @@ class ACCBBATaskBid(object):
         return ACCBBATaskBid(self.task, self.bidder, self.winning_bid, self.winner, self.t_arrive, self.t_update)
 
 class ACCBBAPlannerModule(PlannerModule):
+    """
+    # Asynchronous Consensus Constraint-Based Bundle Algorithm
+    
+    """
     def __init__(self,  
                 results_path,
                 manager_port: int, 
@@ -703,6 +707,7 @@ class ACCBBAPlannerModule(PlannerModule):
                         # compare bid 
                         my_bid : ACCBBATaskBid = results[their_bid.task_id]
                         broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
+                        results[my_bid.task_id] = my_bid
                         
                         if broadcast_bid is not None:
                             # if relevant changes were made, send to bundle builder and to out-going inbox 
@@ -723,25 +728,99 @@ class ACCBBAPlannerModule(PlannerModule):
 
     async def bundle_builder(self) -> None:
         """
-        Bundle-builder
+        ## Bundle-builder
 
         Performs periodic checks on the received messages from the listener and
         creates a plan based.
         """
-
+        results = {}
         bundle = []
+        t_curr = 0.0
+        t_update = 0.0
+        t_next = 0.0
+        f_update = 1.0
+        
         try:
             while True:
-                x = await self.states_inbox.get()
-                # wait for periodic message check
+                # wait for next periodict check
+                state_msg : AgentStateMessage = await self.states_inbox.get()
+                state_dict : dict = state_msg.state
+                state = SimulationAgentState(**state_dict)
+                t_curr = state.t
+                
+                if t_curr < t_next:
+                    # update threshold has not been reached yet; instruct agent to wait for messages
+                    action = WaitForMessages(t_curr, t_next)
+                    await self.outgoing_bundle_builder_inbox.put(action)
+                    continue
 
-                # if no messages received, wait again
+                # set next update time
+                t_next += 1/f_update
+                
+                if self.relevant_changes_inbox.empty():
+                    # if no relevant messages have been received by the update time; wait for next update time
+                    action = WaitForMessages(t_curr, t_next)
+                    await self.outgoing_bundle_builder_inbox.put(action)
+                    continue
+                
+                # compare bids with incoming messages
+                changes = []
+                while not self.relevant_changes_inbox.empty():
+                    # get next bid
+                    bid_msg : TaskBidMessage = await self.relevant_changes_inbox.get()
+                    
+                    # unpackage bid
+                    their_bid = ACCBBATaskBid(**bid_msg.bid)
+                    
+                    # check if bid exists for this task
+                    if their_bid.task_id not in results:
+                        # was not aware of this task; add to results as a blank bid
+                        results[their_bid.task_id] = ACCBBATaskBid( their_bid.task, self.get_parent_name())
+                
+                    # compare bids
+                    my_bid : ACCBBATaskBid = results[their_bid.task_id]
+                    broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
+                    results[my_bid.task_id] = my_bid
+                        
+                    if broadcast_bid is not None:
+                        # track if relevant changes were made
+                        out_msg = TaskBidMessage(   
+                                                self.get_parent_name(), 
+                                                self.get_parent_name(), 
+                                                broadcast_bid.to_dict()
+                                            )
+                        changes.append(out_msg)
 
-                # if messages exist, process all messages from listener 
+                # create bundle from new results
+                while len(bundle) < self.l_bundle and self.tasks_available(state, bundle, results):
+                    pass
+
+                # send changes to 
+                for change in changes:
+                    await self.outgoing_bundle_builder_inbox(change)
+
                 await asyncio.sleep(1e6)
 
         except asyncio.CancelledError:
             pass
+
+    def tasks_available(self, state : SimulationAgentState, bundle : list, results : dict) -> bool:
+        """
+        Checks if there are any tasks available to be performed
+        """
+        for task_id in results:
+            bid : ACCBBATaskBid = results[task_id]
+            task = MeasurementTask(**bid.task)
+
+            if can_b
+
+        return False
+
+    def can_bid(self, state : SimulationAgentState, bundle : list, path : list, task : MeasurementTask) -> bool:
+        """
+        Checks if an agent can perform a measurement task
+        """
+        pass
 
     async def rebroadcaster(self) -> None:
         try:
