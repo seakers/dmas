@@ -39,7 +39,7 @@ if __name__ == '__main__':
     Wrapper for planner simulation using DMAS
     """    
     # create results directory
-    plot_results = True
+    plot_results = False
     scenario_name = 'TEST'
     results_path = setup_results_directory(scenario_name)
     
@@ -158,13 +158,13 @@ if __name__ == '__main__':
         agents.append(agent)
 
     # run simulation
-    with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
-        pool.submit(monitor.run, *[])
-        pool.submit(manager.run, *[])
-        pool.submit(environment.run, *[])
-        for agent in agents:                
-            agent : SimulationElement
-            pool.submit(agent.run, *[])
+    # with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
+    #     pool.submit(monitor.run, *[])
+    #     pool.submit(manager.run, *[])
+    #     pool.submit(environment.run, *[])
+    #     for agent in agents:                
+    #         agent : SimulationElement
+    #         pool.submit(agent.run, *[])
 
     # compile results from monitor
 

@@ -189,8 +189,8 @@ class Agent(Node):
                             agent_network_config, 
                             manager_network_config, 
                             modules, 
-                            level, 
-                            logger)
+                            level=level, 
+                            logger=logger)
         
         if zmq.REQ not in agent_network_config.get_external_addresses() and zmq.DEALER not in agent_network_config.get_external_addresses():
             raise AttributeError(f'`node_network_config` must contain a REQ or DEALER port and an address within its external address map.')

@@ -37,6 +37,7 @@ class PlannerModule(InternalModule):
                         module_network_config, 
                         parent_network_config, 
                         [], 
+                        parent_network_config.network_name,
                         level, 
                         logger)
         
@@ -45,6 +46,12 @@ class PlannerModule(InternalModule):
         self.planner_type = planner_type
         self.results_path = results_path
         self.parent_id = agent_id
+
+    async def sim_wait(self, delay: float) -> None:
+        pass
+
+    async def live(self) -> None:
+        pass
 
     async def empty_manager_inbox(self) -> list:
         msgs = []
@@ -64,6 +71,7 @@ class PlannerModule(InternalModule):
             self.log('manager queue still contains elements.')
         
         return msgs
+
 class FixedPlannerModule(PlannerModule):
     def __init__(self, 
                 results_path : str, 

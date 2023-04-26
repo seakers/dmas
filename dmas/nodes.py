@@ -396,7 +396,6 @@ class Node(SimulationElement):
         if self.manager_name != SimulationElementRoles.MANAGER.value:
             await self.__broadcast_deactivated()
 
-
         if self.has_modules() and offline_modules_task in pending:
             # internal modules are not yet disabled. inform modules that the node is terminating
             self.log('terminating internal modules....')

@@ -28,8 +28,8 @@ class EnvironmentNode(Node):
                         env_network_config, 
                         manager_network_config, 
                         modules, 
-                        level, 
-                        logger)
+                        level=level, 
+                        logger=logger)
     
         if zmq.REP not in env_network_config.get_external_addresses() and zmq.ROUTER not in env_network_config.get_external_addresses():
             raise AttributeError(f'`env_network_config` must contain a REP or ROUTER port and an address within its external address map.')
