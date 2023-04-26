@@ -8,6 +8,7 @@ from dmas.messages import SimulationMessage
 class ActionTypes(Enum):
     PEER_MSG = 'PEER_MSG'
     BROADCAST_MSG = 'BROADCAST_MSG'
+    BROADCAST_STATE = 'BROADCAST_STATE'
     MOVE = 'MOVE'
     MEASURE = 'MEASURE'
     IDLE = 'IDLE'
@@ -46,6 +47,37 @@ class PeerMessageAction(AgentAction):
         """
         super().__init__(ActionTypes.PEER_MSG.value, t_start, t_end, status, id)
         self.msg = msg
+
+class BroadcastStateAction(AgentAction):
+    """
+    ## Broadcast Message Action 
+
+    Instructs an agent to broadcast its state to all of its peers
+
+    ### Attributes:
+        - action_type (`str`): type of action to be performed
+        - t_start (`float`): start time of this action in [s] from the beginning of the simulation
+        - t_end (`float`): start time of this actrion in[s] from the beginning of the simulation
+        - status (`str`): completion status of the task
+        - id (`str`) : identifying number for this task in uuid format
+    """
+    def __init__(   self, 
+                    t_start: Union[float, int], 
+                    t_end: Union[float, int], 
+                    status: str = 'PENDING', 
+                    id: str = None, 
+                    **_
+                ) -> None:
+        """
+        Creates an instance of a Broadcast State Action
+
+        ### Arguments
+            - t_start (`float`): start time of this action in [s] from the beginning of the simulation
+            - t_end (`float`): start time of this actrion in[s] from the beginning of the simulation
+            - status (`str`): completion status of the task
+            - id (`str`) : identifying number for this task in uuid format
+        """
+        super().__init__(ActionTypes.BROADCAST_STATE.value, t_start, t_end, status, id)
 
 class BroadcastMessageAction(AgentAction):
     """
@@ -222,5 +254,5 @@ class WaitForMessages(AgentAction):
                             t_start, 
                             t_end, 
                             status, 
-                            id, 
-                            **_)
+                            id
+                            )

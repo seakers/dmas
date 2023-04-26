@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     ## agents
     n_agents = 1
-    comms_range = 1
+    comms_range = 10
     v_max = 1
 
     ## clock configuration
@@ -69,10 +69,10 @@ if __name__ == '__main__':
     # clock_config = EventDrivenClockConfig(start_date, end_date)
 
     ## network
-    port = 5555
+    port = random.randint(5555,9999)
 
     ## loggers
-    level = logging.WARNING
+    level = logging.DEBUG
 
     ### random tasks 
     n_tasks = 5
@@ -98,7 +98,8 @@ if __name__ == '__main__':
 											manager_address_map = {
 																	zmq.REP: [f'tcp://*:{port}'],
 																	zmq.PUB: [f'tcp://*:{port+1}'],
-																	zmq.PUSH: [f'tcp://localhost:{port+2}']
+                                                                    zmq.SUB: [f'tcp://*:{port+2}'],
+																	zmq.PUSH: [f'tcp://localhost:{port+3}']
                                                                     }
                                             )
     node_names = [f'AGENT_{i}' for i in range(n_agents)]
@@ -109,7 +110,7 @@ if __name__ == '__main__':
     # create results monitor
     monitor_network_config = NetworkConfig( network_name,
                                     external_address_map = {zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                            zmq.PULL: [f'tcp://*:{port+2}']}
+                                                            zmq.PULL: [f'tcp://*:{port+3}']}
                                     )
     
     monitor = ResultsMonitor(clock_config, monitor_network_config, logger=logger)
@@ -119,10 +120,11 @@ if __name__ == '__main__':
 											manager_address_map = {
 													zmq.REQ: [f'tcp://localhost:{port}'],
 													zmq.SUB: [f'tcp://localhost:{port+1}'],
-													zmq.PUSH: [f'tcp://localhost:{port+2}']},
+                                                    zmq.PUB: [f'tcp://localhost:{port+2}'],
+													zmq.PUSH: [f'tcp://localhost:{port+3}']},
 											external_address_map = {
-													zmq.REP: [f'tcp://*:{port+3}'],
-													zmq.PUB: [f'tcp://*:{port+4}']
+													zmq.REP: [f'tcp://*:{port+4}'],
+													zmq.PUB: [f'tcp://*:{port+5}']
 											})
     
     environment = SimulationEnvironment(results_path, env_network_config, manager_network_config, x_bounds, y_bounds, comms_range, tasks, logger=logger)

@@ -47,11 +47,7 @@ class SimulationEnvironment(EnvironmentNode):
     async def live(self) -> None:
         try:
             # broadcast task requests
-            self.log(f'publishing {len(self.tasks)} task requests to all agents...')
-            for task in self.tasks:
-                task : MeasurementTask
-                task_req = TaskRequest(self.name, self.get_network_name(), task.to_dict())
-                await self.send_peer_broadcast(task_req)
+            initial_tasks_sent = False
 
             # track agent and simulation states
             poller = azmq.Poller()
@@ -123,6 +119,14 @@ class SimulationEnvironment(EnvironmentNode):
                             ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
                             await self.send_peer_broadcast(ok_msg)
                         self.log('connectivity updates sent!')
+
+                        # publish tasks
+                        if len(self.tasks) > 0:
+                            self.log(f'publishing {len(self.tasks)} task requests to all agents...')
+                        while len(self.tasks):
+                            task : MeasurementTask = self.tasks.pop(0)
+                            task_req = TaskRequest(self.name, self.get_network_name(), task.to_dict())
+                            await self.send_peer_broadcast(task_req)
 
                         # save connectivity state to history
                         agent_connectivity = {}

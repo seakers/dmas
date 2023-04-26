@@ -1029,6 +1029,7 @@ class NetworkElement(ABC):
 
             return receive_task.result()
         
+        
         finally:
             if (
                 socket_lock is not None

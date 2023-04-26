@@ -1,7 +1,7 @@
 import math
 from messages import *
 from states import SimulationAgentState
-from tasks import IdleAction, MoveAction, MeasurementTask
+from tasks import *
 from zmq import asyncio as azmq
 from dmas.agents import AgentAction
 from dmas.modules import *
@@ -31,9 +31,9 @@ class PlannerModule(InternalModule):
         module_network_config =  NetworkConfig(f'AGENT_{agent_id}',
                                                 manager_address_map = {
                                                 zmq.REQ: [],
-                                                zmq.PUB: [f'tcp://*:{manager_port+5 + 4*agent_id + 3}'],
-                                                zmq.SUB: [f'tcp://localhost:{manager_port+5 + 4*agent_id + 2}'],
-                                                zmq.PUSH: [f'tcp://localhost:{manager_port+2}']})
+                                                zmq.PUB: [f'tcp://*:{manager_port+6 + 4*agent_id + 3}'],
+                                                zmq.SUB: [f'tcp://localhost:{manager_port+6 + 4*agent_id + 2}'],
+                                                zmq.PUSH: [f'tcp://localhost:{manager_port+3}']})
                 
         super().__init__(f'PLANNING_MODULE_{agent_id}', 
                         module_network_config, 
@@ -96,11 +96,17 @@ class FixedPlannerModule(PlannerModule):
         travel_to_target = MoveAction(pos, dt)
         measure = MeasurementTask(pos, 1, ['VNIR'], t_start, t_end=1e6)
         return_to_origin = MoveAction([0,0], t_start)
+        
+        if self.parent_id < 1:
+            msg_task = WaitForMessages(0, 3)
+        else:
+            msg_task = BroadcastStateAction(1, 2)
 
         self.plan = [
-                    travel_to_target,
-                    measure,
-                    return_to_origin
+                    # travel_to_target,
+                    # measure,
+                    # return_to_origin
+                    # msg_task
                     ]
         
     async def live(self) -> None:

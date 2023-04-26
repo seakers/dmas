@@ -123,7 +123,7 @@ class PlanningSimulationManager(AbstractManager):
                 send_task = None
 
                 # wait for incoming messages
-                read_task = asyncio.create_task( self.listen_for_requests() )
+                read_task = asyncio.create_task( self._receive_manager_msg(zmq.SUB) )
                 await read_task
                 _, src, msg_dict = read_task.result()
                 msg_type = msg_dict['msg_type']
@@ -133,10 +133,10 @@ class PlanningSimulationManager(AbstractManager):
                     # ignore all incoming messages that are not of the desired type 
                     self.log(f'Received {msg_type} message from node {src}! Ignoring message...')
 
-                    # inform node that its message request was not accepted
-                    msg_resp = ManagerReceptionIgnoredMessage(src, -1)
-                    send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )
-                    await send_task
+                    # # inform node that its message request was not accepted
+                    # msg_resp = ManagerReceptionIgnoredMessage(src, -1)
+                    # send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )
+                    # await send_task
 
                     continue
 
@@ -167,9 +167,9 @@ class PlanningSimulationManager(AbstractManager):
                     msg_resp = ManagerReceptionAckMessage(src, -1)
                     self.log(f'{src} has now reported reported its tic request  to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
-                # send response
-                send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )
-                await send_task
+                # # send response
+                # send_task = asyncio.create_task( self._send_manager_msg(msg_resp, zmq.REP) )
+                # await send_task
 
             return received_messages
 

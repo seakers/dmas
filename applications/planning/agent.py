@@ -27,15 +27,16 @@ class SimulationAgent(Agent):
 												manager_address_map = {
 														zmq.REQ: [f'tcp://localhost:{manager_port}'],
 														zmq.SUB: [f'tcp://localhost:{manager_port+1}'],
-														zmq.PUSH: [f'tcp://localhost:{manager_port+2}']},
+														zmq.PUB: [f'tcp://localhost:{manager_port+2}'],
+                                                        zmq.PUSH: [f'tcp://localhost:{manager_port+3}']},
 												external_address_map = {
 														zmq.REQ: [],
-														zmq.PUB: [f'tcp://*:{manager_port+5 + 4*id}'],
-														zmq.SUB: [f'tcp://localhost:{manager_port+4}']},
+														zmq.SUB: [f'tcp://localhost:{manager_port+5}'],
+														zmq.PUB: [f'tcp://*:{manager_port+6 + 4*id}']},
                                                 internal_address_map = {
-														zmq.REP: [f'tcp://*:{manager_port+5 + 4*id + 1}'],
-														zmq.PUB: [f'tcp://*:{manager_port+5 + 4*id + 2}'],
-														zmq.SUB: [f'tcp://localhost:{manager_port+5 + 4*id + 3}']
+														zmq.REP: [f'tcp://*:{manager_port+6 + 4*id + 1}'],
+														zmq.PUB: [f'tcp://*:{manager_port+6 + 4*id + 2}'],
+														zmq.SUB: [f'tcp://localhost:{manager_port+6 + 4*id + 3}']
 											})
         
         if planner_type is PlannerTypes.ACCBBA:
@@ -124,10 +125,10 @@ class SimulationAgent(Agent):
                 while self.get_current_time() <= t0:
                     # send tic request
                     tic_req = TicRequest(self.get_element_name(), t0, tf)
-                    _, _, content = await self.send_manager_message(tic_req)
+                    await self._send_manager_msg(tic_req, zmq.PUB)
 
-                    if content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value:
-                        raise asyncio.CancelledError()
+                    # if content['msg_type'] != ManagerMessageTypes.RECEPTION_ACK.value:
+                    #     raise asyncio.CancelledError()
 
                     self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
                     dst, src, content = await self.manager_inbox.get()
@@ -290,6 +291,18 @@ class SimulationAgent(Agent):
                     
                     # update action completion status
                     action.status = AgentAction.COMPLETED
+                
+                elif action_dict['action_type'] == ActionTypes.BROADCAST_STATE.value:
+                    # unpack action
+                    action = BroadcastStateAction(**action_dict)
+
+                    # perform action
+                    self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
+                    msg = AgentStateMessage(self.get_element_name(), self.get_network_name(), self.state.to_dict())
+                    await self.send_peer_broadcast(msg)
+                    
+                    # update action completion status
+                    action.status = AgentAction.COMPLETED
                     
                 elif action_dict['action_type'] == ActionTypes.BROADCAST_MSG.value:
                     # unpack action
@@ -389,6 +402,35 @@ class SimulationAgent(Agent):
 
                     else:
                         ### agent has NOT reached its desired position
+                        # update action completion status
+                        action.status = AgentAction.PENDING
+
+                elif action_dict['action_type'] == ActionTypes.WAIT_FOR_MSG.value:
+                    # unpack action 
+                    task = WaitForMessages(**action_dict)
+
+                    # wait for message to be received or timeout to run out
+                    t_curr = self.get_current_time()
+                    timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
+                    receive_broadcast = asyncio.create_task(self.external_inbox.get())
+
+                    done, _ = await asyncio.wait([timeout, receive_broadcast], return_when=asyncio.FIRST_COMPLETED)
+
+                    if receive_broadcast in done:
+                        # a mesasge was received before the timer ran out; cancel timer
+                        timeout.cancel()
+                        await timeout
+
+                        # restore message to inbox so it can be processed during `sense()`
+                        await self.external_inbox.put(receive_broadcast.result())    
+
+                        # update action completion status
+                        action.status = AgentAction.COMPLETED                
+                    else:
+                        # timer ran out before a message was received; cancel inbox listening
+                        # receive_broadcast.cancel()
+                        # await receive_broadcast
+
                         # update action completion status
                         action.status = AgentAction.PENDING
 
