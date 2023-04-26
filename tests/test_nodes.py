@@ -90,15 +90,29 @@ class TestSimulationNode(unittest.TestCase):
             except asyncio.CancelledError:
                 return
 
-    class DummyNode(Node):
-        async def sim_wait(self, delay: float) -> None:
-            return asyncio.sleep(delay)
-        
+    class DummyNode(Node):        
         async def setup(self) -> None:
             return
 
-        async def teardown(self) -> None:
-            return
+        async def live(self) -> None:
+            try:
+                work_task = asyncio.create_task(self.work_routine())
+                listen_task = asyncio.create_task(self.listen_to_manager())
+                tasks = [work_task, listen_task]
+
+                _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+                for task in pending:
+                    task : asyncio.Task
+                    task.cancel()
+                    await task
+            
+            except asyncio.CancelledError:
+                self.log(f'`live()` interrupted.')
+                return
+            except Exception as e:
+                self.log(f'`live()` failed. {e}')
+                raise e
 
         async def work_routine(self) -> None:
             try:
@@ -132,25 +146,11 @@ class TestSimulationNode(unittest.TestCase):
                 self.log(f'`live()` failed. {e}')
                 raise e
 
-        async def live(self) -> None:
-            try:
-                work_task = asyncio.create_task(self.work_routine())
-                listen_task = asyncio.create_task(self.listen_to_manager())
-                tasks = [work_task, listen_task]
-
-                _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-
-                for task in pending:
-                    task : asyncio.Task
-                    task.cancel()
-                    await task
-            
-            except asyncio.CancelledError:
-                self.log(f'`live()` interrupted.')
-                return
-            except Exception as e:
-                self.log(f'`live()` failed. {e}')
-                raise e
+        async def teardown(self) -> None:
+            return
+        
+        async def sim_wait(self, delay: float) -> None:
+            return asyncio.sleep(delay)
 
     class ModularTestNode(DummyNode):
         def __init__(   self, 
@@ -191,7 +191,7 @@ class TestSimulationNode(unittest.TestCase):
                                                                     zmq.REQ: [f'tcp://localhost:{port}'],
                                                                     zmq.SUB: [f'tcp://localhost:{port+1}'],
                                                                     zmq.PUSH: [f'tcp://localhost:{port+2}']})
-            submodules = []
+            modules = []
             for i in range(n_modules):
                 module_port = module_ports[i]
                 module_sub_ports = []
@@ -204,15 +204,31 @@ class TestSimulationNode(unittest.TestCase):
                                                             manager_address_map = {
                                                                     zmq.REQ: [f'tcp://localhost:{node_rep_port}'],
                                                                     zmq.PUB: [f'tcp://*:{module_port}'],
-                                                                    zmq.SUB: [f'tcp://localhost:{module_sub_port}' for module_sub_port in module_sub_ports]})
+                                                                    zmq.SUB: [f'tcp://localhost:{module_sub_port}' for module_sub_port in module_sub_ports],
+                                                                    zmq.PUSH: [f'tcp://localhost:{port+2}']
+                                                                                }
+                                                        )
                 
-                submodules.append( TestSimulationNode.DummyModule(f'MODULE_{i}', submodule_network_config, node_network_config, logger) )
+                modules.append( TestSimulationNode.DummyModule(f'MODULE_{i}', submodule_network_config, node_network_config, logger=logger) )
 
-            super().__init__(f'NODE_{id}', node_network_config, manager_network_config, submodules, level, logger)
+            super().__init__(   f'NODE_{id}', 
+                                node_network_config, 
+                                manager_network_config, 
+                                modules, 
+                                level=level, 
+                                logger=logger)
 
     class DummyModule(InternalModule):
-        def __init__(self, module_name: str, network_config: NetworkConfig, parent_network_config : NetworkConfig, logger: logging.Logger = None) -> None:
-            super().__init__(module_name, network_config, parent_network_config, [], logger=logger)
+        def __init__(   self, 
+                        module_name: str, 
+                        module_network_config: NetworkConfig, 
+                        parent_node_network_config: NetworkConfig, 
+                        level: int = logging.INFO, 
+                        logger: logging.Logger = None) -> None:
+            super().__init__(module_name, module_network_config, parent_node_network_config, level, logger)
+        
+        # def __init__(self, module_name: str, network_config: NetworkConfig, parent_network_config : NetworkConfig, logger: logging.Logger = None) -> None:
+        #     super().__init__(module_name, network_config, parent_network_config, [], logger=logger)
 
         async def setup(self) -> None:
             return
@@ -220,21 +236,34 @@ class TestSimulationNode(unittest.TestCase):
         async def teardown(self) -> None:
             return
 
+        async def sim_wait(self, delay: float) -> None:
+            await asyncio.sleep(delay)
+
+        async def live(self) -> None:
+            t_1 = asyncio.create_task(self.listen(),name='listen()')
+            t_2 = asyncio.create_task(self.work(),name='work()')
+            _, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
+
+            for task in pending:
+                task : asyncio.Task
+                task.cancel()
+                await task
+
         async def listen(self):
             try:
                 # do some 'listening'
                 self.log('listening...')
-                while True:
-                    await asyncio.sleep(2)
+                
+                await self._receive_manager_msg(zmq.SUB)
                    
             except asyncio.CancelledError:
-                self.log(f'`routine()` interrupted.')
+                self.log(f'`listen()` interrupted.')
                 return
             except Exception as e:
-                self.log(f'`routine()` failed. {e}')
+                self.log(f'`listen()` failed. {e}')
                 raise e
             
-        async def routine(self):
+        async def work(self):
             try:
                 # do some 'work'
                 self.log('doing some work...')
@@ -242,10 +271,10 @@ class TestSimulationNode(unittest.TestCase):
                     await asyncio.sleep(2)
                    
             except asyncio.CancelledError:
-                self.log(f'`routine()` interrupted.')
+                self.log(f'`work()` interrupted.')
                 return
             except Exception as e:
-                self.log(f'`routine()` failed. {e}')
+                self.log(f'`work()` failed. {e}')
                 raise e
 
     def test_init(self):
@@ -304,11 +333,11 @@ class TestSimulationNode(unittest.TestCase):
 
         return logger
 
-    def test_sync_routine(self):
+    def test_sync_routine_realtime(self):
         print('\nTESTING SYNC ROUTINE')
+
         n_nodes = [10]
-        n_modules = [4]
-        port = 5555 + 100
+        n_modules = [3]
         level=logging.WARNING
 
         year = 2023
@@ -321,14 +350,16 @@ class TestSimulationNode(unittest.TestCase):
         end_date = datetime(year, month, day, hh, mm, ss+1)
 
         print('Real-time Clock Config:')
+        port = random.randint(5555, 9999)
         clock_config = RealTimeClockConfig(start_date, end_date)
 
         logger = None
         for n in n_nodes:
             for m in n_modules:
                 logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
-    
+
         print('\nAccelerated Real-time Clock Config:')
+        port = random.randint(5555, 9999)
         clock_config = AcceleratedRealTimeClockConfig(start_date, end_date, 2.0)
 
         logger = None
@@ -336,6 +367,7 @@ class TestSimulationNode(unittest.TestCase):
             for m in n_modules:
                 logger = self.run_tester(clock_config, n, m, port, level=level, logger=logger)
 
+        
     class TransmissionTypes(Enum):
         DIRECT = 'DIRECT'
         BROADCAST = 'BROADCAST'
@@ -349,7 +381,12 @@ class TestSimulationNode(unittest.TestCase):
                         level: int = logging.INFO, 
                         logger: logging.Logger = None
                     ) -> None:
-            super().__init__(node_name, node_network_config, manager_network_config, [], level, logger)
+            super().__init__(node_name, 
+                            node_network_config, 
+                            manager_network_config, 
+                            [],
+                            level=level, 
+                            logger=logger)
             self.t_type : TestSimulationNode.TransmissionTypes = t_type
             self.msgs = []
 
@@ -370,7 +407,12 @@ class TestSimulationNode(unittest.TestCase):
                         level: int = logging.INFO, 
                         logger: logging.Logger = None
                     ) -> None:
-            super().__init__('PING', t_type, node_network_config, manager_network_config, level, logger)
+            super().__init__('PING', 
+                            t_type, 
+                            node_network_config,
+                            manager_network_config, 
+                            level, 
+                            logger)
 
         async def listen_to_manager(self):
             poller = azmq.Poller()
@@ -499,7 +541,7 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_ping_pong_broadcast(self):
         print(f'PING-PONG TEST')
-        port = 5555
+        port = random.randint(5555, 9999)
         level = logging.WARNING
         
         year = 2023
@@ -563,8 +605,7 @@ class TestSimulationNode(unittest.TestCase):
 
     def test_ping_pong_direct(self):
         print(f'PING-PONG TEST')
-        port = 5555 + 500
-        # port = 5555
+        port = random.randint(5555, 9999)
         level = logging.WARNING
         
         year = 2023

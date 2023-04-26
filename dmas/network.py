@@ -965,14 +965,6 @@ class NetworkElement(ABC):
 
             # send multi-part message
             return await self.__receive_msg(socket)
-
-        # except asyncio.CancelledError as e:
-        #     self.log(f'message reception interrupted. {e}', level=logging.DEBUG)
-        #     return None, None, None
-            
-        # except Exception as e:
-        #     self.log(f'message reception failed. {e}', level=logging.ERROR)
-        #     raise e
         
         finally:
             if (

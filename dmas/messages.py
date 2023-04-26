@@ -216,7 +216,7 @@ class SimulationInfoMessage(ManagerMessage):
         - clock_config (:obj:`dict`): dictionary discribing a config object containing information about the clock being used in this simulation
     """
 
-    def __init__(self, dst : str, address_ledger: dict, clock_config: dict, t: float, id : uuid.UUID = None, **kwargs):
+    def __init__(self, dst : str, address_ledger: dict, clock_config: dict, t: float = -1, id : uuid.UUID = None, **kwargs):
         """
         Initiallizes and instance of a Simulation Start Message
 
@@ -309,13 +309,13 @@ class NodeMessageTypes(Enum):
     """
     TEST = 'TEST'
     SYNC_REQUEST = 'SYNC_REQUEST'
-    NODE_READY = 'NODE_READY'
-    NODE_DEACTIVATED = 'NODE_DEACTIVATED'
-    RECEPTION_ACK = 'RECEPTION_ACK'
+    NODE_READY = 'READY'
+    NODE_DEACTIVATED = 'DEACTIVATED'
+    RECEPTION_ACK = 'RECEPTION_ACKNOWLEDGED'
     RECEPTION_IGNORED = 'RECEPTION_IGNORED'
-    MODULE_ACTIVATE = 'MODULE_ACTIVATE'
-    MODULE_DEACTIVATE = 'MODULE_DEACTIVATE'
-    NODE_INFO = 'NODE_INFO'
+    MODULE_ACTIVATE = 'SIM_START'
+    MODULE_DEACTIVATE = 'SIM_END'
+    NODE_INFO = 'SIM_INFO'
     TIC_REQ = 'TIC_REQ'
 
 class TicRequest(SimulationMessage):
@@ -358,16 +358,17 @@ class NodeSyncRequestMessage(SimulationMessage):
         - network_config (`dict`): dictiory discribing a network configuration from sender node
     """
 
-    def __init__(self, src: str, network_config : dict, id : uuid.UUID = None, **kwargs):
+    def __init__(self, src: str, dst : str, network_config : dict, id : uuid.UUID = None, **kwargs):
         """
         Initializes an instance of a Sync Request Message
 
         ### Arguments:
             - src (`str`): name of the simulation node sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
             - network_config (:obj:`NodeNetworkConfig`): network configuration from sender node
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.SYNC_REQUEST.value, id)
+        super().__init__(src, dst, NodeMessageTypes.SYNC_REQUEST.value, id)
         self.network_config = network_config
 
     def get_network_config(self) -> dict:
@@ -388,7 +389,7 @@ class NodeReadyMessage(SimulationMessage):
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
     """
-    def __init__(self, src: str, id : uuid.UUID = None, **kwargs):
+    def __init__(self, src: str, dst : str, id : uuid.UUID = None, **kwargs):
         """
         Initializes an instance of a Node Ready Message
 
@@ -396,7 +397,7 @@ class NodeReadyMessage(SimulationMessage):
             - src (`str`): name of the simulation node sending this message
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.NODE_READY.value, id)
+        super().__init__(src, dst, NodeMessageTypes.NODE_READY.value, id)
 
 class NodeDeactivatedMessage(SimulationMessage):
     """
@@ -410,15 +411,16 @@ class NodeDeactivatedMessage(SimulationMessage):
         - msg_type (`str`): type of message being sent
         - id (`uuid.UUID`) : Universally Unique IDentifier for this message
     """
-    def __init__(self, src: str, id : uuid.UUID = None, **kwargs):
+    def __init__(self, src: str, dst : str, id : uuid.UUID = None, **kwargs):
         """
         Initializes an instance of a Node Deactivated Message
 
         ### Arguments:
             - src (`str`): name of the simulation node sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.NODE_DEACTIVATED.value, id)
+        super().__init__(src, dst, NodeMessageTypes.NODE_DEACTIVATED.value, id)
 
 class NodeInfoMessage(SimulationMessage):
     """
@@ -431,20 +433,23 @@ class NodeInfoMessage(SimulationMessage):
         - dst (`str`): name of the intended simulation element to receive this message
         - msg_type (`str`): type of message being sent
         - id (`uuid.UUID`) : Universally Unique IDentifier for this message
+        - address_ledger (`dict`): dictionary mapping simulation element names to network addresses to be used for peer-to-peer communication or broadcast subscription
         - clock_config (`dict`): clock configuration to be used in the simulation
     """
-    def __init__(self, src: str, dst: str, clock_config : dict, id: str = None, **kwargs):
+    def __init__(self, src : str, dst : str, address_ledger: dict, clock_config: dict, id : uuid.UUID = None, **kwargs):
         """
         Initializes an instance of a Node Info Message
 
         ### Arguments:
             - src (`str`): name of the simulation node sending this message
             - dst (`str`): name of the internal module receiving this message
+            - address_ledger (`dict`): dictionary mapping simulation element names to network addresses to be used for peer-to-peer communication or broadcast subscription
             - clock_config (`dict`): clock configuration to be used in the simulation
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
         super().__init__(src, dst, NodeMessageTypes.NODE_INFO.value, id)
-        self.clock_config = clock_config
+        self.address_ledger = address_ledger.copy()
+        self.clock_config = clock_config.copy()
     
     def get_clock_config(self) -> ClockConfig:
         clock_type = self.clock_config['clock_type']
@@ -575,8 +580,8 @@ class ModuleMessageTypes(Enum):
         2- ModuleDeactivated: notifies the parent node that the sending module is offline.
     """
     SYNC_REQUEST = 'SYNC_REQUEST'
-    MODULE_READY = 'MODULE_READY'
-    MODULE_DEACTIVATED = 'MODULE_DEACTIVATED'
+    MODULE_READY = 'READY'
+    MODULE_DEACTIVATED = 'DEACTIVATED'
 
 class ModuleSyncRequestMessage(SimulationMessage):
     """

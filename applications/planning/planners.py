@@ -643,8 +643,44 @@ class ACCBBAPlannerModule(PlannerModule):
         except asyncio.CancelledError:
             return
 
+    async def bundle_builder(self) -> None:
+        """
+        Bundle-builder
+
+        Performs periodic checks on the received messages from the listener and
+        creates a plan based.
+        """
+        bundle = []
+        try:
+            while True:
+                # wait for periodic message check
+
+                # if no messages received, wait again
+
+                # if messages exist, process all messages from listener 
+                pass
+
+        except asyncio.CancelledError:
+            pass
+
+    async def rebroadcaster(self) -> None:
+        try:
+            while True:
+                # wait for both outgoing inboxes to not be empty
+
+                # discard all repeating bids from both inboxes, only keep the most updated one from each
+
+                # compare bundle results from the builder and changes from the listener
+
+                # if 
+                
+                pass
+
+        except asyncio.CancelledError:
+            pass
+
     async def routine(self) -> None:
-        # waits for changes in the ledger that may affect the current bundle
+        
         
         # if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
         #     # if action wasn't completed, re-try

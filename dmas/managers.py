@@ -149,7 +149,7 @@ class AbstractManager(SimulationElement):
                     _, src, msg_dict = read_task.result()
                     msg_type = msg_dict['msg_type']
 
-                    if NodeMessageTypes[msg_type] != message_type:
+                    if msg_type != message_type.value:
                         # ignore all incoming messages that are not of the desired type 
                         self.log(f'Received {msg_type} message from node {src}! Ignoring message...')
 
@@ -242,18 +242,6 @@ class AbstractManager(SimulationElement):
         desc=f'{self.name}: Ready simulation elements'
         await self.__wait_for_elements(NodeMessageTypes.NODE_READY, NodeReadyMessage, desc=desc)
         self.log(f'All elements ready!')
-        return
-
-    async def __wait_for_offline_elements(self) -> None:
-        """
-        Listens for any incoming messages from other simulation elements. Counts how many simulation elements are deactivated.
-
-        Returns when all simulation elements are deactivated.
-        """
-        self.log(f'Waiting for deactivation confirmation from simulation elements...')
-        desc=f'{self.name}: Offline simulation elements'
-        await self.__wait_for_elements(NodeMessageTypes.NODE_DEACTIVATED, NodeDeactivatedMessage, desc=desc)
-        self.log(f'All elements deactivated!')
         return
 
     async def send_manager_broadcast(self, msg : SimulationMessage) -> None:

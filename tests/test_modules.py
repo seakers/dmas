@@ -9,15 +9,13 @@ from dmas.messages import *
 
 from dmas.modules import InternalModule
 from dmas.network import NetworkConfig
+from dmas.nodes import Node
 
 
 class TestInternalModule(unittest.TestCase): 
     class DummyModule(InternalModule):
-        async def listen(self):
-            return
-        
-        async def routine(self):
-            return
+        async def sim_wait(self, delay: float) -> None:
+            await asyncio.sleep(delay)
 
         async def setup(self):
             return
@@ -25,34 +23,51 @@ class TestInternalModule(unittest.TestCase):
         async def teardown(self) -> None:
             return
 
-    class TestModule(InternalModule):
-        def __init__(self, 
-                    parent_name : str, 
-                    parent_network_config : NetworkConfig,
-                    module_name: str, 
-                    node_rep_port : int, 
-                    node_pub_port : int, 
-                    level: int = logging.INFO, 
-                    logger: logging.Logger = None
-                    ) -> None:
+        async def live(self) -> None:
+            await self.sim_wait(1e6)
+
+    class TestModule(DummyModule):
+        def __init__(   self, 
+                        parent_name : str,
+                        parent_node_network_config: NetworkConfig, 
+                        module_name: str, 
+                        node_rep_port : int,
+                        node_pub_port : int,
+                        node_push_port : int,
+                        level: int = logging.INFO, 
+                        logger: logging.Logger = None) -> None:
+
             manager_address_map = {
                                     zmq.REQ: [f'tcp://localhost:{node_rep_port}'],
-                                    zmq.SUB: [f'tcp://localhost:{node_pub_port}']
+                                    zmq.SUB: [f'tcp://localhost:{node_pub_port}'],
+                                    zmq.PUSH: [f'tcp://localhost:{node_push_port}']
                                     }
             module_network_config = NetworkConfig(parent_name, manager_address_map=manager_address_map)
-            super().__init__(module_name, module_network_config, parent_network_config, [], level, logger)
+            
+            super().__init__(   module_name, 
+                                module_network_config, 
+                                parent_node_network_config, 
+                                level, 
+                                logger)
 
-        async def setup(self):
-            return
+        async def live(self) -> None:
+            t_1 = asyncio.create_task(self.listen(),name='listen()')
+            t_2 = asyncio.create_task(self.work(),name='work()')
+            _, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
 
-        async def teardown(self) -> None:
-            return
+            for task in pending:
+                task : asyncio.Task
+                task.cancel()
+                await task
 
         async def listen(self):
             try:
                 # do some 'listening'
                 while True:
-                    await asyncio.sleep(1e6)
+                    dst, src, content = await self._receive_manager_msg(zmq.SUB)
+
+                    self.log(f'finishing!')
+                    return
                    
             except asyncio.CancelledError:
                 self.log(f'`listen()` interrupted.')
@@ -61,7 +76,7 @@ class TestInternalModule(unittest.TestCase):
                 self.log(f'`listen()` failed. {e}')
                 raise e
             
-        async def routine(self):
+        async def work(self):
             try:
                 # do some 'work'
                 while True:
@@ -88,7 +103,7 @@ class TestInternalModule(unittest.TestCase):
 
             module_network_config = NetworkConfig('TEST_NETWORK', internal_address_map=internal_address_map)
 
-            super().__init__(element_name, module_network_config, level, logger)
+            super().__init__(element_name, module_network_config, level=level, logger=logger)
 
             self.__modules = []
             for i in range(n_modules):
@@ -97,8 +112,12 @@ class TestInternalModule(unittest.TestCase):
                                                                     f'MODULE_{i}',
                                                                     port, 
                                                                     port+1, 
+                                                                    port+2,
                                                                     level,
                                                                     self.get_logger()))
+        def has_modules(self) -> bool:
+            return len(self.__modules) > 0
+
         async def sim_wait(self, delay: float) -> None:
             return asyncio.sleep(delay)
         
@@ -145,12 +164,18 @@ class TestInternalModule(unittest.TestCase):
                 # create internal ledger
                 internal_address_ledger = dict()
                 for module in self.__modules:
-                    module : InternalModule
+                    module : Node
                     internal_address_ledger[module.name] = module.get_network_config()
-
+                
                 # broadcast simulation info to modules
-                msg = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
-                await self._send_internal_msg(msg, zmq.PUB)
+                if self.has_modules():
+                    internal_address_ledger_dict = {}
+                    for module_name in internal_address_ledger:
+                        module_config : NetworkConfig = internal_address_ledger[module_name]
+                        internal_address_ledger_dict[module_name] = module_config.to_dict()
+
+                    msg = NodeInfoMessage(self._element_name, self._element_name, internal_address_ledger_dict, clock_config.to_dict())
+                    await self._send_internal_msg(msg, zmq.PUB)
 
                 # return ledger
                 return internal_address_ledger
@@ -171,6 +196,9 @@ class TestInternalModule(unittest.TestCase):
             responses = []
             m : InternalModule
             module_names = [f'{m.get_element_name()}' for m in self.__modules]
+
+            if not self.has_modules():
+                return
 
             with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
                 while len(responses) < len(self.__modules):
@@ -205,49 +233,6 @@ class TestInternalModule(unittest.TestCase):
             self.log('node\'s `live()` finalized. Terminating internal modules....')
             terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
             await self._send_internal_msg(terminate_msg, zmq.PUB)
-
-            # wait for all modules to terminate and become offline
-            terminate_task = asyncio.create_task(self.__wait_for_offline_modules())
-            await terminate_task
-
-        async def __wait_for_offline_modules(self) -> None:
-            """
-            Waits for all internal modules to become offline
-            """
-            # send terminate message to all modules
-            responses = []
-            module_names = [m.get_element_name() for m in self.__modules]
-
-            with tqdm(total=len(self.__modules) , desc=f'{self.name} Offline Internal Modules') as pbar:
-                while len(responses) < len(self.__modules):
-                    # listen for messages from internal nodes
-                    dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
-                    dst : str; src : str; msg_dict : dict
-                    msg_type = msg_dict.get('msg_type', None)    
-
-                    if (
-                        dst not in self.name
-                        or src not in module_names 
-                        or msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value
-                        or src in responses
-                        ):
-                        # undesired message received. Ignoring and trying again later
-                        print(dst not in self.name)
-                        print(src not in module_names )
-                        print(msg_type != ModuleMessageTypes.MODULE_DEACTIVATED.value)
-                        print(src in responses)
-
-                        self.log(f'received undesired message of type {msg_type}, expected tye {ModuleMessageTypes.MODULE_DEACTIVATED.value}. Ignoring...')
-                        resp = NodeReceptionIgnoredMessage(self._element_name, src)
-
-                    else:
-                        # add to list of offline modules if it hasn't been registered as offline before
-                        pbar.update(1)
-                        resp = NodeReceptionAckMessage(self._element_name, src)
-                        responses.append(src)
-                        self.log(f'{src} is now offline! offline module status: {len(responses)}/{len(self.__modules)}')
-
-                    await self._send_internal_msg(resp, zmq.REP)
         
         async def _publish_deactivate(self):
             return
@@ -271,7 +256,7 @@ class TestInternalModule(unittest.TestCase):
         port = 5555
         n_modules = 1
 
-        module = TestInternalModule.TestModule('TEST_NODE', None, 'MODULE_0', port, port+1)
+        module = TestInternalModule.TestModule('TEST_NODE', None, 'MODULE_0', port, port+1, port+2)
         self.assertTrue(isinstance(module, TestInternalModule.TestModule))
 
         node = TestInternalModule.DummyNode('NODE_0', n_modules, port, logger=module.get_logger())
@@ -290,7 +275,6 @@ class TestInternalModule(unittest.TestCase):
     def test_module(self):
         port = 5555
         n_modules = [1, 3, 10]
-        # n_modules = [1]
         level = logging.WARNING
 
         prev_logger = None

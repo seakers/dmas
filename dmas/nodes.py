@@ -6,7 +6,6 @@ from tqdm import tqdm
 import concurrent.futures
 from dmas.elements import *
 from dmas.messages import *
-from dmas.modules import InternalModule
 from dmas.network import NetworkConfig
 from dmas.utils import *
 
@@ -22,11 +21,12 @@ class Node(SimulationElement):
                  node_network_config: NetworkConfig, 
                  manager_network_config : NetworkConfig,
                  modules : list = [], 
+                 manager_name = SimulationElementRoles.MANAGER.value,
                  level: int = logging.INFO, 
                  logger : logging.Logger = None
                  ) -> None:
         super().__init__(node_name, node_network_config, level, logger)   
-        self._manager_address_ledger = {SimulationElementRoles.MANAGER.name : manager_network_config}
+        self._manager_address_ledger = {manager_name : manager_network_config}
 
         if zmq.REQ not in node_network_config.get_manager_addresses():
             raise AttributeError(f'`node_network_config` must contain a REQ port and an address to node within external address map.')
@@ -41,6 +41,7 @@ class Node(SimulationElement):
             if zmq.PUB not in node_network_config.get_internal_addresses():
                 raise AttributeError(f'`node_network_config` must contain a PUB port and an address to node within internal address map.')
         
+        self.manager_name = manager_name
         self.manager_inbox = None
         self.external_inbox = None
         self.internal_inbox = None
@@ -48,8 +49,8 @@ class Node(SimulationElement):
         self.__t_curr = None
 
         for module in modules:
-            if not isinstance(module, InternalModule):
-                raise TypeError(f'elements in `modules` argument must be of type `{InternalModule}`. Is of type {type(module)}.')
+            if not isinstance(module, Node):
+                raise TypeError(f'elements in `modules` argument must be of type `{Node}`. Is of type {type(module)}.')                
         self.__modules = modules.copy()        
 
     def run(self) -> int:
@@ -62,7 +63,7 @@ class Node(SimulationElement):
             with concurrent.futures.ThreadPoolExecutor(len(self.__modules) + 1) as pool:
                 pool.submit(asyncio.run, *[self._run_routine()])
                 for module in self.__modules:
-                    module : InternalModule
+                    module : Node
                     pool.submit(module.run, *[])
 
             return 1
@@ -75,22 +76,31 @@ class Node(SimulationElement):
         """
         Logs a message to the desired level.
         """
-        if level is logging.DEBUG:
-            self._logger.debug(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
-        elif level is logging.INFO:
-            self._logger.info(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
-        elif level is logging.WARNING:
-            self._logger.warning(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
-        elif level is logging.ERROR:
-            self._logger.error(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
-        elif level is logging.CRITICAL:
-            self._logger.critical(f'T={self.get_current_time()}[s] | {self.name}: {msg}')
+        try:
+            t = self.get_current_time()
+            t = t if t is None else round(t,3)
+
+            if level is logging.DEBUG:
+                self._logger.debug(f'T={t}[s] | {self.name}: {msg}')
+            elif level is logging.INFO:
+                self._logger.info(f'T={t}[s] | {self.name}: {msg}')
+            elif level is logging.WARNING:
+                self._logger.warning(f'T={t}[s] | {self.name}: {msg}')
+            elif level is logging.ERROR:
+                self._logger.error(f'T={t}[s] | {self.name}: {msg}')
+            elif level is logging.CRITICAL:
+                self._logger.critical(f'T={t}[s] | {self.name}: {msg}')
+        
+        except Exception as e:
+            raise e
 
 
     async def _activate(self) -> None:
         # give manager time to set up
-        self.log('waiting for simulation manager to configure its network...', level=logging.INFO) 
-        await asyncio.sleep(1e-1 * random.random())
+        self.log('waiting for simulation manager to configure its own network...', level=logging.INFO) 
+        await asyncio.sleep(1e-1)
+        if self.manager_name != SimulationElementRoles.MANAGER.value:
+            await asyncio.sleep(1e-1)
 
         # perform activation routine
         await super()._activate()
@@ -110,26 +120,23 @@ class Node(SimulationElement):
     async def _external_sync(self) -> tuple:
         try:
             # request to sync with the simulation manager
-            self.log('syncing with simulation manager...', level=logging.INFO) 
+            self.log('syncing with manager...', level=logging.INFO) 
             while True:
                 # send sync request from REQ socket
-                msg = NodeSyncRequestMessage(self.get_element_name(), self._network_config.to_dict())
+                msg = NodeSyncRequestMessage(self.get_element_name(), self.manager_name, self._network_config.to_dict())
 
                 dst, src, content = await self.send_manager_message(msg)
                 dst : str; src : str; content : dict
                 msg_type = content['msg_type']
 
                 if (
-                    dst not in self.name 
-                    or SimulationElementRoles.MANAGER.value not in src
-                    or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
+                    msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                     ):
                     # if the manager did not acknowledge the sync request, try again later
                     self.log(f'sync request not accepted. trying again later...')
-                    await asyncio.wait(random.random())
                 else:
                     # if the manager acknowledged the sync request, stop trying
-                    self.log(f'sync request accepted! waiting for simulation information from simulation manager...', level=logging.INFO)
+                    self.log(f'sync request accepted! waiting for simulation information from manager...', level=logging.INFO)
                     break
 
             # wait for external address ledger from manager
@@ -140,9 +147,7 @@ class Node(SimulationElement):
                 msg_type = content['msg_type']
 
                 if (
-                    dst not in self.name 
-                    or SimulationElementRoles.MANAGER.value not in src
-                    or msg_type != ManagerMessageTypes.SIM_INFO.value
+                    msg_type != ManagerMessageTypes.SIM_INFO.value
                     ):
                     # undesired message received. Ignoring and trying again later
                     self.log(f'received undesired message of type {msg_type}. Ignoring...')
@@ -159,12 +164,7 @@ class Node(SimulationElement):
                         if self.get_element_name() != node_name:
                             # only save network configs of other nodes that are not me
                             external_ledger[node_name] = NetworkConfig(**ledger_dicts[node_name])
-                        # else:
-                        #     x = 1
-
-                    # if self.get_element_name() == 'AGENT_1':
-                    #     x =1
-
+                    
                     clock_config = msg.get_clock_info()
                     clock_type = clock_config['clock_type']
                     if clock_type == ClockTypes.REAL_TIME.value:
@@ -193,15 +193,18 @@ class Node(SimulationElement):
             # create internal ledger
             internal_address_ledger = dict()
             for module in self.__modules:
-                module : InternalModule
+                module : Node
                 internal_address_ledger[module.name] = module.get_network_config()
             
             # broadcast simulation info to modules
             if self.has_modules():
-                msg = NodeInfoMessage(self._element_name, self._element_name, clock_config.to_dict())
-                await self._send_internal_msg(msg, zmq.PUB)
+                internal_address_ledger_dict = {}
+                for module_name in internal_address_ledger:
+                    module_config : NetworkConfig = internal_address_ledger[module_name]
+                    internal_address_ledger_dict[module_name] = module_config.to_dict()
 
-            # TODO include internal ledger within modules for inter-module communication
+                msg = NodeInfoMessage(self._element_name, self._element_name, internal_address_ledger_dict, clock_config.to_dict())
+                await self._send_internal_msg(msg, zmq.PUB)
 
             # return ledger
             return internal_address_ledger
@@ -300,20 +303,18 @@ class Node(SimulationElement):
 
     async def __broadcast_ready(self):
         """
-        Informs the simulation manager that the node is ready to start the simulation.
+        Informs the node manager that the node is ready to start the simulation.
         """
         self.log('informing manager of ready state...', level=logging.INFO) 
         while True:
             # send ready announcement from REQ socket
-            ready_msg = NodeReadyMessage(self.get_element_name())
+            ready_msg = NodeReadyMessage(self.get_element_name(), self.manager_name)
             dst, src, content = await self.send_manager_message(ready_msg)
             dst : str; src : str; content : dict
             msg_type = content['msg_type']
 
             if (
-                dst not in self.name 
-                or SimulationElementRoles.MANAGER.value not in src 
-                or msg_type != ManagerMessageTypes.RECEPTION_ACK.value
+                msg_type != ManagerMessageTypes.RECEPTION_ACK.value
                 ):
                 # if the manager did not acknowledge the request, try again later
                 self.log(f'received undesired message of type {msg_type}. Ignoring...')
@@ -321,6 +322,29 @@ class Node(SimulationElement):
             else:
                 # if the manager acknowledge the message, stop trying
                 self.log(f'ready state message accepted! waiting for simulation to start...', level=logging.INFO)
+                break
+
+    async def __broadcast_deactivated(self):
+        """
+        Informs the node manager that the node has deactivated
+        """
+        self.log('informing manager of ready state...', level=logging.INFO) 
+        while True:
+            # send ready announcement from REQ socket
+            ready_msg = NodeDeactivatedMessage(self.get_element_name(), self.manager_name)
+            dst, src, content = await self.send_manager_message(ready_msg)
+            dst : str; src : str; content : dict
+            msg_type = content['msg_type']
+
+            if (
+                msg_type != ManagerMessageTypes.RECEPTION_ACK.value
+                ):
+                # if the manager did not acknowledge the request, try again later
+                self.log(f'received undesired message of type {msg_type}. Ignoring...')
+                await asyncio.wait(random.random())
+            else:
+                # if the manager acknowledge the message, stop trying
+                self.log(f'deactivated state message accepted! waiting for simulation to start...', level=logging.INFO)
                 break
 
     async def __wait_for_manager_ready(self):
@@ -335,7 +359,7 @@ class Node(SimulationElement):
 
             if (
                 dst not in self.name 
-                or SimulationElementRoles.MANAGER.value not in src 
+                or self.manager_name not in src 
                 or msg_type != ManagerMessageTypes.SIM_START.value
                 ):
                 # undesired message received. Ignoring and trying again later
@@ -368,17 +392,19 @@ class Node(SimulationElement):
             live_task.cancel()
             self.log(f'cancelling `{live_task.get_name()}` task...')
 
+        # inform manager
+        if self.manager_name != SimulationElementRoles.MANAGER.value:
+            await self.__broadcast_deactivated()
+
+
         if self.has_modules() and offline_modules_task in pending:
             # internal modules are not yet disabled. inform modules that the node is terminating
             self.log('terminating internal modules....')
             terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
             await self._send_internal_msg(terminate_msg, zmq.PUB)
-        
-        # wait for pending tasks to terminate
-        self.log(f'waiting on pending tasks to return...')
-        await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
-        self.log(f'all pending tasks cancelled and terminated!')
 
+            await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
+        
     @abstractmethod
     async def live(self) -> None:
         """
@@ -401,31 +427,42 @@ class Node(SimulationElement):
         """
         Waits for all internal modules to send a message of type `target_type` through the node's REP port
         """
-        responses = []
-        module_names = [m.get_element_name() for m in self.__modules]
+        try:
+            responses = []
+            module_names = [m.get_element_name() for m in self.__modules]
+            
+            if not self.has_modules():
+                return
 
-        with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
-            while len(responses) < len(self.__modules):
-                # listen for messages from internal module
-                dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
-                dst : str; src : str; msg_dict : dict
-                msg_type = msg_dict.get('msg_type', None)
+            pbar = None
+            prog = 0
+            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
+                while len(responses) < len(self.__modules):
+                    # listen for messages from internal module
+                    dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
+                    dst : str; src : str; msg_dict : dict
+                    msg_type = msg_dict.get('msg_type', None)
 
-                if (dst in self.name
-                    and src in module_names
-                    and msg_type == target_type.value
-                    and src not in responses
-                    ):
-                    # Add to list of registered modules if it hasn't been registered before
-                    responses.append(src)
-                    pbar.update(1)
-                    resp = NodeReceptionAckMessage(self._element_name, src)
-                else:
-                    # ignore message
-                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
+                    if (dst in self.name
+                        and src in module_names
+                        and msg_type == target_type.value
+                        and src not in responses
+                        ):
+                        # Add to list of registered modules if it hasn't been registered before
+                        responses.append(src)
+                        pbar.update(1)
+                        prog += 1
+                        resp = NodeReceptionAckMessage(self._element_name, src)
+                    else:
+                        # ignore message
+                        resp = NodeReceptionIgnoredMessage(self._element_name, src)
 
-                # respond to module
-                await self._send_internal_msg(resp, zmq.REP)
+                    # respond to module
+                    await self._send_internal_msg(resp, zmq.REP)
+        
+        except asyncio.CancelledError:
+            if pbar is not None:
+                pbar.update(len(self.__modules) - prog)
 
     async def _publish_deactivate(self) -> None:        
         # inform monitor that I am deactivated
