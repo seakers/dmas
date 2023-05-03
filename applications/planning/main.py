@@ -32,9 +32,6 @@ def random_instruments(task_types : list) -> list:
         instruments.append(task_types[i_ins])           
     return instruments
 
-def create_tasks():
-    pass
-
 if __name__ == '__main__':
     """
     Wrapper for planner simulation using DMAS
@@ -76,7 +73,7 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 5
+    n_tasks = 1
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
@@ -146,13 +143,14 @@ if __name__ == '__main__':
                                                 vel, 
                                                 v_max, 
                                                 [],  
-                                                status=SimulationAgentState.IDLING)
+                                                status=SimulationAgentState.IDLING,
+                                                instruments=instruments)
         agent = SimulationAgent(    results_path,
                                     network_name,
                                     port, 
                                     id,
                                     manager_network_config,
-                                    PlannerTypes.FIXED,
+                                    PlannerTypes.ACCBBA,
                                     instruments,
                                     initial_state,
                                     level,

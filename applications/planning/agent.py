@@ -180,7 +180,7 @@ class SimulationAgent(Agent):
 
         # update state
         self.state.update_state(self.get_current_time(), 
-                                tasks_performed=completed, 
+                                actions_performed=completed, 
                                 status=SimulationAgentState.SENSING)
 
         # inform environment of new state
@@ -245,11 +245,17 @@ class SimulationAgent(Agent):
     async def think(self, senses: list) -> list:
         # send all sensed messages to planner
         self.log(f'sending {len(senses)} senses to planning module...')
+        senses_dict = []
+        state_dict = None
         for sense in senses:
             sense : SimulationMessage
-            sense.src = self.get_element_name()
-            sense.dst = self.get_element_name()
-            await self.send_internal_message(sense)
+            if isinstance(sense, AgentStateMessage) and sense.src == self.get_element_name():
+                state_dict = sense.to_dict()
+            else:
+                senses_dict.append(sense.to_dict())
+
+        senses_msg = SensesMessage(self.get_element_name(), self.get_element_name(), state_dict, senses_dict)
+        await self.send_internal_message(senses_msg)
 
         # wait for planner to send list of tasks to perform
         self.log(f'senses sent! waiting on response from planner module...')
@@ -314,12 +320,19 @@ class SimulationAgent(Agent):
 
                     # perform action
                     self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                    msg_out = action.msg
-                    msg_out.dst = self.get_network_name()
-                    await self.send_peer_broadcast(msg_out)
                     
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
+                    if action.msg['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+
+                        msg_out = TaskBidMessage(**action.msg)
+                        msg_out.dst = self.get_network_name()
+                        await self.send_peer_broadcast(msg_out)
+
+                        # update action completion status
+                        action.status = AgentAction.COMPLETED
+
+                    else:
+                        # message type not supported
+                        action.status = AgentAction.ABORTED
                 
                 elif action_dict['action_type'] == ActionTypes.IDLE.value:
                     # unpack action 
@@ -416,6 +429,7 @@ class SimulationAgent(Agent):
                     task = WaitForMessages(**action_dict)
 
                     # wait for message to be received or timeout to run out
+                    self.state.update_state(self.get_current_time(), status=SimulationAgentState.LISTENING)
                     t_curr = self.get_current_time()
                     timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
                     receive_broadcast = asyncio.create_task(self.external_inbox.get())
