@@ -20,7 +20,7 @@ class SimulationAgentState(AgentState):
                 actions_performed : list, 
                 status : str,
                 t : Union[float, int]=0,
-                instruments : list = []
+                instruments : list = [],
                 **_
                 ) -> None:
         super().__init__()

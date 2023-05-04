@@ -844,18 +844,18 @@ class ACCBBAPlannerModule(PlannerModule):
                         # TODO: implement task release
 
                 # create bundle from new results
-                old_bundle = copy.deepcopy(bundle)
-                while len(bundle) < self.l_bundle:
-                    # check if tasks are available to be bid on
-                    available_tasks = self.get_available_tasks(state, bundle, results)
-                    if len(available_tasks) == 0:
-                        break
+                # old_bundle = copy.deepcopy(bundle)
+                # while len(bundle) < self.l_bundle:
+                #     # check if tasks are available to be bid on
+                #     available_tasks = self.get_available_tasks(state, bundle, results)
+                #     if len(available_tasks) == 0:
+                #         break
                     
-                    potential_bids = {}
-                    for task in available_tasks:
-                        task : MeasurementTask
+                #     potential_bids = {}
+                #     for task in available_tasks:
+                #         task : MeasurementTask
 
-                        bid, path_location = self.calculate_bid(state, path, task)
+                #         bid, path_location = self.calculate_bid(state, path, task)
 
                 # DEBUG PURPOSES ONLY: doesn nothing
                 action = WaitForMessages(t_curr, t_next)

@@ -26,15 +26,16 @@ conda activate ./.venv
 make install
 ```
 > ### NOTEs: 
-> - **Installation instructions above are only supported in Mac or Linux systems.** For windows installation, use a Windows Subsystem for Linux (WSL) and follow said instructions.
-> - Command line cloning of this repositioryt is recommended as Github Desktop client users may experience problems due to submodule dependencies.
-> - Mac users have experienced issues installing the `propcov` dependency contained within the `orbitpy` submodule during the automated installation procedure. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy/tree/master/propcov) for further details on fixes.
+> - **Installation instructions above are only supported in Mac or Linux systems.** For windows installation, use a Windows Subsystem for Linux (WSL) and follow the instructions above.
+> - Command line cloning of this repository is recommended as Github Desktop client users may experience problems due to submodule dependencies.
+> - Mac users are known to experience issues installing the `propcov` dependency contained within the `orbitpy` submodule during the automated installation procedure. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy/tree/master/propcov) for fixes.
+> - For development in Windows, Visual Studio Code's remote development feature in WSL was used. See [instructions for remote develpoment in VSCode](https://code.visualstudio.com/docs/remote/wsl-tutorial) for more details on WSL installation and remote development environment set-up.
 
 ---
 ## Contact 
 **Principal Investigator:** 
-- Daniel Selva Valero <dselva@tamu.edu>
+- Daniel Selva Valero - <dselva@tamu.edu>
 
 **Lead Developers:** 
-- Alan Aguilar Jaramillo <aguilaraj15@tamu.edu>
-- Ben Gorr <bgorr@tamu.edu>
+- Alan Aguilar Jaramillo - <aguilaraj15@tamu.edu>
+- Ben Gorr - <bgorr@tamu.edu>

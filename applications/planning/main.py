@@ -43,8 +43,8 @@ if __name__ == '__main__':
     
     # define simulation config
     ## environment bounds
-    x_bounds = [-5, 5]
-    y_bounds = [-5, 5]
+    x_bounds = [0, 10]
+    y_bounds = [0, 10]
 
     ## agents
     n_agents = 2
@@ -79,10 +79,16 @@ if __name__ == '__main__':
     # create tasks
     tasks = []
     for i in range(n_tasks):
-        t_start = random.random() * clock_config.get_total_seconds()
-        t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
-        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        # t_start = random.random() * clock_config.get_total_seconds()
+        # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
+        # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        
+        t_start = 0.0
+        t_end = T
+        x = x_bounds[0] + i
+        y = 0.0
+        
         pos = [x, y]
         s_max = 1.0
         
@@ -130,10 +136,13 @@ if __name__ == '__main__':
     # create simulation agents
     agents = []
     for id in range(n_agents):        
-        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()        
+        # x, y = 0.0, 0.0
+
+        x, y = x_bounds[0] + id, 1.0
+
         pos = [x, y]
-        pos = [0.0, 0.0]
         vel = [0.0, 0.0]
         instruments = task_types[:1]
         # instruments = random_instruments(task_types)

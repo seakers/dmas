@@ -4,7 +4,7 @@ import shutil
 
 def setup_results_directory(scenario_name) -> str:
     """
-    Creates an empty results directory within the `mccbba` directory
+    Creates an empty results directory within the current working directory
     """
     results_path = f'{scenario_name}' if scenario_name[0]=='.' else f'./{scenario_name}'
 
