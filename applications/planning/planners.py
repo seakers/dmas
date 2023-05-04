@@ -819,17 +819,21 @@ class ACCBBAPlannerModule(PlannerModule):
                     their_bid = ACCBBATaskBid(**bid_msg.bid)
                     
                     # check if bid exists for this task
-                    if their_bid.task_id not in results:
+                    new_task = their_bid.task_id not in results
+                    if new_task:
                         # was not aware of this task; add to results as a blank bid
                         results[their_bid.task_id] = ACCBBATaskBid( their_bid.task, self.get_parent_name())
-                
+
                     # compare bids
                     my_bid : ACCBBATaskBid = results[their_bid.task_id]
+                    self.log(f'comparing bids:\n\tmy bid: {my_bid}\n\ttheir bid: {their_bid}')
                     broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict(), t_curr)
+                    self.log(f'bid updated:\n{my_bid}')
                     results[my_bid.task_id] = my_bid
                         
-                    if broadcast_bid is not None:
-                        # track if relevant changes were made
+                    # check if relevant changes were made
+                    if broadcast_bid or new_task:
+                        broadcast_bid = broadcast_bid if not new_task else my_bid
                         out_msg = TaskBidMessage(   
                                                 self.get_parent_name(), 
                                                 self.get_parent_name(), 
@@ -837,11 +841,14 @@ class ACCBBAPlannerModule(PlannerModule):
                                             )
                         changes.append(out_msg)
                     
-                        # if outbid for a task in my bundle; release subsequent tasks in bundle
-                        if broadcast_bid in bundle:
-                            bid_index = bundle.index(broadcast_bid)
-                            
-                        # TODO: implement task release
+                    # if outbid for a task in the bundle; release subsequent tasks in bundle and path
+                    if broadcast_bid in bundle:
+                        bid_index = bundle.index(broadcast_bid)
+
+                        for _ in range(bid_index, len(bundle)):
+                            # remove task from bundle
+                            task = bundle.pop(bid_index)
+                            path.remove(task)
 
                 # create bundle from new results
                 # old_bundle = copy.deepcopy(bundle)
