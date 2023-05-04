@@ -9,6 +9,7 @@ class SimulationAgentState(AgentState):
     MESSAGING = 'MESSAGING'
     SENSING = 'SENSING'
     THINKING = 'THINKING'
+    LISTENING = 'LISTENING'
 
     def __init__(self, 
                 pos : list, 
@@ -16,9 +17,10 @@ class SimulationAgentState(AgentState):
                 y_bounds : list,
                 vel : list, 
                 v_max : float, 
-                tasks_performed : list, 
+                actions_performed : list, 
                 status : str,
                 t : Union[float, int]=0,
+                instruments : list = [],
                 **_
                 ) -> None:
         super().__init__()
@@ -27,17 +29,17 @@ class SimulationAgentState(AgentState):
         self.y_bounds = y_bounds
         self.vel = vel
         self.v_max = v_max
-        self.tasks_performed = tasks_performed
+        self.actions_performed = actions_performed
         self.status = status
         self.t = t
         self.history = []
+        self.instruments = instruments
 
     def update_state(self, 
                     t : Union[float, int], 
                     vel : list=None, 
-                    tasks_performed : list=[], 
-                    status : str=None, 
-                    agent_connectivity : list=[]):
+                    actions_performed : list=[], 
+                    status : str=None):
         if t >= self.t:        
             # update position with previous state info and new time jump
             x, y = self.pos
@@ -64,7 +66,7 @@ class SimulationAgentState(AgentState):
                 self.vel = vel  
 
         # update tasks performed
-        self.tasks_performed.extend(tasks_performed)
+        self.actions_performed.extend(actions_performed)
 
         # update status
         if status is not None:

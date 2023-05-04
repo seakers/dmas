@@ -9,6 +9,7 @@ class SimulationMessageTypes(Enum):
     PLANNER_RESULTS = 'PLANNER_RESULTS'
     TASK_BID = 'TASK_BID'
     PLAN = 'PLAN'
+    SENSES = 'SENSES'
 
 class AgentStateMessage(SimulationMessage):
     """
@@ -147,6 +148,34 @@ class PlanMessage(SimulationMessage):
         """
         super().__init__(src, dst, SimulationMessageTypes.PLAN.value, id)
         self.plan = plan
+
+class SensesMessage(SimulationMessage):
+    """
+    # Plan Message
+    
+    Informs an agent of a set of tasks to perform. 
+    Sent by either an external or internal planner
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - senses (`list`): list of senses from the agent
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
+    def __init__(self, src: str, dst: str, state : dict, senses : list, id: str = None, **_):
+        """
+        Creates an instance of a plan message
+
+        ### Attributes:
+            - src (`str`): name of the simulation element sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - senses (`list`): list of senses from the agent
+            - id (`str`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, SimulationMessageTypes.SENSES.value, id)
+        self.state = state
+        self.senses = senses
 
 class AgentActionMessage(SimulationMessage):
     """

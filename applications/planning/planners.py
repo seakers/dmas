@@ -1,3 +1,4 @@
+import copy
 import math
 from messages import *
 from states import SimulationAgentState
@@ -161,7 +162,14 @@ class FixedPlannerModule(PlannerModule):
             while True:
                 # listen for agent to send new senses
                 self.log('waiting for incoming senses from parent agent...')
-                senses = await self.empty_manager_inbox()
+                sense_msgs = await self.empty_manager_inbox()
+
+                senses = []
+                for sense_msg_dict in sense_msgs:
+                    if sense_msg_dict['msg_type'] == SimulationMessageTypes.SENSES.value:
+                        sense_msg : SensesMessage = SensesMessage(**sense_msg_dict)
+                        senses.append(sense_msg.state)
+                        senses.extend(sense_msg.senses)                     
 
                 self.log(f'received {len(senses)} senses from agent! processing senses...')
                 new_plan = []
@@ -169,7 +177,7 @@ class FixedPlannerModule(PlannerModule):
                     sense : dict
                     if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
                         # unpack message 
-                        msg : AgentActionMessage = AgentActionMessage(**sense)
+                        msg = AgentActionMessage(**sense)
                         
                         if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
                             # if action wasn't completed, re-try
@@ -293,6 +301,13 @@ class ACCBBATaskBid(object):
         self.winner = winner
         self.t_arrive = t_arrive
         self.t_update = t_update
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of this task bid in the following format:
+        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_arrive`, `t_update`
+        """
+        return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_arrive},{self.t_update}'
 
     def update(self, other_dict : dict, t : Union[float, int]) -> object:
         """
@@ -597,6 +612,8 @@ class ACCBBAPlannerModule(PlannerModule):
 
         self.t_curr = 0.0
         self.state_curr = None
+        self.listener_results = None
+        self.bundle_builder_results = None
     
     async def setup(self) -> None:
         # initialize internal messaging queues
@@ -661,70 +678,97 @@ class ACCBBAPlannerModule(PlannerModule):
                         self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
                         return
 
-                    elif content['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                    if content['msg_type'] == SimulationMessageTypes.SENSES.value:
+                        self.log(f"received senses from parent agent!")
+
                         # unpack message 
-                        msg : AgentActionMessage = AgentActionMessage(**content)
-                        
-                        # send to bundle builder 
-                        await self.action_status_inbox.put(msg)
+                        senses_msg : SensesMessage = SensesMessage(**content)
 
-                    elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                        # unpack message 
-                        msg : AgentStateMessage = AgentStateMessage(**content)
-                        
-                        # send to bundle builder 
-                        await self.states_inbox.put(msg) 
+                        senses = []
+                        senses.extend(senses_msg.senses)     
+                        senses.append(senses_msg.state)
 
-                    elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                        # unpack message
-                        task_req = TaskRequest(**content)
+                        for sense in senses:
+                            if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                                # unpack message 
+                                action_msg = AgentActionMessage(**sense)
+                                self.log(f"received agent action of status {action_msg.status}! sending to bundle-builder...")
+                                
+                                # send to bundle builder 
+                                await self.action_status_inbox.put(action_msg)
 
-                        # create task bid from task request and add to results
-                        task_dict : dict = task_req.task
-                        task = MeasurementTask(**task_dict)
-                        bid = ACCBBATaskBid(task_dict, self.get_parent_name())
-                        results[task.id] = bid
+                            elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                                # unpack message 
+                                state_msg : AgentStateMessage = AgentStateMessage(**sense)
+                                self.log(f"received agent state message! sending to bundle-builder...")
+                                
+                                # send to bundle builder 
+                                await self.states_inbox.put(state_msg) 
 
-                        # send to bundle-builder and rebroadcaster
-                        out_msg = TaskBidMessage(   
-                                                    self.get_element_name(), 
-                                                    self.get_parent_name(), 
-                                                    bid.to_dict()
-                                                )
-                        await self.relevant_changes_inbox.put(out_msg)
-                        await self.outgoing_bundle_builder_inbox.put(out_msg)
+                            elif sense['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                                # unpack message
+                                task_req = TaskRequest(**sense)
+                                task_dict : dict = task_req.task
+                                task = MeasurementTask(**task_dict)
 
-                    elif content['msg_type'] == SimulationMessageTypes.TASK_BID.value:
-                        # unpack message 
-                        bid_msg : TaskBidMessage = TaskBidMessage(**content)
-                        their_bid = ACCBBATaskBid(**bid_msg.bid)
+                                # check if task has already been received
+                                if task.id in results:
+                                    self.log(f"received task request of an already registered task. Ignoring request...")
+                                    continue
+                                
+                                # create task bid from task request and add to results
+                                self.log(f"received new task request! Adding to results ledger...")
+                                bid = ACCBBATaskBid(task_dict, self.get_parent_name())
+                                results[task.id] = bid
 
-                        if their_bid.task_id not in results:
-                            # bid is for a task that I was not aware of; create new empty bid for it and compare
-                            my_bid = ACCBBATaskBid(their_bid.task, self.get_parent_name())
-                            results[their_bid.task_id] = my_bid
-                        
-                        # compare bid 
-                        my_bid : ACCBBATaskBid = results[their_bid.task_id]
-                        broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
-                        results[my_bid.task_id] = my_bid
-                        
-                        if broadcast_bid is not None:
-                            # if relevant changes were made, send to bundle builder and to out-going inbox 
-                            out_msg = TaskBidMessage(   
-                                                    self.get_parent_name(), 
-                                                    self.get_parent_name(), 
-                                                    broadcast_bid.to_dict()
-                                                )
-                            await self.relevant_changes_inbox.put(out_msg)
-                            await self.outgoing_listen_inbox.put(out_msg) 
+                                # send to bundle-builder and rebroadcaster
+                                out_msg = TaskBidMessage(   
+                                                            self.get_element_name(), 
+                                                            self.get_parent_name(), 
+                                                            bid.to_dict()
+                                                        )
+                                await self.relevant_changes_inbox.put(out_msg)
+                                await self.outgoing_bundle_builder_inbox.put(out_msg)
 
-                    # else, let agent handle it
+                            elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                                # unpack message 
+                                bid_msg : TaskBidMessage = TaskBidMessage(**sense)
+                                their_bid = ACCBBATaskBid(**bid_msg.bid)
+                                self.log(f"received a bid from anoger agent for task {their_bid.task_id}!")
+
+                                if their_bid.task_id not in results:
+                                    # bid is for a task that I was not aware of; create new empty bid for it and compare
+                                    self.log(f"task in question had not been received by this agent. Creating empty bid...")
+                                    my_bid = ACCBBATaskBid(their_bid.task, self.get_parent_name())
+                                    results[their_bid.task_id] = my_bid
+                                
+                                # compare bid 
+                                self.log(f"comparing bids for task {their_bid.task_id}...")
+                                my_bid : ACCBBATaskBid = results[their_bid.task_id]
+                                self.log(f'original bid: {my_bid}')
+                                broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
+                                self.log(f'updated bid: {my_bid}')
+                                results[my_bid.task_id] = my_bid
+                                
+                                if broadcast_bid is not None:
+                                    # if relevant changes were made, send to bundle builder and to out-going inbox 
+                                    self.log(f'relevant changes made to bid. Informing bundle-builder')
+                                    out_msg = TaskBidMessage(   
+                                                            self.get_parent_name(), 
+                                                            self.get_parent_name(), 
+                                                            broadcast_bid.to_dict()
+                                                        )
+                                    await self.relevant_changes_inbox.put(out_msg)
+                                    await self.outgoing_listen_inbox.put(out_msg) 
+
                     else:
                         self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...")
         
         except asyncio.CancelledError:
             return
+
+        finally:
+            self.listener_results = results
 
     async def bundle_builder(self) -> None:
         """
@@ -735,6 +779,7 @@ class ACCBBAPlannerModule(PlannerModule):
         """
         results = {}
         bundle = []
+        path = []
         t_curr = 0.0
         t_update = 0.0
         t_next = 0.0
@@ -744,6 +789,7 @@ class ACCBBAPlannerModule(PlannerModule):
             while True:
                 # wait for next periodict check
                 state_msg : AgentStateMessage = await self.states_inbox.get()
+
                 state_dict : dict = state_msg.state
                 state = SimulationAgentState(**state_dict)
                 t_curr = state.t
@@ -779,7 +825,7 @@ class ACCBBAPlannerModule(PlannerModule):
                 
                     # compare bids
                     my_bid : ACCBBATaskBid = results[their_bid.task_id]
-                    broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
+                    broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict(), t_curr)
                     results[my_bid.task_id] = my_bid
                         
                     if broadcast_bid is not None:
@@ -790,47 +836,116 @@ class ACCBBAPlannerModule(PlannerModule):
                                                 broadcast_bid.to_dict()
                                             )
                         changes.append(out_msg)
+                    
+                        # if outbid for a task in my bundle; release subsequent tasks in bundle
+                        if broadcast_bid in bundle:
+                            bid_index = bundle.index(broadcast_bid)
+                            
+                        # TODO: implement task release
 
                 # create bundle from new results
-                while len(bundle) < self.l_bundle and self.tasks_available(state, bundle, results):
-                    pass
+                # old_bundle = copy.deepcopy(bundle)
+                # while len(bundle) < self.l_bundle:
+                #     # check if tasks are available to be bid on
+                #     available_tasks = self.get_available_tasks(state, bundle, results)
+                #     if len(available_tasks) == 0:
+                #         break
+                    
+                #     potential_bids = {}
+                #     for task in available_tasks:
+                #         task : MeasurementTask
+
+                #         bid, path_location = self.calculate_bid(state, path, task)
+
+                # DEBUG PURPOSES ONLY: doesn nothing
+                action = WaitForMessages(t_curr, t_next)
+                await self.outgoing_bundle_builder_inbox.put(action)
+                continue
 
                 # send changes to 
                 for change in changes:
                     await self.outgoing_bundle_builder_inbox(change)
 
-                await asyncio.sleep(1e6)
+                # update internal timer
+                t_update = t_curr
+
+                # await asyncio.sleep(1e6)
 
         except asyncio.CancelledError:
-            pass
+            return
 
-    def tasks_available(self, state : SimulationAgentState, bundle : list, results : dict) -> bool:
+        finally:
+            self.bundle_builder_results = results
+
+    def get_available_tasks(self, state : SimulationAgentState, bundle : list, path : list, results : dict) -> list:
         """
         Checks if there are any tasks available to be performed
+
+        ### Returns:
+            - list containing all available and bidable tasks to be performed by the parent agent
         """
+        available = []
         for task_id in results:
             bid : ACCBBATaskBid = results[task_id]
             task = MeasurementTask(**bid.task)
 
-            #if can_b
+            if self.can_bid(state, bundle, path, task):
+                available.append(task)
 
-        return False
+        return available
 
     def can_bid(self, state : SimulationAgentState, bundle : list, path : list, task : MeasurementTask) -> bool:
         """
         Checks if an agent can perform a measurement task
         """
-        pass
+        # check capabilities
+        for instrument in task.instruments:
+            if instrument not in state.instruments:
+                return False
+        # TODO: Replace with knowledge graph^
+        
+        # # check possible paths
+        # valid_paths = False
+        # for i in range(len(path)+1):
+        #     path_i = []
+        #     for scheduled_task in path:
+        #         path_i.append(scheduled_task)
+        #     path_i.insert(i, task)
+            
+        #     # check time constraints
+        #     t_arrival : float = self.calculate_arrival_time(state, path, task)
+
+        #     # Constraint 1: task must be able to be performed before it is no longer available
+        #     if t_arrival + task.duration <= task.t_end:
+        #         valid_paths = True
+        #         break
+
+        #     # TODO Constraint 2: check correlation time constraints
+        # if not valid_paths:
+        #     return False
+        
+        return True
+
+    def calc_arrival_time(self, state : SimulationAgentState, path : list) -> float:
+        """
+        Calculates the fastest arrival time for a 
+        """
+
 
     async def rebroadcaster(self) -> None:
         try:
             while True:
                 # wait for bundle-builder to finish processing information
                 self.log('waiting for bundle-builder...')
-                bundle_msgs = [await self.outgoing_bundle_builder_inbox.get()]
-                await asyncio.sleep(1e-2)
-                while not self.outgoing_bundle_builder_inbox.empty():
+                bundle_msgs = []
+                while True:
                     bundle_msgs.append(await self.outgoing_bundle_builder_inbox.get())
+                    
+                    if self.outgoing_bundle_builder_inbox.empty():
+                        await asyncio.sleep(1e-2)
+                        if self.outgoing_bundle_builder_inbox.empty():
+                            break
+
                 self.log('bundle-builder sent its messages! comparing bids with listener...')
 
                 # get all messages from listener                
@@ -863,8 +978,9 @@ class ACCBBAPlannerModule(PlannerModule):
                 # build plan
                 plan = []
                 for bid_id in bid_messages:
-                    bid_message : TaskBidMessage = bid_message[bid_id]
-                    plan.append(BroadcastMessageAction(bid_message).to_dict())
+                    bid_message : TaskBidMessage = bid_messages[bid_id]
+                    plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
+
                 for action in actions:
                     action : AgentAction
                     plan.append(action.to_dict())
@@ -878,31 +994,20 @@ class ACCBBAPlannerModule(PlannerModule):
         except asyncio.CancelledError:
             pass
 
-    async def routine(self) -> None:
-        
-        
-        # if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
-        #     # if action wasn't completed, re-try
-        #     action_dict : dict = msg.action
-        #     self.log(f'action {action_dict} not completed yet! trying again...')
-        #     msg.dst = self.get_parent_name()
-        #     new_plan.append(action_dict)
-
-        # elif msg.status == AgentAction.COMPLETED:
-        #     # if action was completed, remove from plan
-        #     action_dict : dict = msg.action
-        #     completed_action = AgentAction(**action_dict)
-        #     removed = None
-        #     for action in self.plan:
-        #         action : AgentAction
-        #         if action.id == completed_action.id:
-        #             removed = action
-        #             break
-
-        #     if removed is not None:
-        #         self.plan.remove(removed)
-
-        pass
-
     async def teardown(self) -> None:
-        return
+        # print bidding results
+        with open(f"{self.results_path}/{self.get_parent_name()}/listener_bids.csv", "w") as file:
+            title = "task_id,bidder,own_bid,winner,winning_bid,t_arrive,t_update"
+            file.write(title)
+
+            for task_id in self.listener_results:
+                bid : ACCBBATaskBid = self.listener_results[task_id]
+                file.write('\n' + str(bid))
+
+        with open(f"{self.results_path}/{self.get_parent_name()}/bundle_builder_bids.csv", "w") as file:
+            title = "task_id,bidder,own_bid,winner,winning_bid,t_arrive,t_update"
+            file.write(title)
+
+            for task_id in self.bundle_builder_results:
+                bid : ACCBBATaskBid = self.bundle_builder_results[task_id]
+                file.write('\n' + str(bid))
