@@ -138,7 +138,7 @@ class FixedPlannerModule(PlannerModule):
                 sockets = dict(await poller.poll())
 
                 if manager_socket in sockets:
-                    self.log('listening to manager broadcast!')
+                    self.log('listening to manager broadcast!',level=logging.WARNING)
                     dst, src, content = await self.listen_manager_broadcast()
 
                     # if sim-end message, end agent `live()`
