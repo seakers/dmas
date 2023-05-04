@@ -256,9 +256,9 @@ class FixedPlannerModule(PlannerModule):
 *********************************************************************************
 """
 
-class ACCBBATaskBid(object):
+class TaskBid(object):
     """
-    ## ACCBBA Task Bid
+    ## Task Bid for ACCBBA 
 
     Describes a bid placed on a task by a given agent
 
@@ -313,16 +313,16 @@ class ACCBBATaskBid(object):
         """
         Compares bid with another and either updates, resets, or leaves the information contained in this bid
         depending on the rules specified in:
-
             - Whitten, Andrew K., et al. "Decentralized task allocation with coupled constraints in complex missions." Proceedings of the 2011 American Control Conference. IEEE, 2011.
-        ### Arguments
+
+        ### Arguments:
             - other_dict (`dict`): dictionary representing the bid being compared to
             - t (`float` or `dict`): time when this information is being updated
 
         ### Returns:
-            - rebroadcast (`TaskBid` or `NoneType`): returns information to be rebroadcasted to agents.
+            - rebroadcast (`TaskBid` or `NoneType`): returns bid information to be rebroadcasted to other agents.
         """
-        other : ACCBBATaskBid = ACCBBATaskBid(**other_dict)
+        other : TaskBid = TaskBid(**other_dict)
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id})')
@@ -534,7 +534,7 @@ class ACCBBATaskBid(object):
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id}).')
 
-        other : ACCBBATaskBid
+        other : TaskBid
         self.winning_bid = other.bid
         self.winner = other.winner
         self.t_arrive = other.t_arrive
@@ -569,6 +569,341 @@ class ACCBBATaskBid(object):
             - t_update (`float` or `int`): latest time when this bid was updated
         """
         return
+    
+    # TODO: add comparison methods for easier bundle creation
+    # def __lt__(self, other : object) -> bool:
+    #     other : TaskBid
+    #     if self.task_id != other.task_id:
+    #         # if update is for a different task, ignore update
+    #         raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+        
+    #     if other.winner == other.bidder:
+    #         if self.winner == self.bidder:
+    #             if other.winning_bid > self.winning_bid:
+    #                 # outbid
+    #                 return True
+                    
+    #             elif other.winning_bid == self.winning_bid:
+    #                 # if there's a tie, bidder with the smallest id wins
+    #                 _, their_id = other.bidder.split('_')
+    #                 _, my_id = self.bidder.split('_')
+    #                 their_id = int(their_id); my_id = int(my_id)
+
+    #                 if their_id < my_id:
+    #                     # outbid
+    #                     return True
+
+    #             if other.winning_bid < self.winning_bid:
+    #                 # NOT outbid
+    #                 return False
+
+    #         elif self.winner == other.bidder:
+    #             if other.t_update > self.t_update:
+    #                 if other.winning_bid > self.winning_bid:
+    #                     # outbid 
+    #                     return True
+
+    #             elif abs(other.t_update - self.t_update) < 1e-6:
+    #                 # leave and no rebroadcast
+    #                 pass
+
+    #             elif other.t_update < self.t_update:
+    #                 # leave and not rebroadcast
+    #                 pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
+    #                 #leave and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid == self.winning_bid:
+    #                 # leave and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #         elif self.winner == self.NONE:
+    #             # update and rebroadcast
+    #             pass
+
+    #     elif other.winner == self.bidder:
+    #         if self.winner == self.bidder:
+    #             if abs(other.t_update - self.t_update) < 1e-6:
+    #                 # leave and no rebroadcast
+    #                 pass
+                
+    #         elif self.winner == other.bidder:
+    #             # reset and rebroadcast with current update time
+    #             pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             # leave and rebroadcast
+    #             pass
+
+    #         elif self.winner == self.NONE:
+    #             # leave and rebroadcast with current update time
+    #             pass
+
+    #     elif other.winner not in [self.bidder, other.bidder]:
+    #         if self.winner == self.bidder:
+    #             if other.winning_bid > self.winning_bid:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid == self.winning_bid:
+    #                 # if there's a tie, bidder with the smallest id wins
+    #                 _, their_id = other.bidder.split('_')
+    #                 _, my_id = self.bidder.split('_')
+
+    #                 their_id = int(their_id); my_id = int(my_id)
+
+    #                 if their_id < my_id:
+    #                     #update and rebroadcast
+    #                     pass
+
+    #             elif other.winning_bid < self.winning_bid:
+    #                 # update time and rebroadcast
+    #                 pass
+
+    #         elif self.winner == other.bidder:
+    #             # update and rebroadcast
+    #             pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             if other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif abs(other.t_update - self.t_update) < 1e-6:
+    #                 # leave and no rebroadcast
+    #                 pass
+
+    #             elif other.t_update < self.t_update:
+    #                 # leave and rebroadcast
+    #                 pass
+
+    #         elif self.winner not in [self.bidder, other.bidder, other.winner]:
+    #             if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
+    #                 # leave and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
+    #                 # leave and rebroadcast
+    #                 pass
+
+    #         elif self.winner == self.NONE:
+    #             # update and rebroadcast
+    #             pass
+
+    #     elif other.winner is other.NONE:
+    #         if self.winner == self.bidder:
+    #             # leave and rebroadcast
+    #             pass
+
+    #         elif self.winner == other.bidder:
+    #             # update and rebroadcast
+    #             pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             if other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #         elif self.winner == self.NONE:
+    #             # leave and no rebroadcast
+    #             pass
+
+    # def __le__(self, other : object) -> bool:
+    #     pass
+
+    # def __gt__(self, other : object) -> bool:
+    #     """
+    #     Compares to other bid and returns true if it has not been outbid
+    #     """
+    #     other : TaskBid
+    #     if self.task_id != other.task_id:
+    #         # if update is for a different task, ignore update
+    #         raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+        
+    #     if other.winner == other.bidder:
+    #         if self.winner == self.bidder:
+    #             if other.winning_bid > self.winning_bid:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid == self.winning_bid:
+    #                 # if there's a tie, bidder with the smallest id wins
+    #                 _, their_id = other.bidder.split('_')
+    #                 _, my_id = self.bidder.split('_')
+    #                 their_id = int(their_id); my_id = int(my_id)
+
+    #                 if their_id < my_id:
+    #                     # update and rebroadcast
+    #                     pass
+
+    #             if other.winning_bid < self.winning_bid:
+    #                 # update time and rebroadcast
+    #                 pass
+
+    #         elif self.winner == other.bidder:
+    #             if other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif abs(other.t_update - self.t_update) < 1e-6:
+    #                 # leave and no rebroadcast
+    #                 pass
+
+    #             elif other.t_update < self.t_update:
+    #                 # leave and not rebroadcast
+    #                 pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
+    #                 #leave and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid == self.winning_bid:
+    #                 # leave and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #         elif self.winner == self.NONE:
+    #             # update and rebroadcast
+    #             pass
+
+    #     elif other.winner == self.bidder:
+    #         if self.winner == self.bidder:
+    #             if abs(other.t_update - self.t_update) < 1e-6:
+    #                 # leave and no rebroadcast
+    #                 pass
+                
+    #         elif self.winner == other.bidder:
+    #             # reset and rebroadcast with current update time
+    #             pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             # leave and rebroadcast
+    #             pass
+
+    #         elif self.winner == self.NONE:
+    #             # leave and rebroadcast with current update time
+    #             pass
+
+    #     elif other.winner not in [self.bidder, other.bidder]:
+    #         if self.winner == self.bidder:
+    #             if other.winning_bid > self.winning_bid:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid == self.winning_bid:
+    #                 # if there's a tie, bidder with the smallest id wins
+    #                 _, their_id = other.bidder.split('_')
+    #                 _, my_id = self.bidder.split('_')
+
+    #                 their_id = int(their_id); my_id = int(my_id)
+
+    #                 if their_id < my_id:
+    #                     #update and rebroadcast
+    #                     pass
+
+    #             elif other.winning_bid < self.winning_bid:
+    #                 # update time and rebroadcast
+    #                 pass
+
+    #         elif self.winner == other.bidder:
+    #             # update and rebroadcast
+    #             pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             if other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif abs(other.t_update - self.t_update) < 1e-6:
+    #                 # leave and no rebroadcast
+    #                 pass
+
+    #             elif other.t_update < self.t_update:
+    #                 # leave and rebroadcast
+    #                 pass
+
+    #         elif self.winner not in [self.bidder, other.bidder, other.winner]:
+    #             if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #             elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
+    #                 # leave and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+                    
+    #             elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
+    #                 # leave and rebroadcast
+    #                 pass
+
+    #         elif self.winner == self.NONE:
+    #             # update and rebroadcast
+    #             pass
+
+    #     elif other.winner is other.NONE:
+    #         if self.winner == self.bidder:
+    #             # leave and rebroadcast
+    #             pass
+
+    #         elif self.winner == other.bidder:
+    #             # update and rebroadcast
+    #             pass
+
+    #         elif self.winner not in [self.bidder, other.bidder]:
+    #             if other.t_update > self.t_update:
+    #                 # update and rebroadcast
+    #                 pass
+
+    #         elif self.winner == self.NONE:
+    #             # leave and no rebroadcast
+    #             pass
+
+    # def __ge__(self, other : object) -> bool:
+    #     pass
+
+    # def __eq__(self, other : object) -> bool:
+    #     pass
+
+    # def __ne__(self, other : object) -> bool:
+    #     pass
 
     def to_dict(self) -> dict:
         """
@@ -580,7 +915,7 @@ class ACCBBATaskBid(object):
         """
         Returns a deep copy of this bid
         """
-        return ACCBBATaskBid(self.task, self.bidder, self.winning_bid, self.winner, self.t_arrive, self.t_update)
+        return TaskBid(self.task, self.bidder, self.winning_bid, self.winner, self.t_arrive, self.t_update)
 
 class ACCBBAPlannerModule(PlannerModule):
     """
@@ -718,7 +1053,7 @@ class ACCBBAPlannerModule(PlannerModule):
                                 
                                 # create task bid from task request and add to results
                                 self.log(f"received new task request! Adding to results ledger...")
-                                bid = ACCBBATaskBid(task_dict, self.get_parent_name())
+                                bid = TaskBid(task_dict, self.get_parent_name())
                                 results[task.id] = bid
 
                                 # send to bundle-builder and rebroadcaster
@@ -733,20 +1068,20 @@ class ACCBBAPlannerModule(PlannerModule):
                             elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
                                 # unpack message 
                                 bid_msg : TaskBidMessage = TaskBidMessage(**sense)
-                                their_bid = ACCBBATaskBid(**bid_msg.bid)
+                                their_bid = TaskBid(**bid_msg.bid)
                                 self.log(f"received a bid from anoger agent for task {their_bid.task_id}!")
 
                                 if their_bid.task_id not in results:
                                     # bid is for a task that I was not aware of; create new empty bid for it and compare
                                     self.log(f"task in question had not been received by this agent. Creating empty bid...")
-                                    my_bid = ACCBBATaskBid(their_bid.task, self.get_parent_name())
+                                    my_bid = TaskBid(their_bid.task, self.get_parent_name())
                                     results[their_bid.task_id] = my_bid
                                 
                                 # compare bid 
                                 self.log(f"comparing bids for task {their_bid.task_id}...")
-                                my_bid : ACCBBATaskBid = results[their_bid.task_id]
+                                my_bid : TaskBid = results[their_bid.task_id]
                                 self.log(f'original bid: {my_bid}')
-                                broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict())
+                                broadcast_bid : TaskBid = my_bid.update(their_bid.to_dict())
                                 self.log(f'updated bid: {my_bid}')
                                 results[my_bid.task_id] = my_bid
                                 
@@ -816,22 +1151,22 @@ class ACCBBAPlannerModule(PlannerModule):
                     bid_msg : TaskBidMessage = await self.relevant_changes_inbox.get()
                     
                     # unpackage bid
-                    their_bid = ACCBBATaskBid(**bid_msg.bid)
+                    their_bid = TaskBid(**bid_msg.bid)
                     
                     # check if bid exists for this task
                     new_task = their_bid.task_id not in results
                     if new_task:
                         # was not aware of this task; add to results as a blank bid
-                        results[their_bid.task_id] = ACCBBATaskBid( their_bid.task, self.get_parent_name())
+                        results[their_bid.task_id] = TaskBid( their_bid.task, self.get_parent_name())
 
                     # compare bids
-                    my_bid : ACCBBATaskBid = results[their_bid.task_id]
+                    my_bid : TaskBid = results[their_bid.task_id]
                     self.log(f'comparing bids:\n\tmy bid: {my_bid}\n\ttheir bid: {their_bid}')
-                    broadcast_bid : ACCBBATaskBid = my_bid.update(their_bid.to_dict(), t_curr)
+                    broadcast_bid : TaskBid = my_bid.update(their_bid.to_dict(), t_curr)
                     self.log(f'bid updated:\n{my_bid}')
                     results[my_bid.task_id] = my_bid
                         
-                    # check if relevant changes were made
+                    # if relevant changes were made, add to changes broadcast
                     if broadcast_bid or new_task:
                         broadcast_bid = broadcast_bid if not new_task else my_bid
                         out_msg = TaskBidMessage(   
@@ -841,7 +1176,7 @@ class ACCBBAPlannerModule(PlannerModule):
                                             )
                         changes.append(out_msg)
                     
-                    # if outbid for a task in the bundle; release subsequent tasks in bundle and path
+                    # if outbid for a task in the bundle, release subsequent tasks in bundle and path
                     if broadcast_bid in bundle:
                         bid_index = bundle.index(broadcast_bid)
 
@@ -850,29 +1185,62 @@ class ACCBBAPlannerModule(PlannerModule):
                             task = bundle.pop(bid_index)
                             path.remove(task)
 
-                # create bundle from new results
-                # old_bundle = copy.deepcopy(bundle)
-                # while len(bundle) < self.l_bundle:
-                #     # check if tasks are available to be bid on
-                #     available_tasks = self.get_available_tasks(state, bundle, results)
-                #     if len(available_tasks) == 0:
-                #         break
+                # update bundle from new information
+                available_tasks : list = self.get_available_tasks(state, bundle, results)
+                while len(bundle) < self.l_bundle:
+                    # check if tasks are available to be bid on
+                    if len(available_tasks) == 0:
+                        # no more tasks to 
+                        break
                     
-                #     potential_bids = {}
-                #     for task in available_tasks:
-                #         task : MeasurementTask
+                    max_bid = None
+                    max_bid_task = None
+                    max_bid_path_location = -1
+                    # iterate through available tasks and find next best task to put in bundle (greedy)
+                    for task in available_tasks:
+                        # calculate bid for a given available task
+                        task : MeasurementTask
+                        bid, path_location = self.calculate_bid(state, path, task)
+                        bid : TaskBid; path_location : int
 
-                #         bid, path_location = self.calculate_bid(state, path, task)
+                        # compare to maximum task
+                        if max_bid is None or bid.own_bid > max_bid.own_bid:
+                            max_bid = bid
+                            max_bid_task = task
+                            max_bid_path_location = path_location                          
 
-                # DEBUG PURPOSES ONLY: doesn nothing
-                action = WaitForMessages(t_curr, t_next)
-                await self.outgoing_bundle_builder_inbox.put(action)
-                continue
+                    if max_bid is not None:
+                        # max bid was found; place max bid in bundle
+                        bundle.append(max_bid_task)
+                        path.insert(max_bid_path_location, max_bid_task)
+                        
+                        # update results
+                        current_bid : TaskBid = results[bid.task_id]
+                        current_bid.update(bid, t_curr)
+                        results[bid.task_id] = current_bid
+
+                        # add to changes broadcast
+                        out_msg = TaskBidMessage(   
+                                                self.get_parent_name(), 
+                                                self.get_parent_name(), 
+                                                current_bid.to_dict()
+                                            )
+                        changes.append(out_msg)
+
+                    else:
+                        # no max bid was found; no more tasks can be added to the bundle
+                        break
+
 
                 # send changes to 
                 for change in changes:
-                    await self.outgoing_bundle_builder_inbox(change)
+                    await self.outgoing_bundle_builder_inbox.put(change)
 
+                # DEBUG PURPOSES ONLY: instructs agent to idle and only messages/listens to agents
+                action = WaitForMessages(t_curr, t_next)
+                await self.outgoing_bundle_builder_inbox.put(action)
+                continue
+            
                 # update internal timer
                 t_update = t_curr
 
@@ -893,10 +1261,10 @@ class ACCBBAPlannerModule(PlannerModule):
         """
         available = []
         for task_id in results:
-            bid : ACCBBATaskBid = results[task_id]
+            bid : TaskBid = results[task_id]
             task = MeasurementTask(**bid.task)
 
-            if self.can_bid(state, bundle, path, task):
+            if self.can_bid(state, bundle, path, task) and task not in bundle:
                 available.append(task)
 
         return available
@@ -905,13 +1273,18 @@ class ACCBBAPlannerModule(PlannerModule):
         """
         Checks if an agent can perform a measurement task
         """
-        # check capabilities
+        # check capabilities - TODO: Replace with knowledge graph
         for instrument in task.instruments:
             if instrument not in state.instruments:
                 return False
-        # TODO: Replace with knowledge graph^
+
+        # check time constraints
+        ## Constraint 1: task must be able to be performed durig or after the current time
+        if task.t_end < state.t:
+            return False
         
-        # # check possible paths
+        
+        # TODO: check possible paths
         # valid_paths = False
         # for i in range(len(path)+1):
         #     path_i = []
@@ -975,8 +1348,8 @@ class ACCBBAPlannerModule(PlannerModule):
                         else:
                             # only keep most recent information for bids
                             listener_bid_msg : TaskBidMessage = bid_messages[msg.id]
-                            bundle_bid : ACCBBATaskBid = msg.bid 
-                            listener_bid : ACCBBATaskBid = listener_bid_msg.bid
+                            bundle_bid : TaskBid = msg.bid 
+                            listener_bid : TaskBid = listener_bid_msg.bid
                             if bundle_bid.t_update > listener_bid.t_update:
                                 bid_messages[msg.id] = msg
                     elif isinstance(msg, AgentAction):
@@ -1008,7 +1381,7 @@ class ACCBBAPlannerModule(PlannerModule):
             file.write(title)
 
             for task_id in self.listener_results:
-                bid : ACCBBATaskBid = self.listener_results[task_id]
+                bid : TaskBid = self.listener_results[task_id]
                 file.write('\n' + str(bid))
 
         with open(f"{self.results_path}/{self.get_parent_name()}/bundle_builder_bids.csv", "w") as file:
@@ -1016,5 +1389,5 @@ class ACCBBAPlannerModule(PlannerModule):
             file.write(title)
 
             for task_id in self.bundle_builder_results:
-                bid : ACCBBATaskBid = self.bundle_builder_results[task_id]
+                bid : TaskBid = self.bundle_builder_results[task_id]
                 file.write('\n' + str(bid))
