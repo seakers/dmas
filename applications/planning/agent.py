@@ -228,17 +228,18 @@ class SimulationAgent(Agent):
         while not self.external_inbox.empty():
             _, _, content = await self.external_inbox.get()
 
+            # save as senses to forward to planner
             if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                # save as senses to forward to planner
                 senses.append(AgentStateMessage(**content))
 
             elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                # save as senses to forward to planner
                 senses.append(TaskRequest(**content))
 
             elif content['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
-                # save as senses to forward to planner
                 senses.append(PlannerResultsMessage(**content))
+
+            elif content['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                senses.append(TaskBidMessage(**content))
 
         return senses
 

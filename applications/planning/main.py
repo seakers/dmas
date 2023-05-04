@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     ## agents
     n_agents = 2
-    comms_range = 0.5
+    comms_range = 20
     v_max = 1
 
     ## clock configuration
@@ -92,7 +92,9 @@ if __name__ == '__main__':
         pos = [x, y]
         s_max = 1.0
         
-        instruments = random_instruments(task_types)
+        # instruments = random_instruments(task_types)
+        instruments = [task_types[0]]
+
         task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
         tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
@@ -144,7 +146,7 @@ if __name__ == '__main__':
 
         pos = [x, y]
         vel = [0.0, 0.0]
-        instruments = task_types[:1]
+        instruments = task_types
         # instruments = random_instruments(task_types)
         initial_state = SimulationAgentState(   pos, 
                                                 x_bounds, 
@@ -177,6 +179,7 @@ if __name__ == '__main__':
             pool.submit(agent.run, *[])
 
     # # TODO compile results from monitor
+    
 
     # # plot results
     if plot_results:

@@ -210,6 +210,9 @@ class Agent(Node):
 
     async def live(self):
         try:
+            # subscribe to environment broadcasts
+            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
+            
             # run `routine()` and `listen()` until the one terminates
             t_1 = asyncio.create_task(self.reactive_routine(), name='reactive_routine()')
             t_2 = asyncio.create_task(self.listen_to_broadcasts(), name='listen_to_broadcasts()')
@@ -255,9 +258,6 @@ class Agent(Node):
         Listens for any incoming broadcasts and classifies them in their respective inbox
         """
         try:
-            # subscribe to environment broadcasts
-            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
-
             # create poller for all broadcast sockets
             poller = azmq.Poller()
 

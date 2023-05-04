@@ -44,6 +44,17 @@ class SimulationEnvironment(EnvironmentNode):
 
         self.agent_connectivity_history = []
 
+        # await self.publish_tasks()
+
+    async def publish_tasks(self):
+        self.log(f'publishing {len(self.tasks)} task requests to all agents...')
+        while len(self.tasks) > 0:
+            task : MeasurementTask = self.tasks.pop(0)
+            task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
+            await self.send_peer_broadcast(task_req)
+            self.pulished_tasks.append(task)
+        self.log('tasks published!')
+
     async def live(self) -> None:
         try:
             # track agent and simulation states
@@ -52,6 +63,10 @@ class SimulationEnvironment(EnvironmentNode):
             socket_agents, _ = self._external_socket_map.get(zmq.REP)
             poller.register(socket_manager, zmq.POLLIN)
             poller.register(socket_agents, zmq.POLLIN)
+
+            await asyncio.sleep(1e-2)
+
+            await self.publish_tasks()
 
             # listen for messages
             self.log(f'task requests broadcasted! listening to incoming messages...')
@@ -114,14 +129,7 @@ class SimulationEnvironment(EnvironmentNode):
                             self.log('connectivity updates sent!')
 
                         elif len(self.tasks) > 0:
-                            # publish tasks
-                            self.log(f'publishing {len(self.tasks)} task requests to all agents...')
-                            while len(self.tasks) > 0:
-                                task : MeasurementTask = self.tasks.pop(0)
-                                task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
-                                await self.send_peer_broadcast(task_req)
-                                self.pulished_tasks.append(task)
-                            self.log('tasks published!')
+                            await self.publish_tasks()
 
                         else:
                             self.log(f'connectivity checked. no connectivity updates...')
