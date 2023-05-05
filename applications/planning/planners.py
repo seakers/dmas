@@ -274,10 +274,12 @@ class TaskBid(object):
         - task (`dict`): task being bid on
         - task_id (`str`): id of the task being bid on
         - bidder (`bidder`): name of the agent keeping track of this bid information
-        - bid (`float` or `int`): current winning bid
+        - own_bid (`float` or `int`): latest bid from bidder
         - winner (`str`): name of current the winning agent
+        - winning_bid (`float` or `int`): current winning bid
         - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
         - t_update (`float` or `int`): lates time when this bid was updated
+        - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
     """
     NONE = 'None'
 
@@ -289,17 +291,21 @@ class TaskBid(object):
                     winner : str = NONE,
                     t_arrive : Union[float, int] = -1, 
                     t_update : Union[float, int] = -1,
+                    dt_converge : Union[float, int] = 0.0,
                     **_
                     ) -> object:
         """
         Creates an instance of a task bid
 
         ### Arguments:
-            - task_id (`str`): id of the task being bid on
-            - bid (`float` or `int`): current winning bid
+            - task (`dict`): task being bid on
+            - bidder (`bidder`): name of the agent keeping track of this bid information
+            - own_bid (`float` or `int`): latest bid from bidder
             - winner (`str`): name of current the winning agent
+            - winning_bid (`float` or `int`): current winning bid
             - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
-            - t_update (`float` or `int`): latest time when this bid was updated
+            - t_update (`float` or `int`): lates time when this bid was updated
+            - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
         """
         self.task = task
         self.task_id = task['id']
@@ -309,6 +315,7 @@ class TaskBid(object):
         self.winner = winner
         self.t_arrive = t_arrive
         self.t_update = t_update
+        self.dt_converge = dt_converge
 
     def __str__(self) -> str:
         """
@@ -1164,6 +1171,7 @@ class ACCBBAPlannerModule(PlannerModule):
         t_update = 0.0
         t_next = 0.0
         f_update = 1.0
+        plan = []
         
         try:
             while True:
@@ -1172,6 +1180,7 @@ class ACCBBAPlannerModule(PlannerModule):
                 state = SimulationAgentState(**state_msg.state)
                 t_curr = state.t
                 
+                # TODO add fixed periodic checking of messages
                 # if t_curr < t_next:
                 #     # update threshold has not been reached yet; instruct agent to wait for messages
                 #     action = WaitForMessages(t_curr, t_next)
@@ -1231,8 +1240,8 @@ class ACCBBAPlannerModule(PlannerModule):
 
                         for _ in range(bid_index, len(bundle)):
                             # remove task from bundle
-                            task = bundle.pop(bid_index)
-                            path.remove(task)
+                            measurement_task = bundle.pop(bid_index)
+                            path.remove(measurement_task)
 
                 # update bundle from new information
                 self.log_results(results)
@@ -1244,10 +1253,10 @@ class ACCBBAPlannerModule(PlannerModule):
                     max_path = None; max_task = None; max_path_bids = None
                     max_path_utility = self.sum_path_utility(path, current_bids)
                     # find next best task to put in bundle (greedy)
-                    for task in available_tasks:
+                    for measurement_task in available_tasks:
                         # calculate bid for a given available task
-                        task : MeasurementTask
-                        projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, task)
+                        measurement_task : MeasurementTask
+                        projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, measurement_task)
                         
                         # check if path was found
                         if projected_path is None:
@@ -1255,14 +1264,14 @@ class ACCBBAPlannerModule(PlannerModule):
 
                         # compare to maximum task
                         if (max_path is None or projected_path_utility > max_path_utility):
-                            proposed_bid : TaskBid = projected_bids[task.id]
-                            current_bid : TaskBid = results[task.id]
+                            proposed_bid : TaskBid = projected_bids[measurement_task.id]
+                            current_bid : TaskBid = results[measurement_task.id]
                             if current_bid.winning_bid > proposed_bid.winning_bid:
                                 # if proposed path for task cannot out-bid current winner
                                 continue
 
                             max_path = projected_path
-                            max_task = task
+                            max_task = measurement_task
                             max_path_bids = projected_bids
                             max_path_utility = projected_path_utility
 
@@ -1272,12 +1281,12 @@ class ACCBBAPlannerModule(PlannerModule):
                         path = max_path
                         
                         # update bids
-                        for task in bundle:
-                            task : MeasurementTask
-                            bid : TaskBid = max_path_bids[task.id]
-                            current_bid : TaskBid = results[task.id]
+                        for measurement_task in bundle:
+                            measurement_task : MeasurementTask
+                            bid : TaskBid = max_path_bids[measurement_task.id]
+                            current_bid : TaskBid = results[measurement_task.id]
                             current_bid.update(bid.to_dict(), t_curr)
-                            results[task.id] = current_bid
+                            results[measurement_task.id] = current_bid
 
                             # add to changes broadcast
                             out_msg = TaskBidMessage(   
@@ -1294,22 +1303,112 @@ class ACCBBAPlannerModule(PlannerModule):
                         # no max bid was found; no more tasks can be added to the bundle
                         break
 
-                # send changes to rebroadcaster
-                for change in changes:
-                    await self.outgoing_bundle_builder_inbox.put(change)
-
                 # DEBUG PURPOSES ONLY: instructs agent to idle and only messages/listens to agents
                 self.log_results(results)
                 self.log_task_sequence('bundle', bundle)
                 self.log_task_sequence('path', path)
-                action = WaitForMessages(t_curr, t_curr + 1/f_update)
-                await self.outgoing_bundle_builder_inbox.put(action)
+                # action = WaitForMessages(t_curr, t_curr + 1/f_update)
+                # await self.outgoing_bundle_builder_inbox.put(action)
+                # continue
+
+                # give agent tasks to perform at the current time
+                actions = []
+                if (len(changes) == 0 
+                    and self.check_path_constraints(path, results, t_curr)):
+                    if len(plan) == 0:
+                        # generate plan
+                        for i in range(path):
+                            measurement_task : MeasurementTask = path[i]
+                            
+                            if len(plan) == 0:
+                                t_start = t_curr
+                            else:
+                                prev_move : MoveAction = actions[(i-1)*2]
+                                prev_measure : MeasurementTask = actions[(i-1)*2 + 1]
+                                t_start = prev_move.t_end + prev_measure.duration
+
+                            task_pos = measurement_task.pos
+                            agent_pos = state.pos
+
+                            dx = np.sqrt( (task_pos[0] - agent_pos[0])**2 + (task_pos[1] - agent_pos[1])**2 )
+                            dt = dx / state.v_max
+                            move_task = MoveAction(measurement_task.pos, t_start, t_start + dt)
+
+                            # plan per measurement request: move to plan, perform measurement 
+                            plan.append(move_task)
+                            plan.append(measurement_task)  
+                        
+                        actions.append(plan[0])
+                    else:
+                        while not self.action_status_inbox.empty():
+                            action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                            agent_action = AgentAction(**action_msg.action)
+
+                            latest_plan_action : AgentAction = plan[0]
+                            if agent_action.id != latest_plan_action.id:
+                                # some other task was performed; ignoring 
+                                continue
+
+                            elif agent_action.status == AgentAction.PENDING:
+                                # latest action from plan was attepted but not completed; performing again
+                                actions.append(plan[0])
+
+                            elif agent_action.status == AgentAction.COMPLETED:
+                                # latest action from plan was completed! performing next action in plan
+                                plan.pop(0)
+                                actions.append(plan[0])
+                else:
+                    # bundle is empty or cannot be executed yet; instructing agent to idle
+                    plan = []
+                    actions.append(WaitForMessages(t_curr, t_curr + 1/f_update))
+
+                # send changes to rebroadcaster
+                for change in changes:
+                    await self.outgoing_bundle_builder_inbox.put(change)
+                    
+                # send actions to broadcaster
+                if len(actions) == 0:
+                    actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
+                for action in actions:
+                    await self.outgoing_bundle_builder_inbox.put(action)
+                
 
         except asyncio.CancelledError:
             return
 
         finally:
             self.bundle_builder_results = results
+
+    def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids of every task in the current path have all of their constraints
+        satisfied by other bids.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        for task in path:
+            # check constraints
+            task : MeasurementTask
+            if not self.check_task_constraints(task, results):
+                return False
+            
+            # check local convergence
+            my_bid : TaskBid = results[task.id]
+            if my_bid.t_update + my_bid.dt_converge > t_curr:
+                return False
+
+        return True
+
+    def check_task_constraints(self, task : MeasurementTask, results : dict) -> bool:
+        """
+        Checks if the bids in the current results satisfy the constraints of a given task.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        # TODO add bid and time constraints
+        return True
 
     def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
         """

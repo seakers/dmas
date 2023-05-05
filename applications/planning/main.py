@@ -47,7 +47,7 @@ if __name__ == '__main__':
     y_bounds = [0, 5]
 
     ## agents
-    n_agents = 2
+    n_agents = 1
     comms_range = 20
     v_max = 1
 
@@ -70,10 +70,10 @@ if __name__ == '__main__':
     port = random.randint(5555,9999)
 
     ## loggers
-    level = logging.WARNING
+    level = logging.DEBUG
 
     ### random tasks 
-    n_tasks = 2
+    n_tasks = 1
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
@@ -87,20 +87,20 @@ if __name__ == '__main__':
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [1.0, 2.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [1.0, 2.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [2.0, 1.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [2.0, 1.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [2.0, 2.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [2.0, 2.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     # for i in range(n_tasks):
         # t_start = random.random() * clock_config.get_total_seconds()
@@ -156,6 +156,7 @@ if __name__ == '__main__':
     pos = [1.0, 0.0]
     vel = [0.0, 0.0]
     instruments = task_types
+    agent_id = 0
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
                                             y_bounds, 
@@ -167,7 +168,7 @@ if __name__ == '__main__':
     agent = SimulationAgent(    results_path,
                                 network_name,
                                 port, 
-                                0,
+                                agent_id,
                                 manager_network_config,
                                 PlannerTypes.ACCBBA,
                                 instruments,
@@ -177,29 +178,30 @@ if __name__ == '__main__':
                                 )
     agents.append(agent)
 
-    pos = [2.0, 0.0]
-    vel = [0.0, 0.0]
-    instruments = task_types
-    initial_state = SimulationAgentState(   pos, 
-                                            x_bounds, 
-                                            y_bounds, 
-                                            vel, 
-                                            v_max, 
-                                            [],  
-                                            status=SimulationAgentState.IDLING,
-                                            instruments=instruments)
-    agent = SimulationAgent(    results_path,
-                                network_name,
-                                port, 
-                                1,
-                                manager_network_config,
-                                PlannerTypes.ACCBBA,
-                                instruments,
-                                initial_state,
-                                level,
-                                logger
-                                )
-    agents.append(agent)
+    # pos = [2.0, 0.0]
+    # vel = [0.0, 0.0]
+    # instruments = task_types
+    # agent_id = 1
+    # initial_state = SimulationAgentState(   pos, 
+    #                                         x_bounds, 
+    #                                         y_bounds, 
+    #                                         vel, 
+    #                                         v_max, 
+    #                                         [],  
+    #                                         status=SimulationAgentState.IDLING,
+    #                                         instruments=instruments)
+    # agent = SimulationAgent(    results_path,
+    #                             network_name,
+    #                             port, 
+    #                             agent_id,
+    #                             manager_network_config,
+    #                             PlannerTypes.ACCBBA,
+    #                             instruments,
+    #                             initial_state,
+    #                             level,
+    #                             logger
+    #                             )
+    # agents.append(agent)
 
 
     # for id in range(n_agents):        
