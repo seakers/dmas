@@ -43,8 +43,8 @@ if __name__ == '__main__':
     
     # define simulation config
     ## environment bounds
-    x_bounds = [0, 10]
-    y_bounds = [0, 10]
+    x_bounds = [0, 5]
+    y_bounds = [0, 5]
 
     ## agents
     n_agents = 2
@@ -73,30 +73,46 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 1
+    n_tasks = 2
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
     tasks = []
-    for i in range(n_tasks):
+    s_max = 1.0
+    t_start = 0.0
+    t_end = T
+
+    pos = [1.0, 1.0]   
+    instruments = [task_types[0]]
+    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    pos = [1.0, 2.0]   
+    instruments = [task_types[0]]
+    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    pos = [2.0, 1.0]   
+    instruments = [task_types[0]]
+    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    pos = [2.0, 2.0]   
+    instruments = [task_types[0]]
+    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    # for i in range(n_tasks):
         # t_start = random.random() * clock_config.get_total_seconds()
         # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
         # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        
-        t_start = 0.0
-        t_end = T
-        x = x_bounds[0] + i
-        y = 0.0
-        
-        pos = [x, y]
-        s_max = 1.0
-        
+        # pos = [x, y]
+        # s_max = 1.0
         # instruments = random_instruments(task_types)
-        instruments = [task_types[0]]
 
-        task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-        tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+        # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+        # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
@@ -137,37 +153,82 @@ if __name__ == '__main__':
 
     # create simulation agents
     agents = []
-    for id in range(n_agents):        
-        # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()        
-        # x, y = 0.0, 0.0
+    pos = [1.0, 0.0]
+    vel = [0.0, 0.0]
+    instruments = task_types
+    initial_state = SimulationAgentState(   pos, 
+                                            x_bounds, 
+                                            y_bounds, 
+                                            vel, 
+                                            v_max, 
+                                            [],  
+                                            status=SimulationAgentState.IDLING,
+                                            instruments=instruments)
+    agent = SimulationAgent(    results_path,
+                                network_name,
+                                port, 
+                                0,
+                                manager_network_config,
+                                PlannerTypes.ACCBBA,
+                                instruments,
+                                initial_state,
+                                level,
+                                logger
+                                )
+    agents.append(agent)
 
-        x, y = x_bounds[0] + id, 1.0
+    pos = [2.0, 0.0]
+    vel = [0.0, 0.0]
+    instruments = task_types
+    initial_state = SimulationAgentState(   pos, 
+                                            x_bounds, 
+                                            y_bounds, 
+                                            vel, 
+                                            v_max, 
+                                            [],  
+                                            status=SimulationAgentState.IDLING,
+                                            instruments=instruments)
+    agent = SimulationAgent(    results_path,
+                                network_name,
+                                port, 
+                                1,
+                                manager_network_config,
+                                PlannerTypes.ACCBBA,
+                                instruments,
+                                initial_state,
+                                level,
+                                logger
+                                )
+    agents.append(agent)
 
-        pos = [x, y]
-        vel = [0.0, 0.0]
-        instruments = task_types
-        # instruments = random_instruments(task_types)
-        initial_state = SimulationAgentState(   pos, 
-                                                x_bounds, 
-                                                y_bounds, 
-                                                vel, 
-                                                v_max, 
-                                                [],  
-                                                status=SimulationAgentState.IDLING,
-                                                instruments=instruments)
-        agent = SimulationAgent(    results_path,
-                                    network_name,
-                                    port, 
-                                    id,
-                                    manager_network_config,
-                                    PlannerTypes.ACCBBA,
-                                    instruments,
-                                    initial_state,
-                                    level,
-                                    logger
-                                    )
-        agents.append(agent)
+
+    # for id in range(n_agents):        
+    #     # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()  
+    #     pos = [x, y]
+    #     vel = [0.0, 0.0]
+    #     instruments = task_types
+    #     # instruments = random_instruments(task_types)
+    #     initial_state = SimulationAgentState(   pos, 
+    #                                             x_bounds, 
+    #                                             y_bounds, 
+    #                                             vel, 
+    #                                             v_max, 
+    #                                             [],  
+    #                                             status=SimulationAgentState.IDLING,
+    #                                             instruments=instruments)
+    #     agent = SimulationAgent(    results_path,
+    #                                 network_name,
+    #                                 port, 
+    #                                 id,
+    #                                 manager_network_config,
+    #                                 PlannerTypes.ACCBBA,
+    #                                 instruments,
+    #                                 initial_state,
+    #                                 level,
+    #                                 logger
+    #                                 )
+    #     agents.append(agent)
 
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
@@ -178,7 +239,13 @@ if __name__ == '__main__':
             agent : SimulationElement
             pool.submit(agent.run, *[])
 
-    # # TODO compile results from monitor
+    # TODO Compile and compare planner results
+    # for id in range(n_agents):
+    #     listener_results = {}
+    #     listener_df = pandas.read_csv(f"{results_path}/AGENT_{id}/listener_bids.csv")
+
+
+    #     bundle_builder_results = {}
     
 
     # # plot results

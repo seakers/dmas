@@ -1124,6 +1124,32 @@ class ACCBBAPlannerModule(PlannerModule):
         finally:
             self.listener_results = results
 
+    def log_results(self, results : dict, level=logging.DEBUG) -> None:
+        """
+        Logs results at a given time for debugging puropses
+        """
+        out = '\ntask_id,  location,  bidder, bid, winner, winning_bid, t_arrive\n'
+        for task_id in results:
+            bid : TaskBid = results[task_id]
+            task = MeasurementTask(**bid.task)
+            split_id = task.id.split('-')
+            out += f'{split_id[0]}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_arrive, 3)}\n'
+
+        self.log(out, level)
+
+    def log_task_sequence(self, name : str, sequence : list, level=logging.DEBUG) -> None:
+        out = f'\n{name} = ['
+        for task in sequence:
+            task : MeasurementTask
+            split_id = task.id.split('-')
+            
+            if sequence.index(task) > 0:
+                out += ', '
+            out += f'{split_id[0]}'
+        out += ']\n'
+
+        self.log(out,level)
+
     async def bundle_builder(self) -> None:
         """
         ## Bundle-builder
@@ -1164,6 +1190,9 @@ class ACCBBAPlannerModule(PlannerModule):
                 # t_update = t_curr
 
                 # compare bids with incoming messages
+                self.log_results(results)
+                self.log_task_sequence('bundle', bundle)
+                self.log_task_sequence('path', path)
                 changes = []
                 while not self.relevant_changes_inbox.empty():
                     # get next bid
@@ -1180,9 +1209,9 @@ class ACCBBAPlannerModule(PlannerModule):
 
                     # compare bids
                     my_bid : TaskBid = results[their_bid.task_id]
-                    self.log(f'comparing bids:\n\tmy bid: {my_bid}\n\ttheir bid: {their_bid}')
+                    self.log(f'comparing bids...\nmine:  {my_bid}\ntheirs: {their_bid}')
                     broadcast_bid : TaskBid = my_bid.update(their_bid.to_dict(), t_curr)
-                    self.log(f'bid updated:\n{my_bid}')
+                    self.log(f'updated: {my_bid}\n')
                     results[my_bid.task_id] = my_bid
                         
                     # if relevant changes were made, add to changes broadcast
@@ -1196,8 +1225,9 @@ class ACCBBAPlannerModule(PlannerModule):
                         changes.append(out_msg)
                     
                     # if outbid for a task in the bundle, release subsequent tasks in bundle and path
-                    if broadcast_bid is not None and broadcast_bid in bundle:
-                        bid_index = bundle.index(broadcast_bid)
+                    bid_task = MeasurementTask(**my_bid.task)
+                    if bid_task in bundle and my_bid.winner != self.get_parent_name():
+                        bid_index = bundle.index(bid_task)
 
                         for _ in range(bid_index, len(bundle)):
                             # remove task from bundle
@@ -1205,6 +1235,9 @@ class ACCBBAPlannerModule(PlannerModule):
                             path.remove(task)
 
                 # update bundle from new information
+                self.log_results(results)
+                self.log_task_sequence('bundle', bundle)
+                self.log_task_sequence('path', path)
                 available_tasks : list = self.get_available_tasks(state, bundle, results)
                 while len(bundle) < self.l_bundle and len(available_tasks) > 0:                    
                     current_bids = {task.id : results[task.id] for task in bundle}
@@ -1216,8 +1249,18 @@ class ACCBBAPlannerModule(PlannerModule):
                         task : MeasurementTask
                         projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, task)
                         
+                        # check if path was found
+                        if projected_path is None:
+                            continue
+
                         # compare to maximum task
-                        if max_path is None or projected_path_utility > max_path_utility:
+                        if (max_path is None or projected_path_utility > max_path_utility):
+                            proposed_bid : TaskBid = projected_bids[task.id]
+                            current_bid : TaskBid = results[task.id]
+                            if current_bid.winning_bid > proposed_bid.winning_bid:
+                                # if proposed path for task cannot out-bid current winner
+                                continue
+
                             max_path = projected_path
                             max_task = task
                             max_path_bids = projected_bids
@@ -1256,6 +1299,9 @@ class ACCBBAPlannerModule(PlannerModule):
                     await self.outgoing_bundle_builder_inbox.put(change)
 
                 # DEBUG PURPOSES ONLY: instructs agent to idle and only messages/listens to agents
+                self.log_results(results)
+                self.log_task_sequence('bundle', bundle)
+                self.log_task_sequence('path', path)
                 action = WaitForMessages(t_curr, t_curr + 1/f_update)
                 await self.outgoing_bundle_builder_inbox.put(action)
 
@@ -1393,7 +1439,7 @@ class ACCBBAPlannerModule(PlannerModule):
             pos_prev = state.pos
         else:
             task_prev : MeasurementTask = path[i-1]
-            bid_prev : TaskBid = bids[task_prev]
+            bid_prev : TaskBid = bids[task_prev.id]
             t_prev : float = bid_prev.t_arrive + task_prev.duration
             pos_prev : list = task_prev.pos
 
@@ -1449,8 +1495,9 @@ class ACCBBAPlannerModule(PlannerModule):
                             # only keep most recent information for bids
                             listener_bid_msg : TaskBidMessage = bid_messages[bundle_bid.task_id]
                             listener_bid : TaskBid = TaskBid(**listener_bid_msg.bid)
-                            if bundle_bid.t_update > listener_bid.t_update:
+                            if bundle_bid.t_update >= listener_bid.t_update:
                                 bid_messages[bundle_bid.task_id] = msg
+                            
                     elif isinstance(msg, AgentAction):
                         actions.append(msg)                        
         
