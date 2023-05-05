@@ -18,6 +18,7 @@ class PlanningModule(Module):
         mission_profiles = dict()
         preplans = dict()
         self.duration = float(parent_agent.mission_dict.get('duration'))*86400.0
+        self.time_step = float(parent_agent.mission_dict.get('propagator').get('stepSize'))
         spacecraft_list = parent_agent.mission_dict.get('spacecraft')
         for spacecraft in spacecraft_list:
             name = spacecraft.get('name')
@@ -178,6 +179,8 @@ class InstrumentCapabilityModule(Module):
                 self.log(f'Querying knowledge graph...', level=logging.DEBUG)
                 driver = GraphDatabase.driver(uri, auth=(user, password))
                 capable = self.can_observe(driver,instrument,event_msg)
+                if capable:
+                    break
                 driver.close()
             return capable
         except Exception as e:
@@ -266,7 +269,7 @@ class ObservationPlanningModule(Module):
                 obs_list.append(obs)
             for obs in obs_list:
                     # estimate next observation opportunities
-                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/100) # TODO get rid of hardcoded timestep size
+                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/self.parent_module.time_step)
                     #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
@@ -274,7 +277,7 @@ class ObservationPlanningModule(Module):
                     #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
                         self.log(f'Adding observation candidate!',level=logging.INFO)
-                        obs.start = gp_access_list[0]['time index']*100 # TODO get rid of hardcoded timestep size
+                        obs.start = gp_access_list[0]['time index']*self.parent_module.time_step
                         obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
                         unique_location = True
@@ -308,14 +311,14 @@ class ObservationPlanningModule(Module):
                 lat = points[i, 0]
                 lon = points[i, 1]
                 obs = ObservationPlannerTask(lat,lon,1.0,[instruments[0]],0.0,1.0) # TODO fix to support multiple insturments
-                gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/100)
+                gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/self.parent_module.time_step)
                 gp_access_list = []
                 for _, row in gp_accesses.iterrows():
                     gp_access_list.append(row)
                 #print(gp_accesses)
                 if(len(gp_accesses) != 0):
                     self.log(f'Adding observation candidate!',level=logging.DEBUG)
-                    obs.start = gp_access_list[0]['time index']*100
+                    obs.start = gp_access_list[0]['time index']*self.parent_module.time_step
                     obs.end = obs.start # TODO change this hardcode
                     obs.angle = gp_access_list[0]['look angle [deg]']
                     obs_list.append(obs)
@@ -387,14 +390,14 @@ class ObservationPlanningModule(Module):
                 self.log(f'Length of obs list: {len(obs_list)}',level=logging.INFO)
                 for obs in obs_list:
                     # estimate next observation opportunities
-                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/100)
+                    gp_accesses = self.orbit_data.get_ground_point_accesses_future(obs.target[0], obs.target[1], self.get_current_time()/self.parent_module.time_step)
                     #self.log(f'Current time: {self.get_current_time()}',level=logging.INFO)
                     gp_access_list = []
                     for _, row in gp_accesses.iterrows():
                         gp_access_list.append(row)
                     #self.log(f'Length of gp access list: {len(gp_access_list)}',level=logging.INFO)
                     if(len(gp_accesses) != 0):
-                        obs.start = gp_access_list[0]['time index']*100
+                        obs.start = gp_access_list[0]['time index']*self.parent_module.time_step
                         obs.end = obs.start
                         obs.angle = gp_access_list[0]['look angle [deg]']
                         # unique_location = True

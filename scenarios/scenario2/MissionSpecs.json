@@ -1,7 +1,7 @@
 {   
     "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
     "duration": 30.0,
-    "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR", "stepSize": 100.0},
+    "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR", "stepSize": 1.0},
     "spacecraft": [
         {
             "@id": "vnir_sat_0_0",

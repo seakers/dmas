@@ -3111,7 +3111,7 @@ class TransmitterComponent(ComponentModule):
 
                 # return task completion status                
                 if transmit_msg.done() and transmit_msg not in pending:
-                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!', level=logging.INFO)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!', level=logging.DEBUG)                    
                     self.log(f'SENT, {msg}', logger_type=LoggerTypes.AGENT_TO_AGENT_MESSAGE, level=logging.INFO)
                     return TaskStatus.DONE
 

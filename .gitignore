@@ -30,3 +30,5 @@ utils/images/*
 !utils/images/.gitkeep
 utils/usgs_data/*
 !utils/usgs_data/.gitkeep
+*.gif
+plot2D_2.gif

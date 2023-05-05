@@ -117,7 +117,7 @@ if __name__=="__main__":
                             i = 1
                             continue
                         blooms.append((row[0],row[1],row[2]))
-            elif "all" in f and "vnirtir" in f:
+            elif "all" in f and ("Landsat" in f or "Sentinel" in f):
                 with open(f) as csv_file:
                     csv_reader = csv.reader(csv_file, delimiter=',')
                     i = 0
@@ -127,25 +127,7 @@ if __name__=="__main__":
                             continue
                         all_temps.append((row[0],row[1],row[2]))
                         all_images.append((row[0],row[1],row[2]))
-            elif "all" in f and "vnir_sat" in f:
-                with open(f) as csv_file:
-                    csv_reader = csv.reader(csv_file, delimiter=',')
-                    i = 0
-                    for row in csv_reader:
-                        if(i == 0):
-                            i = 1
-                            continue
-                        all_images.append((row[0],row[1],row[2]))
-            elif "all" in f and "tir_sat" in f:
-                with open(f) as csv_file:
-                    csv_reader = csv.reader(csv_file, delimiter=',')
-                    i = 0
-                    for row in csv_reader:
-                        if(i == 0):
-                            i = 1
-                            continue
-                        all_temps.append((row[0],row[1],row[2]))
-            elif "all" in f and "alt_sat" in f:
+            else:
                 with open(f) as csv_file:
                     csv_reader = csv.reader(csv_file, delimiter=',')
                     i = 0
@@ -154,6 +136,26 @@ if __name__=="__main__":
                             i = 1
                             continue
                         all_levels.append((row[0],row[1],row[2]))
+            # elif "all" in f and ("Landsat" in f or "Sentinel" in f):
+            #     with open(f) as csv_file:
+            #         csv_reader = csv.reader(csv_file, delimiter=',')
+            #         i = 0
+            #         for row in csv_reader:
+            #             if(i == 0):
+            #                 i = 1
+            #                 continue
+            #             all_images.append((row[0],row[1],row[2]))
+            # elif "all" in f and ("Landsat" in f or "Sentinel" in f):
+            #     with open(f) as csv_file:
+            #         csv_reader = csv.reader(csv_file, delimiter=',')
+            #         i = 0
+            #         for row in csv_reader:
+            #             if(i == 0):
+            #                 i = 1
+            #                 continue
+            #             all_temps.append((row[0],row[1],row[2]))
+    print(all_images)
+    print(lake_droughts)
     ground_track_dir = './utils/ground_tracks/scenario2'
     vnirtir_ground_tracks = []
     tir_ground_tracks = []
@@ -292,7 +294,7 @@ if __name__=="__main__":
     coobs_lons = []
     #hfs_coobs_lats = []
     #hfs_coobs_lons = []
-    duration = 86400
+    duration = 86400*30
     for t in range(0,duration,500):
         #hf_lats,hf_lons = get_curr_points(hf_points,t)
         #flood_lats, flood_lons = get_curr_points(flood_points,t)
@@ -305,10 +307,10 @@ if __name__=="__main__":
         hot_lakes_lats, hot_lakes_lons = get_past_points(hot_lakes,t)
         #hfs_tss_lats, hfs_tss_lons = get_past_points(tss_hfs,t)
         #hfs_coobs_lats, hfs_coobs_lons = get_past_points(coobs_hfs,t)
-        alt_gts_lats, alt_gts_lons = get_ground_track(alt_ground_tracks,t,600.0)
-        vnir_gts_lats, vnir_gts_lons = get_ground_track(vnir_ground_tracks,t,600.0)
-        vnirtir_gts_lats, vnirtir_gts_lons = get_ground_track(vnirtir_ground_tracks,t,600.0)
-        tir_gts_lats, tir_gts_lons = get_ground_track(tir_ground_tracks,t,600.0)
+        alt_gts_lats, alt_gts_lons = get_ground_track(alt_ground_tracks,t,1000.0)
+        vnir_gts_lats, vnir_gts_lons = get_ground_track(vnir_ground_tracks,t,1000.0)
+        vnirtir_gts_lats, vnirtir_gts_lons = get_ground_track(vnirtir_ground_tracks,t,1000.0)
+        tir_gts_lats, tir_gts_lons = get_ground_track(tir_ground_tracks,t,1000.0)
         
         filename = f'./utils/images/frame_{t}.png'
         filenames.append(filename)
@@ -317,7 +319,7 @@ if __name__=="__main__":
             for i in range(5):
                 filenames.append(filename)        # save img
         m = Basemap(projection='merc',llcrnrlat=-60,urcrnrlat=60,\
-                llcrnrlon=-180,urcrnrlon=0,resolution='c')
+                llcrnrlon=-180,urcrnrlon=180,resolution='c')
         #alt_x, alt_y = m(alt_lons,alt_lats)
         #tss_x, tss_y = m(tss_lons,tss_lats)
         #flood_x, flood_y = m(flood_lons,flood_lats)

@@ -171,18 +171,18 @@ class ScienceModule(Module):
             outlier = True
             outlier_data = item
             outlier_data["event_type"] = "lake flood"
-            self.log(f'Lake flood detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.INFO)
+            self.log(f'Lake flood detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
         elif latest_obs[5] < (latest_obs[2]-latest_obs[3]):
             item["severity"] = np.abs(latest_obs[5]/latest_obs[3])
             outlier = True
             outlier_data = item
             outlier_data["event_type"] = "lake drought"
-            self.log(f'Lake drought detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.INFO)
+            self.log(f'Lake drought detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
         else:
             outlier_data = item
             outlier_data["severity"] = 0.0
             outlier_data["event_type"] = ""
-            self.log(f'No lake height outlier detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.INFO)
+            self.log(f'No lake height outlier detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
         return outlier, outlier_data
 
     def check_laketemp_outliers(self,item):
@@ -490,11 +490,11 @@ class ScienceValueModule(Module):
             if obs["product_type"] == "altimetry":
                 outlier, outlier_data = self.parent_module.check_lakelevel_outliers(obs)
                 science_val = outlier_data["severity"]
-                self.log(f'Scenario 2 lake level outlier checked!',level=logging.INFO)
+                self.log(f'Scenario 2 lake level outlier checked!',level=logging.DEBUG)
             elif obs["product_type"] == "thermal":
                 outlier, outlier_data = self.parent_module.check_laketemp_outliers(obs)
                 science_val = outlier_data["severity"]
-                self.log(f'Scenario 2 lake temp outlier checked!',level=logging.INFO)
+                self.log(f'Scenario 2 lake temp outlier checked!',level=logging.DEBUG)
             else:
                 science_val = 1.0
         if outlier:
