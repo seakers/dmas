@@ -55,7 +55,36 @@ class SimulationEnvironment(EnvironmentNode):
             self.pulished_tasks.append(task)
         self.log('tasks published!')
 
+    async def live(self) -> None:
+        try:
+            maanger_listener_task = asyncio.create_task(self.listen_to_manager(), name='listen_to_manager()')
+            agent_listener_task = asyncio.create_task(self.listen_to_agents(), name='listen_to_agents()')
+            
+            tasks = [maanger_listener_task, agent_listener_task]
+
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        except asyncio.CancelledError:
+            return
+
+        except Exception as e:
+            self.log(f'`live()` failed. {e}', level=logging.ERROR)
+            raise e
+        
+        finally:
+            for task in done:
+                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+
+            for task in pending:
+                task : asyncio.Task
+                if not task.done():
+                    task.cancel()
+                    await task
+
     async def listen_to_manager(self) -> None:
+        """
+        Listens for broadcasts from the manager. Updates internal clock or termiantes accordingly
+        """
         try:
             # track agent and simulation states
             poller = azmq.Poller()
@@ -100,6 +129,9 @@ class SimulationEnvironment(EnvironmentNode):
             return
                 
     async def listen_to_agents(self) -> None:
+        """
+        Listens for any incoming agent requests and responds to them accordingly.
+        """
         try:
             # track agent and simulation states
             poller = azmq.Poller()
@@ -195,32 +227,6 @@ class SimulationEnvironment(EnvironmentNode):
                         await self.respond_peer_message(resp)
         except asyncio.CancelledError:
             return
-
-    async def live(self) -> None:
-        try:
-            maanger_listener_task = asyncio.create_task(self.listen_to_manager(), name='listen_to_manager()')
-            agent_listener_task = asyncio.create_task(self.listen_to_agents(), name='listen_to_agents()')
-            
-            tasks = [maanger_listener_task, agent_listener_task]
-
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-
-        except asyncio.CancelledError:
-            return
-
-        except Exception as e:
-            self.log(f'`live()` failed. {e}', level=logging.ERROR)
-            raise e
-        
-        finally:
-            for task in done:
-                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
-
-            for task in pending:
-                task : asyncio.Task
-                if not task.done():
-                    task.cancel()
-                    await task
 
     def same_state_times(self) -> bool:
         """
