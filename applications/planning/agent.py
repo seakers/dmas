@@ -147,8 +147,8 @@ class SimulationAgent(Agent):
             else:
                 raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
         
-        except asyncio.CancelledError:
-            return
+        except asyncio.CancelledError as e:
+            raise e
 
         finally:
             if (
@@ -342,7 +342,11 @@ class SimulationAgent(Agent):
                     # perform action
                     self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
                     delay = action.t_end - self.get_current_time()
-                    await self.sim_wait(delay)
+                    
+                    try:
+                        await self.sim_wait(delay)
+                    except asyncio.CancelledError:
+                        return
 
                     # update action completion status
                     if self.get_current_time() >= action.t_end:
@@ -388,7 +392,10 @@ class SimulationAgent(Agent):
 
                         ## wait until destination is reached
                         delay = norm / self.state.v_max
-                        await self.sim_wait(delay)
+                        try:
+                            await self.sim_wait(delay)
+                        except asyncio.CancelledError:
+                            return
                         
                         # update action completion status
                         action.status = AgentAction.PENDING
@@ -415,7 +422,10 @@ class SimulationAgent(Agent):
                         # perform measurement
                         self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
                         
-                        await self.sim_wait(task.duration)  # TODO communicate with environment and obtain measurement information
+                        try:
+                            await self.sim_wait(task.duration)  # TODO communicate with environment and obtain measurement information
+                        except asyncio.CancelledError:
+                            return
 
                         # update action completion status
                         action.status = AgentAction.COMPLETED
@@ -439,14 +449,15 @@ class SimulationAgent(Agent):
 
                     if receive_broadcast in done:
                         # a mesasge was received before the timer ran out; cancel timer
-                        timeout.cancel()
-                        await timeout
+                        try:
+                            timeout.cancel()
+                            await timeout
+                        except asyncio.CancelledError:
+                            # restore message to inbox so it can be processed during `sense()`
+                            await self.external_inbox.put(receive_broadcast.result())    
 
-                        # restore message to inbox so it can be processed during `sense()`
-                        await self.external_inbox.put(receive_broadcast.result())    
-
-                        # update action completion status
-                        action.status = AgentAction.COMPLETED                
+                            # update action completion status
+                            action.status = AgentAction.COMPLETED                
                     else:
                         # timer ran out or time advanced
                         try:

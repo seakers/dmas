@@ -460,6 +460,8 @@ class Node(SimulationElement):
 
                     # respond to module
                     await self._send_internal_msg(resp, zmq.REP)
+
+            return
         
         except asyncio.CancelledError:
             if pbar is not None:

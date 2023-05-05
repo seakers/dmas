@@ -73,6 +73,38 @@ class SimulationEnvironment(EnvironmentNode):
             while True:
                 socks = dict(await poller.poll())
                 
+                # check if manager message is received:
+                if socket_manager in socks:
+                    # read message from socket
+                    dst, src, content = await self.listen_manager_broadcast()
+
+                    if (dst in self.name 
+                        and SimulationElementRoles.MANAGER.value in src 
+                        and content['msg_type'] == ManagerMessageTypes.SIM_END.value
+                        ):
+                        # sim end message received
+                        self.log(f"received message of type {content['msg_type']}. ending simulation...")
+                        # raise asyncio.CancelledError(f"received message of type {content['msg_type']}")
+                        return
+
+                    elif content['msg_type'] == ManagerMessageTypes.TOC.value:
+                        # toc message received
+
+                        # unpack message
+                        msg = TocMessage(**content)
+
+                        # update internal clock
+                        self.log(f"received message of type {content['msg_type']}. updating internal clock to {msg.t}[s]...")
+                        await self.update_current_time(msg.t)
+
+                        # wait for all agent's to send their updated states
+                        self.log(f"internal clock uptated to time {self.get_current_time()}[s]!")
+                    
+                    else:
+                        # ignore message
+                        self.log(f"received message of type {content['msg_type']}. ignoring message...")
+                    
+
                 # check if agent message is received:
                 if socket_agents in socks:
                     # read message from socket
@@ -151,37 +183,6 @@ class SimulationEnvironment(EnvironmentNode):
 
                         # respond to request
                         await self.respond_peer_message(resp)
-
-                # check if manager message is received:
-                if socket_manager in socks:
-                    # read message from socket
-                    dst, src, content = await self.listen_manager_broadcast()
-
-                    if (dst in self.name 
-                        and SimulationElementRoles.MANAGER.value in src 
-                        and content['msg_type'] == ManagerMessageTypes.SIM_END.value
-                        ):
-                        # sim end message received
-                        self.log(f"received message of type {content['msg_type']}. ending simulation...")
-                        raise asyncio.CancelledError(f"received message of type {content['msg_type']}")
-
-                    elif content['msg_type'] == ManagerMessageTypes.TOC.value:
-                        # toc message received
-
-                        # unpack message
-                        msg = TocMessage(**content)
-
-                        # update internal clock
-                        self.log(f"received message of type {content['msg_type']}. updating internal clock to {msg.t}[s]...")
-                        await self.update_current_time(msg.t)
-
-                        # wait for all agent's to send their updated states
-                        self.log(f"internal clock uptated to time {self.get_current_time()}[s]!")
-                    
-                    else:
-                        # ignore message
-                        self.log(f"received message of type {content['msg_type']}. ignoring message...")
-                    
 
         except asyncio.CancelledError:
             return

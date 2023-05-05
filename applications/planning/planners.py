@@ -113,16 +113,22 @@ class FixedPlannerModule(PlannerModule):
                     ]
         
     async def live(self) -> None:
-        work_task = asyncio.create_task(self.routine())
-        listen_task = asyncio.create_task(self.listen())
-        tasks = [work_task, listen_task]
+        try:
+            work_task = asyncio.create_task(self.routine())
+            listen_task = asyncio.create_task(self.listen())
+            tasks = [work_task, listen_task]
 
-        _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
-        for task in pending:
-            task : asyncio.Task
-            task.cancel()
-            await task
+        finally:
+            for task in done:
+                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+
+            for task in pending:
+                task : asyncio.Task
+                if not task.done():
+                    task.cancel()
+                    await task
 
     async def listen(self):
         """
@@ -146,12 +152,12 @@ class FixedPlannerModule(PlannerModule):
 
                     # if sim-end message, end agent `live()`
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
+                        self.log(f"received manager broadcast of type {content['msg_type']}! terminating `live()`...")
                         return
 
                     # else, let agent handle it
                     else:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! sending to inbox...")
+                        self.log(f"received manager broadcast of type {content['msg_type']}! sending to inbox...")
                         await self.manager_inbox.put( (dst, src, content) )
 
         except asyncio.CancelledError:
@@ -977,10 +983,13 @@ class ACCBBAPlannerModule(PlannerModule):
             
             tasks = [listener_task, bundle_builder_task, rebroadcaster_task]
 
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         finally:
-            for task in tasks:
+            for task in done:
+                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+
+            for task in pending:
                 task : asyncio.Task
                 if not task.done():
                     task.cancel()
