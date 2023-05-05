@@ -470,7 +470,6 @@ class SimulationAgent(Agent):
                             else:
                                 action.status = AgentAction.COMPLETED
 
-
                 else:
                     # ignore action
                     self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)

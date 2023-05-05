@@ -390,6 +390,7 @@ class Node(SimulationElement):
         # cancel all pending tasks
         if live_task in pending:
             live_task.cancel()
+            await live_task
             self.log(f'cancelling `{live_task.get_name()}` task...')
 
         # inform manager

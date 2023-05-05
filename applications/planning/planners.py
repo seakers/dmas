@@ -1242,6 +1242,22 @@ class ACCBBAPlannerModule(PlannerModule):
                             # remove task from bundle
                             measurement_task = bundle.pop(bid_index)
                             path.remove(measurement_task)
+                
+                # release tasks from bundle if t_end has passed
+                task_to_remove = None
+                for task in bundle:
+                    task : MeasurementTask
+                    if task.t_end - task.duration < t_curr:
+                        task_to_remove = task
+                        break
+
+                if task_to_remove is not None:
+                    bid_index = bundle.index(task_to_remove)
+
+                    for _ in range(bid_index, len(bundle)):
+                        # remove task from bundle
+                        measurement_task = bundle.pop(bid_index)
+                        path.remove(measurement_task)
 
                 # update bundle from new information
                 self.log_results(results)
@@ -1303,21 +1319,18 @@ class ACCBBAPlannerModule(PlannerModule):
                         # no max bid was found; no more tasks can be added to the bundle
                         break
 
-                # DEBUG PURPOSES ONLY: instructs agent to idle and only messages/listens to agents
                 self.log_results(results)
                 self.log_task_sequence('bundle', bundle)
                 self.log_task_sequence('path', path)
-                # action = WaitForMessages(t_curr, t_curr + 1/f_update)
-                # await self.outgoing_bundle_builder_inbox.put(action)
-                # continue
 
                 # give agent tasks to perform at the current time
                 actions = []
                 if (len(changes) == 0 
+                    and len(path) > 0
                     and self.check_path_constraints(path, results, t_curr)):
                     if len(plan) == 0:
-                        # generate plan
-                        for i in range(path):
+                        # no plan has been generated yet; generate one
+                        for i in range(len(path)):
                             measurement_task : MeasurementTask = path[i]
                             
                             if len(plan) == 0:
@@ -1340,6 +1353,7 @@ class ACCBBAPlannerModule(PlannerModule):
                         
                         actions.append(plan[0])
                     else:
+                        # plan has already been developed and is being performed; check plan complation status
                         while not self.action_status_inbox.empty():
                             action_msg : AgentActionMessage = await self.action_status_inbox.get()
                             agent_action = AgentAction(**action_msg.action)
@@ -1355,8 +1369,14 @@ class ACCBBAPlannerModule(PlannerModule):
 
                             elif agent_action.status == AgentAction.COMPLETED:
                                 # latest action from plan was completed! performing next action in plan
-                                plan.pop(0)
-                                actions.append(plan[0])
+                                done_task : AgentAction = plan.pop(0)
+                                
+                                if done_task in path:
+                                    path.remove(done_task)
+
+                                if len(plan) > 0:
+                                    actions.append(plan[0])
+                                x = 1
                 else:
                     # bundle is empty or cannot be executed yet; instructing agent to idle
                     plan = []
@@ -1367,7 +1387,7 @@ class ACCBBAPlannerModule(PlannerModule):
                     await self.outgoing_bundle_builder_inbox.put(change)
                     
                 # send actions to broadcaster
-                if len(actions) == 0:
+                if len(actions) == 0 and len(changes) == 0:
                     actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
                 for action in actions:
                     await self.outgoing_bundle_builder_inbox.put(action)
