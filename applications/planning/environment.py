@@ -55,21 +55,13 @@ class SimulationEnvironment(EnvironmentNode):
             self.pulished_tasks.append(task)
         self.log('tasks published!')
 
-    async def live(self) -> None:
+    async def listen_to_manager(self) -> None:
         try:
             # track agent and simulation states
             poller = azmq.Poller()
             socket_manager, _ = self._manager_socket_map.get(zmq.SUB)
-            socket_agents, _ = self._external_socket_map.get(zmq.REP)
             poller.register(socket_manager, zmq.POLLIN)
-            poller.register(socket_agents, zmq.POLLIN)
 
-            await asyncio.sleep(1e-2)
-
-            await self.publish_tasks()
-
-            # listen for messages
-            self.log(f'task requests broadcasted! listening to incoming messages...')
             while True:
                 socks = dict(await poller.poll())
                 
@@ -103,8 +95,26 @@ class SimulationEnvironment(EnvironmentNode):
                     else:
                         # ignore message
                         self.log(f"received message of type {content['msg_type']}. ignoring message...")
-                    
+        
+        except asyncio.CancelledError:
+            return
+                
+    async def listen_to_agents(self) -> None:
+        try:
+            # track agent and simulation states
+            poller = azmq.Poller()
+            socket_agents, _ = self._external_socket_map.get(zmq.REP)
+            poller.register(socket_agents, zmq.POLLIN)
 
+            await asyncio.sleep(1e-2)
+
+            await self.publish_tasks()
+
+            # listen for messages
+            self.log(f'task requests broadcasted! listening to incoming messages...')
+            while True:
+                socks = dict(await poller.poll())
+                
                 # check if agent message is received:
                 if socket_agents in socks:
                     # read message from socket
@@ -183,6 +193,17 @@ class SimulationEnvironment(EnvironmentNode):
 
                         # respond to request
                         await self.respond_peer_message(resp)
+        except asyncio.CancelledError:
+            return
+
+    async def live(self) -> None:
+        try:
+            maanger_listener_task = asyncio.create_task(self.listen_to_manager(), name='listen_to_manager()')
+            agent_listener_task = asyncio.create_task(self.listen_to_agents(), name='listen_to_agents()')
+            
+            tasks = [maanger_listener_task, agent_listener_task]
+
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         except asyncio.CancelledError:
             return
@@ -190,6 +211,16 @@ class SimulationEnvironment(EnvironmentNode):
         except Exception as e:
             self.log(f'`live()` failed. {e}', level=logging.ERROR)
             raise e
+        
+        finally:
+            for task in done:
+                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+
+            for task in pending:
+                task : asyncio.Task
+                if not task.done():
+                    task.cancel()
+                    await task
 
     def same_state_times(self) -> bool:
         """

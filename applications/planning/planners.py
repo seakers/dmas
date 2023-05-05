@@ -1161,6 +1161,8 @@ class ACCBBAPlannerModule(PlannerModule):
                 #     await self.outgoing_bundle_builder_inbox.put(action)
                 #     continue
                 
+                # t_update = t_curr
+
                 # compare bids with incoming messages
                 changes = []
                 while not self.relevant_changes_inbox.empty():
