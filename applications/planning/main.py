@@ -239,16 +239,7 @@ if __name__ == '__main__':
         pool.submit(environment.run, *[])
         for agent in agents:                
             agent : SimulationElement
-            pool.submit(agent.run, *[])
-
-    # TODO Compile and compare planner results
-    # for id in range(n_agents):
-    #     listener_results = {}
-    #     listener_df = pandas.read_csv(f"{results_path}/AGENT_{id}/listener_bids.csv")
-
-
-    #     bundle_builder_results = {}
-    
+            pool.submit(agent.run, *[])    
 
     # # plot results
     if plot_results:
@@ -277,10 +268,10 @@ if __name__ == '__main__':
             _, id = agent.split('_')
             x.append( agent_data[agent]['x_pos'][0] )
             y.append( agent_data[agent]['y_pos'][0] )
-        scat = ax.scatter(x, y, color='b')
+        agent_scat = ax.scatter(x, y, color='b')
         
         # load measurement location
-        # measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
+        measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
 
         # plot task location
         x = []
@@ -290,7 +281,7 @@ if __name__ == '__main__':
             x_i, y_i = task.pos
             x.append(x_i)
             y.append(y_i)
-        ax.scatter(x, y, color='r', marker='*')
+        task_scat = ax.scatter(x, y, color='r', marker='*')
 
         def update(frame):
             # update agent states
@@ -299,16 +290,19 @@ if __name__ == '__main__':
             for agent in agent_data: 
                 x.append( agent_data[agent]['x_pos'][frame] )
                 y.append( agent_data[agent]['y_pos'][frame] )
+            
+            data = np.stack([x,y]).T
+            agent_scat.set_offsets(data)
 
             # TODO update task states
-            # updated_measurements = measurement_data[(measurement_data['t_measurement'] <= frame)]
-            # print(updated_measurements, frame)
+            t_curr = t[frame]
+            updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_measurement'] <= t_curr]
+            for i, row in updated_measurements.iterrows():
+                x_pos, y_pos = row['x_pos'], row['y_pos']
+                ax.scatter(x_pos, y_pos, color='g', marker='*')
 
-            # update plots
-            data = np.stack([x,y]).T
-            scat.set_offsets(data)
             ax.set_title(f't={t[frame]}[s]')
-            return scat
+            return agent_scat
         
         ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
         plt.show()

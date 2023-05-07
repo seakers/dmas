@@ -90,13 +90,13 @@ class MeasurementResultsRequest(SimulationMessage):
         - id (`str`) : Universally Unique IDentifier for this message
         - measurement (`dict`) : measurement data being communicated
     """
-    def __init__(self, src: str, dst: str, measurement_req_id : int, id: str = None, **_):
+    def __init__(self, src: str, dst: str, masurement_req : dict, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT.value, id)
         
-        if not isinstance(measurement_req_id, str):
-            raise AttributeError(f'`measurement_request_id` must be of type `str`; is of type {type(measurement_req_id)}.')
+        if not isinstance(masurement_req, dict):
+            raise AttributeError(f'`measurement_request_id` must be of type `dict`; is of type {type(masurement_req)}.')
 
-        self.measurement_req_id = measurement_req_id
+        self.masurement_req = masurement_req
         self.measurement = {}
 
 class PlannerResultsMessage(SimulationMessage):

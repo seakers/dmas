@@ -43,7 +43,7 @@ class SimulationEnvironment(EnvironmentNode):
 
         self.agent_connectivity_history = []
         self.pulished_task_history = []
-        self.measurement_history = {}
+        self.measurement_history = []
 
     async def publish_tasks(self):
         self.log(f'publishing {len(self.tasks)} task requests to all agents...')
@@ -54,7 +54,6 @@ class SimulationEnvironment(EnvironmentNode):
             await self.send_peer_broadcast(task_req)
             
             self.pulished_task_history.append((task, self.get_current_time()))
-            self.measurement_history[task.id] = []
 
         self.log('tasks published!')
 
@@ -137,10 +136,6 @@ class SimulationEnvironment(EnvironmentNode):
         """
         try:
             # track agent and simulation states
-            poller = azmq.Poller()
-            socket_agents, _ = self._external_socket_map.get(zmq.REP)
-            poller.register(socket_agents, zmq.POLLIN)
-
             await asyncio.sleep(1e-2)
 
             await self.publish_tasks()
@@ -148,103 +143,100 @@ class SimulationEnvironment(EnvironmentNode):
             # listen for messages
             self.log(f'task requests broadcasted! listening to incoming messages...')
             while True:
-                socks = dict(await poller.poll())
+
+                # read message from socket
+                dst, src, content = await self.listen_peer_message()
                 
-                # check if agent message is received:
-                if socket_agents in socks:
-                    # read message from socket
-                    dst, src, content = await self.listen_peer_message()
+                if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
+                    # unpack message
+                    msg = MeasurementResultsRequest(**content)
+                    self.log(f'received masurement data request from {msg.src}. quering measurement results...')
+
+                    # find/generate measurement results
+                    # TODO look up requested measurement results from database/model
+                    measurement_data = {'agent' : msg.src, 
+                                        't_measurement' : self.get_current_time()}
+
+                    # repsond to request
+                    self.log(f'measurement results obtained! responding to request')
+                    msg.dst = msg.src
+                    msg.src = self.get_element_name()
+                    msg.measurement = measurement_data
                     
-                    if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
-                        # unpack message
-                        msg = MeasurementResultsRequest(**content)
-                        self.log(f'received masurement data request from {msg.src}. quering measurement results...')
+                    self.measurement_history.append(msg)
 
-                        # find/generate measurement results
-                        # TODO look up requested measurement results from database/model
-                        measurement_data = {'agent' : msg.src, 
-                                            't_measurement' : self.get_current_time()}
+                    await self.respond_peer_message(msg) 
 
-                        # log measurements performed
-                        self.measurement_history[msg.measurement_req_id].append(measurement_data)
+                elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                    # unpack message
+                    msg = AgentStateMessage(**content)
+                    self.log(f'state message received from {msg.src}. updating state tracker...')
 
-                        # repsond to request
-                        self.log(f'measurement results obtained! responding to request')
-                        msg.dst = msg.src
-                        msg.src = self.get_element_name()
-                        msg.measurement = measurement_data
-                        await self.respond_peer_message(msg) 
+                    # update state tracker
+                    self.states_tracker[src] = SimulationAgentState(**msg.state)
+                    self.log(f'state tracker updated! sending response acknowledgement')
 
-                    elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                        # unpack message
-                        msg = AgentStateMessage(**content)
-                        self.log(f'state message received from {msg.src}. updating state tracker...')
+                    # send confirmation response
+                    resp = NodeReceptionAckMessage(self.get_element_name(), src)
+                    await self.respond_peer_message(resp)
+                    self.log('response sent! checking if all states are in the same time...')
 
-                        # update state tracker
-                        self.states_tracker[src] = SimulationAgentState(**msg.state)
-                        self.log(f'state tracker updated! sending response acknowledgement')
+                    ## Check if all states are of the same time
+                    while not self.same_state_times():
+                        self.log('states are at different times! waiting for more incoming state updates...')
+
+                        # read message from socket
+                        dst, src, content = await self.listen_peer_message()
+                        self.log(f'agent message received: {content}')
+
+                        if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                            # message is of type `AgentState`
+                            self.log(f"received message of type {content['msg_type']}. processing message....")
+
+                            # unpack message
+                            msg = AgentStateMessage(**content)
+
+                            # update state tracker
+                            self.states_tracker[src] = SimulationAgentState(**msg.state)
 
                         # send confirmation response
                         resp = NodeReceptionAckMessage(self.get_element_name(), src)
-                        await self.respond_peer_message(resp)
-                        self.log('response sent! checking if all states are in the same time...')
+                        await self.respond_peer_message(resp)                       
 
-                        ## Check if all states are of the same time
-                        while not self.same_state_times():
-                            self.log('states are at different times! waiting for more incoming state updates...')
+                    # check for range and announce chances in connectivity 
+                    self.log('states are all from the same time! checking agent connectivity...')
+                    range_updates : list = self.check_agent_connectivity()
 
-                            # read message from socket
-                            dst, src, content = await self.listen_peer_message()
-                            self.log(f'agent message received: {content}')
+                    if len(range_updates) > 0:
+                        self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
+                        for range_update in range_updates:
+                            range_update : AgentConnectivityUpdate
+                            await self.send_peer_broadcast(range_update)
+                        self.log('connectivity updates sent!')
 
-                            if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                                # message is of type `AgentState`
-                                self.log(f"received message of type {content['msg_type']}. processing message....")
-
-                                # unpack message
-                                msg = AgentStateMessage(**content)
-
-                                # update state tracker
-                                self.states_tracker[src] = SimulationAgentState(**msg.state)
-
-                            # send confirmation response
-                            resp = NodeReceptionAckMessage(self.get_element_name(), src)
-                            await self.respond_peer_message(resp)                       
-
-                        # check for range and announce chances in connectivity 
-                        self.log('states are all from the same time! checking agent connectivity...')
-                        range_updates : list = self.check_agent_connectivity()
-
-                        if len(range_updates) > 0:
-                            self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
-                            for range_update in range_updates:
-                                range_update : AgentConnectivityUpdate
-                                await self.send_peer_broadcast(range_update)
-                            self.log('connectivity updates sent!')
-
-                        elif len(self.tasks) > 0:
-                            await self.publish_tasks()
-
-                        else:
-                            self.log(f'connectivity checked. no connectivity updates...')
-                            ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
-                            await self.send_peer_broadcast(ok_msg)                        
-
-                        # save connectivity state to history
-                        agent_connectivity = {}
-                        for src in self.agent_connectivity:
-                            connections = {dst : self.agent_connectivity[src][dst] for dst in self.agent_connectivity[src]}
-                            agent_connectivity[src] = connections
-
-                        self.agent_connectivity_history.append((self.get_current_time(), agent_connectivity.copy()))
+                    elif len(self.tasks) > 0:
+                        await self.publish_tasks()
 
                     else:
-                        # message is of an unsopported type. send blank response
-                        self.log(f"received message of type {content['msg_type']}. ignoring message...")
-                        resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
+                        self.log(f'connectivity checked. no connectivity updates...')
+                        ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
+                        await self.send_peer_broadcast(ok_msg)                        
 
-                        # respond to request
-                        await self.respond_peer_message(resp)
+                    # save connectivity state to history
+                    agent_connectivity = {}
+                    for src in self.agent_connectivity:
+                        connections = {dst : self.agent_connectivity[src][dst] for dst in self.agent_connectivity[src]}
+                        agent_connectivity[src] = connections
+
+                    self.agent_connectivity_history.append((self.get_current_time(), agent_connectivity.copy()))
+
+                else:
+                    # message is of an unsopported type. send blank response
+                    self.log(f"received message of type {content['msg_type']}. ignoring message...")
+                    resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
+
+                    # respond to request
+                    await self.respond_peer_message(resp)
         except asyncio.CancelledError:
             return
 
@@ -372,19 +364,17 @@ class SimulationEnvironment(EnvironmentNode):
 
         # print measurements
         with open(f"{self.results_path}/measurements.csv", "w") as file:
-            title = 'Task Request ID,t_start,t_end,t_pub,Measurer,t_measurement\n'
+            title = 'Task Request ID,x_pos,y_pos,t_start,t_end,Measurer,t_measurement\n'
             file.write(title)
-            for task, t_pub in self.pulished_task_history:
-                task : MeasurementTask
-                t_pub : float
-                for measurement in self.measurement_history[task.id]:
-                    measurement : dict
 
-                    measurer = measurement['agent']
-                    t_measurement = measurement['t_measurement']
+            for msg in self.measurement_history:
+                msg : MeasurementResultsRequest
+                task = MeasurementTask(**msg.masurement_req)
+                measurer = msg.measurement['agent']
+                t_measurement = msg.measurement['t_measurement']
 
-                    line = f'{task.id},{task.t_start},{task.t_end},{t_pub},{measurer},{t_measurement}\n'
-                    file.write(line)
+                line = f'{task.id},{task.pos[0]},{task.pos[1]},{task.t_start},{task.t_end},{measurer},{t_measurement}\n'
+                file.write(line)
 
     async def sim_wait(self, delay: float) -> None:
         try:
