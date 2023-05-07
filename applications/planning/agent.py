@@ -423,7 +423,20 @@ class SimulationAgent(Agent):
                         self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
                         
                         try:
-                            await self.sim_wait(task.duration)  # TODO communicate with environment and obtain measurement information
+                            # send a measurement data request to the environment
+                            measurement = MeasurementResultsRequest(self.get_element_name(),
+                                                            SimulationElementRoles.ENVIRONMENT.value, 
+                                                            task.id,
+                                                            )
+
+                            dst, src, measurement_dict = await self.send_peer_message(measurement)
+                            
+                            # add measurement to environment inbox to be processed during `sensing()`
+                            await self.environment_inbox.put((dst, src, measurement_dict))
+
+                            # wait for the designated duration of the measurmeent 
+                            await self.sim_wait(task.duration)  # TODO only compensate for the time lost between queries
+                            
                         except asyncio.CancelledError:
                             return
 

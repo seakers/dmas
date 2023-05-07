@@ -1034,7 +1034,7 @@ class ACCBBAPlannerModule(PlannerModule):
                         self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
                         return
 
-                    if content['msg_type'] == SimulationMessageTypes.SENSES.value:
+                    elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
                         self.log(f"received senses from parent agent!")
 
                         # unpack message 
@@ -1336,8 +1336,9 @@ class ACCBBAPlannerModule(PlannerModule):
                             if len(plan) == 0:
                                 t_start = t_curr
                             else:
-                                prev_move : MoveAction = actions[(i-1)*2]
-                                prev_measure : MeasurementTask = actions[(i-1)*2 + 1]
+                                i_prev = (i-1)*2
+                                prev_move : MoveAction = plan[i_prev]
+                                prev_measure : MeasurementTask = plan[i_prev + 1]
                                 t_start = prev_move.t_end + prev_measure.duration
 
                             task_pos = measurement_task.pos
@@ -1373,10 +1374,11 @@ class ACCBBAPlannerModule(PlannerModule):
                                 
                                 if done_task in path:
                                     path.remove(done_task)
+                                    bundle.remove(done_task)
 
                                 if len(plan) > 0:
                                     actions.append(plan[0])
-                                x = 1
+
                 else:
                     # bundle is empty or cannot be executed yet; instructing agent to idle
                     plan = []
@@ -1392,7 +1394,6 @@ class ACCBBAPlannerModule(PlannerModule):
                 for action in actions:
                     await self.outgoing_bundle_builder_inbox.put(action)
                 
-
         except asyncio.CancelledError:
             return
 

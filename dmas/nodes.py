@@ -388,10 +388,10 @@ class Node(SimulationElement):
             self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
 
         # cancel all pending tasks
-        if live_task in pending:
-            live_task.cancel()
-            await live_task
+        while not live_task.done():
             self.log(f'cancelling `{live_task.get_name()}` task...')
+            live_task.cancel()
+            await asyncio.wait(live_task, timeout=0.1)
 
         # inform manager
         if self.manager_name != SimulationElementRoles.MANAGER.value:

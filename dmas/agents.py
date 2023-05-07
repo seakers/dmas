@@ -226,8 +226,11 @@ class Agent(Node):
             for task in pending:
                 task : asyncio.Task
                 self.log(f'Terminating task `{task.get_name()}`...')
-                task.cancel()
-                await task
+                while not task.done():
+                    task.cancel()
+                    timeout_task = asyncio.sleep(1e-2)
+                    await asyncio.wait([task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
+
                 self.log(f'`{task.get_name()}` task terminated!')
         
         except asyncio.CancelledError:

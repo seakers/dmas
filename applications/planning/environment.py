@@ -31,7 +31,6 @@ class SimulationEnvironment(EnvironmentNode):
         self.x_bounds = x_bounds
         self.y_bounds = y_bounds
         self.comms_range = comms_range
-        self.pulished_tasks = []
         self.tasks = tasks.copy()
 
         # setup results folder:
@@ -43,16 +42,20 @@ class SimulationEnvironment(EnvironmentNode):
         self.agent_connectivity = {agent_name : {target_name : 0 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
 
         self.agent_connectivity_history = []
-
-        # await self.publish_tasks()
+        self.pulished_task_history = []
+        self.measurement_history = {}
 
     async def publish_tasks(self):
         self.log(f'publishing {len(self.tasks)} task requests to all agents...')
         while len(self.tasks) > 0:
             task : MeasurementTask = self.tasks.pop(0)
             task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
+            
             await self.send_peer_broadcast(task_req)
-            self.pulished_tasks.append(task)
+            
+            self.pulished_task_history.append((task, self.get_current_time()))
+            self.measurement_history[task.id] = []
+
         self.log('tasks published!')
 
     async def live(self) -> None:
@@ -152,13 +155,30 @@ class SimulationEnvironment(EnvironmentNode):
                     # read message from socket
                     dst, src, content = await self.listen_peer_message()
                     
-                    if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                        # message is of type `AgentState`
-                        self.log(f"received message of type {content['msg_type']}. processing message....")
+                    if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
+                        # unpack message
+                        msg = MeasurementResultsRequest(**content)
+                        self.log(f'received masurement data request from {msg.src}. quering measurement results...')
 
+                        # find/generate measurement results
+                        # TODO look up requested measurement results from database/model
+                        measurement_data = {'agent' : msg.src, 
+                                            't_measurement' : self.get_current_time()}
+
+                        # log measurements performed
+                        self.measurement_history[msg.measurement_req_id].append(measurement_data)
+
+                        # repsond to request
+                        self.log(f'measurement results obtained! responding to request')
+                        msg.dst = msg.src
+                        msg.src = self.get_element_name()
+                        msg.measurement = measurement_data
+                        await self.respond_peer_message(msg) 
+
+                    elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                         # unpack message
                         msg = AgentStateMessage(**content)
-                        self.log(f'state received from {msg.src}. updating state tracker...')
+                        self.log(f'state message received from {msg.src}. updating state tracker...')
 
                         # update state tracker
                         self.states_tracker[src] = SimulationAgentState(**msg.state)
@@ -217,7 +237,7 @@ class SimulationEnvironment(EnvironmentNode):
                             agent_connectivity[src] = connections
 
                         self.agent_connectivity_history.append((self.get_current_time(), agent_connectivity.copy()))
-                        
+
                     else:
                         # message is of an unsopported type. send blank response
                         self.log(f"received message of type {content['msg_type']}. ignoring message...")
@@ -336,9 +356,9 @@ class SimulationEnvironment(EnvironmentNode):
         # print connectivity history
         with open(f"{self.results_path}/connectivity.csv", "w") as file:
             dsts = []
-            title = f"t, src"
+            title = f"t,src"
             for src in self.agent_connectivity:
-                title += f', dst:{src}'
+                title += f',dst:{src}'
                 dsts.append(src)
             file.write(title)
 
@@ -348,6 +368,22 @@ class SimulationEnvironment(EnvironmentNode):
                     for dst in dsts:
                         connected = agent_connectivity[src][dst]
                         line += f', {connected}'
+                    file.write(line)
+
+        # print measurements
+        with open(f"{self.results_path}/measurements.csv", "w") as file:
+            title = 'Task Request ID,t_start,t_end,t_pub,Measurer,t_measurement\n'
+            file.write(title)
+            for task, t_pub in self.pulished_task_history:
+                task : MeasurementTask
+                t_pub : float
+                for measurement in self.measurement_history[task.id]:
+                    measurement : dict
+
+                    measurer = measurement['agent']
+                    t_measurement = measurement['t_measurement']
+
+                    line = f'{task.id},{task.t_start},{task.t_end},{t_pub},{measurer},{t_measurement}\n'
                     file.write(line)
 
     async def sim_wait(self, delay: float) -> None:
