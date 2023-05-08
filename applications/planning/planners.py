@@ -597,7 +597,7 @@ class TaskBid(object):
         other : TaskBid
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
         
         if other.winning_bid == self.winning_bid:
             # if there's a tie, bidder with the smallest id wins
@@ -613,7 +613,7 @@ class TaskBid(object):
         other : TaskBid
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
         
         if abs(other.winning_bid - self.winning_bid) < 1e-3:
             return True
@@ -624,10 +624,18 @@ class TaskBid(object):
         other : TaskBid
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
         
         if other.winning_bid == self.winning_bid:
             # if there's a tie, bidder with the smallest id wins
+
+            if other.winner == self.NONE and self.winner != self.NONE:
+                return True
+            elif other.winner != self.NONE and self.winner == self.NONE:
+                return False
+            elif other.winner == self.NONE and self.winner == self.NONE:
+                return True
+
             _, their_id = other.winner.split('_')
             _, my_id = self.winner.split('_')
             their_id = int(their_id); my_id = int(my_id)
@@ -640,7 +648,7 @@ class TaskBid(object):
         other : TaskBid
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
         
         if abs(other.winning_bid - self.winning_bid) < 1e-3:
             return True
@@ -651,7 +659,7 @@ class TaskBid(object):
         other : TaskBid
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
         
         return abs(other.winning_bid - self.winning_bid) < 1e-3 and other.winning_bid == self.winning_bid
 
@@ -659,7 +667,7 @@ class TaskBid(object):
         other : TaskBid
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bidsintended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
         
         return abs(other.winning_bid - self.winning_bid) > 1e-3 or other.winning_bid != self.winning_bid
 
@@ -944,9 +952,9 @@ class ACCBBAPlannerModule(PlannerModule):
                 # t_update = t_curr
 
                 # compare bids with incoming messages
-                self.log_results(results, 'INITIAL RESULTS', level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
+                # self.log_results(results, 'INITIAL RESULTS', level=logging.WARNING)
+                # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+                # self.log_task_sequence('path', path, level=logging.WARNING)
                 
                 changes = []
                 while not self.relevant_changes_inbox.empty():
@@ -1016,9 +1024,9 @@ class ACCBBAPlannerModule(PlannerModule):
                         path.remove(measurement_task)
 
                 # update bundle from new information
-                self.log_results(results, 'COMPARED RESULTS', level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
+                # self.log_results(results, 'COMPARED RESULTS', level=logging.WARNING)
+                # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+                # self.log_task_sequence('path', path, level=logging.WARNING)
 
                 available_tasks : list = self.get_available_tasks(state, bundle, results)
 
@@ -1103,9 +1111,9 @@ class ACCBBAPlannerModule(PlannerModule):
                     changes.append(out_msg)
 
 
-                self.log_results(results, 'MODIFIED BUNDLE RESULTS', level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
+                # self.log_results(results, 'MODIFIED BUNDLE RESULTS', level=logging.WARNING)
+                # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+                # self.log_task_sequence('path', path, level=logging.WARNING)
 
                 # give agent tasks to perform at the current time
                 actions = []

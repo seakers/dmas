@@ -103,16 +103,17 @@ if __name__ == '__main__':
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     # for i in range(n_tasks):
-        # t_start = random.random() * clock_config.get_total_seconds()
-        # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
-        # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        # pos = [x, y]
-        # s_max = 1.0
-        # instruments = random_instruments(task_types)
+    #     t_start = random.random() * clock_config.get_total_seconds()
+    #     t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
+    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+    #     pos = [x, y]
+    #     s_max = 1.0
+    #     # instruments = random_instruments(task_types)
+    #     instruments = [task_types[0]]
 
-        # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-        # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    #     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    #     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
