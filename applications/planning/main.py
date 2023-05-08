@@ -318,3 +318,6 @@ if __name__ == '__main__':
         
         ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
         plt.show()
+
+        ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
+        plt.close()
