@@ -238,7 +238,7 @@ class Agent(Node):
 
     async def reactive_routine(self):
         """
-        Agent performs sense, thinkg, and do loop while state is . 
+        Agent performs sense-think-do loop 
         """
         try:
             statuses = []

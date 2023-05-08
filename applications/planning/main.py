@@ -153,7 +153,7 @@ if __name__ == '__main__':
 
     # create simulation agents
     agents = []
-    pos = [1.0, 0.0]
+    pos = [0.0, 0.0]
     vel = [0.0, 0.0]
     instruments = task_types
     agent_id = 0
@@ -178,7 +178,7 @@ if __name__ == '__main__':
                                 )
     agents.append(agent)
 
-    pos = [2.0, 0.0]
+    pos = [0.0, 0.0]
     vel = [0.0, 0.0]
     instruments = task_types
     agent_id = 1
@@ -203,10 +203,9 @@ if __name__ == '__main__':
                                 )
     agents.append(agent)
 
-
     # for id in range(n_agents):        
-    #     # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()  
+    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()  
     #     pos = [x, y]
     #     vel = [0.0, 0.0]
     #     instruments = task_types
@@ -295,11 +294,23 @@ if __name__ == '__main__':
             agent_scat.set_offsets(data)
 
             # TODO update task states
-            t_curr = t[frame]
-            updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_measurement'] <= t_curr]
-            for i, row in updated_measurements.iterrows():
-                x_pos, y_pos = row['x_pos'], row['y_pos']
-                ax.scatter(x_pos, y_pos, color='g', marker='*')
+            x_tasks = []
+            y_tasks = []
+            if frame > 0:
+                t_curr = t[frame]
+                t_prev = t[frame-1]
+                updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_measurement'] <= t_curr]
+                updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_measurement'] >= t_prev]
+                for _, row in updated_measurements.iterrows():
+                    x_pos, y_pos = row['x_pos'], row['y_pos']
+                    task_scat = ax.scatter(x_pos, y_pos, color='g', marker='*')
+            else:
+                for task in tasks:
+                    task : MeasurementTask
+                    x_i, y_i = task.pos
+                    x_tasks.append(x_i)
+                    y_tasks.append(y_i)
+                task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
 
             ax.set_title(f't={t[frame]}[s]')
             return agent_scat
