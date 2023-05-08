@@ -285,7 +285,7 @@ class SimulationAgent(Agent):
             if self.get_current_time() < action.t_start:
                 if isinstance(self._clock_config, FixedTimesStepClockConfig):
                     if action.t_start - self.get_current_time() > self._clock_config.dt:
-                        self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
+                        self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.WARNING)
                         statuses.append((action, AgentAction.PENDING))
                         continue
                 else:

@@ -1186,7 +1186,19 @@ class ACCBBAPlannerModule(PlannerModule):
                                     bundle.remove(done_task)
 
                                 if len(plan) > 0:
-                                    actions.append(plan[0])
+                                    next_task : AgentAction = plan[0]
+                                    if t_curr >= next_task.t_start:
+                                        actions.append(next_task)
+                                    else:
+                                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                        
+                        if len(actions) == 0 and len(plan) > 0:
+                            next_task : AgentAction = plan[0]
+                            if t_curr >= next_task.t_start:
+                                actions.append(next_task)
+                            else:
+                                actions.append( WaitForMessages(t_curr, next_task.t_start) )
+
                         x = 1
                 else:
                     # bundle is empty or cannot be executed yet; instructing agent to idle

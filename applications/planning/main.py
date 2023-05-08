@@ -61,7 +61,7 @@ if __name__ == '__main__':
     ss = 00
     start_date = datetime(year, month, day, hh, mm, ss)
     end_date = datetime(year, month, day, hh, mm, ss+T)
-    dt = 1.0/2.0
+    dt = 1.0/4.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
 
     # clock_config = EventDrivenClockConfig(start_date, end_date)
@@ -73,7 +73,7 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 4
+    n_tasks = 7
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
@@ -82,38 +82,38 @@ if __name__ == '__main__':
     t_start = 0.0
     t_end = T
 
-    pos = [1.0, 1.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [1.0, 1.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [1.0, 2.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [1.0, 2.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [2.0, 1.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [2.0, 1.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [2.0, 2.0]   
-    instruments = [task_types[0]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [2.0, 2.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    # for i in range(n_tasks):
-    #     t_start = random.random() * clock_config.get_total_seconds()
-    #     t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
-    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-    #     pos = [x, y]
-    #     s_max = 1.0
-    #     # instruments = random_instruments(task_types)
-    #     instruments = [task_types[0]]
+    for i in range(n_tasks):
+        # t_start = random.random() * clock_config.get_total_seconds()
+        # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        pos = [x, y]
+        s_max = 1.0
+        # instruments = random_instruments(task_types)
+        instruments = [task_types[0]]
 
-    #     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    #     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+        task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+        tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
