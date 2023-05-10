@@ -48,12 +48,12 @@ if __name__ == '__main__':
     
     # define simulation config
     ## environment bounds
-    x_bounds = [0, 10]
-    y_bounds = [0, 10]
+    x_bounds = [0, 5]
+    y_bounds = [0, 5]
 
     ## agents
     n_agents = 2
-    comms_range = 0.5
+    comms_range = 20
     v_max = 1
 
     ## clock configuration
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     ss = 00
     start_date = datetime(year, month, day, hh, mm, ss)
     end_date = datetime(year, month, day, hh, mm, ss+T)
-    dt = 1.0/2.0
+    dt = 1.0/4.0
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
 
     # clock_config = EventDrivenClockConfig(start_date, end_date)
@@ -78,26 +78,45 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 1
+    n_tasks = 7
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
     tasks = []
+    s_max = 1.0
+    t_start = 0.0
+    t_end = T
+
+    # pos = [1.0, 1.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    # pos = [1.0, 2.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    # pos = [2.0, 1.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
+    # pos = [2.0, 2.0]   
+    # instruments = [task_types[0]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+
     for i in range(n_tasks):
         # t_start = random.random() * clock_config.get_total_seconds()
         # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
-        # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        
-        t_start = 0.0
-        t_end = T
-        x = x_bounds[0] + i
-        y = 0.0
-        
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
         pos = [x, y]
         s_max = 1.0
-        
-        instruments = random_instruments(task_types)
+        # instruments = random_instruments(task_types)
+        instruments = [task_types[0]]
+
         task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
         tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
@@ -140,37 +159,83 @@ if __name__ == '__main__':
 
     # create simulation agents
     agents = []
-    for id in range(n_agents):        
-        # x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        # y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()        
-        # x, y = 0.0, 0.0
+    pos = [0.0, 0.0]
+    vel = [0.0, 0.0]
+    instruments = task_types
+    agent_id = 0
+    initial_state = SimulationAgentState(   pos, 
+                                            x_bounds, 
+                                            y_bounds, 
+                                            vel, 
+                                            v_max, 
+                                            [],  
+                                            status=SimulationAgentState.IDLING,
+                                            instruments=instruments)
+    agent = SimulationAgent(    results_path,
+                                network_name,
+                                port, 
+                                agent_id,
+                                manager_network_config,
+                                PlannerTypes.ACCBBA,
+                                instruments,
+                                initial_state,
+                                level,
+                                logger
+                                )
+    agents.append(agent)
 
-        x, y = x_bounds[0] + id, 1.0
+    pos = [0.0, 0.0]
+    vel = [0.0, 0.0]
+    instruments = task_types
+    agent_id = 1
+    initial_state = SimulationAgentState(   pos, 
+                                            x_bounds, 
+                                            y_bounds, 
+                                            vel, 
+                                            v_max, 
+                                            [],  
+                                            status=SimulationAgentState.IDLING,
+                                            instruments=instruments)
+    agent = SimulationAgent(    results_path,
+                                network_name,
+                                port, 
+                                agent_id,
+                                manager_network_config,
+                                PlannerTypes.ACCBBA,
+                                instruments,
+                                initial_state,
+                                level,
+                                logger
+                                )
+    agents.append(agent)
 
-        pos = [x, y]
-        vel = [0.0, 0.0]
-        instruments = task_types[:1]
-        # instruments = random_instruments(task_types)
-        initial_state = SimulationAgentState(   pos, 
-                                                x_bounds, 
-                                                y_bounds, 
-                                                vel, 
-                                                v_max, 
-                                                [],  
-                                                status=SimulationAgentState.IDLING,
-                                                instruments=instruments)
-        agent = SimulationAgent(    results_path,
-                                    network_name,
-                                    port, 
-                                    id,
-                                    manager_network_config,
-                                    PlannerTypes.ACCBBA,
-                                    instruments,
-                                    initial_state,
-                                    level,
-                                    logger
-                                    )
-        agents.append(agent)
+    # for id in range(n_agents):        
+    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()  
+    #     pos = [x, y]
+    #     vel = [0.0, 0.0]
+    #     instruments = task_types
+    #     # instruments = random_instruments(task_types)
+    #     initial_state = SimulationAgentState(   pos, 
+    #                                             x_bounds, 
+    #                                             y_bounds, 
+    #                                             vel, 
+    #                                             v_max, 
+    #                                             [],  
+    #                                             status=SimulationAgentState.IDLING,
+    #                                             instruments=instruments)
+    #     agent = SimulationAgent(    results_path,
+    #                                 network_name,
+    #                                 port, 
+    #                                 id,
+    #                                 manager_network_config,
+    #                                 PlannerTypes.ACCBBA,
+    #                                 instruments,
+    #                                 initial_state,
+    #                                 level,
+    #                                 logger
+    #                                 )
+    #     agents.append(agent)
 
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
@@ -179,13 +244,13 @@ if __name__ == '__main__':
         pool.submit(environment.run, *[])
         for agent in agents:                
             agent : SimulationElement
-            pool.submit(agent.run, *[])
-
-    # # TODO compile results from monitor
+            pool.submit(agent.run, *[])    
 
     # # plot results
     if plot_results:
         t = None
+
+        # load agent data
         agent_data = {}
         for id in range(n_agents):
             df = pandas.read_csv(f"{results_path}/AGENT_{id}/states.csv")
@@ -208,8 +273,11 @@ if __name__ == '__main__':
             _, id = agent.split('_')
             x.append( agent_data[agent]['x_pos'][0] )
             y.append( agent_data[agent]['y_pos'][0] )
-        scat = ax.scatter(x, y, color='b')
+        agent_scat = ax.scatter(x, y, color='b')
         
+        # load measurement location
+        measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
+
         # plot task location
         x = []
         y = []
@@ -218,7 +286,7 @@ if __name__ == '__main__':
             x_i, y_i = task.pos
             x.append(x_i)
             y.append(y_i)
-        ax.scatter(x, y, color='r', marker='*')
+        task_scat = ax.scatter(x, y, color='r', marker='*')
 
         def update(frame):
             # update agent states
@@ -227,14 +295,34 @@ if __name__ == '__main__':
             for agent in agent_data: 
                 x.append( agent_data[agent]['x_pos'][frame] )
                 y.append( agent_data[agent]['y_pos'][frame] )
+            
+            data = np.stack([x,y]).T
+            agent_scat.set_offsets(data)
 
             # TODO update task states
+            x_tasks = []
+            y_tasks = []
+            if frame > 0:
+                t_curr = t[frame]
+                t_prev = t[frame-1]
+                updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_measurement'] <= t_curr]
+                updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_measurement'] >= t_prev]
+                for _, row in updated_measurements.iterrows():
+                    x_pos, y_pos = row['x_pos'], row['y_pos']
+                    task_scat = ax.scatter(x_pos, y_pos, color='g', marker='*')
+            else:
+                for task in tasks:
+                    task : MeasurementTask
+                    x_i, y_i = task.pos
+                    x_tasks.append(x_i)
+                    y_tasks.append(y_i)
+                task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
 
-            # update plots
-            data = np.stack([x,y]).T
-            scat.set_offsets(data)
             ax.set_title(f't={t[frame]}[s]')
-            return scat
+            return agent_scat
         
         ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
         plt.show()
+
+        ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
+        plt.close()

@@ -10,6 +10,7 @@ class SimulationMessageTypes(Enum):
     TASK_BID = 'TASK_BID'
     PLAN = 'PLAN'
     SENSES = 'SENSES'
+    MEASUREMENT = 'MEASUREMENT'
 
 class AgentStateMessage(SimulationMessage):
     """
@@ -75,6 +76,28 @@ class TaskRequest(SimulationMessage):
         if not isinstance(task, dict):
             raise AttributeError(f'`task` must be of type `dict`; is of type {type(task)}.')
         self.task = task
+
+class MeasurementResultsRequest(SimulationMessage):
+    """
+    ## Measurement Results Request Message 
+
+    Carries information regarding a measurement performed on the environment
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+        - measurement (`dict`) : measurement data being communicated
+    """
+    def __init__(self, src: str, dst: str, masurement_req : dict, id: str = None, **_):
+        super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT.value, id)
+        
+        if not isinstance(masurement_req, dict):
+            raise AttributeError(f'`measurement_request_id` must be of type `dict`; is of type {type(masurement_req)}.')
+
+        self.masurement_req = masurement_req
+        self.measurement = {}
 
 class PlannerResultsMessage(SimulationMessage):
     """

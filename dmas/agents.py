@@ -210,24 +210,35 @@ class Agent(Node):
 
     async def live(self):
         try:
+            # subscribe to environment broadcasts
+            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
+
             # run `routine()` and `listen()` until the one terminates
             t_1 = asyncio.create_task(self.reactive_routine(), name='reactive_routine()')
             t_2 = asyncio.create_task(self.listen_to_broadcasts(), name='listen_to_broadcasts()')
 
-            _, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
+
+            for task in done:
+                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
 
             # cancel pending task
             for task in pending:
                 task : asyncio.Task
-                task.cancel()
-                await task
+                self.log(f'Terminating task `{task.get_name()}`...')
+                while not task.done():
+                    task.cancel()
+                    timeout_task = asyncio.sleep(1e-2)
+                    await asyncio.wait([task, timeout_task], return_when=asyncio.FIRST_COMPLETED)
+
+                self.log(f'`{task.get_name()}` task terminated!')
         
         except asyncio.CancelledError:
             return
 
     async def reactive_routine(self):
         """
-        Agent performs sense, thinkg, and do loop while state is . 
+        Agent performs sense-think-do loop 
         """
         try:
             statuses = []
@@ -249,15 +260,12 @@ class Agent(Node):
         
         except FailureStateException:
             return
-        
+                
     async def listen_to_broadcasts(self):
         """
         Listens for any incoming broadcasts and classifies them in their respective inbox
         """
         try:
-            # subscribe to environment broadcasts
-            self.subscribe_to_broadcasts(SimulationElementRoles.ENVIRONMENT.value)
-
             # create poller for all broadcast sockets
             poller = azmq.Poller()
 
