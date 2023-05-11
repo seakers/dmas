@@ -1,17 +1,11 @@
-import copy
-import math
-
-import numpy as np
-from messages import *
-from states import SimulationAgentState
-from tasks import *
-from zmq import asyncio as azmq
-from dmas.agents import AgentAction
 from dmas.modules import *
 
 class PlannerTypes(Enum):
-    ACCBBA = 'ACCBBA'   # Asynchronous Consensus Constraint-Based Bundle Algorithm
     FIXED = 'FIXED'     # Fixed pre-determined plan
+    CBBA = 'CCBBA'      # Synchronous Consensus-Based Bundle Algorithm
+    ACBBA = 'ACBBA'     # Asynchronous Consensus-Based Bundle Algorithm
+    CCBBA = 'CCBBA'     # Synchronous Consensus Constraint-Based Bundle Algorithm
+    ACCBBA = 'ACCBBA'   # Asynchronous Consensus Constraint-Based Bundle Algorithm
 
 class PlannerResults(ABC):
     @abstractmethod

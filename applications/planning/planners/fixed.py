@@ -1,8 +1,6 @@
 
-import copy
 import math
 
-import numpy as np
 from applications.planning.planners.planners import *
 from messages import *
 from states import SimulationAgentState
@@ -47,8 +45,8 @@ class FixedPlannerModule(PlannerModule):
         self.plan = [
                     travel_to_target,
                     measure,
-                    return_to_origin
-                    # msg_task
+                    return_to_origin,
+                    msg_task
                     ]
         
     async def live(self) -> None:

@@ -225,7 +225,7 @@ if __name__ == '__main__':
                                     port, 
                                     id,
                                     manager_network_config,
-                                    PlannerTypes.ACCBBA,
+                                    PlannerTypes.ACBBA,
                                     instruments,
                                     initial_state,
                                     level,

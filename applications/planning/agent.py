@@ -1,6 +1,7 @@
 import logging
 import math
-from planners.accbba import ACCBBAPlannerModule
+from planners.acbba import ACBBAPlannerModule
+from planners.fixed import FixedPlannerModule
 from planners.planners import *
 from utils import setup_results_directory
 from tasks import *
@@ -40,8 +41,8 @@ class SimulationAgent(Agent):
 														zmq.SUB: [f'tcp://localhost:{manager_port+6 + 4*id + 3}']
 											})
         
-        if planner_type is PlannerTypes.ACCBBA:
-            planning_module = ACCBBAPlannerModule(  results_path,
+        if planner_type is PlannerTypes.ACBBA:
+            planning_module = ACBBAPlannerModule(  results_path,
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
