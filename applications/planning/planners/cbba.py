@@ -68,7 +68,14 @@ class TaskBid(object):
         """
         return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_arrive},{self.iter_update}'
 
-    def update(self, other_dict : dict, iteration : Union[float, int]) -> None:
+    def get_update_iteration(self, target : str) -> Union[int, float]:
+        if target not in self.iterations:
+            iterations = [iteration for iteration in self.iterations]
+            return max(iterations)
+        else:
+            return self.iterations[target]
+
+    def update(self, other_dict : dict, iteration : Union[float, int]) -> object:
         """
         Compares bid with another and either updates, resets, or leaves the information contained in this bid
         depending on the rules specified in:
@@ -92,94 +99,83 @@ class TaskBid(object):
         if other.bidder == self.bidder:
             if other.iterations[other.bidder] > self.iterations[other.bidder]:
                 self.__update_info(other)
+                return self
         
         elif other.winner == other.bidder:
             if self.winner == self.bidder:
                 if other.winning_bid > self.winning_bid:
                     self.__update_info(other)
+                    return self
 
             elif self.winner == other.bidder:
                 self.__update_info(other)
+                return self
 
             elif self.winner not in [self.bidder, other.bidder]:
-                if self.winner not in other.iterations:
-                    if other.winning_bid > self.winning_bid:
-                        self.__update_info(other)
-                else:
-                    if other.iterations[self.winner] > self.iterations[self.winner] or other.winning_bid > self.winning_bid:
-                        self.__update_info(other)
+                if (
+                    other.get_update_iteration(other.winner) > self.get_update_iteration(other.winner) 
+                    or other.winning_bid > self.winning_bid
+                    ):
+                    self.__update_info(other)
+                    return self
 
             elif self.winner == self.NONE:
                 self.__update_info(other)
+                return self
 
         elif other.winner == self.bidder:
             if self.winner == self.bidder:
                 self.__leave()
+                return None
                 
             elif self.winner == other.bidder:
                 self.reset()
+                return self
 
             elif self.winner not in [self.bidder, other.bidder]:
-                if self.winner not in other.iterations:
-                    self.__leave()
-                elif other.iterations[self.winner] > self.iterations[self.winner]:
+                if other.get_update_iteration(self.winner) > self.get_update_iteration(self.winner):
                     self.reset()
+                    return self
 
             elif self.winner == self.NONE:
                 self.__leave()
+                return None
 
         elif other.winner not in [self.bidder, other.bidder]:
             if self.winner == self.bidder:
-                if other.winner not in self.iterations:
-                    if other.winning_bid > self.winning_bid:
-                        self.__update_info(other)
-                else:
-                    if other.iterations[other.winner] >  self.iterations[other.winner] and other.winning_bid > self.winning_bid:
-                        self.__update_info(other)
+                if (
+                    other.get_update_iteration(other.winner) > self.get_update_iteration(other.winner) 
+                    and other.winning_bid > self.winning_bid
+                    ):
+                    self.__update_info(other)
+                    return self
 
             elif self.winner == other.bidder:
-                if other.winner not in self.iterations:
-                    self.__update_info(other)
-                elif other.iterations[other.winner] >  self.iterations[other.winner]:
+                if other.get_update_iteration(other.winner) > self.get_update_iteration(other.winner):
                     self.__update_info(other)
                 else:
-                    self.reset(iteration)
+                    self.reset()
+                return self
 
             elif self.winner == other.winner:
-                if other.winner not in self.iterations:
+                if other.get_update_iteration(other.winner) > self.get_update_iteration(other.winner):
                     self.__update_info(other)
-                elif other.iterations[other.winner] >  self.iterations[other.winner]:
-                    self.__update_info(other)
+                    return self
 
             elif self.winner not in [self.bidder, other.bidder, other.winner]:
-                pass
+                if other.get_update_iteration(other.winner) > self.get_update_iteration(other.winner):
+                    if (
+                        other.get_update_iteration(self.winner) > self.get_update_iteration(self.winner)
+                        or other.winning_bid > self.winning_bid
+                        ):
+                        self.__update_info(other)
+                        return self
+                
+
+                adsasd
 
             elif self.winner == self.NONE:
-                if other.winner not in self.iterations:
-                    if self.winner not in other.iterations:
-                        self.__leave()
-                    elif other.iterations[self.winner] > self.iterations[self.winner]:
-                        self.__update_info(other)
-                    elif other.winning_bid > self.winning_bid:
-                        self.__update_info(other)
-
-                elif other.iterations[other.winner] > self.iterations[other.winner]:
-                    if self.winner not in other.iterations:
-                        self.__leave()
-                    elif other.iterations[self.winner] > self.iterations[self.winner]:
-                        self.__update_info(other)
-                    elif other.winning_bid > self.winning_bid:
-                        self.__update_info(other)
-
-                elif self.winner not in other.iterations:
-                    self.__leave()
-
-                elif other.iterations[self.winner] > self.iterations[self.winner]:
-                    if other.winner not in self.iterations:
-                        self.__leave()
-
-                    elif self.iterations[other.winner] > other.iterations[other.winner]:
-                        self.reset()
+                
 
         elif other.winner is other.NONE:
             if self.winner == self.bidder:
@@ -215,6 +211,11 @@ class TaskBid(object):
         self.winning_bid = other.winning_bid
         self.winner = other.winner
         self.t_arrive = other.t_arrive
+
+        if other.winner not in self.iterations:
+            self.iterations[other.winner] = other.iterations[other.winner]
+        if self.iterations[other.winner] > self.iterations[other.winner]:
+            self.iterations[other.winner] = other.iterations[other.winner]
 
         if self.bidder == other.bidder:
             self.own_bid = other.own_bid
