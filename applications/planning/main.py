@@ -19,7 +19,7 @@ from manager import PlanningSimulationManager
 from monitor import ResultsMonitor
 from environment import SimulationEnvironment
 from agent import SimulationAgent
-from planners import PlannerTypes
+from planners.planners import PlannerTypes
 from states import *
 
 def random_instruments(task_types : list) -> list:
