@@ -37,7 +37,7 @@ class SimulationAgentState(AgentState):
 
     def update_state(self, 
                     t : Union[float, int], 
-                    vel : list=None, 
+                    vel : list=[0.0,0.0], 
                     actions_performed : list=[], 
                     status : str=None):
         if t >= self.t:        

@@ -38,6 +38,7 @@ if __name__ == '__main__':
     """    
     # create results directory
     plot_results = True
+    save_plot = False
     scenario_name = 'TEST'
     results_path = setup_results_directory(scenario_name)
     
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 10
+    T = 15
     year = 2023
     month = 1
     day = 1
@@ -154,83 +155,83 @@ if __name__ == '__main__':
 
     # create simulation agents
     agents = []
-    pos = [0.0, 0.0]
-    vel = [0.0, 0.0]
-    instruments = task_types
-    agent_id = 0
-    initial_state = SimulationAgentState(   pos, 
-                                            x_bounds, 
-                                            y_bounds, 
-                                            vel, 
-                                            v_max, 
-                                            [],  
-                                            status=SimulationAgentState.IDLING,
-                                            instruments=instruments)
-    agent = SimulationAgent(    results_path,
-                                network_name,
-                                port, 
-                                agent_id,
-                                manager_network_config,
-                                PlannerTypes.ACCBBA,
-                                instruments,
-                                initial_state,
-                                level,
-                                logger
-                                )
-    agents.append(agent)
+    # pos = [0.0, 0.0]
+    # vel = [0.0, 0.0]
+    # instruments = task_types
+    # agent_id = 0
+    # initial_state = SimulationAgentState(   pos, 
+    #                                         x_bounds, 
+    #                                         y_bounds, 
+    #                                         vel, 
+    #                                         v_max, 
+    #                                         [],  
+    #                                         status=SimulationAgentState.IDLING,
+    #                                         instruments=instruments)
+    # agent = SimulationAgent(    results_path,
+    #                             network_name,
+    #                             port, 
+    #                             agent_id,
+    #                             manager_network_config,
+    #                             PlannerTypes.ACCBBA,
+    #                             instruments,
+    #                             initial_state,
+    #                             level,
+    #                             logger
+    #                             )
+    # agents.append(agent)
 
-    pos = [0.0, 0.0]
-    vel = [0.0, 0.0]
-    instruments = task_types
-    agent_id = 1
-    initial_state = SimulationAgentState(   pos, 
-                                            x_bounds, 
-                                            y_bounds, 
-                                            vel, 
-                                            v_max, 
-                                            [],  
-                                            status=SimulationAgentState.IDLING,
-                                            instruments=instruments)
-    agent = SimulationAgent(    results_path,
-                                network_name,
-                                port, 
-                                agent_id,
-                                manager_network_config,
-                                PlannerTypes.ACCBBA,
-                                instruments,
-                                initial_state,
-                                level,
-                                logger
-                                )
-    agents.append(agent)
+    # pos = [0.0, 0.0]
+    # vel = [0.0, 0.0]
+    # instruments = task_types
+    # agent_id = 1
+    # initial_state = SimulationAgentState(   pos, 
+    #                                         x_bounds, 
+    #                                         y_bounds, 
+    #                                         vel, 
+    #                                         v_max, 
+    #                                         [],  
+    #                                         status=SimulationAgentState.IDLING,
+    #                                         instruments=instruments)
+    # agent = SimulationAgent(    results_path,
+    #                             network_name,
+    #                             port, 
+    #                             agent_id,
+    #                             manager_network_config,
+    #                             PlannerTypes.ACCBBA,
+    #                             instruments,
+    #                             initial_state,
+    #                             level,
+    #                             logger
+    #                             )
+    # agents.append(agent)
 
-    # for id in range(n_agents):        
-    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()  
-    #     pos = [x, y]
-    #     vel = [0.0, 0.0]
-    #     instruments = task_types
-    #     # instruments = random_instruments(task_types)
-    #     initial_state = SimulationAgentState(   pos, 
-    #                                             x_bounds, 
-    #                                             y_bounds, 
-    #                                             vel, 
-    #                                             v_max, 
-    #                                             [],  
-    #                                             status=SimulationAgentState.IDLING,
-    #                                             instruments=instruments)
-    #     agent = SimulationAgent(    results_path,
-    #                                 network_name,
-    #                                 port, 
-    #                                 id,
-    #                                 manager_network_config,
-    #                                 PlannerTypes.ACCBBA,
-    #                                 instruments,
-    #                                 initial_state,
-    #                                 level,
-    #                                 logger
-    #                                 )
-    #     agents.append(agent)
+    for id in range(n_agents):        
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()  
+        pos = [x, y]
+        vel = [0.0, 0.0]
+        instruments = task_types
+        # instruments = random_instruments(task_types)
+        initial_state = SimulationAgentState(   pos, 
+                                                x_bounds, 
+                                                y_bounds, 
+                                                vel, 
+                                                v_max, 
+                                                [],  
+                                                status=SimulationAgentState.IDLING,
+                                                instruments=instruments)
+        agent = SimulationAgent(    results_path,
+                                    network_name,
+                                    port, 
+                                    id,
+                                    manager_network_config,
+                                    PlannerTypes.ACCBBA,
+                                    instruments,
+                                    initial_state,
+                                    level,
+                                    logger
+                                    )
+        agents.append(agent)
 
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
@@ -318,6 +319,7 @@ if __name__ == '__main__':
         
         ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
         plt.show()
-
-        ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
-        plt.close()
+        
+        if save_plot:
+            ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
+            plt.close() 

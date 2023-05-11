@@ -1191,6 +1191,8 @@ class ACCBBAPlannerModule(PlannerModule):
                                         actions.append(next_task)
                                     else:
                                         actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                            elif agent_action.status == AgentAction.ABORTED:
+                                x = 1
                         
                         if len(actions) == 0 and len(plan) > 0:
                             next_task : AgentAction = plan[0]

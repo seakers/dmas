@@ -295,6 +295,10 @@ class SimulationAgent(Agent):
                                 
             elif action.t_end < self.get_current_time():                
                 if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                    dt = self._clock_config.dt
+                    prev_t_end = action.t_end
+                    action.t_end = dt * math.ceil(action.t_end/dt)
+                    # dt = 0.25 * round(dt/0.25)
                     if self.get_current_time() - action.t_end > self._clock_config.dt:
                         self.log(f"action of type {action_dict['action_type']} has already occureed. could not perform task before...", level=logging.INFO)
                         statuses.append((action, AgentAction.ABORTED))
