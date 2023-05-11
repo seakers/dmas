@@ -48,7 +48,7 @@ if __name__ == '__main__':
     y_bounds = [0, 5]
 
     ## agents
-    n_agents = 2
+    n_agents = 3
     comms_range = 20
     v_max = 1
 
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    for i in range(n_tasks):
+    while len(tasks) < n_tasks:
         # t_start = random.random() * clock_config.get_total_seconds()
         # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
@@ -317,7 +317,7 @@ if __name__ == '__main__':
             ax.set_title(f't={t[frame]}[s]')
             return agent_scat
         
-        ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=30)
+        ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=50)
         plt.show()
         
         if save_plot:

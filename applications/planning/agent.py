@@ -283,31 +283,17 @@ class SimulationAgent(Agent):
             action = AgentAction(**action_dict)
 
             if self.get_current_time() < action.t_start:
-                if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    if action.t_start - self.get_current_time() > self._clock_config.dt:
-                        self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.WARNING)
-                        statuses.append((action, AgentAction.PENDING))
-                        continue
-                else:
-                    self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
-                    statuses.append((action, AgentAction.PENDING))
-                    continue
-                                
-            elif action.t_end < self.get_current_time():                
-                if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    dt = self._clock_config.dt
-                    prev_t_end = action.t_end
-                    action.t_end = dt * math.ceil(action.t_end/dt)
-                    # dt = 0.25 * round(dt/0.25)
-                    if self.get_current_time() - action.t_end > self._clock_config.dt:
-                        self.log(f"action of type {action_dict['action_type']} has already occureed. could not perform task before...", level=logging.INFO)
-                        statuses.append((action, AgentAction.ABORTED))
-                        continue
-                else:
-                    self.log(f"action of type {action_dict['action_type']} has already occureed. could not perform task before...", level=logging.INFO)
-                    statuses.append((action, AgentAction.ABORTED))
-                    continue
-                
+                self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
+                action.status = AgentAction.PENDING
+                statuses.append((action, action.status))
+                continue
+            
+            if action.t_end < self.get_current_time():
+                self.log(f"action of type {action_dict['action_type']} has already occureed. could not perform task before...", level=logging.INFO)
+                action.status = AgentAction.ABORTED
+                statuses.append((action, action.status))
+                continue
+
             self.log(f"performing action of type {action_dict['action_type']}...", level=logging.INFO)    
             if action_dict['action_type'] == ActionTypes.PEER_MSG.value:
                 # unpack action
@@ -463,7 +449,7 @@ class SimulationAgent(Agent):
                 else:
                     ### agent has NOT reached its desired position
                     # update action completion status
-                    action.status = AgentAction.PENDING
+                    action.status = AgentAction.ABORTED
 
             elif action_dict['action_type'] == ActionTypes.WAIT_FOR_MSG.value:
                 # unpack action 

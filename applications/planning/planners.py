@@ -1154,30 +1154,50 @@ class ACCBBAPlannerModule(PlannerModule):
                             agent_pos = state.pos
 
                             dx = np.sqrt( (task_pos[0] - agent_pos[0])**2 + (task_pos[1] - agent_pos[1])**2 )
-                            dt = dx / state.v_max
-                            move_task = MoveAction(measurement_task.pos, t_start, t_start + dt)
+                            t_end = t_start + dx / state.v_max
+
+                            if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                                dt = self._clock_config.dt
+                                prev_t_start = t_start
+                                prev_t_end = t_end
+                                if t_start < np.Inf:
+                                    t_start = dt * math.floor(t_start/dt)
+                                if t_end < np.Inf:
+                                    t_end = dt * math.ceil(t_end/dt)
+
+                                if t_end > t_start:
+                                    t_end += dt
+
+                            move_task = MoveAction(measurement_task.pos, t_start, t_end)
 
                             # plan per measurement request: move to plan, perform measurement 
                             plan.append(move_task)
                             plan.append(measurement_task)  
-                        
+
                         actions.append(plan[0])
+
                     else:
                         # plan has already been developed and is being performed; check plan complation status
                         while not self.action_status_inbox.empty():
                             action_msg : AgentActionMessage = await self.action_status_inbox.get()
-                            agent_action = AgentAction(**action_msg.action)
+                            performed_action = AgentAction(**action_msg.action)
 
                             latest_plan_action : AgentAction = plan[0]
-                            if agent_action.id != latest_plan_action.id:
+                            if performed_action.id != latest_plan_action.id:
                                 # some other task was performed; ignoring 
                                 continue
 
-                            elif agent_action.status == AgentAction.PENDING:
+                            elif performed_action.status == AgentAction.PENDING:
                                 # latest action from plan was attepted but not completed; performing again
-                                actions.append(plan[0])
+                                
+                                if t_curr < latest_plan_action.t_start:
+                                    # if action was not ready to be performed, wait for a bit
+                                    actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
+                                else:
+                                    # try to perform action again
+                                    actions.append(plan[0])
 
-                            elif agent_action.status == AgentAction.COMPLETED:
+                            elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
                                 # latest action from plan was completed! performing next action in plan
                                 done_task : AgentAction = plan.pop(0)
                                 
@@ -1191,8 +1211,6 @@ class ACCBBAPlannerModule(PlannerModule):
                                         actions.append(next_task)
                                     else:
                                         actions.append( WaitForMessages(t_curr, next_task.t_start) )
-                            elif agent_action.status == AgentAction.ABORTED:
-                                x = 1
                         
                         if len(actions) == 0 and len(plan) > 0:
                             next_task : AgentAction = plan[0]
