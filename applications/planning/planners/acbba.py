@@ -20,7 +20,7 @@ from zmq import asyncio as azmq
 from dmas.agents import AgentAction
 from dmas.modules import *
 
-class TaskBid(object):
+class TaskBid(Bid):
     """
     ## Task Bid for ACBBA 
 
@@ -37,14 +37,13 @@ class TaskBid(object):
         - t_update (`float` or `int`): lates time when this bid was updated
         - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
     """
-    NONE = 'None'
 
     def __init__(self, 
                     task : dict, 
                     bidder : str,
                     winning_bid : Union[float, int] = 0, 
                     own_bid : Union[float, int] = 0, 
-                    winner : str = NONE,
+                    winner : str = Bid.NONE,
                     t_arrive : Union[float, int] = -1, 
                     t_update : Union[float, int] = -1,
                     dt_converge : Union[float, int] = 0.0,
@@ -100,15 +99,15 @@ class TaskBid(object):
 
         if other.bidder == self.bidder:
             if other.t_update > self.t_update:
-                self.__update_info(other,t)
+                self._update_info(other,t)
             else:
-                self.__leave(t)
+                self._leave(t)
         
         elif other.winner == other.bidder:
             if self.winner == self.bidder:
                 if other.winning_bid > self.winning_bid:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
                     
                 elif other.winning_bid == self.winning_bid:
@@ -119,7 +118,7 @@ class TaskBid(object):
 
                     if their_id < my_id:
                         # update and rebroadcast
-                        self.__update_info(other, t)
+                        self._update_info(other, t)
                         return other
 
                 if other.winning_bid < self.winning_bid:
@@ -130,55 +129,55 @@ class TaskBid(object):
             elif self.winner == other.bidder:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
 
                 elif abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return None
 
                 elif other.t_update < self.t_update:
                     # leave and not rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return None
 
             elif self.winner not in [self.bidder, other.bidder]:
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
 
                 elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
                     #leave and rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return self
 
                 elif other.winning_bid == self.winning_bid:
                     # leave and rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return self
 
                 elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
                     
                 elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
 
             elif self.winner == self.NONE:
                 # update and rebroadcast
-                self.__update_info(other, t)
+                self._update_info(other, t)
                 return other
 
         elif other.winner == self.bidder:
             if self.winner == self.bidder:
                 if abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return None
                 
             elif self.winner == other.bidder:
@@ -188,7 +187,7 @@ class TaskBid(object):
 
             elif self.winner not in [self.bidder, other.bidder]:
                 # leave and rebroadcast
-                self.__leave(t)
+                self._leave(t)
                 return self
 
             elif self.winner == self.NONE:
@@ -200,7 +199,7 @@ class TaskBid(object):
             if self.winner == self.bidder:
                 if other.winning_bid > self.winning_bid:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
 
                 elif other.winning_bid == self.winning_bid:
@@ -212,7 +211,7 @@ class TaskBid(object):
 
                     if their_id < my_id:
                         #update and rebroadcast
-                        self.__update_info(other, t)
+                        self._update_info(other, t)
                         return other
 
                 elif other.winning_bid < self.winning_bid:
@@ -222,79 +221,79 @@ class TaskBid(object):
 
             elif self.winner == other.bidder:
                 # update and rebroadcast
-                self.__update_info(other, t)
+                self._update_info(other, t)
                 return other
 
             elif self.winner == other.winner:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
                     
                 elif abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return None
 
                 elif other.t_update < self.t_update:
                     # leave and rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return self
 
             elif self.winner not in [self.bidder, other.bidder, other.winner]:
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
 
                 elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
                     # leave and rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return self
                     
                 elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
                     
                 elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
                     # leave and rebroadcast
-                    self.__leave(t)
+                    self._leave(t)
                     return self
 
             elif self.winner == self.NONE:
                 # update and rebroadcast
-                self.__update_info(other, t)
+                self._update_info(other, t)
                 return other
 
         elif other.winner is other.NONE:
             if self.winner == self.bidder:
                 # leave and rebroadcast
-                self.__leave(t)
+                self._leave(t)
                 return self
 
             elif self.winner == other.bidder:
                 # update and rebroadcast
-                self.__update_info(other, t)
+                self._update_info(other, t)
                 return other
 
             elif self.winner not in [self.bidder, other.bidder]:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
-                    self.__update_info(other, t)
+                    self._update_info(other, t)
                     return other
 
             elif self.winner == self.NONE:
                 # leave and no rebroadcast
-                self.__leave(t)
+                self._leave(t)
                 return self
         
         return None
     
-    def __update_info(self,
-                other, 
-                t : Union[float, int]
-                ) -> None:
+    def _update_info(self, 
+                    other, 
+                    t : Union[float, int]
+                    ) -> None:
         """
         Updates all of the variable bid information
 
@@ -306,18 +305,8 @@ class TaskBid(object):
             # if update is from an older time than this bid, ignore update
             raise ValueError(f'attempting to update bid with outdated information.')
 
-        elif self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id}).')
-
-        other : TaskBid
-        self.winning_bid = other.winning_bid
-        self.winner = other.winner
-        self.t_arrive = other.t_arrive
+        super()._update_info(other)
         self.t_update = t
-
-        if self.bidder == other.bidder:
-            self.own_bid = other.own_bid
 
     def __update_time(self, t_update : Union[float, int]) -> None:
         """
@@ -328,110 +317,24 @@ class TaskBid(object):
         """
         self.t_update = t_update
 
-    def reset(self, t_update : Union[float, int]):
+    def reset(self, t_update : Union[float, int]) -> None:
         """
         Resets the values of this bid while keeping track of lates update time
 
         ### Arguments:
             - t_update (`float` or `int`): latest time when this bid was updated
         """
-        self.winning_bid = 0
-        self.winner = self.NONE
-        self.t_arrive = -1
+        super().reset()
         self.t_update = t_update
 
-    def __leave(self, t : Union[float, int]):
+    def _leave(self, t : Union[float, int]):
         """
         Leaves bid as is (used for algorithm readibility).
 
         ### Arguments:
             - t_update (`float` or `int`): latest time when this bid was updated
-        """
-        return
-    
-    def __lt__(self, other : object) -> bool:
-        other : TaskBid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if other.winning_bid == self.winning_bid:
-            # if there's a tie, bidder with the smallest id wins
-            _, their_id = other.winner.split('_')
-            _, my_id = self.winner.split('_')
-            their_id = int(their_id); my_id = int(my_id)
-
-            return their_id < my_id
-
-        return other.winning_bid > self.winning_bid
-
-    def __le__(self, other : object) -> bool:
-        other : TaskBid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if abs(other.winning_bid - self.winning_bid) < 1e-3:
-            return True
-
-        return other.winning_bid >= self.winning_bid
-
-    def __gt__(self, other : object) -> bool:
-        other : TaskBid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if other.winning_bid == self.winning_bid:
-            # if there's a tie, bidder with the smallest id wins
-
-            if other.winner == self.NONE and self.winner != self.NONE:
-                return True
-            elif other.winner != self.NONE and self.winner == self.NONE:
-                return False
-            elif other.winner == self.NONE and self.winner == self.NONE:
-                return True
-
-            _, their_id = other.winner.split('_')
-            _, my_id = self.winner.split('_')
-            their_id = int(their_id); my_id = int(my_id)
-
-            return their_id > my_id
-
-        return other.winning_bid < self.winning_bid
-
-    def __ge__(self, other : object) -> bool:
-        other : TaskBid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if abs(other.winning_bid - self.winning_bid) < 1e-3:
-            return True
-
-        return other.winning_bid <= self.winning_bid
-
-    def __eq__(self, other : object) -> bool:
-        other : TaskBid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        return abs(other.winning_bid - self.winning_bid) < 1e-3 and other.winning_bid == self.winning_bid
-
-    def __ne__(self, other : object) -> bool:
-        other : TaskBid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        return abs(other.winning_bid - self.winning_bid) > 1e-3 or other.winning_bid != self.winning_bid
-
-    def to_dict(self) -> dict:
-        """
-        Crates a dictionary containing all information contained in this bid
-        """
-        return dict(self.__dict__)
+        """        
+        return super()._leave()
 
     def copy(self) -> object:
         """

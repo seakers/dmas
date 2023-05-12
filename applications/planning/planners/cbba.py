@@ -170,28 +170,31 @@ class TaskBid(object):
                         ):
                         self.__update_info(other)
                         return self
-                
-
-                adsasd
+                elif other.get_update_iteration(self.winner) > self.get_update_iteration(self.winner):
+                    self.reset()
+                    return self
 
             elif self.winner == self.NONE:
-                
+                if other.get_update_iteration(other.winner) > self.get_update_iteration(other.winner):
+                    self.__update_info(other)
+                    return self
 
         elif other.winner is other.NONE:
             if self.winner == self.bidder:
                 self.__leave()
+                return None
 
             elif self.winner == other.bidder:
                 self.__update_info(other)
 
             elif self.winner not in [self.bidder, other.bidder]:
-                if other.winner not in other.iterations:
-                    self.__leave()
-                elif other.iterations[self.winner] > self.iterations[self.winner]:
+                if other.get_update_iteration(self.winner) > self.get_update_iteration(self.winner):
                     self.__update_info(other)
+                    return self
 
             elif self.winner == self.NONE:
                 self.__leave()
+                return None
         
         return None
     

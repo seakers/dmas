@@ -87,7 +87,7 @@ class SimulationAgent(Agent):
         # log state 
         out += '\nt, pos, vel, status\n'
         for state_dict in self.state.history:
-            out += f"{state_dict['t']}, {state_dict['pos']}, {state_dict['vel']}, {state_dict['status']}\n"    
+            out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
 
         self.log(out, level=logging.WARNING)
 
