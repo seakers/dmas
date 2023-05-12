@@ -140,20 +140,27 @@ class SimulationAgent(Agent):
         
         # handle peer broadcasts
         while not self.external_inbox.empty():
-            _, _, msg_dict = await self.external_inbox.get()
+            _, _, content = await self.external_inbox.get()
 
-            # save as senses to forward to planner
-            if msg_dict['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                senses.append(AgentStateMessage(**msg_dict))
+            if content['msg_type'] == SimulationMessageTypes.BUS.value:
+                msg = BusMessage(**content)
+                msg_dicts = msg.contents
+            else:
+                msg_dicts = [content]
 
-            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                senses.append(TaskRequest(**msg_dict))
+            for msg_dict in msg_dicts:
+                # save as senses to forward to planner
+                if msg_dict['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                    senses.append(AgentStateMessage(**msg_dict))
 
-            elif msg_dict['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
-                senses.append(PlannerResultsMessage(**msg_dict))
+                elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                    senses.append(TaskRequest(**msg_dict))
 
-            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_BID.value:
-                senses.append(TaskBidMessage(**msg_dict))
+                elif msg_dict['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
+                    senses.append(PlannerResultsMessage(**msg_dict))
+
+                elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                    senses.append(TaskBidMessage(**msg_dict))
 
         return senses
 
@@ -372,7 +379,7 @@ class SimulationAgent(Agent):
                 if not self.external_inbox.empty():
                     action.status = AgentAction.COMPLETED
                 else:
-                    await asyncio.sleep(1e-2)
+                    await asyncio.sleep(1e-3)
 
                     if not self.external_inbox.empty():
                         action.status = AgentAction.COMPLETED

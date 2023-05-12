@@ -977,6 +977,8 @@ class ACBBAPlannerModule(ConsensusPlanner):
         
                 # build plan
                 plan = []
+
+                
                 for bid_id in bid_messages:
                     bid_message : TaskBidMessage = bid_messages[bid_id]
                     plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
