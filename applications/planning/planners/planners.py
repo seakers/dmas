@@ -1,4 +1,7 @@
+from states import SimulationAgentState
+from tasks import MeasurementTask
 from dmas.modules import *
+import numpy as np
 
 class PlannerTypes(Enum):
     FIXED = 'FIXED'     # Fixed pre-determined plan
@@ -43,6 +46,7 @@ class PlannerModule(InternalModule):
         self.planner_type = planner_type
         self.results_path = results_path
         self.parent_id = agent_id
+        self.paren_name = f'AGENT_{agent_id}'
 
     async def sim_wait(self, delay: float) -> None:
         return
@@ -271,4 +275,203 @@ class Bid(ABC):
         pass
 
 class ConsensusPlanner(PlannerModule):
-    pass
+    """
+    # Abstract Consensus-Based Bundle Algorithm Planner
+    """
+    def __init__(self,  
+                results_path,
+                manager_port: int, 
+                agent_id: int, 
+                parent_network_config: NetworkConfig, 
+                planner_type: PlannerTypes,
+                l_bundle: int,
+                level: int = logging.INFO, 
+                logger: logging.Logger = None
+                ) -> None:
+        super().__init__(   results_path,
+                            manager_port, 
+                            agent_id, 
+                            parent_network_config,
+                            planner_type, 
+                            level, 
+                            logger)
+
+        if not isinstance(l_bundle, int) and not isinstance(l_bundle, float):
+            raise AttributeError(f'`l_bundle` must be of type `int` or `float`; is of type `{type(l_bundle)}`')
+        
+        self.l_bundle = l_bundle
+
+        self.t_curr = 0.0
+        self.state_curr = None
+        self.listener_results = None
+        self.bundle_builder_results = None
+    
+    async def setup(self) -> None:
+        # initialize internal messaging queues
+        self.states_inbox = asyncio.Queue()
+        self.relevant_changes_inbox = asyncio.Queue()
+        self.action_status_inbox = asyncio.Queue()
+
+        self.outgoing_listen_inbox = asyncio.Queue()
+        self.outgoing_bundle_builder_inbox = asyncio.Queue()
+
+    def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids of every task in the current path have all of their constraints
+        satisfied by other bids.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        for task in path:
+            # check constraints
+            task : MeasurementTask
+            if not self.check_task_constraints(task, results):
+                return False
+            
+            # check local convergence
+            my_bid : TaskBid = results[task.id]
+            if t_curr < my_bid.t_update + my_bid.dt_converge:
+                return False
+
+        return True
+
+    def check_task_constraints(self, task : MeasurementTask, results : dict) -> bool:
+        """
+        Checks if the bids in the current results satisfy the constraints of a given task.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        # TODO add bid and time constraints
+        return True
+
+    def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
+        """
+        Checks if there are any tasks available to be performed
+
+        ### Returns:
+            - list containing all available and bidable tasks to be performed by the parent agent
+        """
+        available = []
+        for task_id in results:
+            bid : Bid = results[task_id]
+            task = MeasurementTask(**bid.task)
+
+            if self.can_bid(state, task) and task not in bundle and (bid.t_arrive >= state.t or bid.t_arrive < 0):
+                available.append(task)
+
+        return available
+
+    def can_bid(self, state : SimulationAgentState, task : MeasurementTask) -> bool:
+        """
+        Checks if an agent can perform a measurement task
+        """
+        # check capabilities - TODO: Replace with knowledge graph
+        for instrument in task.instruments:
+            if instrument not in state.instruments:
+                return False
+
+        # check time constraints
+        ## Constraint 1: task must be able to be performed durig or after the current time
+        if task.t_end < state.t:
+            return False
+        
+        return True
+
+    @abstractmethod
+    def calc_path_bid(self, state : SimulationAgentState, original_path : list, task : MeasurementTask) -> tuple:
+        """
+        Calculates the best possible bid for a given task and creates the best path to accomodate said task
+
+        ### Arguments:
+        - state (:obj:`SimulationAgentState`): latest known state of the agent
+        - original_path (`list`): sequence of tasks to be performed under the current plan
+        - task (:obj:`MeasurementTask`): task to be scheduled
+
+        ### Returns:
+        - winning_path (`list`): list indicating the best path if `task` was to be performed. 
+                            Is of type `NoneType` if no suitable path can be found for `task`.
+        - winning_bids (`dict`): dictionary mapping task IDs to their proposed bids if the winning 
+                            path is to be scheduled. Is of type `NoneType` if no suitable path can 
+                            be found.
+        - winning_path_utility (`float`): projected utility of executing the winning path
+        """
+        pass
+    
+    def sum_path_utility(self, path : list, bids : dict) -> float:
+        """
+        Sums the utilities of a proposed path
+        """
+        utility = 0.0
+        for task in path:
+            task : MeasurementTask
+            bid : Bid = bids[task.id]
+            utility += bid.own_bid
+
+        return utility
+    
+    def calc_utility(self, task : MeasurementTask, t_arrive : float):
+        """
+        Calculates the expected utility of performing a measurement task
+        """
+        # check time constraints
+        if t_arrive < task.t_start or task.t_end < t_arrive:
+            return 0.0
+        
+        # calculate urgency factor from task
+        urgency = np.log(1e-3) / (task.t_start - task.t_end)
+
+        return task.s_max * np.exp( -urgency * (t_arrive - task.t_start) )
+
+    def calc_arrival_time(self, state : SimulationAgentState, path : list, bids : dict, task : MeasurementTask) -> float:
+        """
+        Computes the time when a task in the path would be performed
+        """
+        # calculate the previous task's position and 
+        i = path.index(task)
+        if i == 0:
+            t_prev = state.t
+            pos_prev = state.pos
+        else:
+            task_prev : MeasurementTask = path[i-1]
+            bid_prev : Bid = bids[task_prev.id]
+            t_prev : float = bid_prev.t_arrive + task_prev.duration
+            pos_prev : list = task_prev.pos
+
+        # compute travel time to the task
+        pos_next = task.pos
+        dpos = np.sqrt( (pos_next[0]-pos_prev[0])**2 + (pos_next[1]-pos_prev[1])**2 )
+        t_travel = dpos / state.v_max
+        t_arrival = t_travel + t_prev
+
+        return t_arrival if t_arrival >= task.t_start else task.t_start
+
+    def log_results(self, results : dict, dsc : str, level=logging.DEBUG) -> None:
+        """
+        Logs current results at a given time for debugging puropses
+        """
+        out = f'\n{dsc}\ntask_id,  location,  bidder, bid, winner, winning_bid, t_arrive\n'
+        for task_id in results:
+            bid : Bid = results[task_id]
+            task = MeasurementTask(**bid.task)
+            split_id = task.id.split('-')
+            out += f'{split_id[0]}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_arrive, 3)}\n'
+
+        self.log(out, level)
+
+    def log_task_sequence(self, dsc : str, sequence : list, level=logging.DEBUG) -> None:
+        """
+        Logs a sequence of tasks at a given time for debugging puropses
+        """
+        out = f'\n{dsc} = ['
+        for task in sequence:
+            task : MeasurementTask
+            split_id = task.id.split('-')
+            
+            if sequence.index(task) > 0:
+                out += ', '
+            out += f'{split_id[0]}'
+        out += ']\n'
+
+        self.log(out,level)
