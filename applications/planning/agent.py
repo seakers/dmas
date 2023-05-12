@@ -254,6 +254,15 @@ class SimulationAgent(Agent):
 
                     # update action completion status
                     action.status = AgentAction.COMPLETED
+                    
+                elif action.msg['msg_type'] == SimulationMessageTypes.BUS.value:
+
+                    msg_out = BusMessage(**action.msg)
+                    msg_out.dst = self.get_network_name()
+                    await self.send_peer_broadcast(msg_out)
+
+                    # update action completion status
+                    action.status = AgentAction.COMPLETED
 
                 else:
                     # message type not supported
