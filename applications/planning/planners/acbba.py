@@ -481,7 +481,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
                                                             bid.to_dict()
                                                         )
                                 await self.relevant_changes_inbox.put(out_msg)
-                                await self.outgoing_bundle_builder_inbox.put(out_msg)
+                                await self.outgoing_listen_inbox.put(out_msg)
 
                             elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
                                 # unpack message 
@@ -817,17 +817,21 @@ class ACBBAPlannerModule(ConsensusPlanner):
                     converged = 0
                     actions.append(WaitForMessages(t_curr, t_curr + 1/f_update))
 
-                x = 2
-
                 # send changes to rebroadcaster
-                for change in changes:
-                    await self.outgoing_bundle_builder_inbox.put(change)
+                # for change in changes:
+                #     await self.outgoing_bundle_builder_inbox.put(change)
                     
                 # send actions to broadcaster
                 if len(actions) == 0 and len(changes) == 0:
                     actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
-                for action in actions:
-                    await self.outgoing_bundle_builder_inbox.put(action)
+                # for action in actions:
+                #     await self.outgoing_bundle_builder_inbox.put(action)
+
+                change_dicts = [change.to_dict() for change in changes]
+                action_dicts = [action.to_dict() for action in actions]
+                action_dicts.extend(change_dicts)
+                action_bus = BusMessage(self.get_element_name(), self.get_element_name(), action_dicts)
+                await self.outgoing_bundle_builder_inbox.put(action_bus)
                 
         except asyncio.CancelledError:
             return
@@ -936,13 +940,22 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 # wait for bundle-builder to finish processing information
                 self.log('waiting for bundle-builder...')
                 bundle_msgs = []
-                while True:
-                    bundle_msgs.append(await self.outgoing_bundle_builder_inbox.get())
+                # while True:
+                #     bundle_msgs.append(await self.outgoing_bundle_builder_inbox.get())
                     
-                    if self.outgoing_bundle_builder_inbox.empty():
-                        await asyncio.sleep(1e-5)
-                        if self.outgoing_bundle_builder_inbox.empty():
-                            break
+                #     if self.outgoing_bundle_builder_inbox.empty():
+                #         await asyncio.sleep(1e-5)
+                #         if self.outgoing_bundle_builder_inbox.empty():
+                #             break
+                bundle_bus : BusMessage = await self.outgoing_bundle_builder_inbox.get()
+                for msg_dict in bundle_bus.contents:
+                    msg_dict : dict
+                    action_type = msg_dict.get('action_type', None)
+                    msg_type = msg_dict.get('msg_type', None)
+                    if action_type is not None:
+                        bundle_msgs.append(action_from_dict(**msg_dict))
+                    elif msg_type is not None:
+                        bundle_msgs.append(message_from_dict(**msg_dict))
 
                 self.log('bundle-builder sent its messages! comparing bids with listener...')
 
@@ -977,8 +990,6 @@ class ACBBAPlannerModule(ConsensusPlanner):
         
                 # build plan
                 plan = []
-
-                
                 for bid_id in bid_messages:
                     bid_message : TaskBidMessage = bid_messages[bid_id]
                     plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
@@ -988,8 +999,6 @@ class ACBBAPlannerModule(ConsensusPlanner):
                     plan.append(action.to_dict())
                 
                 # send to agent
-                if len(actions) > 0:
-                    x=1
                 self.log(f'bids compared! generating plan with {len(bid_messages)} bid messages and {len(actions)} actions')
                 plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), plan)
                 await self._send_manager_msg(plan_msg, zmq.PUB)
