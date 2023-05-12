@@ -101,7 +101,6 @@ class SimulationAgent(Agent):
 
         # update state
         self.state.update_state(self.get_current_time(), 
-                                actions_performed=completed, 
                                 status=SimulationAgentState.SENSING)
 
         # inform environment of new state
@@ -384,46 +383,39 @@ class SimulationAgent(Agent):
             elif action_dict['action_type'] == ActionTypes.WAIT_FOR_MSG.value:
                 # unpack action 
                 task = WaitForMessages(**action_dict)
+                t_curr = self.get_current_time()
+                self.state.update_state(t_curr, status=SimulationAgentState.LISTENING)
 
                 if not self.external_inbox.empty():
                     action.status = AgentAction.COMPLETED
                 else:
-                    await asyncio.sleep(1e-3)
+                    timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
+                    receive_broadcast = asyncio.create_task(self.external_inbox.get())
 
-                    if not self.external_inbox.empty():
-                        action.status = AgentAction.COMPLETED
+                    done, _ = await asyncio.wait([timeout, receive_broadcast], return_when=asyncio.FIRST_COMPLETED)
+
+                    if receive_broadcast in done:
+                        # a mesasge was received before the timer ran out; cancel timer
+                        try:
+                            timeout.cancel()
+                            await timeout
+                        except asyncio.CancelledError:
+                            # restore message to inbox so it can be processed during `sense()`
+                            await self.external_inbox.put(receive_broadcast.result())    
+
+                            # update action completion status
+                            action.status = AgentAction.COMPLETED                
                     else:
-                        # wait for message to be received or timeout to run out
-                        self.state.update_state(self.get_current_time(), status=SimulationAgentState.LISTENING)
-                        t_curr = self.get_current_time()
-                        timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
-                        receive_broadcast = asyncio.create_task(self.external_inbox.get())
-
-                        done, _ = await asyncio.wait([timeout, receive_broadcast], return_when=asyncio.FIRST_COMPLETED)
-
-                        if receive_broadcast in done:
-                            # a mesasge was received before the timer ran out; cancel timer
-                            try:
-                                timeout.cancel()
-                                await timeout
-                            except asyncio.CancelledError:
-                                # restore message to inbox so it can be processed during `sense()`
-                                await self.external_inbox.put(receive_broadcast.result())    
-
-                                # update action completion status
-                                action.status = AgentAction.COMPLETED                
-                        else:
-                            # timer ran out or time advanced
-                            try:
-                                receive_broadcast.cancel()
-                                await receive_broadcast
-                            except asyncio.CancelledError:
-                                # update action completion status
-                                if self.external_inbox.empty():
-                                    action.status = AgentAction.PENDING
-                                else:
-                                    action.status = AgentAction.COMPLETED
-
+                        # timer ran out or time advanced
+                        try:
+                            receive_broadcast.cancel()
+                            await receive_broadcast
+                        except asyncio.CancelledError:
+                            # update action completion status
+                            if self.external_inbox.empty():
+                                action.status = AgentAction.PENDING
+                            else:
+                                action.status = AgentAction.COMPLETED
             else:
                 # ignore action
                 self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
@@ -443,7 +435,15 @@ class SimulationAgent(Agent):
         out += '\nt, pos, vel, status\n'
         for state_dict in self.state.history:
             out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
-
+        
+        # log performance stats
+        out += '\nroutine: t_avg[s], t_std[s], t_median[s], n\n'
+        for routine in self.stats:
+            t_avg = np.mean(self.stats[routine])
+            t_std = np.std(self.stats[routine])
+            t_median = np.median(self.stats[routine])
+            n = len(self.stats[routine])
+            out += f'`{routine}`: {np.round(t_avg,4)}, {np.round(t_std,4)}, {np.round(t_median,4)}, {n}\n'
         self.log(out, level=logging.WARNING)
 
         # print agent states
@@ -483,15 +483,17 @@ class SimulationAgent(Agent):
                 while self.get_current_time() <= t0:
                     # send tic request
                     tic_req = TicRequest(self.get_element_name(), t0, tf)
-                    await self._send_manager_msg(tic_req, zmq.PUB)
+                    toc_msg = None
+                    confirmation = None
+                    confirmation = await self._send_manager_msg(tic_req, zmq.PUB)
 
                     self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
                     dst, src, content = await self.manager_inbox.get()
                     
                     if content['msg_type'] == ManagerMessageTypes.TOC.value:
                         # update clock
-                        msg = TocMessage(**content)
-                        await self.update_current_time(msg.t)
+                        toc_msg = TocMessage(**content)
+                        await self.update_current_time(toc_msg.t)
                         self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
                     else:
                         # ignore message
@@ -505,6 +507,11 @@ class SimulationAgent(Agent):
                 raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
         
         except asyncio.CancelledError as e:
+            # if still waiting on  cancel request
+            if confirmation is not None and toc_msg is None:
+                tic_cancel = CancelTicRequest(self.get_element_name(), t0, tf)
+                await self._send_manager_msg(tic_cancel, zmq.PUB)
+
             raise e
 
         finally:
@@ -512,6 +519,7 @@ class SimulationAgent(Agent):
                 isinstance(self._clock_config, FixedTimesStepClockConfig) 
                 or isinstance(self._clock_config, EventDrivenClockConfig)
                 ) and ignored is not None:
+
+                # forward all ignored messages as manager messages
                 for dst, src, content in ignored:
                     await self.manager_inbox.put((dst,src,content))
-

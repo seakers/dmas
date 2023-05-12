@@ -33,13 +33,12 @@ class SimulationAgentState(AgentState):
         self.actions_performed = actions_performed
         self.status = status
         self.t = t
-        self.history = []
         self.instruments = instruments
+        self.history = []
 
     def update_state(self, 
                     t : Union[float, int], 
                     vel : list=[0.0,0.0], 
-                    actions_performed : list=[], 
                     status : str=None):
         if t >= self.t:        
             # update position with previous state info and new time jump
@@ -65,9 +64,6 @@ class SimulationAgentState(AgentState):
             # update velocity for future update
             if vel is not None:
                 self.vel = vel  
-
-        # update tasks performed
-        self.actions_performed.extend(actions_performed)
 
         # update status
         if status is not None:
@@ -111,8 +107,18 @@ class SimulationAgentState(AgentState):
         return str(dict(self.__dict__))
     
     def to_dict(self) -> dict:
-        out = super().to_dict().copy()
-        out.pop('history')
+        out = {
+            'pos' : self.pos,
+            'x_bounds' : self.x_bounds,
+            'y_bounds' : self.y_bounds,
+            'vel' : self.vel,
+            'v_max' : self.v_max,
+            'actions_performed' : self.actions_performed,
+            'status' : self.status,
+            't' : self.t,
+            'instruments' : self.instruments
+        }
+
         return out
     
     def is_critial(self) -> bool:

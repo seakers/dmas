@@ -712,7 +712,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
                     and len(path) > 0
                     and self.check_path_constraints(path, results, t_curr)):
 
-                    if converged < 2:
+                    if converged < 1:
                         converged += 1
 
                         for measurement_task in bundle:
@@ -810,7 +810,6 @@ class ACBBAPlannerModule(ConsensusPlanner):
                             else:
                                 actions.append( WaitForMessages(t_curr, next_task.t_start) )
 
-                        x = 1
                 else:
                     # bundle is empty or cannot be executed yet; instructing agent to idle
                     plan = []
@@ -940,13 +939,6 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 # wait for bundle-builder to finish processing information
                 self.log('waiting for bundle-builder...')
                 bundle_msgs = []
-                # while True:
-                #     bundle_msgs.append(await self.outgoing_bundle_builder_inbox.get())
-                    
-                #     if self.outgoing_bundle_builder_inbox.empty():
-                #         await asyncio.sleep(1e-5)
-                #         if self.outgoing_bundle_builder_inbox.empty():
-                #             break
                 bundle_bus : BusMessage = await self.outgoing_bundle_builder_inbox.get()
                 for msg_dict in bundle_bus.contents:
                     msg_dict : dict

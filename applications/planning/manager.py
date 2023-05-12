@@ -110,7 +110,7 @@ class PlanningSimulationManager(AbstractManager):
             - `dict` mapping simulation elements' names to the messages they sent.
         """
         try:
-            received_messages = dict()
+            received_messages : dict = {}
             read_task = None
 
             while(
@@ -126,7 +126,8 @@ class PlanningSimulationManager(AbstractManager):
                 _, src, msg_dict = read_task.result()
                 msg_type = msg_dict['msg_type']
 
-                if (NodeMessageTypes[msg_type] != NodeMessageTypes.TIC_REQ
+                if ((NodeMessageTypes[msg_type] != NodeMessageTypes.TIC_REQ
+                    and NodeMessageTypes[msg_type] != NodeMessageTypes.CANCEL_TIC_REQ)
                     or SimulationElementRoles.ENVIRONMENT.value in src):
                     # ignore all incoming messages that are not of the desired type 
                     self.log(f'Received {msg_type} message from node {src}! Ignoring message...')
@@ -134,21 +135,41 @@ class PlanningSimulationManager(AbstractManager):
 
                 # unpack and message
                 self.log(f'Received {msg_type} message from node {src}!')
-                tic_req = TicRequest(**msg_dict)
+                if NodeMessageTypes[msg_type] == NodeMessageTypes.TIC_REQ:
+                    # unpack message
+                    tic_req = TicRequest(**msg_dict)
 
-                # log subscriber confirmation
-                if src not in self._simulation_element_name_list and self.get_network_name() + '/' + src not in self._simulation_element_name_list:
-                    # node is not a part of the simulation
-                    self.log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
+                    # log subscriber confirmation
+                    if src not in self._simulation_element_name_list and self.get_network_name() + '/' + src not in self._simulation_element_name_list:
+                        # node is not a part of the simulation
+                        self.log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
-                elif src in received_messages:
-                    # node is a part of the simulation but has already communicated with me
-                    self.log(f'{src} has already reported its tic request to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
+                    elif src in received_messages:
+                        # node is a part of the simulation but has already communicated with me
+                        self.log(f'{src} has already reported its tic request to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
-                else:
-                    # node is a part of the simulation and has not yet been synchronized
-                    received_messages[src] = tic_req
-                    self.log(f'{src} has now reported reported its tic request  to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
+                    else:
+                        # node is a part of the simulation and has not yet been synchronized
+                        received_messages[src] = tic_req
+                        self.log(f'{src} has now reported reported its tic request  to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
+
+                elif NodeMessageTypes[msg_type] == NodeMessageTypes.CANCEL_TIC_REQ:
+                    # unpack message
+                    cancelled_tic_req = CancelTicRequest(**msg_dict)
+
+                    # log subscriber cancellation
+                    if src not in self._simulation_element_name_list and self.get_network_name() + '/' + src not in self._simulation_element_name_list:
+                        # node is not a part of the simulation
+                        self.log(f'{src} is not part of this simulation. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
+
+                    elif src not in received_messages:
+                        # node is a part of the simulation but ha not yet communicated with me
+                        self.log(f'{src} has not reported its tic request to the simulation manager yet. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
+
+                    else:
+                        # node is a part of the simulation and has already been synchronized
+                        received_messages.pop(src)
+                        self.log(f'{src} has cancelled its tic request to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
             return received_messages
 

@@ -317,6 +317,7 @@ class NodeMessageTypes(Enum):
     MODULE_DEACTIVATE = 'SIM_END'
     NODE_INFO = 'SIM_INFO'
     TIC_REQ = 'TIC_REQ'
+    CANCEL_TIC_REQ = 'CANCEL_TIC_REQ'
 
 class TicRequest(SimulationMessage):
     """
@@ -334,6 +335,32 @@ class TicRequest(SimulationMessage):
     """
     def __init__(self, src: str, t0 : Union[float, int], tf : Union[float, int], id: str = None, **_):
         super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.TIC_REQ.value, id)
+        
+        # check types
+        if not isinstance(t0 , float) and not isinstance(t0 , int):
+            raise TypeError(f'`t0` must be of type `float` or `int`. Is of type {type(t0)}')
+        if not isinstance(tf , float) and not isinstance(tf , int):
+            raise TypeError(f'`tf` must be of type `float` or `int`. Is of type {type(tf)}')
+
+        self.t0 = t0
+        self.tf = tf
+
+class CancelTicRequest(SimulationMessage):
+    """
+    ## Cancel Tic Request Message
+
+    Request from agents indicating that they are NO LONGER waiting for the next time-step advance
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+        - t0 (`float` or `int`): current time registered by the agent
+        - tf (`float` or `int`): desired time to be reached by agent
+    """
+    def __init__(self, src: str, t0 : Union[float, int], tf : Union[float, int], id: str = None, **_):
+        super().__init__(src, SimulationElementRoles.MANAGER.value, NodeMessageTypes.CANCEL_TIC_REQ.value, id)
         
         # check types
         if not isinstance(t0 , float) and not isinstance(t0 , int):

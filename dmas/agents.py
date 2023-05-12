@@ -3,6 +3,7 @@ import asyncio
 import datetime
 import json
 import logging
+import time
 from typing import Union
 import uuid
 import zmq
@@ -209,6 +210,11 @@ class Agent(Node):
             raise AttributeError(f'`node_network_config` must contain a SUB port and an address within its external address map.')
 
         self.state : AgentState = initial_state
+        self.stats = {
+                        'sense' : [],
+                        'think' : [],
+                        'do' : []
+                    }
 
     async def _activate(self) -> None:
         await super()._activate()
@@ -252,15 +258,24 @@ class Agent(Node):
             while not self.state.is_failure():
                 # sense environment
                 self.log('sensing...')
+                t_0 = time.perf_counter()
                 senses = await self.sense(statuses)
+                dt = time.perf_counter() - t_0
+                self.stats['sense'].append(dt)
 
                 # think of next action(s) to take
-                self.log('thikning...')
+                self.log('thinking...')
+                t_0 = time.perf_counter()
                 actions = await self.think(senses)
+                dt = time.perf_counter() - t_0
+                self.stats['think'].append(dt)
 
                 # perform action(s)
+                t_0 = time.perf_counter()
                 self.log('performing action(s)...')
                 statuses = await self.do(actions)
+                dt = time.perf_counter() - t_0
+                self.stats['do'].append(dt)
         
         except asyncio.CancelledError:
             return        
