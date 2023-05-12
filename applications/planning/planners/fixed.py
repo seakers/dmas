@@ -186,6 +186,25 @@ class FixedPlannerModule(PlannerModule):
             self.log(f'routine failed. {e}')
             raise e
 
+    async def empty_manager_inbox(self) -> list:
+        msgs = []
+        while True:
+            # wait for manager messages
+            self.log('waiting for parent agent message...')
+            _, _, content = await self.manager_inbox.get()
+            msgs.append(content)
+
+            # wait for any current transmissions to finish being received
+            self.log('waiting for any possible transmissions to finish...')
+            await asyncio.sleep(0.01)
+
+            if self.manager_inbox.empty():
+                self.log('manager queue empty.')
+                break
+            self.log('manager queue still contains elements.')
+        
+        return msgs
+
     async def teardown(self) -> None:
         # nothing to tear-down
         return

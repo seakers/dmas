@@ -2,6 +2,7 @@ from enum import Enum
 from dmas.messages import *
 
 class SimulationMessageTypes(Enum):
+    BUS = 'BUS'
     TASK_REQ = 'TASK_REQUEST'
     AGENT_ACTION = 'AGENT_ACTION'
     AGENT_STATE = 'AGENT_STATE'
@@ -11,6 +12,27 @@ class SimulationMessageTypes(Enum):
     PLAN = 'PLAN'
     SENSES = 'SENSES'
     MEASUREMENT = 'MEASUREMENT'
+
+class BusMessage(SimulationMessage):
+    """
+    ## Bus Message
+    A message designed to carry multiple messages during a single transmission
+    
+    ### Attributes:
+        - src (`str`): name of the agent sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`): Universally Unique IDentifier for this message
+        - msgs (`list`): List of message dictionaries to be transmitted
+    """
+    def __init__(self, 
+                src: str, 
+                dst: str, 
+                msgs : list,
+                id: str = None, 
+                **_):
+        super().__init__(src, dst, SimulationMessageTypes.BUS.value, id)
+        self.msgs = msgs
 
 class AgentStateMessage(SimulationMessage):
     """

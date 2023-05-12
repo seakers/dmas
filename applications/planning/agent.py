@@ -77,89 +77,46 @@ class SimulationAgent(Agent):
         self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
 
     async def setup(self) -> None:
-        # nothing to set up
         return
-    
-    async def teardown(self) -> None:
-        # log agent capabilities
-        out = f'\ninstruments: {self.instruments}'
-
-        # log state 
-        out += '\nt, pos, vel, status\n'
-        for state_dict in self.state.history:
-            out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
-
-        self.log(out, level=logging.WARNING)
-
-        # print agent states
-        with open(f"{self.results_path}/states.csv", "w") as file:
-            title = 't,x_pos,y_pos,x_vel,y_vel,status'
-            file.write(title)
-
-            for state_dict in self.state.history:
-                pos = state_dict['pos']
-                vel = state_dict['vel']
-                file.write(f"\n{state_dict['t']},{pos[0]},{pos[1]},{vel[0]},{vel[1]},{state_dict['status']}")
-
-    async def sim_wait(self, delay: float) -> None:
-        try:  
-            if (
-                isinstance(self._clock_config, FixedTimesStepClockConfig) 
-                or isinstance(self._clock_config, EventDrivenClockConfig)
-                ):
-                if delay < 1e-6: 
-                    ignored = None
-                    return
-
-                # desired time not yet reached
-                t0 = self.get_current_time()
-                tf = t0 + delay
-
-                # check if failure or critical state will be reached first
-                t_failure = self.state.predict_failure() 
-                t_crit = self.state.predict_critical()
-                if t_failure < tf:
-                    tf = t_failure
-                elif t_crit < tf:
-                    tf = t_crit
-                
-                # wait for time update        
-                ignored = []   
-                while self.get_current_time() <= t0:
-                    # send tic request
-                    tic_req = TicRequest(self.get_element_name(), t0, tf)
-                    await self._send_manager_msg(tic_req, zmq.PUB)
-
-                    self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
-                    dst, src, content = await self.manager_inbox.get()
-                    
-                    if content['msg_type'] == ManagerMessageTypes.TOC.value:
-                        # update clock
-                        msg = TocMessage(**content)
-                        await self.update_current_time(msg.t)
-                        self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
-                    else:
-                        # ignore message
-                        self.log(f'some other manager message was received. ignoring...')
-                        ignored.append((dst, src, content))
-
-            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
-                await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
-
-            else:
-                raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
         
-        except asyncio.CancelledError as e:
-            raise e
+        # # listen for initial environment broadcast
+        
+        # # inform environment of new state
+        # state_msg = AgentStateMessage(  self.get_element_name(), 
+        #                                 SimulationElementRoles.ENVIRONMENT.value,
+        #                                 self.state.to_dict()
+        #                             )
+        # await self.send_peer_message(state_msg)
 
-        finally:
-            if (
-                isinstance(self._clock_config, FixedTimesStepClockConfig) 
-                or isinstance(self._clock_config, EventDrivenClockConfig)
-                ) and ignored is not None:
-                for dst, src, content in ignored:
-                    await self.manager_inbox.put((dst,src,content))
+        # # wait for environment messages
+        # senses = []
+        # _, _, content = await self.environment_inbox.get()
 
+        # if content['msg_type'] == SimulationMessageTypes.BUS.value:
+        #     msg = BusMessage(**content)
+        #     msgs = msg.msgs
+        # else:
+        #     msgs = [content]
+
+        # for msg_dict in msgs:
+        #     if msg_dict['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+        #         # update connectivity
+        #         msg = AgentConnectivityUpdate(**msg_dict)
+        #         if msg.connected == 1:
+        #             self.subscribe_to_broadcasts(msg.target)
+        #         else:
+        #             self.unsubscribe_to_broadcasts(msg.target)
+
+        #     elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+        #         # save as senses to forward to planner
+        #         task_msg = TaskRequest(**msg_dict)
+        #         task_msg.dst = self.get_element_name()
+        #         senses.append(task_msg)
+
+        #     elif msg_dict['msg_type'] == NodeMessageTypes.RECEPTION_ACK.value:
+        #         # no relevant information was sent by the environment
+        #     break
+    
     async def sense(self, statuses: list) -> list:
         # initiate senses array
         senses = []
@@ -199,49 +156,49 @@ class SimulationAgent(Agent):
         # handle environment updates
         while True:
             # wait for environment messages
-            _, _, content = await self.environment_inbox.get()
+            _, _, msg_dict = await self.environment_inbox.get()
 
-            if content['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+            if msg_dict['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
                 # update connectivity
-                msg = AgentConnectivityUpdate(**content)
+                msg = AgentConnectivityUpdate(**msg_dict)
                 if msg.connected == 1:
                     self.subscribe_to_broadcasts(msg.target)
                 else:
                     self.unsubscribe_to_broadcasts(msg.target)
 
-            elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                 # save as senses to forward to planner
-                task_msg = TaskRequest(**content)
+                task_msg = TaskRequest(**msg_dict)
                 task_msg.dst = self.get_element_name()
                 senses.append(task_msg)
 
-            elif content['msg_type'] == NodeMessageTypes.RECEPTION_ACK.value:
+            elif msg_dict['msg_type'] == NodeMessageTypes.RECEPTION_ACK.value:
                 # no relevant information was sent by the environment
                 break
-                
-            if self.environment_inbox.empty():
-                # give environment time to continue sending any pending messages if any are yet to be transmitted
-                await asyncio.sleep(0.01)
-
-                if self.environment_inbox.empty():
-                    break
         
         # handle peer broadcasts
         while not self.external_inbox.empty():
-            _, _, content = await self.external_inbox.get()
+            _, _, msg_dict = await self.external_inbox.get()
 
             # save as senses to forward to planner
-            if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                senses.append(AgentStateMessage(**content))
+            if msg_dict['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                senses.append(AgentStateMessage(**msg_dict))
 
-            elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                senses.append(TaskRequest(**content))
+            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                senses.append(TaskRequest(**msg_dict))
 
-            elif content['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
-                senses.append(PlannerResultsMessage(**content))
+            elif msg_dict['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
+                senses.append(PlannerResultsMessage(**msg_dict))
 
-            elif content['msg_type'] == SimulationMessageTypes.TASK_BID.value:
-                senses.append(TaskBidMessage(**content))
+            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                senses.append(TaskBidMessage(**msg_dict))
+
+            if self.external_inbox.empty():
+                # give environment time to continue sending any pending messages if any are yet to be transmitted
+                await asyncio.sleep(1e-2)
+
+                if self.external_inbox.empty():
+                    break
 
         return senses
 
@@ -506,3 +463,84 @@ class SimulationAgent(Agent):
 
         self.log(f'returning {len(statuses)} statuses')
         return statuses
+
+    async def teardown(self) -> None:
+        # log agent capabilities
+        out = f'\ninstruments: {self.instruments}'
+
+        # log state 
+        out += '\nt, pos, vel, status\n'
+        for state_dict in self.state.history:
+            out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
+
+        self.log(out, level=logging.WARNING)
+
+        # print agent states
+        with open(f"{self.results_path}/states.csv", "w") as file:
+            title = 't,x_pos,y_pos,x_vel,y_vel,status'
+            file.write(title)
+
+            for state_dict in self.state.history:
+                pos = state_dict['pos']
+                vel = state_dict['vel']
+                file.write(f"\n{state_dict['t']},{pos[0]},{pos[1]},{vel[0]},{vel[1]},{state_dict['status']}")
+
+    async def sim_wait(self, delay: float) -> None:
+        try:  
+            if (
+                isinstance(self._clock_config, FixedTimesStepClockConfig) 
+                or isinstance(self._clock_config, EventDrivenClockConfig)
+                ):
+                if delay < 1e-6: 
+                    ignored = None
+                    return
+
+                # desired time not yet reached
+                t0 = self.get_current_time()
+                tf = t0 + delay
+
+                # check if failure or critical state will be reached first
+                t_failure = self.state.predict_failure() 
+                t_crit = self.state.predict_critical()
+                if t_failure < tf:
+                    tf = t_failure
+                elif t_crit < tf:
+                    tf = t_crit
+                
+                # wait for time update        
+                ignored = []   
+                while self.get_current_time() <= t0:
+                    # send tic request
+                    tic_req = TicRequest(self.get_element_name(), t0, tf)
+                    await self._send_manager_msg(tic_req, zmq.PUB)
+
+                    self.log(f'tic request for {tf}[s] sent! waiting on toc broadcast...')
+                    dst, src, content = await self.manager_inbox.get()
+                    
+                    if content['msg_type'] == ManagerMessageTypes.TOC.value:
+                        # update clock
+                        msg = TocMessage(**content)
+                        await self.update_current_time(msg.t)
+                        self.log(f'toc received! time updated to: {self.get_current_time()}[s]')
+                    else:
+                        # ignore message
+                        self.log(f'some other manager message was received. ignoring...')
+                        ignored.append((dst, src, content))
+
+            elif isinstance(self._clock_config, AcceleratedRealTimeClockConfig):
+                await asyncio.sleep(delay / self._clock_config.sim_clock_freq)
+
+            else:
+                raise NotImplementedError(f'`sim_wait()` for clock of type {type(self._clock_config)} not yet supported.')
+        
+        except asyncio.CancelledError as e:
+            raise e
+
+        finally:
+            if (
+                isinstance(self._clock_config, FixedTimesStepClockConfig) 
+                or isinstance(self._clock_config, EventDrivenClockConfig)
+                ) and ignored is not None:
+                for dst, src, content in ignored:
+                    await self.manager_inbox.put((dst,src,content))
+

@@ -1,3 +1,4 @@
+import copy
 from typing import Union
 import numpy as np
 from dmas.agents import AgentState
@@ -78,6 +79,30 @@ class SimulationAgentState(AgentState):
         if self.status != self.SENSING:
             out = self.to_dict()
             self.history.append(out)
+
+    def propagate_state(self, t : Union[float, int], vel : list=None) -> object:
+        future_vel = vel if vel is not None else [v for v in self.vel]
+        
+        x_future = self.pos[0] + future_vel[0] * (t - self.t)
+        y_future = self.pos[1] + future_vel[1] * (t - self.t)
+        future_pos = [x_future, y_future]
+
+        return SimulationAgentState(future_pos, 
+                                    self.x_bounds, 
+                                    self.y_bounds,
+                                    future_vel,
+                                    self.v_max,
+                                    [],
+                                    self.status,
+                                    t,
+                                    self.instruments)      
+
+    def calc_arrival_time(self, pos_start : list, pos_final : list, t_start : Union[int, float]) -> float:
+        """
+        Estimates the quickest arrival time from a starting position to a given final position
+        """
+        dpos = np.sqrt( (pos_final[0]-pos_start[0])**2 + (pos_final[1]-pos_start[1])**2 )
+        return t_start + dpos / self.v_max
 
     def __repr__(self) -> str:
         return str(self.to_dict())

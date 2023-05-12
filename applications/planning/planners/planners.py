@@ -51,24 +51,12 @@ class PlannerModule(InternalModule):
     async def sim_wait(self, delay: float) -> None:
         return
 
-    async def empty_manager_inbox(self) -> list:
-        msgs = []
-        while True:
-            # wait for manager messages
-            self.log('waiting for parent agent message...')
-            _, _, content = await self.manager_inbox.get()
-            msgs.append(content)
-
-            # wait for any current transmissions to finish being received
-            self.log('waiting for any possible transmissions to finish...')
-            await asyncio.sleep(0.01)
-
-            if self.manager_inbox.empty():
-                self.log('manager queue empty.')
-                break
-            self.log('manager queue still contains elements.')
-        
-        return msgs
+    @abstractmethod
+    def calc_utility(self, task : MeasurementTask, **kwargs) -> float:
+        """
+        Quantifies the expected utility of performing a task
+        """
+        pass
 
 class Bid(ABC):
     """
@@ -305,16 +293,8 @@ class ConsensusPlanner(PlannerModule):
         self.state_curr = None
         self.listener_results = None
         self.bundle_builder_results = None
-    
-    async def setup(self) -> None:
-        # initialize internal messaging queues
-        self.states_inbox = asyncio.Queue()
-        self.relevant_changes_inbox = asyncio.Queue()
-        self.action_status_inbox = asyncio.Queue()
 
-        self.outgoing_listen_inbox = asyncio.Queue()
-        self.outgoing_bundle_builder_inbox = asyncio.Queue()
-
+    @abstractmethod
     def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """
         Checks if the bids of every task in the current path have all of their constraints
@@ -323,19 +303,8 @@ class ConsensusPlanner(PlannerModule):
         ### Returns:
             - True if all constraints are met; False otherwise
         """
-        for task in path:
-            # check constraints
-            task : MeasurementTask
-            if not self.check_task_constraints(task, results):
-                return False
-            
-            # check local convergence
-            my_bid : TaskBid = results[task.id]
-            if t_curr < my_bid.t_update + my_bid.dt_converge:
-                return False
 
-        return True
-
+    @abstractmethod
     def check_task_constraints(self, task : MeasurementTask, results : dict) -> bool:
         """
         Checks if the bids in the current results satisfy the constraints of a given task.
@@ -343,8 +312,7 @@ class ConsensusPlanner(PlannerModule):
         ### Returns:
             - True if all constraints are met; False otherwise
         """
-        # TODO add bid and time constraints
-        return True
+        pass
 
     def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
         """
@@ -363,21 +331,12 @@ class ConsensusPlanner(PlannerModule):
 
         return available
 
+    @abstractmethod
     def can_bid(self, state : SimulationAgentState, task : MeasurementTask) -> bool:
         """
         Checks if an agent can perform a measurement task
         """
-        # check capabilities - TODO: Replace with knowledge graph
-        for instrument in task.instruments:
-            if instrument not in state.instruments:
-                return False
-
-        # check time constraints
-        ## Constraint 1: task must be able to be performed durig or after the current time
-        if task.t_end < state.t:
-            return False
-        
-        return True
+        pass
 
     @abstractmethod
     def calc_path_bid(self, state : SimulationAgentState, original_path : list, task : MeasurementTask) -> tuple:
@@ -402,6 +361,10 @@ class ConsensusPlanner(PlannerModule):
     def sum_path_utility(self, path : list, bids : dict) -> float:
         """
         Sums the utilities of a proposed path
+
+        ### Arguments:
+            - path (`list`): sequence of tasks dictionaries to be performed
+            - bids (`dict`): dictionary of task ids to the current task bid dictionaries 
         """
         utility = 0.0
         for task in path:
@@ -411,9 +374,16 @@ class ConsensusPlanner(PlannerModule):
 
         return utility
     
-    def calc_utility(self, task : MeasurementTask, t_arrive : float):
+    def calc_utility(self, task : MeasurementTask, t_arrive : float) -> float:
         """
         Calculates the expected utility of performing a measurement task
+
+        ### Arguments:
+            - task (obj:`MeasurementTask`) task to be performed 
+            - t_arrive (`float`): time at which the task will be performed
+
+        ### RetrurnsL
+            - utility (`float`): estimated normalized utility 
         """
         # check time constraints
         if t_arrive < task.t_start or task.t_end < t_arrive:
@@ -427,6 +397,14 @@ class ConsensusPlanner(PlannerModule):
     def calc_arrival_time(self, state : SimulationAgentState, path : list, bids : dict, task : MeasurementTask) -> float:
         """
         Computes the time when a task in the path would be performed
+
+        ### Arguments:
+            - state (obj:`SimulationAgentState`): state of the agent at the start of the path
+            - path (`list`): sequence of tasks dictionaries to be performed
+            - bids (`dict`): dictionary of task ids to the current task bid dictionaries 
+
+        ### Returns
+            - t_arrival (`float`): earliest available arrival time
         """
         # calculate the previous task's position and 
         i = path.index(task)
@@ -440,16 +418,17 @@ class ConsensusPlanner(PlannerModule):
             pos_prev : list = task_prev.pos
 
         # compute travel time to the task
-        pos_next = task.pos
-        dpos = np.sqrt( (pos_next[0]-pos_prev[0])**2 + (pos_next[1]-pos_prev[1])**2 )
-        t_travel = dpos / state.v_max
-        t_arrival = t_travel + t_prev
-
+        t_arrival = state.calc_arrival_time(pos_prev, task.pos, t_prev)
         return t_arrival if t_arrival >= task.t_start else task.t_start
 
-    def log_results(self, results : dict, dsc : str, level=logging.DEBUG) -> None:
+    def log_results(self, dsc : str, results : dict, level=logging.DEBUG) -> None:
         """
-        Logs current results at a given time for debugging puropses
+        Logs current results at a given time for debugging purposes
+
+        ### Argumnents:
+            - dsc (`str`): description of what is to be logged
+            - results (`dict`): results to be logged
+            - level (`int`): logging level to be used
         """
         out = f'\n{dsc}\ntask_id,  location,  bidder, bid, winner, winning_bid, t_arrive\n'
         for task_id in results:
@@ -462,7 +441,12 @@ class ConsensusPlanner(PlannerModule):
 
     def log_task_sequence(self, dsc : str, sequence : list, level=logging.DEBUG) -> None:
         """
-        Logs a sequence of tasks at a given time for debugging puropses
+        Logs a sequence of tasks at a given time for debugging purposes
+
+        ### Argumnents:
+            - dsc (`str`): description of what is to be logged
+            - sequence (`list`): list of tasks to be logged
+            - level (`int`): logging level to be used
         """
         out = f'\n{dsc} = ['
         for task in sequence:

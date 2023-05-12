@@ -12,7 +12,7 @@
 import math
 
 import numpy as np
-from applications.planning.planners.planners import *
+from planners.planners import *
 from messages import *
 from states import SimulationAgentState
 from tasks import *
@@ -359,6 +359,15 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 ) -> None:
         super().__init__(results_path, manager_port, agent_id, parent_network_config, PlannerTypes.ACBBA, l_bundle, level, logger)
     
+    async def setup(self) -> None:
+        # initialize internal messaging queues
+        self.states_inbox = asyncio.Queue()
+        self.relevant_changes_inbox = asyncio.Queue()
+        self.action_status_inbox = asyncio.Queue()
+
+        self.outgoing_listen_inbox = asyncio.Queue()
+        self.outgoing_bundle_builder_inbox = asyncio.Queue()
+
     async def live(self) -> None:
         """
         Performs three concurrent tasks:
@@ -826,6 +835,53 @@ class ACBBAPlannerModule(ConsensusPlanner):
         finally:
             self.bundle_builder_results = results
 
+    def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids of every task in the current path have all of their constraints
+        satisfied by other bids.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        for task in path:
+            # check constraints
+            task : MeasurementTask
+            if not self.check_task_constraints(task, results):
+                return False
+            
+            # check local convergence
+            my_bid : TaskBid = results[task.id]
+            if t_curr < my_bid.t_update + my_bid.dt_converge:
+                return False
+
+        return True
+
+    def check_task_constraints(self, task : MeasurementTask, results : dict) -> bool:
+        """
+        Checks if the bids in the current results satisfy the constraints of a given task.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        # TODO add bid and time constraints
+        return True
+
+    def can_bid(self, state : SimulationAgentState, task : MeasurementTask) -> bool:
+        """
+        Checks if an agent can perform a measurement task
+        """
+        # check capabilities - TODO: Replace with knowledge graph
+        for instrument in task.instruments:
+            if instrument not in state.instruments:
+                return False
+
+        # check time constraints
+        ## Constraint 1: task must be able to be performed durig or after the current time
+        if task.t_end < state.t:
+            return False
+        
+        return True
+
     def calc_path_bid(self, state : SimulationAgentState, original_path : list, task : MeasurementTask) -> tuple:
         winning_path = None
         winning_bids = None
@@ -884,7 +940,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
                     bundle_msgs.append(await self.outgoing_bundle_builder_inbox.get())
                     
                     if self.outgoing_bundle_builder_inbox.empty():
-                        await asyncio.sleep(1e-2)
+                        await asyncio.sleep(1e-5)
                         if self.outgoing_bundle_builder_inbox.empty():
                             break
 

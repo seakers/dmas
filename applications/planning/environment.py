@@ -1,4 +1,5 @@
 import copy
+import math
 from utils import setup_results_directory
 from states import SimulationAgentState
 from dmas.environments import *
@@ -8,6 +9,7 @@ from dmas.messages import *
 from messages import *
 from tasks import MeasurementTask
 from zmq import asyncio as azmq
+import numpy as np
 
 class SimulationEnvironment(EnvironmentNode):
     """
@@ -46,15 +48,37 @@ class SimulationEnvironment(EnvironmentNode):
         self.pulished_task_history = []
         self.measurement_history = []
 
+        if isinstance(self._clock_config, FixedTimesStepClockConfig):
+            tasks = []
+            for task in self.tasks:
+                task : MeasurementTask
+                dt = self._clock_config.dt
+                prev_t_start = task.t_start
+                prev_t_end = task.t_end
+                if task.t_start < np.Inf:
+                    task.t_start = dt * math.floor(task.t_start/dt)
+                if task.t_end < np.Inf:
+                    task.t_end = dt * math.ceil(task.t_end/dt)
+
+                if task.t_end > task.t_start:
+                    task.t_end += dt
+                tasks.append(task)
+            self.tasks = tasks
+
     async def publish_tasks(self):
         self.log(f'publishing {len(self.tasks)} task requests to all agents...')
-        while len(self.tasks) > 0:
-            task : MeasurementTask = self.tasks.pop(0)
-            task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
+        tasks_to_pop = []
+        for task in self.tasks:
+            task : MeasurementTask
+            if task.t_start <= self.get_current_time() <= task.t_end:
+                task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
+                await self.send_peer_broadcast(task_req)
+                tasks_to_pop.append(task)
             
-            await self.send_peer_broadcast(task_req)
-            
-            self.pulished_task_history.append((task, self.get_current_time()))
+                self.pulished_task_history.append((task, self.get_current_time()))
+
+        for task in tasks_to_pop:
+            self.tasks.remove(task)
 
         self.log('tasks published!')
 
@@ -122,48 +146,6 @@ class SimulationEnvironment(EnvironmentNode):
                         if not self.same_state_times():
                             continue
 
-                        # while not self.same_state_times():
-                        #     self.log('states are at different times! waiting for more incoming state updates...')
-
-                        #     # read message from socket
-                        #     dst, src, content = await self.listen_peer_message()
-                        #     self.log(f'agent message received: {content}')
-
-                        #     if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                        #         # message is of type `AgentState`
-                        #         self.log(f"received message of type {content['msg_type']}. processing message....")
-
-                        #         # unpack message
-                        #         msg = AgentStateMessage(**content)
-
-                        #         # update state tracker
-                        #         self.states_tracker[src] = SimulationAgentState(**msg.state)
-
-                        #         # send confirmation response
-                        #         resp = NodeReceptionAckMessage(self.get_element_name(), src)
-                        #         await self.respond_peer_message(resp)                       
-                            
-                        #     elif content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
-                        #         # unpack message
-                        #         msg = MeasurementResultsRequest(**content)
-                        #         self.log(f'received masurement data request from {msg.src}. quering measurement results...')
-
-                        #         # find/generate measurement results
-                        #         # TODO look up requested measurement results from database/model
-                        #         measurement_data = {'agent' : msg.src, 
-                        #                             't_measurement' : self.get_current_time()}
-
-                        #         # repsond to request
-                        #         self.log(f'measurement results obtained! responding to request')
-                        #         resp = copy.deepcopy(msg)
-                        #         resp.dst = resp.src
-                        #         resp.src = self.get_element_name()
-                        #         resp.measurement = measurement_data
-                                
-                        #         self.measurement_history.append(resp)
-
-                        #         await self.respond_peer_message(resp) 
-
                         # check for range and announce chances in connectivity 
                         self.log('states are all from the same time! checking agent connectivity...')
                         range_updates : list = self.check_agent_connectivity()
@@ -175,13 +157,14 @@ class SimulationEnvironment(EnvironmentNode):
                                 await self.send_peer_broadcast(range_update)
                             self.log('connectivity updates sent!')
 
-                        elif len(self.tasks) > 0:
+                        if len(self.tasks) > 0:
                             await self.publish_tasks()
 
                         else:
                             self.log(f'connectivity checked. no connectivity updates...')
-                            ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
-                            await self.send_peer_broadcast(ok_msg)                        
+
+                        ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
+                        await self.send_peer_broadcast(ok_msg)                        
 
                         # save connectivity state to history
                         agent_connectivity = {}
@@ -234,207 +217,6 @@ class SimulationEnvironment(EnvironmentNode):
         except Exception as e:
             self.log(f'`live()` failed. {e}', level=logging.ERROR)
             raise e
-
-    # async def live(self) -> None:
-    #     try:
-    #         maanger_listener_task = asyncio.create_task(self.listen_to_manager(), name='listen_to_manager()')
-    #         agent_listener_task = asyncio.create_task(self.listen_to_agents(), name='listen_to_agents()')
-            
-    #         tasks = [maanger_listener_task, agent_listener_task]
-
-    #         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-
-        # except asyncio.CancelledError:
-        #     return
-
-        # except Exception as e:
-        #     self.log(f'`live()` failed. {e}', level=logging.ERROR)
-        #     raise e
-        
-    #     finally:
-    #         for task in done:
-    #             self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
-
-    #         for task in pending:
-    #             task : asyncio.Task
-    #             if not task.done():
-    #                 task.cancel()
-    #                 await task
-
-    async def listen_to_manager(self) -> None:
-        """
-        Listens for broadcasts from the manager. Updates internal clock or termiantes accordingly
-        """
-        try:
-            # track agent and simulation states
-            while True:
-                
-                # check if manager message is received:
-                dst, src, content = await self.listen_manager_broadcast()
-
-                if (dst in self.name 
-                    and SimulationElementRoles.MANAGER.value in src 
-                    and content['msg_type'] == ManagerMessageTypes.SIM_END.value
-                    ):
-                    # sim end message received
-                    self.log(f"received message of type {content['msg_type']}. ending simulation...")
-                    # raise asyncio.CancelledError(f"received message of type {content['msg_type']}")
-                    return
-
-                elif content['msg_type'] == ManagerMessageTypes.TOC.value:
-                    # toc message received
-
-                    # unpack message
-                    msg = TocMessage(**content)
-
-                    # update internal clock
-                    self.log(f"received message of type {content['msg_type']}. updating internal clock to {msg.t}[s]...")
-                    await self.update_current_time(msg.t)
-
-                    # wait for all agent's to send their updated states
-                    self.log(f"internal clock uptated to time {self.get_current_time()}[s]!")
-                
-                else:
-                    # ignore message
-                    self.log(f"received message of type {content['msg_type']}. ignoring message...")
-        
-        except asyncio.CancelledError:
-            return
-                
-    async def listen_to_agents(self) -> None:
-        """
-        Listens for any incoming agent requests and responds to them accordingly.
-        """
-        try:
-            # track agent and simulation states
-            await asyncio.sleep(1e-2)
-
-            await self.publish_tasks()
-
-            # listen for messages
-            self.log(f'task requests broadcasted! listening to incoming messages...')
-            while True:
-
-                # read message from socket
-                dst, src, content = await self.listen_peer_message()
-                
-                if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
-                    # unpack message
-                    msg = MeasurementResultsRequest(**content)
-                    self.log(f'received masurement data request from {msg.src}. quering measurement results...')
-
-                    # find/generate measurement results
-                    # TODO look up requested measurement results from database/model
-                    measurement_data = {'agent' : msg.src, 
-                                        't_measurement' : self.get_current_time()}
-
-                    # repsond to request
-                    self.log(f'measurement results obtained! responding to request')
-                    resp = copy.deepcopy(msg)
-                    resp.dst = resp.src
-                    resp.src = self.get_element_name()
-                    resp.measurement = measurement_data
-                    
-                    self.measurement_history.append(resp)
-
-                    await self.respond_peer_message(resp) 
-
-                elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                    # unpack message
-                    msg = AgentStateMessage(**content)
-                    self.log(f'state message received from {msg.src}. updating state tracker...')
-
-                    # update state tracker
-                    self.states_tracker[src] = SimulationAgentState(**msg.state)
-                    self.log(f'state tracker updated! sending response acknowledgement')
-
-                    # send confirmation response
-                    resp = NodeReceptionAckMessage(self.get_element_name(), src)
-                    await self.respond_peer_message(resp)
-                    self.log('response sent! checking if all states are in the same time...')
-
-                    # Check if all states are of the same time
-                    if not self.same_state_times():
-                        continue
-
-                    # while not self.same_state_times():
-                    #     self.log('states are at different times! waiting for more incoming state updates...')
-
-                    #     # read message from socket
-                    #     dst, src, content = await self.listen_peer_message()
-                    #     self.log(f'agent message received: {content}')
-
-                    #     if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                    #         # message is of type `AgentState`
-                    #         self.log(f"received message of type {content['msg_type']}. processing message....")
-
-                    #         # unpack message
-                    #         msg = AgentStateMessage(**content)
-
-                    #         # update state tracker
-                    #         self.states_tracker[src] = SimulationAgentState(**msg.state)
-
-                    #         # send confirmation response
-                    #         resp = NodeReceptionAckMessage(self.get_element_name(), src)
-                    #         await self.respond_peer_message(resp)                       
-                        
-                    #     elif content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
-                    #         # unpack message
-                    #         msg = MeasurementResultsRequest(**content)
-                    #         self.log(f'received masurement data request from {msg.src}. quering measurement results...')
-
-                    #         # find/generate measurement results
-                    #         # TODO look up requested measurement results from database/model
-                    #         measurement_data = {'agent' : msg.src, 
-                    #                             't_measurement' : self.get_current_time()}
-
-                    #         # repsond to request
-                    #         self.log(f'measurement results obtained! responding to request')
-                    #         resp = copy.deepcopy(msg)
-                    #         resp.dst = resp.src
-                    #         resp.src = self.get_element_name()
-                    #         resp.measurement = measurement_data
-                            
-                    #         self.measurement_history.append(resp)
-
-                    #         await self.respond_peer_message(resp) 
-
-                    # check for range and announce chances in connectivity 
-                    self.log('states are all from the same time! checking agent connectivity...')
-                    range_updates : list = self.check_agent_connectivity()
-
-                    if len(range_updates) > 0:
-                        self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
-                        for range_update in range_updates:
-                            range_update : AgentConnectivityUpdate
-                            await self.send_peer_broadcast(range_update)
-                        self.log('connectivity updates sent!')
-
-                    elif len(self.tasks) > 0:
-                        await self.publish_tasks()
-
-                    else:
-                        self.log(f'connectivity checked. no connectivity updates...')
-                        ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
-                        await self.send_peer_broadcast(ok_msg)                        
-
-                    # save connectivity state to history
-                    agent_connectivity = {}
-                    for src in self.agent_connectivity:
-                        connections = {dst : self.agent_connectivity[src][dst] for dst in self.agent_connectivity[src]}
-                        agent_connectivity[src] = connections
-
-                    self.agent_connectivity_history.append((self.get_current_time(), agent_connectivity.copy()))
-
-                else:
-                    # message is of an unsopported type. send blank response
-                    self.log(f"received message of type {content['msg_type']}. ignoring message...")
-                    resp = NodeReceptionIgnoredMessage(self.get_element_name(), src)
-
-                    # respond to request
-                    await self.respond_peer_message(resp)
-        except asyncio.CancelledError:
-            return
 
     def same_state_times(self) -> bool:
         """

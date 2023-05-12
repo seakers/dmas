@@ -20,9 +20,16 @@ class AgentState(ABC):
     Describes the state of an agent
     """
     @abstractmethod
-    def update_state(self, **kwargs):
+    def update_state(self, **kwargs) -> None:
         """
         Updates the state of this agent
+        """
+        pass
+
+    @abstractmethod
+    def propagate_state(self, **kwargs) -> object:
+        """
+        Propagates the current state
         """
         pass
 
