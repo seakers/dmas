@@ -94,7 +94,7 @@ class SimulationEnvironment(EnvironmentNode):
             poller.register(peer_socket, zmq.POLLIN)
             
             # track agent and simulation states
-            await asyncio.sleep(1e-2)
+            await asyncio.sleep(1e-3)
 
             # publish initial set of tasks
             await self.publish_tasks()

@@ -78,44 +78,6 @@ class SimulationAgent(Agent):
 
     async def setup(self) -> None:
         return
-        
-        # # listen for initial environment broadcast
-        
-        # # inform environment of new state
-        # state_msg = AgentStateMessage(  self.get_element_name(), 
-        #                                 SimulationElementRoles.ENVIRONMENT.value,
-        #                                 self.state.to_dict()
-        #                             )
-        # await self.send_peer_message(state_msg)
-
-        # # wait for environment messages
-        # senses = []
-        # _, _, content = await self.environment_inbox.get()
-
-        # if content['msg_type'] == SimulationMessageTypes.BUS.value:
-        #     msg = BusMessage(**content)
-        #     msgs = msg.msgs
-        # else:
-        #     msgs = [content]
-
-        # for msg_dict in msgs:
-        #     if msg_dict['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
-        #         # update connectivity
-        #         msg = AgentConnectivityUpdate(**msg_dict)
-        #         if msg.connected == 1:
-        #             self.subscribe_to_broadcasts(msg.target)
-        #         else:
-        #             self.unsubscribe_to_broadcasts(msg.target)
-
-        #     elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-        #         # save as senses to forward to planner
-        #         task_msg = TaskRequest(**msg_dict)
-        #         task_msg.dst = self.get_element_name()
-        #         senses.append(task_msg)
-
-        #     elif msg_dict['msg_type'] == NodeMessageTypes.RECEPTION_ACK.value:
-        #         # no relevant information was sent by the environment
-        #     break
     
     async def sense(self, statuses: list) -> list:
         # initiate senses array
@@ -192,13 +154,6 @@ class SimulationAgent(Agent):
 
             elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_BID.value:
                 senses.append(TaskBidMessage(**msg_dict))
-
-            if self.external_inbox.empty():
-                # give environment time to continue sending any pending messages if any are yet to be transmitted
-                await asyncio.sleep(1e-2)
-
-                if self.external_inbox.empty():
-                    break
 
         return senses
 

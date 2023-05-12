@@ -13,6 +13,33 @@ class SimulationMessageTypes(Enum):
     SENSES = 'SENSES'
     MEASUREMENT = 'MEASUREMENT'
 
+def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
+    """
+    Creates the appropriate message from a given dictionary in the correct format
+    """
+    if msg_type == SimulationMessageTypes.BUS.value:
+        return BusMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.TASK_REQ.value:
+        return TaskBidMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.AGENT_ACTION.value:
+        return AgentActionMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.AGENT_STATE.value:
+        return AgentStateMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
+        return AgentConnectivityUpdate(**kwargs)
+    elif msg_type == SimulationMessageTypes.PLANNER_RESULTS.value:
+        return PlannerResultsMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.TASK_BID.value:
+        return TaskBidMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.PLAN.value:
+        return PlanMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.SENSES.value:
+        return SensesMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.MEASUREMENT.value:
+        return MeasurementResultsRequest(**kwargs)
+    else:
+        raise NotImplemented(f'Action of type {msg_type} not yet implemented.')
+
 class BusMessage(SimulationMessage):
     """
     ## Bus Message
@@ -23,16 +50,16 @@ class BusMessage(SimulationMessage):
         - dst (`str`): name of the intended simulation element to receive this message
         - msg_type (`str`): type of message being sent
         - id (`str`): Universally Unique IDentifier for this message
-        - msgs (`list`): List of message dictionaries to be transmitted
+        - contents (`list`): List of message dictionaries to be transmitted
     """
     def __init__(self, 
                 src: str, 
                 dst: str, 
-                msgs : list,
+                contents : list,
                 id: str = None, 
                 **_):
         super().__init__(src, dst, SimulationMessageTypes.BUS.value, id)
-        self.msgs = msgs
+        self.contents = contents
 
 class AgentStateMessage(SimulationMessage):
     """

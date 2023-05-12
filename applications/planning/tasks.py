@@ -14,6 +14,24 @@ class ActionTypes(Enum):
     IDLE = 'IDLE'
     WAIT_FOR_MSG = 'WAIT_FOR_MSG'
 
+def action_from_dict(action_type : str, **kwargs) -> AgentAction:
+    if action_type == ActionTypes.PEER_MSG.value:
+        return PeerMessageAction(**kwargs)
+    elif action_type == ActionTypes.BROADCAST_MSG.value:
+        return BroadcastMessageAction(**kwargs)
+    elif action_type == ActionTypes.BROADCAST_STATE.value:
+        return BroadcastStateAction(**kwargs)
+    elif action_type == ActionTypes.MOVE.value:
+        return MoveAction(**kwargs)
+    elif action_type == ActionTypes.MEASURE.value:
+        return MeasurementTask(**kwargs)
+    elif action_type == ActionTypes.IDLE.value:
+        return IdleAction(**kwargs)
+    elif action_type == ActionTypes.WAIT_FOR_MSG.value:
+        return WaitForMessages(**kwargs)
+    else:
+        raise NotImplemented(f'Action of type {action_type} not yet implemented.')
+    
 class PeerMessageAction(AgentAction):
     """
     ## Peer-Message Action 
