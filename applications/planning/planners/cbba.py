@@ -1,4 +1,8 @@
 from typing import Union
+from planners.planners import *
+import zmq 
+from zmq import asyncio as azmq
+
 """
 *********************************************************************************
    __________  ____  ___       ____  __                           
@@ -10,7 +14,7 @@ from typing import Union
 *********************************************************************************
 """
 
-class TaskBid(object):
+class TaskBid(Bid):
     """
     ## Task Bid for CBBA 
 
@@ -27,14 +31,13 @@ class TaskBid(object):
         - iterations (`dict`): list of latest iteration when this bid was updated
         - iter_converge (`float` or `int`): iterations interval after which global convergence is assumed to have been reached
     """
-    NONE = 'None'
 
     def __init__(self, 
                     task : dict, 
                     bidder : str,
                     winning_bid : Union[float, int] = 0, 
                     own_bid : Union[float, int] = 0, 
-                    winner : str = NONE,
+                    winner : str = Bid.NONE,
                     t_arrive : Union[float, int] = -1,
                     iter_converge : Union[float, int] = 0.0,
                     **_
@@ -51,13 +54,7 @@ class TaskBid(object):
             - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
             - iter_converge (`float` or `int`): iterations interval after which global convergence is assumed to have been reached
         """
-        self.task = task
-        self.task_id = task['id']
-        self.bidder = bidder
-        self.winning_bid = winning_bid
-        self.own_bid = own_bid
-        self.winner = winner
-        self.t_arrive = t_arrive
+        super().__init__(task, bidder, winning_bid, own_bid, winner, t_arrive)
         self.iterations = {bidder : 0}
         self.iter_converge = iter_converge
 
@@ -69,6 +66,11 @@ class TaskBid(object):
         return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_arrive},{self.iter_update}'
 
     def get_update_iteration(self, target : str) -> Union[int, float]:
+        """
+        Returns the last known time of contact with the target agent.
+        If no direct contact has been established, it returns the last time a contact was established with 
+        another agent that was in contact with the target agent
+        """
         if target not in self.iterations:
             iterations = [iteration for iteration in self.iterations]
             return max(iterations)
@@ -79,7 +81,8 @@ class TaskBid(object):
         """
         Compares bid with another and either updates, resets, or leaves the information contained in this bid
         depending on the rules specified in:
-            - Whitten, Andrew K., et al. "Decentralized task allocation with coupled constraints in complex missions." Proceedings of the 2011 American Control Conference. IEEE, 2011.
+            - Whitten, Andrew K., et al. "Decentralized task allocation with coupled constraints in complex missions." 
+            Proceedings of the 2011 American Control Conference. IEEE, 2011.
 
         ### Arguments:
             - other_dict (`dict`): dictionary representing the bid being compared to
@@ -329,3 +332,61 @@ class TaskBid(object):
         Returns a deep copy of this bid
         """
         return TaskBid(self.task, self.bidder, self.winning_bid, self.winner, self.t_arrive, self.iter_update)
+
+class CBBAPlannerModule(ConsensusPlanner):
+    """
+    # Synchronous Consensus-Based Bundle Algorithm Planner
+    """
+    def __init__(   
+                self, 
+                results_path: str, 
+                manager_port: int, 
+                agent_id: int, 
+                parent_network_config: NetworkConfig, 
+                l_bundle: int, 
+                level: int = logging.INFO, 
+                logger: logging.Logger = None
+                ) -> None:
+        """
+        Creates an intance of a CBBA Planner Module
+        
+        ### Arguments:
+            - results_path (`str`): path for printing this planner's results
+            - manager_port (`int`): localhost port used by the parent agent
+            - agent_id (`int`): iddentification number for the parent agent
+            - parent_network_config (:obj:`NetworkConfig`): network config of the parent agent
+            - l_bundle (`int`): maximum bundle size
+            - level (`int`): logging level
+            - logger (`logging.Logger`): logger being used 
+        """
+        super().__init__(results_path, manager_port, agent_id, parent_network_config, PlannerTypes.CBBA, l_bundle, level, logger)
+
+    async def live(self) -> None:
+        try:
+            results = {}
+            while True:
+                bundle, path, results =await self.planning(results)
+
+                incoming_bids = await self.execute_plan(bundle, path)
+        finally:
+            pass
+
+    async def listen_to_parent(self) -> list:
+        """
+        Listens for any incoming transmissions from the parent agent and transforms them into a list of SimulationMessage objects
+        """
+        poller = azmq.Poller()
+
+    async def planning(self, results : dict) -> tuple:
+        """
+        Iterates between bundle-building phase and consensus phase to create a sequence of tasks to perform by the agent
+        """
+        while True:
+            pass
+
+
+    async def execute_plan(self, bundle : list, path : list) -> tuple:
+        """
+        Listens to agent's senses and informs it of what next action to take based on consensus-built plan
+        """
+        pass

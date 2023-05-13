@@ -37,7 +37,6 @@ class TaskBid(Bid):
         - t_update (`float` or `int`): lates time when this bid was updated
         - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
     """
-
     def __init__(self, 
                     task : dict, 
                     bidder : str,
@@ -62,13 +61,7 @@ class TaskBid(Bid):
             - t_update (`float` or `int`): lates time when this bid was updated
             - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
         """
-        self.task = task
-        self.task_id = task['id']
-        self.bidder = bidder
-        self.winning_bid = winning_bid
-        self.own_bid = own_bid
-        self.winner = winner
-        self.t_arrive = t_arrive
+        super().__init__(task, bidder, winning_bid, own_bid, winner, t_arrive)
         self.t_update = t_update
         self.dt_converge = dt_converge
 
@@ -345,11 +338,10 @@ class TaskBid(Bid):
 class ACBBAPlannerModule(ConsensusPlanner):
     """
     # Asynchronous Consensus-Based Bundle Algorithm Planner
-    
     """
     def __init__(
                 self, 
-                results_path,
+                results_path: str,
                 manager_port: int, 
                 agent_id: int, 
                 parent_network_config: NetworkConfig, 
@@ -357,6 +349,18 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
+        """
+        Creates an intance of an ACBBA Planner Module
+
+        ### Arguments:
+            - results_path (`str`): path for printing this planner's results
+            - manager_port (`int`): localhost port used by the parent agent
+            - agent_id (`int`): iddentification number for the parent agent
+            - parent_network_config (:obj:`NetworkConfig`): network config of the parent agent
+            - l_bundle (`int`): maximum bundle size
+            - level (`int`): logging level
+            - logger (`logging.Logger`): logger being used 
+        """
         super().__init__(results_path, manager_port, agent_id, parent_network_config, PlannerTypes.ACBBA, l_bundle, level, logger)
     
     async def setup(self) -> None:
@@ -408,91 +412,83 @@ class ACBBAPlannerModule(ConsensusPlanner):
             results = {}
             t_curr = 0.0
 
-            # create poller for all broadcast sockets
-            poller = azmq.Poller()
-            manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
-            poller.register(manager_socket, zmq.POLLIN)
-
             # listen for broadcasts and place in the appropriate inboxes
             while True:
-                sockets = dict(await poller.poll())
+                self.log('listening to manager broadcast!')
+                _, _, content = await self.listen_manager_broadcast()
 
-                if manager_socket in sockets:
-                    self.log('listening to manager broadcast!')
-                    _, _, content = await self.listen_manager_broadcast()
+                # if sim-end message, end agent `live()`
+                if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+                    self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
+                    return
 
-                    # if sim-end message, end agent `live()`
-                    if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
-                        return
+                elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
+                    self.log(f"received senses from parent agent!")
 
-                    elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
-                        self.log(f"received senses from parent agent!")
+                    # unpack message 
+                    senses_msg : SensesMessage = SensesMessage(**content)
 
-                        # unpack message 
-                        senses_msg : SensesMessage = SensesMessage(**content)
+                    senses = []
+                    senses.append(senses_msg.state)
+                    senses.extend(senses_msg.senses)     
 
-                        senses = []
-                        senses.append(senses_msg.state)
-                        senses.extend(senses_msg.senses)     
+                    for sense in senses:
+                        if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
+                            # unpack message 
+                            action_msg = AgentActionMessage(**sense)
+                            self.log(f"received agent action of status {action_msg.status}! sending to bundle-builder...")
+                            
+                            # send to bundle builder 
+                            await self.action_status_inbox.put(action_msg)
 
-                        for sense in senses:
-                            if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-                                # unpack message 
-                                action_msg = AgentActionMessage(**sense)
-                                self.log(f"received agent action of status {action_msg.status}! sending to bundle-builder...")
-                                
-                                # send to bundle builder 
-                                await self.action_status_inbox.put(action_msg)
+                        elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                            # unpack message 
+                            state_msg : AgentStateMessage = AgentStateMessage(**sense)
+                            self.log(f"received agent state message! sending to bundle-builder...")
+                            
+                            # update current time:
+                            state = SimulationAgentState(**state_msg.state)
+                            if t_curr < state.t:
+                                t_curr = state.t
 
-                            elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                                # unpack message 
-                                state_msg : AgentStateMessage = AgentStateMessage(**sense)
-                                self.log(f"received agent state message! sending to bundle-builder...")
-                                
-                                # update current time:
-                                state = SimulationAgentState(**state_msg.state)
-                                if t_curr < state.t:
-                                    t_curr = state.t
+                            # send to bundle builder 
+                            await self.states_inbox.put(state_msg) 
 
-                                # send to bundle builder 
-                                await self.states_inbox.put(state_msg) 
+                        elif sense['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                            # unpack message
+                            task_req = TaskRequest(**sense)
+                            task_dict : dict = task_req.task
+                            task = MeasurementTask(**task_dict)
 
-                            elif sense['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                                # unpack message
-                                task_req = TaskRequest(**sense)
-                                task_dict : dict = task_req.task
-                                task = MeasurementTask(**task_dict)
+                            # check if task has already been received
+                            if task.id in results:
+                                self.log(f"received task request of an already registered task. Ignoring request...")
+                                continue
+                            
+                            # create task bid from task request and add to results
+                            self.log(f"received new task request! Adding to results ledger...")
+                            bid = TaskBid(task_dict, self.get_parent_name())
+                            results[task.id] = bid
 
-                                # check if task has already been received
-                                if task.id in results:
-                                    self.log(f"received task request of an already registered task. Ignoring request...")
-                                    continue
-                                
-                                # create task bid from task request and add to results
-                                self.log(f"received new task request! Adding to results ledger...")
-                                bid = TaskBid(task_dict, self.get_parent_name())
-                                results[task.id] = bid
+                            # send to bundle-builder and rebroadcaster
+                            out_msg = TaskBidMessage(   
+                                                        self.get_element_name(), 
+                                                        self.get_parent_name(), 
+                                                        bid.to_dict()
+                                                    )
+                            await self.relevant_changes_inbox.put(out_msg)
+                            await self.outgoing_listen_inbox.put(out_msg)
 
-                                # send to bundle-builder and rebroadcaster
-                                out_msg = TaskBidMessage(   
-                                                            self.get_element_name(), 
-                                                            self.get_parent_name(), 
-                                                            bid.to_dict()
-                                                        )
-                                await self.relevant_changes_inbox.put(out_msg)
-                                await self.outgoing_listen_inbox.put(out_msg)
+                        elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                            # unpack message 
+                            bid_msg : TaskBidMessage = TaskBidMessage(**sense)
+                            their_bid = TaskBid(**bid_msg.bid)
+                            self.log(f"received a bid from another agent for task {their_bid.task_id}!")
+                            
+                            await self.relevant_changes_inbox.put(bid_msg)
 
-                            elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
-                                # unpack message 
-                                bid_msg : TaskBidMessage = TaskBidMessage(**sense)
-                                their_bid = TaskBid(**bid_msg.bid)
-                                self.log(f"received a bid from another agent for task {their_bid.task_id}!")
-                                
-                                await self.relevant_changes_inbox.put(bid_msg)
-
-                    else:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...")
+                else:
+                    self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...")
         
         except asyncio.CancelledError:
             return

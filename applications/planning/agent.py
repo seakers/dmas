@@ -73,6 +73,11 @@ class SimulationAgent(Agent):
         self.id = id
         self.instruments : list = instruments.copy()
         
+        # TODO Implement a way to not reattempt a task from the planner that keeps failing in its execution
+        self.last_action_performed : AgentAction = None
+        self.last_action_attempts = 0
+        self.max_action_attempts = 10
+
         # setup results folder:
         self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
 
@@ -121,11 +126,12 @@ class SimulationAgent(Agent):
 
             if msg_dict['msg_type'] == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
                 # update connectivity
-                msg = AgentConnectivityUpdate(**msg_dict)
-                if msg.connected == 1:
-                    self.subscribe_to_broadcasts(msg.target)
+                connectivity_msg = AgentConnectivityUpdate(**msg_dict)
+                if connectivity_msg.connected == 1:
+                    self.subscribe_to_broadcasts(connectivity_msg.target)
                 else:
-                    self.unsubscribe_to_broadcasts(msg.target)
+                    self.unsubscribe_to_broadcasts(connectivity_msg.target)
+                senses.append(connectivity_msg)
 
             elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                 # save as senses to forward to planner
@@ -201,6 +207,7 @@ class SimulationAgent(Agent):
         for action_dict in actions:
             action_dict : dict
             action = AgentAction(**action_dict)
+            t_0 = time.perf_counter()
 
             if self.get_current_time() < action.t_start:
                 self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
@@ -291,31 +298,27 @@ class SimulationAgent(Agent):
                 action = MoveAction(**action_dict)
 
                 # perform action
-                ## calculate new direction 
-                dx = action.pos[0] - self.state.pos[0]
-                dy = action.pos[1] - self.state.pos[1]
-
-                norm = math.sqrt(dx**2 + dy**2)
-
                 if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    eps = self.state.v_max * self._clock_config.dt / 2.0
+                    is_at_taget = self.state.is_goal_state(action.pos, self._clock_config.dt)
                 else:
-                    eps = 1e-6
+                    is_at_taget = self.state.is_goal_state(action.pos)
 
-                if norm < eps:
+                if is_at_taget:
                     self.log('agent has reached its desired position. stopping.', level=logging.DEBUG)
                     ## stop agent 
-                    new_vel = [ 0.0, 
-                                0.0]
-                    self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
+                    self.state.update_state(self.get_current_time(), vel = [0,0], status=SimulationAgentState.TRAVELING)
 
                     # update action completion status
                     action.status = AgentAction.COMPLETED
                 else:
-                    ## change velocity towards destination
+                    ## calculate new direction 
+                    dx = action.pos[0] - self.state.pos[0]
+                    dy = action.pos[1] - self.state.pos[1]
+                    norm = math.sqrt(dx**2 + dy**2)     
                     dx = dx / norm
                     dy = dy / norm
 
+                    ## change velocity towards destination
                     new_vel = [ dx*self.state.v_max, 
                                 dy*self.state.v_max]
 
@@ -328,8 +331,22 @@ class SimulationAgent(Agent):
                         await self.sim_wait(delay)
                     except asyncio.CancelledError:
                         return
-                    
-                    # update action completion status
+
+                    # ## Check if destination has been reached
+                    # self.state.update_state(self.get_current_time(), status=SimulationAgentState.TRAVELING)
+
+                    # ## calculate new direction 
+                    # if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                    #     is_at_taget = self.state.is_goal_state(action.pos, action.t_end, self._clock_config.dt)
+                    # else:
+                    #     is_at_taget = self.state.is_goal_state(action.pos, action.t_end)
+
+                    # # update action completion status
+                    # if is_at_taget:
+                    #     action.status = AgentAction.COMPLETED
+                    # else:
+                    #     action.status = AgentAction.PENDING
+
                     action.status = AgentAction.PENDING
             
             elif action_dict['action_type'] == ActionTypes.MEASURE.value:
@@ -424,6 +441,16 @@ class SimulationAgent(Agent):
             self.log(f"finished performing action of type {action_dict['action_type']}! action completion status: {action.status}", level=logging.INFO)
             statuses.append((action, action.status))
 
+            if (action.status in [
+                                    AgentAction.COMPLETED, 
+                                    AgentAction.PENDING,
+                                    AgentAction.ABORTED
+                                ]):
+                dt = time.perf_counter() - t_0
+                if action_dict['action_type'] not in self.stats:
+                    self.stats[action_dict['action_type']] = []    
+                self.stats[action_dict['action_type']].append(dt)
+
         self.log(f'returning {len(statuses)} statuses')
         return statuses
 
@@ -437,13 +464,21 @@ class SimulationAgent(Agent):
             out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
         
         # log performance stats
-        out += '\nroutine: t_avg[s], t_std[s], t_median[s], n\n'
+        out += '\nROUTINE RUN-TIME STATS'
+        out += '\nroutine\t\tt_avg\tt_std\tt_med\tn\n'
+        n_decimals = 5
         for routine in self.stats:
             t_avg = np.mean(self.stats[routine])
             t_std = np.std(self.stats[routine])
             t_median = np.median(self.stats[routine])
             n = len(self.stats[routine])
-            out += f'`{routine}`: {np.round(t_avg,4)}, {np.round(t_std,4)}, {np.round(t_median,4)}, {n}\n'
+            if len(routine) < 5:
+                out += f'`{routine}`:\t\t'
+            elif len(routine) < 13:
+                out += f'`{routine}`:\t'
+            else:
+                out += f'`{routine}`:'
+            out += f'{np.round(t_avg,n_decimals)}\t{np.round(t_std,n_decimals)}\t{np.round(t_median,n_decimals)}\t{n}\n'
         self.log(out, level=logging.WARNING)
 
         # print agent states

@@ -2,6 +2,7 @@ import copy
 from typing import Union
 import numpy as np
 from dmas.agents import AgentState
+from dmas.clocks import FixedTimesStepClockConfig
 
 class SimulationAgentState(AgentState):
     IDLING = 'IDLING'
@@ -99,6 +100,33 @@ class SimulationAgentState(AgentState):
         """
         dpos = np.sqrt( (pos_final[0]-pos_start[0])**2 + (pos_final[1]-pos_start[1])**2 )
         return t_start + dpos / self.v_max
+
+    def is_goal_state(
+                        self, 
+                        target_pos : list, 
+                        dt : Union[float, int] = None,
+                    ) -> bool:
+        """
+        Returns True if a goal state has been reached
+
+        ## Arguments:
+            - target_pos (`list`) : target position at goal state
+            - target_t (`float` or `int`) : time by which the desired state should be reached by
+            - clock type (`type`) : Clock type being used to propagation of this state
+            - target_vel (`list`) : target velocity at goal state
+            - target_status (`str`) : target status at goal state
+        """
+        dx = target_pos[0] - self.pos[0]
+        dy = target_pos[1] - self.pos[1]
+
+        dpos = np.sqrt(dx**2 + dy**2)
+
+        if dt is not None:
+            eps = self.v_max * dt / 2.0
+        else:
+            eps = 1e-6        
+
+        return dpos < eps
 
     def __repr__(self) -> str:
         return str(self.to_dict())

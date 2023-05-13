@@ -35,6 +35,12 @@ class AgentState(ABC):
         pass
 
     @abstractmethod
+    def is_goal_state(self, **kwargs) -> bool:
+        """
+        Returns true if a goal state has been reached
+        """
+
+    @abstractmethod
     def is_critial(self, **kwargs) -> bool:
         """
         Returns true if the state is a critical state

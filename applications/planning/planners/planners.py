@@ -266,8 +266,9 @@ class ConsensusPlanner(PlannerModule):
     """
     # Abstract Consensus-Based Bundle Algorithm Planner
     """
-    def __init__(self,  
-                results_path,
+    def __init__(
+                self,  
+                results_path: str,
                 manager_port: int, 
                 agent_id: int, 
                 parent_network_config: NetworkConfig, 
@@ -276,6 +277,19 @@ class ConsensusPlanner(PlannerModule):
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
+        """
+        Creates an instance of this consensus planner
+
+        ### Arguments:
+            - results_path (`str`): path for printing this planner's results
+            - manager_port (`int`): localhost port used by the parent agent
+            - agent_id (`int`): iddentification number for the parent agent
+            - parent_network_config (:obj:`NetworkConfig`): network config of the parent agent
+            - planner_type (:obj:`PlanerTypes`): type of consensus planner being generated
+            - l_bundle (`int`): maximum bundle size
+            - level (`int`): logging level
+            - logger (`logging.Logger`): logger being used 
+        """
         super().__init__(   results_path,
                             manager_port, 
                             agent_id, 
