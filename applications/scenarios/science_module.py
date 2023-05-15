@@ -8,6 +8,7 @@ from tasks import *
 from zmq import asyncio as azmq
 from dmas.agents import AgentAction
 from dmas.modules import *
+import time
 
 class ScienceModuleTypes(Enum):
     SCENARIO1 = 'SCENARIO1' 
@@ -26,7 +27,7 @@ class ScienceModule(InternalModule):
         module_network_config =  NetworkConfig(f'AGENT_{agent_id}',
                                                 manager_address_map = {
                                                 zmq.REQ: [],
-                                                zmq.PUB: [f'tcp://*:{manager_port+6 + 4*agent_id + 3}'],
+                                                zmq.PUB: [f'tcp://localhost:{manager_port+6 + 4*agent_id + 4}'],
                                                 zmq.SUB: [f'tcp://localhost:{manager_port+6 + 4*agent_id + 2}'],
                                                 zmq.PUSH: [f'tcp://localhost:{manager_port+3}']})
                 
@@ -82,7 +83,6 @@ class Scenario1ScienceModule(ScienceModule):
                          logger)
         
     async def setup(self) -> None:
-        
         # setup internal inboxes
         self.science_value_inbox = asyncio.Queue()
         self.science_reasoning_inbox = asyncio.Queue()
@@ -90,7 +90,7 @@ class Scenario1ScienceModule(ScienceModule):
         self.processed_items = []
         self.sd = []
         self.points = np.zeros(shape=(1000, 4))
-        with open('/home/ben/repos/dmaspy/scenarios/scenario1_agile/resources/riverATLAS.csv') as csvfile:
+        with open('/home/ben/repos/DMASpy/scenarios/scenario1_agile/resources/riverATLAS.csv') as csvfile:
             reader = csv.reader(csvfile)
             count = 0
             for row in reader:
@@ -99,7 +99,6 @@ class Scenario1ScienceModule(ScienceModule):
                     continue
                 self.points[count-1,:] = [row[0], row[1], row[2], row[3]]
                 count = count + 1
-        self.log('done w/ setup',level=logging.WARNING)
         
     async def live(self) -> None:
         """
@@ -109,7 +108,6 @@ class Scenario1ScienceModule(ScienceModule):
         - Science reasoning: checks data for outliers
         - Onboard processing: converts data of one type into data of another type (e.g. level 0 to level 1)
         """
-        self.log('starting tasks',level=logging.WARNING)
         listener_task = asyncio.create_task(self.listener(), name='listener()')
         science_value_task = asyncio.create_task(self.science_value(), name='science_value()')
         #science_reasoning_task = asyncio.create_task(self.science_reasoning(), name='science_reasoning()')
@@ -154,7 +152,7 @@ class Scenario1ScienceModule(ScienceModule):
 
                     # if sim-end message, end agent `live()`
                     if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
+                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...",level=logging.WARN)
                         return
 
                     elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
@@ -162,7 +160,7 @@ class Scenario1ScienceModule(ScienceModule):
                         msg : AgentStateMessage = AgentStateMessage(**content)
                         
                         # send to bundle builder 
-                        print('Received agent state in science module!')
+                        self.log('Received agent state in science module!',level=logging.WARN)
                         await self.science_value_inbox.put(msg)
 
                     elif content['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
@@ -172,11 +170,11 @@ class Scenario1ScienceModule(ScienceModule):
                         # create task bid from task request and add to results
                         task_dict : dict = task_req.task
                         task = MeasurementTask(**task_dict)
-                        print("received task request in science module")
+                        print("received task request in science module",level=logging.WARN)
 
                     # else, let agent handle it
                     else:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...")
+                        self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...",level=logging.WARN)
         
         except asyncio.CancelledError:
             print("Asyncio cancelled error in science module listener")
@@ -186,7 +184,7 @@ class Scenario1ScienceModule(ScienceModule):
         try:
             while True:
                 msg = await self.science_value_inbox.get()
-                print("got msg!")
+                self.log(f'Got message in science_value!',level=logging.WARNING)
                 print(msg)
                 lat = msg.content["lat"]
                 lon = msg.content["lon"]
@@ -194,7 +192,7 @@ class Scenario1ScienceModule(ScienceModule):
                 print(obs)
                 science_value, outlier = self.compute_science_value(lat, lon, obs)
                 print(science_value)
-                self.log('Computed the science value!')
+                self.log('Computed the science value!',level=logging.WARNING)
                 metadata = {
                     "observation" : obs
                 }

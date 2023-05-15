@@ -9,6 +9,8 @@ class SimulationMessageTypes(Enum):
     PLANNER_RESULTS = 'PLANNER_RESULTS'
     TASK_BID = 'TASK_BID'
     PLAN = 'PLAN'
+    SENSES = 'SENSES'
+    MEASUREMENT = 'MEASUREMENT'
 
 class AgentStateMessage(SimulationMessage):
     """
@@ -74,6 +76,28 @@ class TaskRequest(SimulationMessage):
         if not isinstance(task, dict):
             raise AttributeError(f'`task` must be of type `dict`; is of type {type(task)}.')
         self.task = task
+
+class MeasurementResultsRequest(SimulationMessage):
+    """
+    ## Measurement Results Request Message 
+
+    Carries information regarding a measurement performed on the environment
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+        - measurement (`dict`) : measurement data being communicated
+    """
+    def __init__(self, src: str, dst: str, masurement_req : dict, id: str = None, **_):
+        super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT.value, id)
+        
+        if not isinstance(masurement_req, dict):
+            raise AttributeError(f'`measurement_request_id` must be of type `dict`; is of type {type(masurement_req)}.')
+
+        self.masurement_req = masurement_req
+        self.measurement = {}
 
 class PlannerResultsMessage(SimulationMessage):
     """
@@ -147,6 +171,34 @@ class PlanMessage(SimulationMessage):
         """
         super().__init__(src, dst, SimulationMessageTypes.PLAN.value, id)
         self.plan = plan
+
+class SensesMessage(SimulationMessage):
+    """
+    # Plan Message
+    
+    Informs an agent of a set of tasks to perform. 
+    Sent by either an external or internal planner
+
+    ### Attributes:
+        - src (`str`): name of the simulation element sending this message
+        - dst (`str`): name of the intended simulation element to receive this message
+        - senses (`list`): list of senses from the agent
+        - msg_type (`str`): type of message being sent
+        - id (`str`) : Universally Unique IDentifier for this message
+    """
+    def __init__(self, src: str, dst: str, state : dict, senses : list, id: str = None, **_):
+        """
+        Creates an instance of a plan message
+
+        ### Attributes:
+            - src (`str`): name of the simulation element sending this message
+            - dst (`str`): name of the intended simulation element to receive this message
+            - senses (`list`): list of senses from the agent
+            - id (`str`) : Universally Unique IDentifier for this message
+        """
+        super().__init__(src, dst, SimulationMessageTypes.SENSES.value, id)
+        self.state = state
+        self.senses = senses
 
 class AgentActionMessage(SimulationMessage):
     """
