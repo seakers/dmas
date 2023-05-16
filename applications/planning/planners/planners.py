@@ -46,7 +46,7 @@ class PlannerModule(InternalModule):
         self.planner_type = planner_type
         self.results_path = results_path
         self.parent_id = agent_id
-        self.paren_name = f'AGENT_{agent_id}'
+        self.parent_name = f'AGENT_{agent_id}'
 
     async def sim_wait(self, delay: float) -> None:
         return
@@ -346,7 +346,7 @@ class ConsensusPlanner(PlannerModule):
         return available
 
     @abstractmethod
-    def can_bid(self, state : SimulationAgentState, task : MeasurementTask) -> bool:
+    def can_bid(self, **kwargs) -> bool:
         """
         Checks if an agent can perform a measurement task
         """
@@ -388,23 +388,15 @@ class ConsensusPlanner(PlannerModule):
 
         return utility
     
-    def calc_utility(self, task : MeasurementTask, t_img : float) -> float:
+    @abstractmethod
+    def calc_utility(self, **kwargs) -> float:
         """
         Calculates the expected utility of performing a measurement task
 
-        ### Arguments:
-            - task (obj:`MeasurementTask`) task to be performed 
-            - t_img (`float`): time at which the task will be performed
-
-        ### RetrurnsL
+        ### Retrurns:
             - utility (`float`): estimated normalized utility 
         """
-        # check time constraints
-        if t_img < task.t_start or task.t_end < t_img:
-            return 0.0
-        
-        # calculate urgency factor from task
-        return task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+        pass
 
     def calc_imaging_time(self, state : SimulationAgentState, path : list, bids : dict, task : MeasurementTask) -> float:
         """

@@ -37,6 +37,7 @@ if __name__ == '__main__':
     """
     Wrapper for planner simulation using DMAS
     """    
+
     # create results directory
     plot_results = True
     save_plot = False
@@ -85,22 +86,22 @@ if __name__ == '__main__':
     t_end = T
 
     pos = [1.0, 1.0]   
-    instruments = [task_types[1]]
+    instruments = [task_types[0], task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     pos = [1.0, 2.0]   
-    instruments = [task_types[0]]
+    instruments = [task_types[0], task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     pos = [2.0, 1.0]   
-    instruments = [task_types[0]]
+    instruments = [task_types[0], task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     pos = [2.0, 2.0]   
-    instruments = [task_types[1]]
+    instruments = [task_types[0], task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
@@ -171,7 +172,7 @@ if __name__ == '__main__':
                                 port, 
                                 agent_id,
                                 manager_network_config,
-                                PlannerTypes.ACBBA,
+                                PlannerTypes.ACCBBA,
                                 instruments,
                                 initial_state,
                                 level,
@@ -196,7 +197,7 @@ if __name__ == '__main__':
                                 port, 
                                 agent_id,
                                 manager_network_config,
-                                PlannerTypes.ACBBA,
+                                PlannerTypes.ACCBBA,
                                 instruments,
                                 initial_state,
                                 level,

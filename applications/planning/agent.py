@@ -1,5 +1,6 @@
 import logging
 import math
+from planners.accbba import ACCBBAPlannerModule
 from planners.acbba import ACBBAPlannerModule
 from planners.fixed import FixedPlannerModule
 from planners.planners import *
@@ -56,6 +57,14 @@ class SimulationAgent(Agent):
                                                  agent_network_config,
                                                  level,
                                                  logger)
+        elif planner_type is PlannerTypes.ACCBBA:
+            planning_module = ACCBBAPlannerModule(    results_path,
+                                                    manager_port,
+                                                    id,
+                                                    agent_network_config,
+                                                    l_bundle=3,
+                                                    level=level,
+                                                    logger=logger)                                  
         else:
             raise NotImplementedError(f'planner of type {planner_type} not yet supported.')
         

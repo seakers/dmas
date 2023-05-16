@@ -299,7 +299,7 @@ class TaskBid(Bid):
             raise ValueError(f'attempting to update bid with outdated information.')
 
         super()._update_info(other)
-        self.t_update = t
+        self.__update_time(t)
 
     def __update_time(self, t_update : Union[float, int]) -> None:
         """
@@ -346,6 +346,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 agent_id: int, 
                 parent_network_config: NetworkConfig, 
                 l_bundle: int, 
+                planner_type : PlannerTypes = PlannerTypes.ACBBA,
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
@@ -361,7 +362,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
             - level (`int`): logging level
             - logger (`logging.Logger`): logger being used 
         """
-        super().__init__(results_path, manager_port, agent_id, parent_network_config, PlannerTypes.ACBBA, l_bundle, level, logger)
+        super().__init__(results_path, manager_port, agent_id, parent_network_config, planner_type, l_bundle, level, logger)
     
     async def setup(self) -> None:
         # initialize internal messaging queues
@@ -834,6 +835,24 @@ class ACBBAPlannerModule(ConsensusPlanner):
         finally:
             self.bundle_builder_results = results
 
+    def calc_utility(self, task : MeasurementTask, t_img : float) -> float:
+        """
+        Calculates the expected utility of performing a measurement task
+
+        ### Arguments:
+            - task (obj:`MeasurementTask`) task to be performed 
+            - t_img (`float`): time at which the task will be performed
+
+        ### Retrurns:
+            - utility (`float`): estimated normalized utility 
+        """
+        # check time constraints
+        if t_img < task.t_start or task.t_end < t_img:
+            return 0.0
+        
+        # calculate urgency factor from task
+        return task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+
     def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """
         Checks if the bids of every task in the current path have all of their constraints
@@ -875,7 +894,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 return False
 
         # check time constraints
-        ## Constraint 1: task must be able to be performed durig or after the current time
+        ## Constraint 1: task must be able to be performed during or after the current time
         if task.t_end < state.t:
             return False
         
