@@ -33,7 +33,7 @@ class TaskBid(Bid):
         - own_bid (`float` or `int`): latest bid from bidder
         - winner (`str`): name of current the winning agent
         - winning_bid (`float` or `int`): current winning bid
-        - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
+        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
         - t_update (`float` or `int`): lates time when this bid was updated
         - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
     """
@@ -43,7 +43,7 @@ class TaskBid(Bid):
                     winning_bid : Union[float, int] = 0, 
                     own_bid : Union[float, int] = 0, 
                     winner : str = Bid.NONE,
-                    t_arrive : Union[float, int] = -1, 
+                    t_img : Union[float, int] = -1, 
                     t_update : Union[float, int] = -1,
                     dt_converge : Union[float, int] = 0.0,
                     **_
@@ -57,20 +57,20 @@ class TaskBid(Bid):
             - own_bid (`float` or `int`): latest bid from bidder
             - winner (`str`): name of current the winning agent
             - winning_bid (`float` or `int`): current winning bid
-            - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
+            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
             - t_update (`float` or `int`): lates time when this bid was updated
             - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
         """
-        super().__init__(task, bidder, winning_bid, own_bid, winner, t_arrive)
+        super().__init__(task, bidder, winning_bid, own_bid, winner, t_img)
         self.t_update = t_update
         self.dt_converge = dt_converge
 
     def __str__(self) -> str:
         """
         Returns a string representation of this task bid in the following format:
-        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_arrive`, `t_update`
+        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`, `t_update`
         """
-        return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_arrive},{self.t_update}'
+        return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img},{self.t_update}'
 
     def update(self, other_dict : dict, t : Union[float, int]) -> object:
         """
@@ -333,7 +333,7 @@ class TaskBid(Bid):
         """
         Returns a deep copy of this bid
         """
-        return TaskBid(self.task, self.bidder, self.winning_bid, self.winner, self.t_arrive, self.t_update)
+        return TaskBid(self.task, self.bidder, self.winning_bid, self.winner, self.t_img, self.t_update)
 
 class ACBBAPlannerModule(ConsensusPlanner):
     """
@@ -897,7 +897,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
             for task_i in path:
                 # calculate arrival time
                 task_i : MeasurementTask
-                t_arrive = self.calc_arrival_time(state, path, bids, task_i)
+                t_arrive = self.calc_imaging_time(state, path, bids, task_i)
 
                 # calculate bidding score
                 utility = self.calc_utility(task, t_arrive)
@@ -998,7 +998,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
     async def teardown(self) -> None:
         # print listener bidding results
         with open(f"{self.results_path}/{self.get_parent_name()}/listener_bids.csv", "w") as file:
-            title = "task_id,bidder,own_bid,winner,winning_bid,t_arrive,t_update"
+            title = "task_id,bidder,own_bid,winner,winning_bid,t_img,t_update"
             file.write(title)
 
             for task_id in self.listener_results:
@@ -1007,7 +1007,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
 
         # print bundle-builder bidding results
         with open(f"{self.results_path}/{self.get_parent_name()}/bundle_builder_bids.csv", "w") as file:
-            title = "task_id,bidder,own_bid,winner,winning_bid,t_arrive,t_update"
+            title = "task_id,bidder,own_bid,winner,winning_bid,t_img,t_update"
             file.write(title)
 
             for task_id in self.bundle_builder_results:

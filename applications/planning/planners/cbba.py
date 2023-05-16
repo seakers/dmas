@@ -376,6 +376,7 @@ class CBBAPlannerModule(ConsensusPlanner):
         Listens for any incoming transmissions from the parent agent and transforms them into a list of SimulationMessage objects
         """
         poller = azmq.Poller()
+        
 
     async def planning(self, results : dict) -> tuple:
         """

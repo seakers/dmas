@@ -115,7 +115,7 @@ class SimulationEnvironment(EnvironmentNode):
                         # find/generate measurement results
                         # TODO look up requested measurement results from database/model
                         measurement_data = {'agent' : msg.src, 
-                                            't_measurement' : self.get_current_time()}
+                                            't_img' : self.get_current_time()}
 
                         # repsond to request
                         self.log(f'measurement results obtained! responding to request')
@@ -342,14 +342,14 @@ class SimulationEnvironment(EnvironmentNode):
 
         # print measurements
         with open(f"{self.results_path}/measurements.csv", "w") as file:
-            title = 'Task Request ID,x_pos,y_pos,t_start,t_end,Measurer,t_measurement\n'
+            title = 'Task Request ID,x_pos,y_pos,t_start,t_end,Measurer,t_img\n'
             file.write(title)
 
             for msg in self.measurement_history:
                 msg : MeasurementResultsRequest
                 task = MeasurementTask(**msg.masurement_req)
                 measurer = msg.measurement['agent']
-                t_measurement = msg.measurement['t_measurement']
+                t_measurement = msg.measurement['t_img']
 
                 line = f'{task.id},{task.pos[0]},{task.pos[1]},{task.t_start},{task.t_end},{measurer},{t_measurement}\n'
                 file.write(line)

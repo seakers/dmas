@@ -71,7 +71,7 @@ class Bid(ABC):
         - own_bid (`float` or `int`): latest bid from bidder
         - winner (`str`): name of current the winning agent
         - winning_bid (`float` or `int`): current winning bid
-        - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
+        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
     """
     NONE = 'None'
     
@@ -81,7 +81,7 @@ class Bid(ABC):
                     winning_bid : Union[float, int] = 0, 
                     own_bid : Union[float, int] = 0, 
                     winner : str = NONE,
-                    t_arrive : Union[float, int] = -1, 
+                    t_img : Union[float, int] = -1, 
                     **_
                     ) -> object:
         """
@@ -93,7 +93,7 @@ class Bid(ABC):
             - own_bid (`float` or `int`): latest bid from bidder
             - winner (`str`): name of current the winning agent
             - winning_bid (`float` or `int`): current winning bid
-            - t_arrive (`float` or `int`): time where the task is set to be performed by the winning agent
+            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
         """
         self.task = task
         self.task_id = task['id']
@@ -101,14 +101,14 @@ class Bid(ABC):
         self.winning_bid = winning_bid
         self.own_bid = own_bid
         self.winner = winner
-        self.t_arrive = t_arrive
+        self.t_img = t_img
 
     def __str__(self) -> str:
         """
         Returns a string representation of this task bid in the following format:
-        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_arrive`
+        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`
         """
-        return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_arrive}'
+        return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img}'
 
     @abstractmethod
     def update(self, other_dict : dict, t : Union[float, int]) -> object:
@@ -143,7 +143,7 @@ class Bid(ABC):
         other : Bid
         self.winning_bid = other.winning_bid
         self.winner = other.winner
-        self.t_arrive = other.t_arrive
+        self.t_img = other.t_img
 
         if self.bidder == other.bidder:
             self.own_bid = other.own_bid
@@ -155,7 +155,7 @@ class Bid(ABC):
         """
         self.winning_bid = 0
         self.winner = self.NONE
-        self.t_arrive = -1
+        self.t_img = -1
 
     def _leave(self, **kwargs) -> None:
         """
@@ -340,7 +340,7 @@ class ConsensusPlanner(PlannerModule):
             bid : Bid = results[task_id]
             task = MeasurementTask(**bid.task)
 
-            if self.can_bid(state, task) and task not in bundle and (bid.t_arrive >= state.t or bid.t_arrive < 0):
+            if self.can_bid(state, task) and task not in bundle and (bid.t_img >= state.t or bid.t_img < 0):
                 available.append(task)
 
         return available
@@ -388,29 +388,27 @@ class ConsensusPlanner(PlannerModule):
 
         return utility
     
-    def calc_utility(self, task : MeasurementTask, t_arrive : float) -> float:
+    def calc_utility(self, task : MeasurementTask, t_img : float) -> float:
         """
         Calculates the expected utility of performing a measurement task
 
         ### Arguments:
             - task (obj:`MeasurementTask`) task to be performed 
-            - t_arrive (`float`): time at which the task will be performed
+            - t_img (`float`): time at which the task will be performed
 
         ### RetrurnsL
             - utility (`float`): estimated normalized utility 
         """
         # check time constraints
-        if t_arrive < task.t_start or task.t_end < t_arrive:
+        if t_img < task.t_start or task.t_end < t_img:
             return 0.0
         
         # calculate urgency factor from task
-        urgency = np.log(1e-3) / (task.t_start - task.t_end)
+        return task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
 
-        return task.s_max * np.exp( -urgency * (t_arrive - task.t_start) )
-
-    def calc_arrival_time(self, state : SimulationAgentState, path : list, bids : dict, task : MeasurementTask) -> float:
+    def calc_imaging_time(self, state : SimulationAgentState, path : list, bids : dict, task : MeasurementTask) -> float:
         """
-        Computes the time when a task in the path would be performed
+        Computes the earliest time when a task in the path would be performed
 
         ### Arguments:
             - state (obj:`SimulationAgentState`): state of the agent at the start of the path
@@ -418,7 +416,7 @@ class ConsensusPlanner(PlannerModule):
             - bids (`dict`): dictionary of task ids to the current task bid dictionaries 
 
         ### Returns
-            - t_arrival (`float`): earliest available arrival time
+            - t_img (`float`): earliest available imaging time
         """
         # calculate the previous task's position and 
         i = path.index(task)
@@ -428,12 +426,12 @@ class ConsensusPlanner(PlannerModule):
         else:
             task_prev : MeasurementTask = path[i-1]
             bid_prev : Bid = bids[task_prev.id]
-            t_prev : float = bid_prev.t_arrive + task_prev.duration
+            t_prev : float = bid_prev.t_img + task_prev.duration
             pos_prev : list = task_prev.pos
 
         # compute travel time to the task
-        t_arrival = state.calc_arrival_time(pos_prev, task.pos, t_prev)
-        return t_arrival if t_arrival >= task.t_start else task.t_start
+        t_img = state.calc_arrival_time(pos_prev, task.pos, t_prev)
+        return t_img if t_img >= task.t_start else task.t_start
 
     def log_results(self, dsc : str, results : dict, level=logging.DEBUG) -> None:
         """
@@ -444,12 +442,12 @@ class ConsensusPlanner(PlannerModule):
             - results (`dict`): results to be logged
             - level (`int`): logging level to be used
         """
-        out = f'\n{dsc}\ntask_id,  location,  bidder, bid, winner, winning_bid, t_arrive\n'
+        out = f'\n{dsc}\ntask_id,  location,  bidder, bid, winner, winning_bid, t_img\n'
         for task_id in results:
             bid : Bid = results[task_id]
             task = MeasurementTask(**bid.task)
             split_id = task.id.split('-')
-            out += f'{split_id[0]}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_arrive, 3)}\n'
+            out += f'{split_id[0]}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_img, 3)}\n'
 
         self.log(out, level)
 

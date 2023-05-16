@@ -164,6 +164,7 @@ class MeasurementTask(AgentAction):
         - duration (`float`): duration of the measurement being performed
         - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
         - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+        - t_corr (`float`): maximum decorralation time between measurements of different measurements
         - id (`str`) : identifying number for this task in uuid format
     """        
     def __init__(self, 
@@ -172,7 +173,9 @@ class MeasurementTask(AgentAction):
                 instruments : list,
                 t_start: Union[float, int], 
                 t_end: Union[float, int], 
-                duration: Union[float, int]=0.0, 
+                t_corr: Union[float, int] = 0.0,
+                duration: Union[float, int] = 0.0, 
+                urgency: Union[float, int] = None,  
                 status: str = 'PENDING', 
                 id: str = None, **_
                 ) -> None:
@@ -185,6 +188,7 @@ class MeasurementTask(AgentAction):
             - instrument (`str`): name of the instrument that can perform this task
             - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
             - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+            - t_corr (`float`): maximum decorralation time between measurements of different measurements
             - id (`str`) : identifying number for this task in uuid format
         """
         super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id)
@@ -207,6 +211,11 @@ class MeasurementTask(AgentAction):
         self.pos = pos
         self.s_max = s_max
         self.instruments = instruments    
+        self.t_corr = t_corr
+        if urgency is not None:
+            self.urgency = urgency
+        else:
+            self.urgency = numpy.log(1e-3) / (t_start - t_end)
 
 class IdleAction(AgentAction):
     """

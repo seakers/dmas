@@ -85,7 +85,7 @@ if __name__ == '__main__':
     t_end = T
 
     pos = [1.0, 1.0]   
-    instruments = [task_types[0]]
+    instruments = [task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
@@ -100,13 +100,11 @@ if __name__ == '__main__':
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     pos = [2.0, 2.0]   
-    instruments = [task_types[0]]
+    instruments = [task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     while len(tasks) < n_tasks:
-        # t_start = random.random() * clock_config.get_total_seconds()
-        # t_end = random.random() * (clock_config.get_total_seconds() - t_start) + t_start
         x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
         y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
         pos = [x, y]
@@ -158,7 +156,7 @@ if __name__ == '__main__':
     agents = []
     pos = [0.0, 0.0]
     vel = [0.0, 0.0]
-    instruments = task_types
+    instruments = [task_types[0]]
     agent_id = 0
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
@@ -183,7 +181,7 @@ if __name__ == '__main__':
 
     pos = [0.0, 0.0]
     vel = [0.0, 0.0]
-    instruments = task_types
+    instruments = [task_types[1]]
     agent_id = 1
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
@@ -302,8 +300,8 @@ if __name__ == '__main__':
             if frame > 0:
                 t_curr = t[frame]
                 t_prev = t[frame-1]
-                updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_measurement'] <= t_curr]
-                updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_measurement'] >= t_prev]
+                updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_img'] <= t_curr]
+                updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_img'] >= t_prev]
                 for _, row in updated_measurements.iterrows():
                     x_pos, y_pos = row['x_pos'], row['y_pos']
                     task_scat = ax.scatter(x_pos, y_pos, color='g', marker='*')
