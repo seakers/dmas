@@ -76,7 +76,7 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 4
+    n_tasks = 3
     task_types = ['VNIR', 'MWR', 'LIDAR']
     
     # create tasks
@@ -85,18 +85,18 @@ if __name__ == '__main__':
     t_start = 0.0
     t_end = T
 
-    pos = [1.0, 1.0]   
-    instruments = [task_types[0], task_types[1]]
-    task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [1.0, 1.0]   
+    # instruments = [task_types[0], task_types[1]]
+    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
+    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     pos = [1.0, 2.0]   
-    instruments = [task_types[0], task_types[1]]
+    instruments = [task_types[1]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
     pos = [2.0, 1.0]   
-    instruments = [task_types[0], task_types[1]]
+    instruments = [task_types[0]]
     task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 

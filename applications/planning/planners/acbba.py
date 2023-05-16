@@ -34,7 +34,7 @@ class TaskBid(Bid):
         - winner (`str`): name of current the winning agent
         - winning_bid (`float` or `int`): current winning bid
         - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
-        - t_update (`float` or `int`): lates time when this bid was updated
+        - t_update (`float` or `int`): latest time when this bid was updated
         - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
     """
     def __init__(self, 
@@ -58,7 +58,7 @@ class TaskBid(Bid):
             - winner (`str`): name of current the winning agent
             - winning_bid (`float` or `int`): current winning bid
             - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
-            - t_update (`float` or `int`): lates time when this bid was updated
+            - t_update (`float` or `int`): latest time when this bid was updated
             - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
         """
         super().__init__(task, bidder, winning_bid, own_bid, winner, t_img)

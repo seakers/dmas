@@ -27,6 +27,27 @@ from dmas.messages import ManagerMessageTypes
 from dmas.network import NetworkConfig
 
 class SubtaskBid(TaskBid):
+    """
+    ## Subtask Bid for ACBBA 
+
+    Describes a bid placed on a task by a given agent
+
+    ### Attributes:
+        - task (`dict`): task being bid on
+        - task_id (`str`): id of the task being bid on
+        - bidder (`bidder`): name of the agent keeping track of this bid information
+        - own_bid (`float` or `int`): latest bid from bidder
+        - winner (`str`): name of current the winning agent
+        - winning_bid (`float` or `int`): current winning bid
+        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
+        - t_update (`float` or `int`): latest time when this bid was updated
+        - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
+        - t_violation (`float` or `int`): time from which this task bid has been in violation of its constraints
+        - dt_violoation (`float` or `int`): maximum time in which this bid is allowed to be in violation of its constraints
+        - bid_solo (`int`): maximum number of solo bid attempts with no constraint satisfaction attempts
+        - bid_any (`int`): maximum number of bid attempts with partial constraint satisfaction attempts
+        - N_req (`int`): number of required constraints
+    """
     def __init__(
                     self, 
                     task: dict, 
@@ -39,28 +60,63 @@ class SubtaskBid(TaskBid):
                     winner: str = TaskBid.NONE, 
                     t_img: Union[float, int] = -1, 
                     t_update: Union[float, int] = -1, 
-                    t_violation: Union[float, int] = -1, 
-                    dt_violoation: Union[float, int] = 0, 
                     dt_converge: Union[float, int] = 0, 
+                    t_violation: Union[float, int] = -1, 
+                    dt_violoation: Union[float, int] = 0,
+                    bid_solo : int = 10,
+                    bid_any : int = 10, 
                     **_
                 ) -> object:
+        """
+        Creates an instance of a task bid
+
+        ### Arguments:
+            - task (`dict`): task being bid on
+            - bidder (`bidder`): name of the agent keeping track of this bid information
+            - own_bid (`float` or `int`): latest bid from bidder
+            - winner (`str`): name of current the winning agent
+            - winning_bid (`float` or `int`): current winning bid
+            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
+            - t_update (`float` or `int`): latest time when this bid was updated
+            - dt_converge (`float` or `int`): time interval after which local convergence is assumed to have been reached
+            - t_violation (`float` or `int`): time from which this task bid has been in violation of its constraints
+            - dt_violoation (`float` or `int`): maximum time in which this bid is allowed to be in violation of its constraints
+            - bid_solo (`int`): maximum number of solo bid attempts with no constraint satisfaction attempts
+            - bid_any (`int`): maximum number of bid attempts with partial constraint satisfaction attempts
+        """
         super().__init__(task, bidder, winning_bid, own_bid, winner, t_img, t_update, dt_converge, **_)
 
         self.subtask_index = subtask_index
         self.main_measurement = main_measurement
-        self.dependencies = TaskBid.NONE
-
         self.dependencies = dependencies
+        
+        self.N_req = 0
         self.time_constraints = []
         parent_task = MeasurementTask(**self.task)
         for dependency in dependencies:
             if -1 <= dependency <= 1:
                 if dependency == 1:
+                    self.N_req += 1
                     self.time_constraints.append(parent_task.t_corr)
                 else:
                     self.time_constraints.append(np.Inf)
             else:
                 raise ValueError('Dependency vector must cuntain integers between [-1, 1]. ')
+        
+        self.t_violation = t_violation
+        self.dt_violation = dt_violoation
+        
+        if not isinstance(bid_solo, int):
+            raise ValueError(f'`bid_solo` must be of type `int`. Is of type {type(bid_solo)}')
+        elif bid_solo < 0:
+            raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_solo}.')
+        self.bid_solo = bid_solo
+
+        if not isinstance(bid_any, int):
+            raise ValueError(f'`bid_solo` must be of type `int`. Is of type {type(bid_any)}')
+        elif bid_any < 0:
+            raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_any}.')
+        self.bid_any = bid_any
 
     def __str__(self) -> str:
         """
@@ -81,12 +137,6 @@ class SubtaskBid(TaskBid):
                             self.t_update,
                             self.dt_converge
                         )
-
-    def has_winner(self) -> bool:
-        """
-        Checks if this bid has a winner
-        """
-        return self.winner != TaskBid.NONE
 
     def subtasks_from_task(task : MeasurementTask, bidder : str) -> list:
         """
@@ -157,6 +207,145 @@ class SubtaskBid(TaskBid):
                                         dependency_matrix[subtask_index],
                                         bidder))
         return subtasks
+
+    def reset(self, t_update: Union[float, int]) -> None:
+        # reset violation timer
+        self.__reset_violation_timer(t_update)
+        
+        # reset bid values
+        super().reset(t_update)        
+
+    def has_winner(self) -> bool:
+        """
+        Checks if this bid has a winner
+        """
+        return self.winner != TaskBid.NONE
+
+    def __set_violation_timer(self, t : Union[int, float]) -> None:
+        """
+        Updates violation counter
+        """
+        if self.t_violation < 0:
+            self.t_violation = t 
+
+    def __reset_violation_timer(self, t : Union[int, float]) -> None:
+        """
+        Resets violation counter
+        """
+        if self.winner == self.bidder:
+            self.t_violation = -1
+
+    def __is_optimistic(self) -> bool:
+        """
+        Checks if bid has an optimistic bidding strategy
+        """
+        for dependency in self.dependencies:
+            if dependency > 0:
+                return True
+
+        return False   
+
+    def __has_timed_out(self, t : Union[int, float]) -> bool:
+        """
+        Returns True if the subtask's constraint violation timer has ran out.    
+        """
+        if self.t_violation < 0:
+            return False
+
+        return t > self.dt_violation + self.t_violation
+    
+
+    def __count_coal_conts_satisied(self, others : list) -> int:
+        """
+        Counts the total number of satisfied coalition constraints
+        """
+        if len(others) != len(self.dependencies):
+            raise ValueError(f'`others` list must be of length {len(self.dependencies)}. is of length {len(others)}')
+        
+        n_sat = 0
+        for i in range(len(others)):
+            other_bid : SubtaskBid = others[i]
+            if self.dependencies[i] == 1 and other_bid.winner != SubtaskBid.NONE:
+                n_sat += 1
+        
+        return n_sat 
+
+    def check_constraints(self, others : list, t : Union[int, float]) -> object:
+        """
+        Compares current bid to other bids for the same task but different subtasks and checks for constraint satisfaction
+        
+        ### Arguments:
+            - others (`list`): list of all subtasks bids from the same task
+            -  (`float` or `dict`): time when this information is being updated
+
+        ### Returns:
+            - rebroadcast (`TaskBid` or `NoneType`): returns bid information to be rebroadcasted to other agents.
+        """
+        mutex_sat = self.__mutex_sat(others, t)
+        dep_sat = self.__dep_sat(others, t)
+        temp_sat = self.__temp_sat(others, t)
+
+        if not mutex_sat or not dep_sat or not temp_sat:
+            self.reset(t)
+            if self.__is_optimistic():
+                self.bid_any -= 1
+                self.bid_any = self.bid_any if self.bid_any > 0 else 0
+
+                self.bid_solo -= 1
+                self.bid_solo = self.bid_solo if self.bid_solo > 0 else 0
+            
+            return self
+
+        return None
+
+    def __mutex_sat(self, others : list, _ : Union[int, float]) -> bool:
+        """
+        Checks for mutually exclusive dependency satisfaction
+        """
+        for other in others:
+            other : SubtaskBid
+            if other.subtask_index == self.subtask_index:
+                continue
+
+            if  other.winning_bid <= self.winning_bid and other.dependencies[self.subtask_index] == 1:
+                return False
+
+        return True
+
+    def __dep_sat(self, others : list, t : Union[int, float]) -> bool:
+        """
+        Checks for dependency constraint satisfaction
+        """
+        n_sat = self.__count_coal_conts_satisied(others)
+        if self.__is_optimistic():
+            if self.N_req > n_sat:
+                self.__set_violation_timer(t)    
+            else:
+                self.__reset_violation_timer(t)
+            return self.__has_timed_out(t)
+        else:
+            return self.N_req == n_sat
+
+
+    def __temp_sat(self, others : list, t : Union[int, float]) -> bool:
+        """
+        Checks for temporal constraint satisfaction
+        """
+        for other in others:
+            other : SubtaskBid
+            if other.winner == SubtaskBid.NONE:
+                continue
+
+            corr_time_met = (self.t_img <= other.t_img + self.time_constraints[other.subtask_index]
+                            and other.t_img <= self.t_img + other.time_constraints[self.subtask_index])
+            independent = other.dependencies[self.subtask_index] <= 0
+
+            tie_breaker = self.__is_optimistic() and (self.t_img > other.t_img)
+
+            if not corr_time_met and not independent and not tie_breaker:
+                return False
+        
+        return True
 
 class ACCBBAPlannerModule(ACBBAPlannerModule):
     """
@@ -344,7 +533,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.log_task_sequence('bundle', bundle, level=logging.WARNING)
                 self.log_task_sequence('path', path, level=logging.WARNING)
                 
-                # Check constraints
+                # check for expired tasks
+                results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t_curr)
+                changes.extend(exp_changes)
+
+                self.log_results('CHECKED EXPIRATION RESULTS', results, level=logging.WARNING)
+                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+                self.log_task_sequence('path', path, level=logging.WARNING)
+
+                # check task constraint satisfaction
                 results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t_curr)
                 changes.extend(cons_changes)
 
@@ -572,7 +769,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         finally:
             self.bundle_builder_results = results
 
-    async def compare_results(self, results : dict, bundle : list, path : list, t_curr : Union[int, float]) -> tuple:
+    async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
         Compares the existing results with any incoming task bids and updates the bundle accordingly
 
@@ -600,7 +797,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # compare bids
             my_bid : SubtaskBid = results[their_bid.task_id][their_bid.subtask_index]
             self.log(f'comparing bids...\nmine:  {my_bid}\ntheirs: {their_bid}', level=logging.DEBUG)
-            broadcast_bid : SubtaskBid = my_bid.update(their_bid.to_dict(), t_curr)
+            broadcast_bid : SubtaskBid = my_bid.update(their_bid.to_dict(), t)
             self.log(f'updated: {my_bid}\n', level=logging.DEBUG)
             results[their_bid.task_id][their_bid.subtask_index] = my_bid
                 
@@ -627,64 +824,101 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     # if the agent is currently winning this bid, reset results
                     current_bid : SubtaskBid = results[measurement_task.id][subtask_index]
                     if current_bid.winner == self.get_parent_name():
-                        current_bid.reset(t_curr)
+                        current_bid.reset(t)
                         results[measurement_task.id][subtask_index] = current_bid
 
-                    self.log_results('PRELIMIANARY COMPARED RESULTS', results, level=logging.WARNING)
-                    self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                    self.log_task_sequence('path', path, level=logging.WARNING)
+                    self.log_results('PRELIMIANARY COMPARED RESULTS', results, level)
+                    self.log_task_sequence('bundle', bundle, level)
+                    self.log_task_sequence('path', path, level)
+        
+        return results, bundle, path, changes
 
+    async def check_task_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+        """
+        Checks if tasks have expired and cannot be performed
+
+        ### Returns
+            - results
+            - bundle
+            - path
+            - changes
+        """
+        changes = []
         # release tasks from bundle if t_end has passed
         task_to_remove = None
         for task, subtask_index in bundle:
             task : MeasurementTask
-            if task.t_end - task.duration < t_curr:
+            if task.t_end - task.duration < t:
                 task_to_remove = (task, subtask_index)
                 break
 
         if task_to_remove is not None:
-            bid_index = bundle.index(task_to_remove)
+            bundle_index = bundle.index(task_to_remove)
+            for _ in range(bundle_index, len(bundle)):
+                # remove task from bundle and path
+                task, subtask_index = bundle.pop(bundle_index)
+                path.remove((task, subtask_index))
 
-            for _ in range(bid_index, len(bundle)):
-                # remove task from bundle
-                measurement_task = bundle.pop(bid_index)
-                path.remove(measurement_task)
+                # # reset bid
+                # task : MeasurementTask
+                # current_bid : SubtaskBid = results[task.id][subtask_index]
+                # current_bid.reset(t)
+                # results[task.id][subtask_index] = current_bid
+
+                # # register change in results
+                # out_msg = TaskBidMessage(   
+                #                         self.get_parent_name(), 
+                #                         self.get_parent_name(), 
+                #                         current_bid.to_dict()
+                #                     )
+                # changes.append(out_msg)
+
+                self.log_results('PRELIMIANARY CHECKED EXPIRATION RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
 
         return results, bundle, path, changes
 
 
-    async def check_results_constraints(self, results : dict, bundle : list, path : list, t_curr : Union[int, float]) -> tuple:
-        changes = []
-        # TODO Check if constraints are met for all subtasks with bids
-        in_violation = []
-        for task_id in results:
-            subtask_bids : list = results[task_id]
-            for subtask_bid in results[task_id]:
-                subtask_bid : SubtaskBid
-                for dep_constraint in subtask_bid.dependencies:
-                    dep_bid : SubtaskBid = subtask_bids[dep_constraint]
+    async def check_results_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
+        changes = []          
+        while True:
+            # find tasks with constraint violations
+            task_to_remove = None
+            for task, subtask_index in bundle:
+                task : MeasurementTask; subtask_index : int
+                bid : SubtaskBid = results[task.id][subtask_index]
+               
+                reset_bid = bid.check_constraints(results[task.id], t)
+                task_to_remove = (task, subtask_index) if reset_bid is not None else None
+                                
+            if task_to_remove is None:
+                # all bids satisfy their constraints
+                break 
 
-                    if dep_constraint == 1:
-                        # check assignment constraints
-                        if not dep_bid.has_winner():
-                            
-                            pass
+            bundle_index = bundle.index(task_to_remove)
+            for _ in range(bundle_index, len(bundle)):
+                # remove task from bundle and path
+                task, subtask_index = bundle.pop(bundle_index)
+                path.remove((task, subtask_index))
 
-                        # check time constraints
-                        else:
-                            pass 
+                # reset bid
+                task : MeasurementTask
+                current_bid : SubtaskBid = results[task.id][subtask_index]
+                current_bid.reset(t)
+                results[task.id][subtask_index] = current_bid
 
-                    elif dep_constraint == 0:
-                        continue
-                     
-                    elif dep_constraint == -1:
-                        # check assignment constraints
-                        if not dep_bid.has_winner():
-                            
-                            pass               
+                # register change in results
+                out_msg = TaskBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        current_bid.to_dict()
+                                    )
+                changes.append(out_msg)
 
-
-        # TODO reset bids and release tasks from bundle if t_violation exceeds tolerance
+                self.log_results('PRELIMIANARY CONSTRAINT CHECKED RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
 
         return results, bundle, path, changes
 
@@ -730,12 +964,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - results (`dict`): results to be logged
             - level (`int`): logging level to be used
         """
-        out = f'\n{dsc}\ntask_id,  i, mmt,\tdeps,\t\t   location,  bidder, bid, winner, winning_bid, t_img\n'
+        out = f'\n{dsc}\n----------------------------------------------------------------------------------------------\n'
+        out += 'task_id,  i, mmt, deps,\t\t   location,  bidder, bid, winner, winning_bid, t_img\n'
+        out += '----------------------------------------------------------------------------------------------\n'
         for task_id in results:
             for bid in results[task_id]:
                 bid : SubtaskBid
                 task = MeasurementTask(**bid.task)
                 split_id = task.id.split('-')
-                out += f'{split_id[0]}, {bid.subtask_index}, {bid.main_measurement},\t{bid.dependencies}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_img, 3)}\n'
+                out += f'{split_id[0]}, {bid.subtask_index}, {bid.main_measurement}, {bid.dependencies}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_img, 3)}\n'
 
         self.log(out, level)
