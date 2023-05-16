@@ -12,6 +12,7 @@
 import copy
 from itertools import combinations, permutations
 import logging
+import math
 from typing import Union
 import numpy as np
 from pandas import DataFrame
@@ -236,7 +237,7 @@ class SubtaskBid(TaskBid):
         if self.winner == self.bidder:
             self.t_violation = -1
 
-    def __is_optimistic(self) -> bool:
+    def is_optimistic(self) -> bool:
         """
         Checks if bid has an optimistic bidding strategy
         """
@@ -256,7 +257,7 @@ class SubtaskBid(TaskBid):
         return t > self.dt_violation + self.t_violation
     
 
-    def __count_coal_conts_satisied(self, others : list) -> int:
+    def count_coal_conts_satisied(self, others : list) -> int:
         """
         Counts the total number of satisfied coalition constraints
         """
@@ -288,7 +289,7 @@ class SubtaskBid(TaskBid):
 
         if not mutex_sat or not dep_sat or not temp_sat:
             self.reset(t)
-            if self.__is_optimistic():
+            if self.is_optimistic():
                 self.bid_any -= 1
                 self.bid_any = self.bid_any if self.bid_any > 0 else 0
 
@@ -317,8 +318,8 @@ class SubtaskBid(TaskBid):
         """
         Checks for dependency constraint satisfaction
         """
-        n_sat = self.__count_coal_conts_satisied(others)
-        if self.__is_optimistic():
+        n_sat = self.count_coal_conts_satisied(others)
+        if self.is_optimistic():
             if self.N_req > n_sat:
                 self.__set_violation_timer(t)    
             else:
@@ -341,7 +342,7 @@ class SubtaskBid(TaskBid):
                             and other.t_img <= self.t_img + other.time_constraints[self.subtask_index])
             independent = other.dependencies[self.subtask_index] <= 0
 
-            tie_breaker = self.__is_optimistic() and (self.t_img > other.t_img)
+            tie_breaker = self.is_optimistic() and (self.t_img > other.t_img)
 
             if not corr_time_met and not independent and not tie_breaker:
                 return False
@@ -524,11 +525,12 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 results, bundle, path, changes = await self.consensus_phase(results, bundle, path, t_curr)
                 results : dict; bundle : list; path : list; changes : list
 
-                results, bundle, path, planner_changes = await self.planning_phase(results, bundle, path, t_curr)
+                results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path)
                 planner_changes : list
                 changes.extend(planner_changes)
 
-                results, bundle, path, plan, actions, action_changes = await self.doing_phase(results, bundle, path, t_curr)
+                bundle, path, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
+                actions : list
                     
                 # send actions to broadcaster
                 if len(actions) == 0 and len(changes) == 0:
@@ -693,6 +695,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
 
     async def check_results_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
+        """
+        Looks for tasks that do not have their constraints satisfied
+        """
         changes = []          
         while True:
             # find tasks with constraint violations
@@ -733,27 +738,46 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.log_task_sequence('path', path, level)
 
         return results, bundle, path, changes
-
+   
     async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list) -> None:
+        """
+        Uses the most updates results information to construct a path
+        """
         available_tasks : list = self.get_available_tasks(state, bundle, results)
 
         changes = []
         changes_to_bundle = []
-        current_bids = {task.id : results[task.id] for task in bundle}
-        max_path = [task for task in path]; 
-        max_path_bids = {task.id : results[task.id] for task in path}
+        
+        current_bids = {task.id : {} for task, _ in bundle}
+        for task, subtask_index in bundle:
+            task : MeasurementTask
+            current_bid[task.id][subtask_index] = results[task.id][subtask_index]
+
+        max_path = [(task, subtask_index) for task, subtask_index in path]; 
+        max_path_bids = {task.id : {} for task, _ in path}
+        for task, subtask_index in path:
+            task : MeasurementTask
+            max_path_bids[task.id][subtask_index] = results[task.id][subtask_index]
+
         max_path_utility = self.sum_path_utility(path, current_bids)
 
         while len(bundle) < self.l_bundle and len(available_tasks) > 0:                   
             # find next best task to put in bundle (greedy)
-            max_task = None; 
-            for measurement_task in available_tasks:
+            max_task = None 
+            max_subtask = None
+            for measurement_task, subtask_index in available_tasks:
                 # calculate bid for a given available task
                 measurement_task : MeasurementTask
+                subtask_index : int
                 projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, measurement_task)
                 
                 # check if path was found
                 if projected_path is None:
+                    continue
+                
+                # check for cualition and mutex satisfaction
+                # TODO add mutex and coalition checks
+                if not self.coalition_test() or not self.mutex_test():
                     continue
 
                 # compare to maximum task
@@ -761,10 +785,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                     # all bids must out-bid the current winners
                     outbids_all = True 
-                    for projected_task in projected_path:
+                    for projected_task, projected_subtask_index in projected_path:
                         projected_task : MeasurementTask
-                        proposed_bid : TaskBid = projected_bids[projected_task.id]
-                        current_bid : TaskBid = results[projected_task.id]
+                        projected_subtask_index : int
+                        proposed_bid : TaskBid = projected_bids[projected_task.id][projected_subtask_index]
+                        current_bid : TaskBid = results[projected_task.id][projected_subtask_index]
 
                         if current_bid > proposed_bid:
                             # ignore path if proposed bid for any task cannot out-bid current winners
@@ -776,16 +801,17 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     
                     max_path = projected_path
                     max_task = measurement_task
+                    max_subtask = subtask_index
                     max_path_bids = projected_bids
                     max_path_utility = projected_path_utility
 
             if max_task is not None:
                 # max bid found! place task with the best bid in the bundle and the path
-                bundle.append(max_task)
+                bundle.append((max_task, max_subtask))
                 path = max_path
 
                 # remove bid task from list of available tasks
-                available_tasks.remove(max_task)
+                available_tasks.remove((max_task, max_subtask))
 
                 # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
                 # self.log_task_sequence('path', path, level=logging.WARNING)
@@ -795,20 +821,22 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 break
 
         #  update bids
-        for measurement_task in path:
+        for measurement_task, subtask_index in path:
             measurement_task : MeasurementTask
-            new_bid : TaskBid = max_path_bids[measurement_task.id]
+            subtask_index : int
+            new_bid : TaskBid = max_path_bids[measurement_task.id][subtask_index]
             
-            if results[measurement_task.id] != new_bid:
-                changes_to_bundle.append(measurement_task)
+            if results[measurement_task.id][subtask_index] != new_bid:
+                changes_to_bundle.append((measurement_task, subtask_index))
 
-            results[measurement_task.id] = new_bid
+            results[measurement_task.id][subtask_index] = new_bid
 
         # broadcast changes to bundle
-        for measurement_task in changes_to_bundle:
+        for measurement_task, subtask_index in changes_to_bundle:
             measurement_task : MeasurementTask
+            subtask_index : int
 
-            new_bid = results[measurement_task.id]
+            new_bid = results[measurement_task.id][subtask_index]
 
             # add to changes broadcast
             out_msg = TaskBidMessage(   
@@ -825,7 +853,83 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         
         return results, bundle, path, changes
 
-    async def doing_phase(self) -> tuple:
+    def sum_path_utility(self, path : list, bids : dict) -> float:
+        utility = 0.0
+        for task, subtask_index in path:
+            task : MeasurementTask
+            bid : SubtaskBid = bids[task.id][subtask_index]
+            utility += bid.own_bid
+
+        return utility
+
+    def calc_path_bid(
+                        self, 
+                        state : SimulationAgentState, 
+                        original_path : list, 
+                        task : MeasurementTask, 
+                        subtask_index : int
+                    ) -> tuple:
+        winning_path = None
+        winning_bids = None
+        winning_path_utility = 0.0
+
+        # find best placement in path
+        for i in range(len(original_path)+1):
+            # generate possible path
+            path = [scheduled_task for scheduled_task in original_path]
+            path.insert(i, (task, subtask_index))
+
+            # calculate bids for each task in the path
+            bids = {}
+            for task_i, subtask_j in path:
+                # calculate arrival time
+                task_i : MeasurementTask
+                subtask_j : int
+                t_arrive = self.calc_imaging_time(state, path, bids, task_i)
+
+                # calculate bidding score
+                utility = self.calc_utility(task, t_arrive)
+
+                # create bid
+                bid = TaskBid(  
+                                task_i.to_dict(), 
+                                self.get_parent_name(),
+                                utility,
+                                utility,
+                                self.get_parent_name(),
+                                t_arrive,
+                                state.t
+                            )
+                
+                if task_i.id not in bids:
+                    bids[task_i.id] = {}    
+                bids[task_i.id][subtask_j] = bid
+
+            # look for path with the best utility
+            # TODO include coalition and mutex test
+            path_utility = self.sum_path_utility(path, bids)
+            if path_utility > winning_path_utility:
+                winning_path = path
+                winning_bids = bids
+                winning_path_utility = path_utility
+
+        return winning_path, winning_bids, winning_path_utility
+
+    async def doing_phase(
+                            self, 
+                            state : SimulationAgentState, 
+                            results : dict, 
+                            bundle : list, 
+                            path : list, 
+                            plan : list, 
+                            changes : list, 
+                            t_curr : Union[int, float], 
+                            f_update : Union[int, float],
+                            converged : int
+                        ) -> tuple:
+        """
+        Given the state of the current plan, give the agent tasks to perform
+        """
         # give agent tasks to perform at the current time
         actions = []
         if (len(changes) == 0 
@@ -869,8 +973,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                     if isinstance(self._clock_config, FixedTimesStepClockConfig):
                         dt = self._clock_config.dt
-                        prev_t_start = t_start
-                        prev_t_end = t_end
                         if t_start < np.Inf:
                             t_start = dt * math.floor(t_start/dt)
                         if t_end < np.Inf:
@@ -936,6 +1038,8 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             converged = 0
             actions.append(WaitForMessages(t_curr, t_curr + 1/f_update))
 
+        return bundle, path, actions, converged
+
     def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
         """
         Checks if there are any tasks available to be performed
@@ -945,20 +1049,25 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         """
         available = []
         for task_id in results:
-            for subtaskbid in results[task_id]:
-                subtaskbid : SubtaskBid
+            for subtask_index in range(len(results[task_id])):
+                subtaskbid : SubtaskBid = results[task_id][subtask_index]; 
                 task = MeasurementTask(**subtaskbid.task)
 
-                if self.can_bid(state, task, subtaskbid) and (task, subtaskbid.subtask_index) not in bundle and (subtaskbid.t_img >= state.t or subtaskbid.t_img < 0):
+                if (
+                        self.can_bid(state, task, subtask_index, results[task_id]) 
+                    and (task, subtaskbid.subtask_index) not in bundle 
+                    and (subtaskbid.t_img >= state.t or subtaskbid.t_img < 0)
+                    ):
                     available.append((task, subtaskbid.subtask_index))
 
         return available
 
-    def can_bid(self, state : SimulationAgentState, task : MeasurementTask, subtaskbid : SubtaskBid) -> bool:
+    def can_bid(self, state : SimulationAgentState, task : MeasurementTask, subtask_index : int, subtaskbids : list) -> bool:
         """
         Checks if an agent can perform a measurement task
         """
         # check capabilities - TODO: Replace with knowledge graph
+        subtaskbid : SubtaskBid = subtaskbids[subtask_index]
         if subtaskbid.main_measurement not in state.instruments:
             return False 
 
@@ -967,7 +1076,16 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         if task.t_end < state.t:
             return False
         
-        return True
+        ## Constraint 2: coalition constraints
+        n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
+        if subtaskbid.is_optimistic():
+            return (    
+                        subtaskbid.N_req == n_sat
+                    or  subtaskbid.bid_solo > 0
+                    or  (subtaskbid.bid_any > 0 and n_sat > 0)
+                    )
+        else:
+            return subtaskbid.N_req == n_sat
         
     def log_results(self, dsc : str, results : dict, level=logging.DEBUG) -> None:
         """
