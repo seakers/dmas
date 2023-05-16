@@ -477,7 +477,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         finally:
             self.listener_results = results
-
         
     async def bundle_builder(self) -> None:
         """
@@ -521,242 +520,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 
                 # t_update = t_curr
 
-                # compare bids with incoming messages
-                self.log_results('INITIAL RESULTS', results, level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
-                
-                changes = []
-                results, bundle, path, comp_changes = await self.compare_results(results, bundle, path, t_curr)
-                changes.extend(comp_changes)
-
-                self.log_results('COMPARED RESULTS', results, level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
-                
-                # check for expired tasks
-                results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t_curr)
-                changes.extend(exp_changes)
-
-                self.log_results('CHECKED EXPIRATION RESULTS', results, level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
-
-                # check task constraint satisfaction
-                results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t_curr)
-                changes.extend(cons_changes)
-
-                self.log_results('CONSTRAINT CHECKED RESULTS', results, level=logging.WARNING)
-                self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                self.log_task_sequence('path', path, level=logging.WARNING)
-
                 # update bundle from new information
-                available_tasks : list = self.get_available_tasks(state, bundle, results)
+                results, bundle, path, changes = await self.consensus_phase(results, bundle, path, t_curr)
+                results : dict; bundle : list; path : list; changes : list
 
-                changes_to_bundle = []
-                current_bids = {task.id : results[task.id] for task in bundle}
-                max_path = [task for task in path]; 
-                max_path_bids = {task.id : results[task.id] for task in path}
-                max_path_utility = self.sum_path_utility(path, current_bids)
+                results, bundle, path, planner_changes = await self.planning_phase(results, bundle, path, t_curr)
+                planner_changes : list
+                changes.extend(planner_changes)
 
-                while len(bundle) < self.l_bundle and len(available_tasks) > 0:                   
-                    # find next best task to put in bundle (greedy)
-                    max_task = None; 
-                    for measurement_task in available_tasks:
-                        # calculate bid for a given available task
-                        measurement_task : MeasurementTask
-                        projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, measurement_task)
-                        
-                        # check if path was found
-                        if projected_path is None:
-                            continue
-
-                        # compare to maximum task
-                        if (max_task is None or projected_path_utility > max_path_utility):
-
-                            # all bids must out-bid the current winners
-                            outbids_all = True 
-                            for projected_task in projected_path:
-                                projected_task : MeasurementTask
-                                proposed_bid : TaskBid = projected_bids[projected_task.id]
-                                current_bid : TaskBid = results[projected_task.id]
-
-                                if current_bid > proposed_bid:
-                                    # ignore path if proposed bid for any task cannot out-bid current winners
-                                    outbids_all = False
-                                    break
-                            
-                            if not outbids_all:
-                                continue
-                            
-                            max_path = projected_path
-                            max_task = measurement_task
-                            max_path_bids = projected_bids
-                            max_path_utility = projected_path_utility
-
-                    if max_task is not None:
-                        # max bid found! place task with the best bid in the bundle and the path
-                        bundle.append(max_task)
-                        path = max_path
-
-                        # remove bid task from list of available tasks
-                        available_tasks.remove(max_task)
-
-                        # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                        # self.log_task_sequence('path', path, level=logging.WARNING)
-
-                    else:
-                        # no max bid was found; no more tasks can be added to the bundle
-                        break
-
-                #  update bids
-                for measurement_task in path:
-                    measurement_task : MeasurementTask
-                    new_bid : TaskBid = max_path_bids[measurement_task.id]
-                    
-                    if results[measurement_task.id] != new_bid:
-                        changes_to_bundle.append(measurement_task)
-
-                    results[measurement_task.id] = new_bid
-
-                # broadcast changes to bundle
-                for measurement_task in changes_to_bundle:
-                    measurement_task : MeasurementTask
-
-                    new_bid = results[measurement_task.id]
-
-                    # add to changes broadcast
-                    out_msg = TaskBidMessage(   
-                                            self.get_parent_name(), 
-                                            self.get_parent_name(), 
-                                            new_bid.to_dict()
-                                        )
-                    changes.append(out_msg)
-
-
-                # self.log_results(results, 'MODIFIED BUNDLE RESULTS', level=logging.WARNING)
-                # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                # self.log_task_sequence('path', path, level=logging.WARNING)
-
-                # give agent tasks to perform at the current time
-                actions = []
-                if (len(changes) == 0 
-                    and len(path) > 0
-                    and self.check_path_constraints(path, results, t_curr)):
-
-                    if converged < 1:
-                        converged += 1
-
-                        for measurement_task in bundle:
-                            measurement_task : MeasurementTask
-
-                            new_bid = results[measurement_task.id]
-
-                            # add to changes broadcast
-                            out_msg = TaskBidMessage(   
-                                                    self.get_parent_name(), 
-                                                    self.get_parent_name(), 
-                                                    new_bid.to_dict()
-                                                )
-                            changes.append(out_msg)
-
-                    elif len(plan) == 0:
-                        # no plan has been generated yet; generate one
-                        for i in range(len(path)):
-                            measurement_task : MeasurementTask = path[i]
-                            
-                            if len(plan) == 0:
-                                t_start = t_curr
-                            else:
-                                i_prev = (i-1)*2
-                                prev_move : MoveAction = plan[i_prev]
-                                prev_measure : MeasurementTask = plan[i_prev + 1]
-                                t_start = prev_move.t_end + prev_measure.duration
-
-                            task_pos = measurement_task.pos
-                            agent_pos = state.pos
-
-                            dx = np.sqrt( (task_pos[0] - agent_pos[0])**2 + (task_pos[1] - agent_pos[1])**2 )
-                            t_end = t_start + dx / state.v_max
-
-                            if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                                dt = self._clock_config.dt
-                                prev_t_start = t_start
-                                prev_t_end = t_end
-                                if t_start < np.Inf:
-                                    t_start = dt * math.floor(t_start/dt)
-                                if t_end < np.Inf:
-                                    t_end = dt * math.ceil(t_end/dt)
-
-                                if t_end > t_start:
-                                    t_end += dt
-
-                            move_task = MoveAction(measurement_task.pos, t_start, t_end)
-
-                            # plan per measurement request: move to plan, perform measurement 
-                            plan.append(move_task)
-                            plan.append(measurement_task)  
-
-                        actions.append(plan[0])
-
-                    else:
-                        # plan has already been developed and is being performed; check plan complation status
-                        while not self.action_status_inbox.empty():
-                            action_msg : AgentActionMessage = await self.action_status_inbox.get()
-                            performed_action = AgentAction(**action_msg.action)
-
-                            latest_plan_action : AgentAction = plan[0]
-                            if performed_action.id != latest_plan_action.id:
-                                # some other task was performed; ignoring 
-                                continue
-
-                            elif performed_action.status == AgentAction.PENDING:
-                                # latest action from plan was attepted but not completed; performing again
-                                
-                                if t_curr < latest_plan_action.t_start:
-                                    # if action was not ready to be performed, wait for a bit
-                                    actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
-                                else:
-                                    # try to perform action again
-                                    actions.append(plan[0])
-
-                            elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
-                                # latest action from plan was completed! performing next action in plan
-                                done_task : AgentAction = plan.pop(0)
-                                
-                                if done_task in path:
-                                    path.remove(done_task)
-                                    bundle.remove(done_task)
-
-                                if len(plan) > 0:
-                                    next_task : AgentAction = plan[0]
-                                    if t_curr >= next_task.t_start:
-                                        actions.append(next_task)
-                                    else:
-                                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
-                        
-                        if len(actions) == 0 and len(plan) > 0:
-                            next_task : AgentAction = plan[0]
-                            if t_curr >= next_task.t_start:
-                                actions.append(next_task)
-                            else:
-                                actions.append( WaitForMessages(t_curr, next_task.t_start) )
-
-                else:
-                    # bundle is empty or cannot be executed yet; instructing agent to idle
-                    plan = []
-                    converged = 0
-                    actions.append(WaitForMessages(t_curr, t_curr + 1/f_update))
-
-                # send changes to rebroadcaster
-                # for change in changes:
-                #     await self.outgoing_bundle_builder_inbox.put(change)
+                results, bundle, path, plan, actions, action_changes = await self.doing_phase(results, bundle, path, t_curr)
                     
                 # send actions to broadcaster
                 if len(actions) == 0 and len(changes) == 0:
                     actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
-                # for action in actions:
-                #     await self.outgoing_bundle_builder_inbox.put(action)
 
                 change_dicts = [change.to_dict() for change in changes]
                 action_dicts = [action.to_dict() for action in actions]
@@ -769,6 +545,41 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         finally:
             self.bundle_builder_results = results
+
+    async def consensus_phase(self, results, bundle, path, t) -> None:
+        """
+        Evaluates incoming bids and updates current results and bundle
+        """
+        changes = []
+        self.log_results('INITIAL RESULTS', results, level=logging.WARNING)
+        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+        self.log_task_sequence('path', path, level=logging.WARNING)
+        
+        # compare bids with incoming messages
+        results, bundle, path, comp_changes = await self.compare_results(results, bundle, path, t)
+        changes.extend(comp_changes)
+
+        self.log_results('COMPARED RESULTS', results, level=logging.WARNING)
+        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+        self.log_task_sequence('path', path, level=logging.WARNING)
+        
+        # check for expired tasks
+        results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t)
+        changes.extend(exp_changes)
+
+        self.log_results('CHECKED EXPIRATION RESULTS', results, level=logging.WARNING)
+        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+        self.log_task_sequence('path', path, level=logging.WARNING)
+
+        # check task constraint satisfaction
+        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t)
+        changes.extend(cons_changes)
+
+        self.log_results('CONSTRAINT CHECKED RESULTS', results, level=logging.WARNING)
+        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+        self.log_task_sequence('path', path, level=logging.WARNING)
+
+        return results, bundle, path, changes
 
     async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
@@ -923,6 +734,208 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         return results, bundle, path, changes
 
+    async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list) -> None:
+        available_tasks : list = self.get_available_tasks(state, bundle, results)
+
+        changes = []
+        changes_to_bundle = []
+        current_bids = {task.id : results[task.id] for task in bundle}
+        max_path = [task for task in path]; 
+        max_path_bids = {task.id : results[task.id] for task in path}
+        max_path_utility = self.sum_path_utility(path, current_bids)
+
+        while len(bundle) < self.l_bundle and len(available_tasks) > 0:                   
+            # find next best task to put in bundle (greedy)
+            max_task = None; 
+            for measurement_task in available_tasks:
+                # calculate bid for a given available task
+                measurement_task : MeasurementTask
+                projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, measurement_task)
+                
+                # check if path was found
+                if projected_path is None:
+                    continue
+
+                # compare to maximum task
+                if (max_task is None or projected_path_utility > max_path_utility):
+
+                    # all bids must out-bid the current winners
+                    outbids_all = True 
+                    for projected_task in projected_path:
+                        projected_task : MeasurementTask
+                        proposed_bid : TaskBid = projected_bids[projected_task.id]
+                        current_bid : TaskBid = results[projected_task.id]
+
+                        if current_bid > proposed_bid:
+                            # ignore path if proposed bid for any task cannot out-bid current winners
+                            outbids_all = False
+                            break
+                    
+                    if not outbids_all:
+                        continue
+                    
+                    max_path = projected_path
+                    max_task = measurement_task
+                    max_path_bids = projected_bids
+                    max_path_utility = projected_path_utility
+
+            if max_task is not None:
+                # max bid found! place task with the best bid in the bundle and the path
+                bundle.append(max_task)
+                path = max_path
+
+                # remove bid task from list of available tasks
+                available_tasks.remove(max_task)
+
+                # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+                # self.log_task_sequence('path', path, level=logging.WARNING)
+
+            else:
+                # no max bid was found; no more tasks can be added to the bundle
+                break
+
+        #  update bids
+        for measurement_task in path:
+            measurement_task : MeasurementTask
+            new_bid : TaskBid = max_path_bids[measurement_task.id]
+            
+            if results[measurement_task.id] != new_bid:
+                changes_to_bundle.append(measurement_task)
+
+            results[measurement_task.id] = new_bid
+
+        # broadcast changes to bundle
+        for measurement_task in changes_to_bundle:
+            measurement_task : MeasurementTask
+
+            new_bid = results[measurement_task.id]
+
+            # add to changes broadcast
+            out_msg = TaskBidMessage(   
+                                    self.get_parent_name(), 
+                                    self.get_parent_name(), 
+                                    new_bid.to_dict()
+                                )
+            changes.append(out_msg)
+
+
+        self.log_results(results, 'MODIFIED BUNDLE RESULTS', level=logging.WARNING)
+        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+        self.log_task_sequence('path', path, level=logging.WARNING)
+        
+        return results, bundle, path, changes
+
+    async def doing_phase(self) -> tuple:
+        # give agent tasks to perform at the current time
+        actions = []
+        if (len(changes) == 0 
+            and len(path) > 0
+            and self.check_path_constraints(path, results, t_curr)):
+
+            if converged < 1:
+                converged += 1
+
+                for measurement_task in bundle:
+                    measurement_task : MeasurementTask
+
+                    new_bid = results[measurement_task.id]
+
+                    # add to changes broadcast
+                    out_msg = TaskBidMessage(   
+                                            self.get_parent_name(), 
+                                            self.get_parent_name(), 
+                                            new_bid.to_dict()
+                                        )
+                    changes.append(out_msg)
+
+            elif len(plan) == 0:
+                # no plan has been generated yet; generate one
+                for i in range(len(path)):
+                    measurement_task : MeasurementTask = path[i]
+                    
+                    if len(plan) == 0:
+                        t_start = t_curr
+                    else:
+                        i_prev = (i-1)*2
+                        prev_move : MoveAction = plan[i_prev]
+                        prev_measure : MeasurementTask = plan[i_prev + 1]
+                        t_start = prev_move.t_end + prev_measure.duration
+
+                    task_pos = measurement_task.pos
+                    agent_pos = state.pos
+
+                    dx = np.sqrt( (task_pos[0] - agent_pos[0])**2 + (task_pos[1] - agent_pos[1])**2 )
+                    t_end = t_start + dx / state.v_max
+
+                    if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                        dt = self._clock_config.dt
+                        prev_t_start = t_start
+                        prev_t_end = t_end
+                        if t_start < np.Inf:
+                            t_start = dt * math.floor(t_start/dt)
+                        if t_end < np.Inf:
+                            t_end = dt * math.ceil(t_end/dt)
+
+                        if t_end > t_start:
+                            t_end += dt
+
+                    move_task = MoveAction(measurement_task.pos, t_start, t_end)
+
+                    # plan per measurement request: move to plan, perform measurement 
+                    plan.append(move_task)
+                    plan.append(measurement_task)  
+
+                actions.append(plan[0])
+
+            else:
+                # plan has already been developed and is being performed; check plan complation status
+                while not self.action_status_inbox.empty():
+                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                    performed_action = AgentAction(**action_msg.action)
+
+                    latest_plan_action : AgentAction = plan[0]
+                    if performed_action.id != latest_plan_action.id:
+                        # some other task was performed; ignoring 
+                        continue
+
+                    elif performed_action.status == AgentAction.PENDING:
+                        # latest action from plan was attepted but not completed; performing again
+                        
+                        if t_curr < latest_plan_action.t_start:
+                            # if action was not ready to be performed, wait for a bit
+                            actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
+                        else:
+                            # try to perform action again
+                            actions.append(plan[0])
+
+                    elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
+                        # latest action from plan was completed! performing next action in plan
+                        done_task : AgentAction = plan.pop(0)
+                        
+                        if done_task in path:
+                            path.remove(done_task)
+                            bundle.remove(done_task)
+
+                        if len(plan) > 0:
+                            next_task : AgentAction = plan[0]
+                            if t_curr >= next_task.t_start:
+                                actions.append(next_task)
+                            else:
+                                actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                
+                if len(actions) == 0 and len(plan) > 0:
+                    next_task : AgentAction = plan[0]
+                    if t_curr >= next_task.t_start:
+                        actions.append(next_task)
+                    else:
+                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
+
+        else:
+            # bundle is empty or cannot be executed yet; instructing agent to idle
+            plan = []
+            converged = 0
+            actions.append(WaitForMessages(t_curr, t_curr + 1/f_update))
+
     def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
         """
         Checks if there are any tasks available to be performed
@@ -965,10 +978,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - results (`dict`): results to be logged
             - level (`int`): logging level to be used
         """
-        # out = f'\n{dsc}\n----------------------------------------------------------------------------------------------\n'
-        # out += 'task_id,  i, mmt, deps,\t\t   location,  bidder, bid, winner, winning_bid, t_img\n'
-        # out += '----------------------------------------------------------------------------------------------\n'
-
         headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v']
         data = []
         for task_id in results:
@@ -976,9 +985,8 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 bid : SubtaskBid
                 task = MeasurementTask(**bid.task)
                 split_id = task.id.split('-')
-                # out += f'{split_id[0]}, {bid.subtask_index}, {bid.main_measurement}, {bid.dependencies}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_img, 3)}\n'
                 line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3)]
                 data.append(line)
+
         df = DataFrame(data, columns=headers)
-        self.log(f'\n{str(df)}', level)
-        # self.log(out, level)
+        self.log(f'\n{dsc}\n{str(df)}', level)
