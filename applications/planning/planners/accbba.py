@@ -14,6 +14,7 @@ from itertools import combinations, permutations
 import logging
 from typing import Union
 import numpy as np
+from pandas import DataFrame
 
 from tasks import *
 from messages import *
@@ -964,14 +965,20 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - results (`dict`): results to be logged
             - level (`int`): logging level to be used
         """
-        out = f'\n{dsc}\n----------------------------------------------------------------------------------------------\n'
-        out += 'task_id,  i, mmt, deps,\t\t   location,  bidder, bid, winner, winning_bid, t_img\n'
-        out += '----------------------------------------------------------------------------------------------\n'
+        # out = f'\n{dsc}\n----------------------------------------------------------------------------------------------\n'
+        # out += 'task_id,  i, mmt, deps,\t\t   location,  bidder, bid, winner, winning_bid, t_img\n'
+        # out += '----------------------------------------------------------------------------------------------\n'
+
+        headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v']
+        data = []
         for task_id in results:
             for bid in results[task_id]:
                 bid : SubtaskBid
                 task = MeasurementTask(**bid.task)
                 split_id = task.id.split('-')
-                out += f'{split_id[0]}, {bid.subtask_index}, {bid.main_measurement}, {bid.dependencies}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_img, 3)}\n'
-
-        self.log(out, level)
+                # out += f'{split_id[0]}, {bid.subtask_index}, {bid.main_measurement}, {bid.dependencies}, {task.pos}, {bid.bidder}, {round(bid.own_bid, 3)}, {bid.winner}, {round(bid.winning_bid, 3)}, {round(bid.t_img, 3)}\n'
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3)]
+                data.append(line)
+        df = DataFrame(data, columns=headers)
+        self.log(f'\n{str(df)}', level)
+        # self.log(out, level)
