@@ -889,7 +889,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
         Checks if an agent can perform a measurement task
         """
         # check capabilities - TODO: Replace with knowledge graph
-        for instrument in task.instruments:
+        for instrument in task.measurements:
             if instrument not in state.instruments:
                 return False
 

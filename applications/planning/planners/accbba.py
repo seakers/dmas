@@ -140,73 +140,17 @@ class SubtaskBid(TaskBid):
                             self.dt_converge
                         )
 
-    def subtasks_from_task(task : MeasurementTask, bidder : str) -> list:
+    def subtask_bids_from_task(task : MeasurementTask, bidder : str) -> list:
         """
         Generates subtask bids from a measurement task request
         """
-        n_instruments = len(task.instruments)
-        subtasks = []
-
-        # create measurement groups
-        measurement_groups = []
-        for r in range(1, n_instruments+1):
-            # combs = list(permutations(task_types, r))
-            combs = list(combinations(task.instruments, r))
-            
-            for comb in combs:
-                measurements = list(comb)
-                main_measurement_permutations = list(permutations(comb, 1))
-                for main_measurement in main_measurement_permutations:
-                    main_measurement = list(main_measurement).pop()
-
-                    dependend_measurements = copy.deepcopy(measurements)
-                    dependend_measurements.remove(main_measurement)
-
-                    if len(dependend_measurements) > 0:
-                        measurement_groups.append((main_measurement, dependend_measurements))
-                    else:
-                        measurement_groups.append((main_measurement, []))
-        
-        # create dependency matrix
-        dependency_matrix = np.zeros((len(measurement_groups), len(measurement_groups)))
-        for index_a in range(len(measurement_groups)):
-            main_a, dependents_a = measurement_groups[index_a]
-
-            for index_b in range(index_a, len(measurement_groups)):
-                main_b, dependents_b = measurement_groups[index_b]
-
-                if index_a == index_b:
-                    continue
-
-                if len(dependents_a) != len(dependents_b):
-                    dependency_matrix[index_a][index_b] = -1
-                    dependency_matrix[index_b][index_a] = -1
-                elif main_a not in dependents_b or main_b not in dependents_a:
-                    dependency_matrix[index_a][index_b] = -1
-                    dependency_matrix[index_b][index_a] = -1
-                elif main_a == main_b:
-                    dependency_matrix[index_a][index_b] = -1
-                    dependency_matrix[index_b][index_a] = -1
-                else:
-                    dependents_a_extended : list = copy.deepcopy(dependents_a)
-                    dependents_a_extended.remove(main_b)
-                    dependents_b_extended : list = copy.deepcopy(dependents_b)
-                    dependents_b_extended.remove(main_a)
-
-                    if dependents_a_extended == dependents_b_extended:
-                        dependency_matrix[index_a][index_b] = 1
-                        dependency_matrix[index_b][index_a] = 1
-                    else:
-                        dependency_matrix[index_a][index_b] = -1
-                        dependency_matrix[index_b][index_a] = -1
-
-        # create subtasks
-        for subtask_index in range(len(measurement_groups)):
-            main_measurement, _ = measurement_groups[subtask_index]
+        subtasks = []        
+        for subtask_index in range(len(task.measurement_groups)):
+            main_measurement, _ = task.measurement_groups[subtask_index]
             subtasks.append(SubtaskBid( task.to_dict(), 
                                         subtask_index,
                                         main_measurement,
-                                        dependency_matrix[subtask_index],
+                                        task.dependency_matrix[subtask_index],
                                         bidder))
         return subtasks
 
@@ -447,7 +391,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                             # create task bid from task request and add to results
                             self.log(f"received new task request! Adding to results ledger...")
 
-                            bids = SubtaskBid.subtasks_from_task(task, self.get_parent_name())
+                            bids = SubtaskBid.subtask_bids_from_task(task, self.get_parent_name())
                             results[task.id] = bids
 
                             # send to bundle-builder and rebroadcaster
@@ -606,7 +550,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             if new_task:
                 # was not aware of this task; add to results as a blank bid
                 task = MeasurementTask(**their_bid.task)
-                results[their_bid.task_id] = SubtaskBid.subtasks_from_task(task, self.get_parent_name())
+                results[their_bid.task_id] = SubtaskBid.subtask_bids_from_task(task, self.get_parent_name())
 
             # compare bids
             my_bid : SubtaskBid = results[their_bid.task_id][their_bid.subtask_index]
@@ -769,7 +713,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # calculate bid for a given available task
                 measurement_task : MeasurementTask
                 subtask_index : int
-                projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, path, measurement_task)
+                projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, results, path, measurement_task, subtask_index)
                 
                 # check if path was found
                 if projected_path is None:
@@ -853,6 +797,80 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         
         return results, bundle, path, changes
 
+    def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
+        """
+        Checks if there are any tasks available to be performed
+
+        ### Returns:
+            - list containing all available and bidable tasks to be performed by the parent agent
+        """
+        available = []
+        for task_id in results:
+            for subtask_index in range(len(results[task_id])):
+                subtaskbid : SubtaskBid = results[task_id][subtask_index]; 
+                task = MeasurementTask(**subtaskbid.task)
+
+                if (
+                        self.can_bid(state, task, subtask_index, results[task_id]) 
+                    and (task, subtaskbid.subtask_index) not in bundle 
+                    and (subtaskbid.t_img >= state.t or subtaskbid.t_img < 0)
+                    and not self.contains_mutex_subtasks(bundle, task, subtask_index)
+                    ):
+                    available.append((task, subtaskbid.subtask_index))
+
+        return available
+
+    def can_bid(self, state : SimulationAgentState, task : MeasurementTask, subtask_index : int, subtaskbids : list) -> bool:
+        """
+        Checks if an agent has the ability to bid on a measurement task
+        """
+        # check capabilities - TODO: Replace with knowledge graph
+        subtaskbid : SubtaskBid = subtaskbids[subtask_index]
+        if subtaskbid.main_measurement not in state.instruments:
+            return False 
+
+        # check time constraints
+        ## Constraint 1: task must be able to be performed during or after the current time
+        if task.t_end < state.t:
+            return False
+        
+        ## Constraint 2: coalition constraints
+        n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
+        if subtaskbid.is_optimistic():
+            return (    
+                        subtaskbid.N_req == n_sat
+                    or  subtaskbid.bid_solo > 0
+                    or  (subtaskbid.bid_any > 0 and n_sat > 0)
+                    )
+        else:
+            return subtaskbid.N_req == n_sat
+
+    def contains_mutex_subtasks(self, bundle : list, task : MeasurementTask, subtask_index : int) -> bool:
+        """
+        Returns true if a bundle contains a subtask that is mutually exclusive to a subtask being added
+
+        ### Arguments:
+            - bundle (`list`) : current bundle to be expanded
+            - task (:obj:`MeasurementTask`) : task to be added to the bundle
+            - subtask_index (`int`) : index of the subtask to be added to the bundle
+        """
+        for task_i, subtask_index_i in bundle:
+            task_i : MeasurementTask
+            subtask_index_i : int 
+
+            if task_i.id != task.id:
+                # are different tasks, cannot be mutuallyexclusive
+                continue
+
+            if (
+                    task_i.dependency_matrix[subtask_index_i][subtask_index] < 0
+                or  task_i.dependency_matrix[subtask_index][subtask_index_i] < 0
+                ):
+                # either the existing subtask in the bundle is mutually exclusive with the subtask to be added or viceversa
+                return False
+            
+        return True
+
     def sum_path_utility(self, path : list, bids : dict) -> float:
         utility = 0.0
         for task, subtask_index in path:
@@ -865,6 +883,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
     def calc_path_bid(
                         self, 
                         state : SimulationAgentState, 
+                        original_results : dict,
                         original_path : list, 
                         task : MeasurementTask, 
                         subtask_index : int
@@ -885,14 +904,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # calculate arrival time
                 task_i : MeasurementTask
                 subtask_j : int
-                t_arrive = self.calc_imaging_time(state, path, bids, task_i)
+                t_arrive = self.calc_imaging_time(state, original_results, path, bids, task_i, subtask_j)
 
                 # calculate bidding score
-                utility = self.calc_utility(task, t_arrive)
+                utility = self.calc_utility(task, subtask_j, t_arrive)
 
                 # create bid
-                bid = TaskBid(  
-                                task_i.to_dict(), 
+                main_measurement, _ = task_i.measurement_groups[subtask_j]
+                dependencies = task_i.dependency_matrix[subtask_index]
+                bid = SubtaskBid(  
+                                task_i.to_dict(),
+                                subtask_j,
+                                main_measurement,
+                                dependencies,
                                 self.get_parent_name(),
                                 utility,
                                 utility,
@@ -915,6 +939,59 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         return winning_path, winning_bids, winning_path_utility
 
+    def calc_imaging_time(self, state : SimulationAgentState, current_results : dict, path : list, bids : dict, task : MeasurementTask, subtask_index : int) -> float:
+        """
+        Computes the earliest time when a task in the path would be performed
+
+        ### Arguments:
+            - state (obj:`SimulationAgentState`): state of the agent at the start of the path
+            - path (`list`): sequence of tasks dictionaries to be performed
+            - bids (`dict`): dictionary of task ids to the current task bid dictionaries 
+
+        ### Returns
+            - t_img (`float`): earliest available imaging time
+        """
+        # calculate the previous task's position and 
+        i = path.index((task,subtask_index))
+        if i == 0:
+            t_prev = state.t
+            pos_prev = state.pos
+        else:
+            task_prev, subtask_index_prev = path[i-1]
+            task_prev : MeasurementTask
+            subtask_index_prev : int
+            bid_prev : Bid = bids[task_prev.id][subtask_index_prev]
+            t_prev : float = bid_prev.t_img + task_prev.duration
+            pos_prev : list = task_prev.pos
+
+        # compute travel time to the task
+        t_img = state.calc_arrival_time(pos_prev, task.pos, t_prev)
+        return t_img if t_img >= task.t_start else task.t_start
+        
+    def calc_utility(self, task : MeasurementTask, subtask_index : int, t_img : float) -> float:
+        """
+        Calculates the expected utility of performing a measurement task
+
+        ### Arguments:
+            - task (obj:`MeasurementTask`): task to be performed 
+            - subtask_index (`int`): index of subtask to be performed
+            - t_img (`float`): time at which the task will be performed
+
+        ### Retrurns:
+            - utility (`float`): estimated normalized utility 
+        """
+        utility = super().calc_utility(task, t_img)
+
+        _, dependent_measurements = task.measurement_groups[subtask_index]
+        k = len(dependent_measurements) + 1
+
+        if k / len(task.measurements) == 1.0:
+            alpha = 1.0
+        else:
+            alpha = 1.0/3.0
+
+        return utility * alpha / k
+    
     async def doing_phase(
                             self, 
                             state : SimulationAgentState, 
@@ -1040,53 +1117,28 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         return bundle, path, actions, converged
 
-    def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
+    def log_task_sequence(self, dsc : str, sequence : list, level=logging.DEBUG) -> None:
         """
-        Checks if there are any tasks available to be performed
+        Logs a sequence of tasks at a given time for debugging purposes
 
-        ### Returns:
-            - list containing all available and bidable tasks to be performed by the parent agent
+        ### Argumnents:
+            - dsc (`str`): description of what is to be logged
+            - sequence (`list`): list of tasks to be logged
+            - level (`int`): logging level to be used
         """
-        available = []
-        for task_id in results:
-            for subtask_index in range(len(results[task_id])):
-                subtaskbid : SubtaskBid = results[task_id][subtask_index]; 
-                task = MeasurementTask(**subtaskbid.task)
+        out = f'\n{dsc} = ['
+        for task, subtask_index in sequence:
+            task : MeasurementTask
+            subtask_index : int
+            split_id = task.id.split('-')
+            
+            if sequence.index(task) > 0:
+                out += ', '
+            out += f'({split_id[0]}, {subtask_index})'
+        out += ']\n'
 
-                if (
-                        self.can_bid(state, task, subtask_index, results[task_id]) 
-                    and (task, subtaskbid.subtask_index) not in bundle 
-                    and (subtaskbid.t_img >= state.t or subtaskbid.t_img < 0)
-                    ):
-                    available.append((task, subtaskbid.subtask_index))
+        self.log(out,level)
 
-        return available
-
-    def can_bid(self, state : SimulationAgentState, task : MeasurementTask, subtask_index : int, subtaskbids : list) -> bool:
-        """
-        Checks if an agent can perform a measurement task
-        """
-        # check capabilities - TODO: Replace with knowledge graph
-        subtaskbid : SubtaskBid = subtaskbids[subtask_index]
-        if subtaskbid.main_measurement not in state.instruments:
-            return False 
-
-        # check time constraints
-        ## Constraint 1: task must be able to be performed during or after the current time
-        if task.t_end < state.t:
-            return False
-        
-        ## Constraint 2: coalition constraints
-        n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
-        if subtaskbid.is_optimistic():
-            return (    
-                        subtaskbid.N_req == n_sat
-                    or  subtaskbid.bid_solo > 0
-                    or  (subtaskbid.bid_any > 0 and n_sat > 0)
-                    )
-        else:
-            return subtaskbid.N_req == n_sat
-        
     def log_results(self, dsc : str, results : dict, level=logging.DEBUG) -> None:
         """
         Logs current results at a given time for debugging purposes
