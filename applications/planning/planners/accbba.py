@@ -37,6 +37,10 @@ class SubtaskBid(TaskBid):
     ### Attributes:
         - task (`dict`): task being bid on
         - task_id (`str`): id of the task being bid on
+        - subtask_index (`int`) : index of the subtask to be bid on
+        - main_measurement (`str`): name of the main measurement assigned by this subtask bid
+        - dependencies (`list`): portion of the dependency matrix related to this subtask bid
+        - time_constraints (`list`): portion of the time dependency matrix related to this subtask bid
         - bidder (`bidder`): name of the agent keeping track of this bid information
         - own_bid (`float` or `int`): latest bid from bidder
         - winner (`str`): name of current the winning agent
@@ -56,6 +60,7 @@ class SubtaskBid(TaskBid):
                     subtask_index : int,
                     main_measurement : str,
                     dependencies : list,
+                    time_constraints : list,
                     bidder: str, 
                     winning_bid: Union[float, int] = 0, 
                     own_bid: Union[float, int] = 0, 
@@ -74,6 +79,10 @@ class SubtaskBid(TaskBid):
 
         ### Arguments:
             - task (`dict`): task being bid on
+            - subtask_index (`int`) : index of the subtask to be bid on
+            - main_measurement (`str`): name of the main measurement assigned by this subtask bid
+            - dependencies (`list`): portion of the dependency matrix related to this subtask bid
+            - time_constraints (`list`): portion of the time dependency matrix related to this subtask bid
             - bidder (`bidder`): name of the agent keeping track of this bid information
             - own_bid (`float` or `int`): latest bid from bidder
             - winner (`str`): name of current the winning agent
@@ -93,18 +102,7 @@ class SubtaskBid(TaskBid):
         self.dependencies = dependencies
         
         self.N_req = 0
-        self.time_constraints = []
-        parent_task = MeasurementTask(**self.task)
-        for dependency in dependencies:
-            if -1 <= dependency <= 1:
-                if dependency == 1:
-                    self.N_req += 1
-                    self.time_constraints.append(parent_task.t_corr)
-                else:
-                    self.time_constraints.append(np.Inf)
-            else:
-                raise ValueError('Dependency vector must cuntain integers between [-1, 1]. ')
-        
+        self.time_constraints = time_constraints
         self.t_violation = t_violation
         self.dt_violation = dt_violoation
         
@@ -151,6 +149,7 @@ class SubtaskBid(TaskBid):
                                         subtask_index,
                                         main_measurement,
                                         task.dependency_matrix[subtask_index],
+                                        task.time_dependency_matrix[subtask_index],
                                         bidder))
         return subtasks
 
@@ -704,8 +703,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             max_path_bids[task.id][subtask_index] = results[task.id][subtask_index]
 
         max_path_utility = self.sum_path_utility(path, current_bids)
+        max_task = -1
 
-        while len(bundle) < self.l_bundle and len(available_tasks) > 0:                   
+        while len(bundle) < self.l_bundle and len(available_tasks) > 0 and max_task is not None:                   
             # find next best task to put in bundle (greedy)
             max_task = None 
             max_subtask = None
@@ -719,11 +719,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 if projected_path is None:
                     continue
                 
-                # check for cualition and mutex satisfaction
-                # TODO add mutex and coalition checks
-                if not self.coalition_test() or not self.mutex_test():
-                    continue
-
                 # compare to maximum task
                 if (max_task is None or projected_path_utility > max_path_utility):
 
@@ -735,11 +730,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         proposed_bid : TaskBid = projected_bids[projected_task.id][projected_subtask_index]
                         current_bid : TaskBid = results[projected_task.id][projected_subtask_index]
 
-                        if current_bid > proposed_bid:
+                        # check for cualition and mutex satisfaction
+                        if (
+                            not self.coalition_test(results, proposed_bid) 
+                            or not self.mutex_test(results, proposed_bid)
+                            ):
                             # ignore path if proposed bid for any task cannot out-bid current winners
                             outbids_all = False
-                            break
-                    
+                            continue
+
                     if not outbids_all:
                         continue
                     
@@ -756,24 +755,22 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # remove bid task from list of available tasks
                 available_tasks.remove((max_task, max_subtask))
-
-                # self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-                # self.log_task_sequence('path', path, level=logging.WARNING)
-
-            else:
-                # no max bid was found; no more tasks can be added to the bundle
-                break
-
-        #  update bids
-        for measurement_task, subtask_index in path:
-            measurement_task : MeasurementTask
-            subtask_index : int
-            new_bid : TaskBid = max_path_bids[measurement_task.id][subtask_index]
             
-            if results[measurement_task.id][subtask_index] != new_bid:
-                changes_to_bundle.append((measurement_task, subtask_index))
+            #  update bids
+            for measurement_task, subtask_index in path:
+                measurement_task : MeasurementTask
+                subtask_index : int
+                new_bid : TaskBid = max_path_bids[measurement_task.id][subtask_index]
+                
+                if results[measurement_task.id][subtask_index] != new_bid:
+                    changes_to_bundle.append((measurement_task, subtask_index))
 
-            results[measurement_task.id][subtask_index] = new_bid
+                results[measurement_task.id][subtask_index] = new_bid
+
+            self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level=logging.WARNING)
+            self.log_task_sequence('bundle', bundle, level=logging.WARNING)
+            self.log_task_sequence('path', path, level=logging.WARNING)
+            x = 1
 
         # broadcast changes to bundle
         for measurement_task, subtask_index in changes_to_bundle:
@@ -791,7 +788,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             changes.append(out_msg)
 
 
-        self.log_results(results, 'MODIFIED BUNDLE RESULTS', level=logging.WARNING)
+        self.log_results('MODIFIED BUNDLE RESULTS', results, level=logging.WARNING)
         self.log_task_sequence('bundle', bundle, level=logging.WARNING)
         self.log_task_sequence('path', path, level=logging.WARNING)
         
@@ -810,11 +807,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 subtaskbid : SubtaskBid = results[task_id][subtask_index]; 
                 task = MeasurementTask(**subtaskbid.task)
 
+                if self.bundle_contains_mutex_subtasks(bundle, task, subtask_index):
+                    continue
+
                 if (
                         self.can_bid(state, task, subtask_index, results[task_id]) 
                     and (task, subtaskbid.subtask_index) not in bundle 
                     and (subtaskbid.t_img >= state.t or subtaskbid.t_img < 0)
-                    and not self.contains_mutex_subtasks(bundle, task, subtask_index)
                     ):
                     available.append((task, subtaskbid.subtask_index))
 
@@ -845,7 +844,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         else:
             return subtaskbid.N_req == n_sat
 
-    def contains_mutex_subtasks(self, bundle : list, task : MeasurementTask, subtask_index : int) -> bool:
+    def bundle_contains_mutex_subtasks(self, bundle : list, task : MeasurementTask, subtask_index : int) -> bool:
         """
         Returns true if a bundle contains a subtask that is mutually exclusive to a subtask being added
 
@@ -867,9 +866,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 or  task_i.dependency_matrix[subtask_index][subtask_index_i] < 0
                 ):
                 # either the existing subtask in the bundle is mutually exclusive with the subtask to be added or viceversa
-                return False
+                return True
             
-        return True
+        return False
 
     def sum_path_utility(self, path : list, bids : dict) -> float:
         utility = 0.0
@@ -901,27 +900,29 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # calculate bids for each task in the path
             bids = {}
             for task_i, subtask_j in path:
-                # calculate arrival time
+                # calculate imaging time
                 task_i : MeasurementTask
                 subtask_j : int
-                t_arrive = self.calc_imaging_time(state, original_results, path, bids, task_i, subtask_j)
+                t_img = self.calc_imaging_time(state, original_results, path, bids, task_i, subtask_j)
 
                 # calculate bidding score
-                utility = self.calc_utility(task, subtask_j, t_arrive)
+                utility = self.calc_utility(task, subtask_j, t_img)
 
                 # create bid
                 main_measurement, _ = task_i.measurement_groups[subtask_j]
-                dependencies = task_i.dependency_matrix[subtask_index]
+                dependencies = task_i.dependency_matrix[subtask_j]
+                time_constraints = task_i.time_dependency_matrix[subtask_j]
                 bid = SubtaskBid(  
                                 task_i.to_dict(),
                                 subtask_j,
                                 main_measurement,
                                 dependencies,
+                                time_constraints,
                                 self.get_parent_name(),
                                 utility,
                                 utility,
                                 self.get_parent_name(),
-                                t_arrive,
+                                t_img,
                                 state.t
                             )
                 
@@ -930,7 +931,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 bids[task_i.id][subtask_j] = bid
 
             # look for path with the best utility
-            # TODO include coalition and mutex test
             path_utility = self.sum_path_utility(path, bids)
             if path_utility > winning_path_utility:
                 winning_path = path
@@ -964,9 +964,36 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             t_prev : float = bid_prev.t_img + task_prev.duration
             pos_prev : list = task_prev.pos
 
-        # compute travel time to the task
+        # compute earliest time to the task
         t_img = state.calc_arrival_time(pos_prev, task.pos, t_prev)
-        return t_img if t_img >= task.t_start else task.t_start
+        t_img = t_img if t_img >= task.t_start else task.t_start
+        
+        # get active time constraints
+        t_consts = []
+        for subtask_index_dep in range(len(current_results[task.id])):
+            dep_bid : SubtaskBid = current_results[task.id][subtask_index_dep]
+            
+            if dep_bid.winner == SubtaskBid.NONE:
+                continue
+
+            if task.dependency_matrix[subtask_index][subtask_index_dep] > 1:
+                t_corr = task.time_dependency_matrix[subtask_index][subtask_index_dep]
+                t_consts.append((dep_bid.t_img, t_corr))
+        
+        if len(t_consts) > 0:
+            # sort time-constraints in ascending order
+            t_consts = sorted(t_consts)
+
+            # check if chosen imaging time satisfies the latest time constraints
+            t_const, t_corr = t_consts.pop()
+            if not (t_img <= t_const + t_corr or t_const < t_img):
+                # i am performing my measurement before the other agent's earliest time; meet its imaging time
+                t_img = t_const - t_corr
+            # else:
+                # other agent images before my earliest time; expect other bidder to met my schedule
+                # or `t_img` satisfies this time constraint; no action required
+
+        return t_img
         
     def calc_utility(self, task : MeasurementTask, subtask_index : int, t_img : float) -> float:
         """
@@ -991,7 +1018,95 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             alpha = 1.0/3.0
 
         return utility * alpha / k
+
+    def coalition_test(self, current_results : dict, proposed_bid : SubtaskBid) -> float:
+        """
+        This minimality in the size of coalitions is enforced during the two
+        phases of the Modified CCBBA algorithm. In the first phase, it is carried
+        out via the COALITIONTEST subroutine (see Algorithm 1, line 14).
+        This elimination of waste of resources works by facilitating winning
+        a particular subtask j if the bidding agent has previously won all other
+        dependent subtasks. Specifically, the bid placed for each subtask, cj
+        a, is compared to the sum of the bids of the subtasks that share a dependency
+        constraint with j (D(j, q) = 1) rather than the bid placed on the
+        single subtask j. This is implemented through an availability indicator hj
+
+        ### Arguments:
+            - current_results (`dict`): list of current bids
+            - proposed_bid (:obj:`SubtaskBid`): proposed bid to be added to the bundle
+        """
+        # initiate agent bid count
+        agent_bid = proposed_bid.winning_bid
+
+        # initiate coalition bid count
+        current_bid : SubtaskBid = current_results[proposed_bid.task_id][proposed_bid.subtask_index]
+        coalition_bid = 0
+
+        for bid_i in current_results[proposed_bid.task_id]:
+            bid_i : SubtaskBid
+            bid_i_index = current_results[proposed_bid.task_id].index(bid_i)
+
+            if (    bid_i.winner == current_bid.winner
+                and current_bid.dependencies[bid_i_index] >= 0 ):
+                coalition_bid += bid_i.winning_bid
+
+            if (    bid_i.winner == proposed_bid.winner 
+                 and proposed_bid.dependencies[bid_i_index] == 1):
+                agent_bid += bid_i.winning_bid
+
+        return agent_bid > coalition_bid
     
+    def mutex_test(self, current_results : dict, proposed_bid : SubtaskBid) -> bool:
+        # calculate total agent bid count
+        agent_bid = proposed_bid.winning_bid
+        agent_coalition = [proposed_bid.subtask_index]
+        for bid_i in current_results[proposed_bid.task_id]:
+            bid_i : SubtaskBid
+            bid_i_index = current_results[proposed_bid.task_id].index(bid_i)
+
+            if bid_i_index == proposed_bid.subtask_index:
+                continue
+
+            if proposed_bid.dependencies[bid_i_index] == 1:
+                agent_bid += bid_i.winning_bid
+                agent_coalition.append(bid_i_index)
+
+        # initiate coalition bid count
+        ## find all possible coalitions
+        task = MeasurementTask(**proposed_bid.task)
+        possible_coalitions = []
+        for i in range(len(task.dependency_matrix)):
+            coalition = [i]
+            for j in range(len(task.dependency_matrix[i])):
+                if task.dependency_matrix[i][j] == 1:
+                    coalition.append(j)
+            possible_coalitions.append(coalition)
+        
+        # calculate total mutex bid count
+        max_mutex_bid = 0
+        for coalition in possible_coalitions:
+            mutex_bid = 0
+            for coalition_member in coalition:
+                bid_i : SubtaskBid = current_results[proposed_bid.task_id][coalition_member]
+
+                if proposed_bid.subtask_index == coalition_member:
+                    continue
+                
+                is_mutex = True
+                for agent_coalition_member in agent_coalition:
+                  if task.dependency_matrix[coalition_member][agent_coalition_member] >= 0:
+                    is_mutex = False  
+                    break
+
+                if not is_mutex:
+                    break
+                
+                mutex_bid += bid_i.winning_bid
+
+            max_mutex_bid = max(mutex_bid, max_mutex_bid)
+
+        return agent_bid > max_mutex_bid
+
     async def doing_phase(
                             self, 
                             state : SimulationAgentState, 
@@ -1132,7 +1247,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             subtask_index : int
             split_id = task.id.split('-')
             
-            if sequence.index(task) > 0:
+            if sequence.index((task, subtask_index)) > 0:
                 out += ', '
             out += f'({split_id[0]}, {subtask_index})'
         out += ']\n'

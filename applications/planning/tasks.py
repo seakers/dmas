@@ -221,6 +221,7 @@ class MeasurementTask(AgentAction):
         
         self.measurement_groups = self.generate_measurement_groups(measurements)
         self.dependency_matrix = self.generate_dependency_matrix()
+        self.time_dependency_matrix = self.generate_time_dependency_matrix()
 
     def generate_measurement_groups(self, measurements) -> list:
         """
@@ -258,25 +259,30 @@ class MeasurementTask(AgentAction):
     
     def generate_dependency_matrix(self) -> list:
         # create dependency matrix
-        dependency_matrix = numpy.zeros((len(self.measurement_groups), len(self.measurement_groups)))
+        dependency_matrix = []
         for index_a in range(len(self.measurement_groups)):
             main_a, dependents_a = self.measurement_groups[index_a]
 
-            for index_b in range(index_a, len(self.measurement_groups)):
+            dependencies = []
+            for index_b in range(len(self.measurement_groups)):
                 main_b, dependents_b = self.measurement_groups[index_b]
 
                 if index_a == index_b:
-                    continue
+                    dependencies.append(0)
+                    # continue
 
-                if len(dependents_a) != len(dependents_b):
-                    dependency_matrix[index_a][index_b] = -1
-                    dependency_matrix[index_b][index_a] = -1
+                elif len(dependents_a) != len(dependents_b):
+                    # dependency_matrix[index_a][index_b] = -1
+                    # dependency_matrix[index_b][index_a] = -1
+                    dependencies.append(-1)
                 elif main_a not in dependents_b or main_b not in dependents_a:
-                    dependency_matrix[index_a][index_b] = -1
-                    dependency_matrix[index_b][index_a] = -1
+                    # dependency_matrix[index_a][index_b] = -1
+                    # dependency_matrix[index_b][index_a] = -1
+                    dependencies.append(-1)
                 elif main_a == main_b:
-                    dependency_matrix[index_a][index_b] = -1
-                    dependency_matrix[index_b][index_a] = -1
+                    # dependency_matrix[index_a][index_b] = -1
+                    # dependency_matrix[index_b][index_a] = -1
+                    dependencies.append(-1)
                 else:
                     dependents_a_extended : list = copy.deepcopy(dependents_a)
                     dependents_a_extended.remove(main_b)
@@ -284,13 +290,34 @@ class MeasurementTask(AgentAction):
                     dependents_b_extended.remove(main_a)
 
                     if dependents_a_extended == dependents_b_extended:
-                        dependency_matrix[index_a][index_b] = 1
-                        dependency_matrix[index_b][index_a] = 1
+                        # dependency_matrix[index_a][index_b] = 1
+                        # dependency_matrix[index_b][index_a] = 1
+                        dependencies.append(1)
                     else:
-                        dependency_matrix[index_a][index_b] = -1
-                        dependency_matrix[index_b][index_a] = -1
-        
+                        # dependency_matrix[index_a][index_b] = -1
+                        # dependency_matrix[index_b][index_a] = -1
+                        dependencies.append(-1)
+            
+            dependency_matrix.append(dependencies)
+       
         return dependency_matrix
+
+    def generate_time_dependency_matrix(self) -> list:
+        # time_dependency_matrix = numpy.zeros((len(self.measurement_groups), len(self.measurement_groups)))
+        time_dependency_matrix = []
+
+        for index_a in range(len(self.measurement_groups)):
+            time_dependencies = []
+            for index_b in range(len(self.measurement_groups)):
+                if self.dependency_matrix[index_a][index_b] > 0:
+                    # time_dependency_matrix[index_a][index_b] = self.t_corr
+                    time_dependencies.append(self.t_corr)
+                else:
+                    # time_dependency_matrix[index_a][index_b] = numpy.Inf
+                    time_dependencies.append(numpy.Inf)
+            time_dependency_matrix.append(time_dependencies)
+
+        return time_dependency_matrix
 
 class IdleAction(AgentAction):
     """
