@@ -16,6 +16,10 @@ import math
 from typing import Union
 import numpy as np
 from pandas import DataFrame
+from applications.planning.messages import Union
+from applications.planning.planners.planners import Union
+from applications.planning.tasks import Union
+from dmas.modules import Union
 
 from tasks import *
 from messages import *
@@ -121,6 +125,9 @@ class SubtaskBid(TaskBid):
         elif bid_any < 0:
             raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_any}.')
         self.bid_any = bid_any
+
+    def update(self, other_dict : dict, t : Union[float, int]) -> object:
+        return self if super().update(other_dict, t) is not None else None
 
     def __str__(self) -> str:
         """
@@ -256,7 +263,7 @@ class SubtaskBid(TaskBid):
             if other.subtask_index == self.subtask_index:
                 continue
 
-            if  other.winning_bid <= self.winning_bid and other.dependencies[self.subtask_index] == 1:
+            if  other.winning_bid <= self.winning_bid and other.dependencies[self.subtask_index] == -1:
                 return False
 
         return True
@@ -422,7 +429,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         
         except asyncio.CancelledError:
             return
-
+        
         finally:
             self.listener_results = results
         
@@ -563,7 +570,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             results[their_bid.task_id][their_bid.subtask_index] = my_bid
                 
             # if relevant changes were made, add to changes broadcast
-            if broadcast_bid or new_task:
+            if broadcast_bid or new_task:                    
                 broadcast_bid = broadcast_bid if not new_task else my_bid
                 out_msg = TaskBidMessage(   
                                         self.get_parent_name(), 
@@ -773,7 +780,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
             new_bid = results[measurement_task.id][subtask_index]
 
-            # add to changes broadcast
+            # add to changes broadcast 
             out_msg = TaskBidMessage(   
                                     self.get_parent_name(), 
                                     self.get_parent_name(), 
@@ -1310,18 +1317,18 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 for msg in listener_msgs:
                     if isinstance(msg, TaskBidMessage):
-                        listener_bid : TaskBid = TaskBid(**msg.bid)
+                        listener_bid : SubtaskBid = SubtaskBid(**msg.bid)
                         bid_messages[listener_bid.task_id] = msg
 
                 for msg in bundle_msgs:
                     if isinstance(msg, TaskBidMessage):
-                        bundle_bid : TaskBid = TaskBid(**msg.bid)
+                        bundle_bid : SubtaskBid = SubtaskBid(**msg.bid)
                         if bundle_bid.task_id not in bid_messages:
                             bid_messages[bundle_bid.task_id] = msg
                         else:
                             # only keep most recent information for bids
                             listener_bid_msg : TaskBidMessage = bid_messages[bundle_bid.task_id]
-                            listener_bid : TaskBid = TaskBid(**listener_bid_msg.bid)
+                            listener_bid : SubtaskBid = SubtaskBid(**listener_bid_msg.bid)
                             if bundle_bid.t_update >= listener_bid.t_update:
                                 bid_messages[bundle_bid.task_id] = msg
                             
