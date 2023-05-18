@@ -166,7 +166,7 @@ class Bid(ABC):
         """
         return
 
-    def __tie_breaker(self, bid1 : object, bid2 : object) -> object:
+    def _tie_breaker(self, bid1 : object, bid2 : object) -> object:
         """
         Tie-breaking criteria for determining which bid is GREATER in case winning bids are equal
         """
@@ -195,7 +195,7 @@ class Bid(ABC):
         
         if other.winning_bid == self.winning_bid:
             # if there's a tie, use tie-breaker
-            return self != self.__tie_breaker(self, other)
+            return self != self._tie_breaker(self, other)
 
         return other.winning_bid > self.winning_bid
 
@@ -207,7 +207,7 @@ class Bid(ABC):
         
         if other.winning_bid == self.winning_bid:
             # if there's a tie, use tie-breaker
-            return self == self.__tie_breaker(self, other)
+            return self == self._tie_breaker(self, other)
 
         return other.winning_bid < self.winning_bid
 

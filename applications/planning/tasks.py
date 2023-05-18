@@ -216,6 +216,8 @@ class MeasurementTask(AgentAction):
         self.t_corr = t_corr
         if urgency is not None:
             self.urgency = urgency
+        elif urgency == numpy.Inf:
+            urgency = 0.0
         else:
             self.urgency = numpy.log(1e-3) / (t_start - t_end)
         
@@ -318,6 +320,10 @@ class MeasurementTask(AgentAction):
             time_dependency_matrix.append(time_dependencies)
 
         return time_dependency_matrix
+
+    def __repr__(self):
+        task_id = self.id.split('-')
+        return f'MeasurementTask_{task_id[0]}'
 
 class IdleAction(AgentAction):
     """

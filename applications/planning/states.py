@@ -77,12 +77,24 @@ class SimulationAgentState(AgentState):
             out = self.to_dict()
             self.history.append(out)
 
-    def propagate_state(self, t : Union[float, int], vel : list=None) -> object:
+    def propagate_state(
+                        self, 
+                        pos : list = None, 
+                        vel : list = None,  
+                        t : Union[float, int]=None
+                        ) -> object:
+        
+                
+        future_pos = pos if pos is not None else [v for v in self.pos]
         future_vel = vel if vel is not None else [v for v in self.vel]
         
-        x_future = self.pos[0] + future_vel[0] * (t - self.t)
-        y_future = self.pos[1] + future_vel[1] * (t - self.t)
-        future_pos = [x_future, y_future]
+        if t is not None:
+            x_future = self.pos[0] + future_vel[0] * (t - self.t)
+            y_future = self.pos[1] + future_vel[1] * (t - self.t)
+            future_pos = [x_future, y_future]
+
+        else:
+            t = self.calc_arrival_time(self.pos, future_pos, self.t)
 
         return SimulationAgentState(future_pos, 
                                     self.x_bounds, 
@@ -92,7 +104,7 @@ class SimulationAgentState(AgentState):
                                     [],
                                     self.status,
                                     t,
-                                    self.instruments)      
+                                    self.instruments)              
 
     def calc_arrival_time(self, pos_start : list, pos_final : list, t_start : Union[int, float]) -> float:
         """

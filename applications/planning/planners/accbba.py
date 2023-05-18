@@ -67,9 +67,9 @@ class SubtaskBid(TaskBid):
                     winner: str = TaskBid.NONE, 
                     t_img: Union[float, int] = -1, 
                     t_update: Union[float, int] = -1, 
-                    dt_converge: Union[float, int] = 0, 
+                    dt_converge: Union[float, int] = 0.0, 
                     t_violation: Union[float, int] = -1, 
-                    dt_violoation: Union[float, int] = 0,
+                    dt_violoation: Union[float, int] = 0.0,
                     bid_solo : int = 10,
                     bid_any : int = 10, 
                     **_
@@ -102,6 +102,10 @@ class SubtaskBid(TaskBid):
         self.dependencies = dependencies
         
         self.N_req = 0
+        for dependency in dependencies:
+            if dependency > 0:
+                self.N_req += 1
+
         self.time_constraints = time_constraints
         self.t_violation = t_violation
         self.dt_violation = dt_violoation
@@ -406,7 +410,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                         elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
                             # unpack message 
-                            bid_msg : TaskBidMessage = TaskBidMessage(**sense)
+                            bid_msg  = TaskBidMessage(**sense)
                             
                             their_bid = SubtaskBid(**bid_msg.bid)
                             self.log(f"received a bid from another agent for task {their_bid.task_id}!")
@@ -434,7 +438,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         path = []
         t_curr = 0.0
         t_next = 0.0
-        f_update = 1.0
+        f_update = 0.25
         plan = []
         converged = 0
 
@@ -476,7 +480,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 actions : list
                     
                 # send actions to broadcaster
-                if len(actions) == 0 and len(changes) == 0:
+                if len(actions) == 0 or len(changes) == 0:
                     actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
 
                 change_dicts = [change.to_dict() for change in changes]
@@ -496,7 +500,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Evaluates incoming bids and updates current results and bundle
         """
         changes = []
-        self.log_results('INITIAL RESULTS', results, level=logging.WARNING)
+        self.log_results('\nINITIAL RESULTS', results, level=logging.WARNING)
         self.log_task_sequence('bundle', bundle, level=logging.WARNING)
         self.log_task_sequence('path', path, level=logging.WARNING)
         
@@ -584,7 +588,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         current_bid.reset(t)
                         results[measurement_task.id][subtask_index] = current_bid
 
-                    self.log_results('PRELIMIANARY COMPARED RESULTS', results, level)
+                    self.log_results('PRELIMINARY COMPARED RESULTS', results, level)
                     self.log_task_sequence('bundle', bundle, level)
                     self.log_task_sequence('path', path, level)
         
@@ -630,7 +634,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 #                     )
                 # changes.append(out_msg)
 
-                self.log_results('PRELIMIANARY CHECKED EXPIRATION RESULTS', results, level)
+                self.log_results('PRELIMINARY CHECKED EXPIRATION RESULTS', results, level)
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
 
@@ -650,7 +654,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 bid : SubtaskBid = results[task.id][subtask_index]
                
                 reset_bid = bid.check_constraints(results[task.id], t)
-                task_to_remove = (task, subtask_index) if reset_bid is not None else None
+                if reset_bid is not None:
+                    task_to_remove = (task, subtask_index)
+                    break
                                 
             if task_to_remove is None:
                 # all bids satisfy their constraints
@@ -676,7 +682,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                     )
                 changes.append(out_msg)
 
-                self.log_results('PRELIMIANARY CONSTRAINT CHECKED RESULTS', results, level)
+                self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
 
@@ -694,7 +700,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         current_bids = {task.id : {} for task, _ in bundle}
         for task, subtask_index in bundle:
             task : MeasurementTask
-            current_bid[task.id][subtask_index] = results[task.id][subtask_index]
+            current_bids[task.id][subtask_index] = results[task.id][subtask_index]
 
         max_path = [(task, subtask_index) for task, subtask_index in path]; 
         max_path_bids = {task.id : {} for task, _ in path}
@@ -722,24 +728,12 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # compare to maximum task
                 if (max_task is None or projected_path_utility > max_path_utility):
 
-                    # all bids must out-bid the current winners
-                    outbids_all = True 
-                    for projected_task, projected_subtask_index in projected_path:
-                        projected_task : MeasurementTask
-                        projected_subtask_index : int
-                        proposed_bid : TaskBid = projected_bids[projected_task.id][projected_subtask_index]
-                        current_bid : TaskBid = results[projected_task.id][projected_subtask_index]
-
-                        # check for cualition and mutex satisfaction
-                        if (
-                            not self.coalition_test(results, proposed_bid) 
-                            or not self.mutex_test(results, proposed_bid)
-                            ):
-                            # ignore path if proposed bid for any task cannot out-bid current winners
-                            outbids_all = False
-                            continue
-
-                    if not outbids_all:
+                    # check for cualition and mutex satisfaction
+                    proposed_bid :SubtaskBid = projected_bids[measurement_task.id][subtask_index]
+                    passed_coalition_test = self.coalition_test(results, proposed_bid)
+                    passed_mutex_test = self.mutex_test(results, proposed_bid)
+                    if not passed_coalition_test or not passed_mutex_test:
+                        # ignore path if proposed bid for any task cannot out-bid current winners
                         continue
                     
                     max_path = projected_path
@@ -810,11 +804,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 if self.bundle_contains_mutex_subtasks(bundle, task, subtask_index):
                     continue
 
-                if (
-                        self.can_bid(state, task, subtask_index, results[task_id]) 
-                    and (task, subtaskbid.subtask_index) not in bundle 
-                    and (subtaskbid.t_img >= state.t or subtaskbid.t_img < 0)
-                    ):
+                is_biddable = self.can_bid(state, task, subtask_index, results[task_id]) 
+                already_in_bundle = (task, subtaskbid.subtask_index) in bundle 
+                already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
+                
+                if is_biddable and (not already_in_bundle) and (not already_performed):
                     available.append((task, subtaskbid.subtask_index))
 
         return available
@@ -858,7 +852,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             subtask_index_i : int 
 
             if task_i.id != task.id:
-                # are different tasks, cannot be mutuallyexclusive
+                # subtasks reffer to different tasks, cannot be mutually exclusive
                 continue
 
             if (
@@ -892,10 +886,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         winning_path_utility = 0.0
 
         # find best placement in path
+        # self.log_task_sequence('original path', original_path, level=logging.WARNING)
         for i in range(len(original_path)+1):
             # generate possible path
             path = [scheduled_task for scheduled_task in original_path]
+            
             path.insert(i, (task, subtask_index))
+            # self.log_task_sequence('new proposed path', path, level=logging.WARNING)
 
             # calculate bids for each task in the path
             bids = {}
@@ -905,8 +902,28 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 subtask_j : int
                 t_img = self.calc_imaging_time(state, original_results, path, bids, task_i, subtask_j)
 
+                # predict state
+                # TODO move state prediction to state class
+                path_index = path.index((task_i, subtask_j))
+                if path_index == 0:
+                    prev_state = state
+                else:
+                    prev_task, prev_subtask = path[path_index-1]
+                    prev_task : MeasurementTask; prev_subtask : int
+                    prev_bid : SubtaskBid = bids[prev_task.id][prev_subtask]
+                    t_prev = prev_bid.t_img + prev_task.duration
+                    prev_state = SimulationAgentState(prev_task.pos,
+                                                        state.x_bounds,
+                                                        state.y_bounds,
+                                                        [0.0, 0.0],
+                                                        state.v_max,
+                                                        [],
+                                                        state.status,
+                                                        t_prev,
+                                                        state.instruments)
+
                 # calculate bidding score
-                utility = self.calc_utility(task, subtask_j, t_img)
+                utility = self.calc_utility(prev_state, task_i, subtask_j, t_img)
 
                 # create bid
                 main_measurement, _ = task_i.measurement_groups[subtask_j]
@@ -976,7 +993,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             if dep_bid.winner == SubtaskBid.NONE:
                 continue
 
-            if task.dependency_matrix[subtask_index][subtask_index_dep] > 1:
+            if task.dependency_matrix[subtask_index][subtask_index_dep] > 0:
                 t_corr = task.time_dependency_matrix[subtask_index][subtask_index_dep]
                 t_consts.append((dep_bid.t_img, t_corr))
         
@@ -986,7 +1003,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
             # check if chosen imaging time satisfies the latest time constraints
             t_const, t_corr = t_consts.pop()
-            if not (t_img <= t_const + t_corr or t_const < t_img):
+            if t_img + t_corr < t_const:
                 # i am performing my measurement before the other agent's earliest time; meet its imaging time
                 t_img = t_const - t_corr
             # else:
@@ -995,12 +1012,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         return t_img
         
-    def calc_utility(self, task : MeasurementTask, subtask_index : int, t_img : float) -> float:
+    def calc_utility(   
+                        self, 
+                        state : SimulationAgentState,
+                        task : MeasurementTask, 
+                        subtask_index : int, 
+                        t_img : float
+                    ) -> float:
         """
         Calculates the expected utility of performing a measurement task
 
         ### Arguments:
-            - task (obj:`MeasurementTask`): task to be performed 
+            - state (:obj:`SimulationAgentState`): agent state before performing the task
+            - task (:obj:`MeasurementTask`): task to be performed 
             - subtask_index (`int`): index of subtask to be performed
             - t_img (`float`): time at which the task will be performed
 
@@ -1017,7 +1041,28 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         else:
             alpha = 1.0/3.0
 
-        return utility * alpha / k
+        return utility * alpha / k - self.calc_cost(state, task, subtask_index, t_img)
+    
+    def calc_cost(   
+                        self, 
+                        state : SimulationAgentState,
+                        task : MeasurementTask, 
+                        subtask_index : int, 
+                        t_img : float
+                    ) -> float:
+        """
+        
+        """
+        # TODO add cost calculations
+        travel_cost = 0
+
+        coalition_formation_cost = 2.0
+
+        coalition_split_cost = 1.0
+
+        intrinsic_cost = 2.0
+
+        return 0.0
 
     def coalition_test(self, current_results : dict, proposed_bid : SubtaskBid) -> float:
         """
@@ -1228,9 +1273,79 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # bundle is empty or cannot be executed yet; instructing agent to idle
             plan = []
             converged = 0
-            actions.append(WaitForMessages(t_curr, t_curr + 1/f_update))
 
         return bundle, path, actions, converged
+
+    async def rebroadcaster(self) -> None:
+        """
+        ## Rebroadcaster
+
+        Sends out-going mesasges from the bundle-builder and the listener to the parent agent.
+        """
+        try:
+            while True:
+                # wait for bundle-builder to finish processing information
+                self.log('waiting for bundle-builder...')
+                bundle_msgs = []
+                bundle_bus : BusMessage = await self.outgoing_bundle_builder_inbox.get()
+                for msg_dict in bundle_bus.contents:
+                    msg_dict : dict
+                    action_type = msg_dict.get('action_type', None)
+                    msg_type = msg_dict.get('msg_type', None)
+                    if action_type is not None:
+                        bundle_msgs.append(action_from_dict(**msg_dict))
+                    elif msg_type is not None:
+                        bundle_msgs.append(message_from_dict(**msg_dict))
+
+                self.log('bundle-builder sent its messages! comparing bids with listener...')
+
+                # get all messages from listener                
+                listener_msgs = []
+                while not self.outgoing_listen_inbox.empty():
+                    listener_msgs.append(await self.outgoing_listen_inbox.get())
+
+                # compare and classify messages
+                bid_messages = {}
+                actions = []
+
+                for msg in listener_msgs:
+                    if isinstance(msg, TaskBidMessage):
+                        listener_bid : TaskBid = TaskBid(**msg.bid)
+                        bid_messages[listener_bid.task_id] = msg
+
+                for msg in bundle_msgs:
+                    if isinstance(msg, TaskBidMessage):
+                        bundle_bid : TaskBid = TaskBid(**msg.bid)
+                        if bundle_bid.task_id not in bid_messages:
+                            bid_messages[bundle_bid.task_id] = msg
+                        else:
+                            # only keep most recent information for bids
+                            listener_bid_msg : TaskBidMessage = bid_messages[bundle_bid.task_id]
+                            listener_bid : TaskBid = TaskBid(**listener_bid_msg.bid)
+                            if bundle_bid.t_update >= listener_bid.t_update:
+                                bid_messages[bundle_bid.task_id] = msg
+                            
+                    elif isinstance(msg, AgentAction):
+                        actions.append(msg)                        
+        
+                # build plan
+                plan = []
+                for bid_id in bid_messages:
+                    bid_message : TaskBidMessage = bid_messages[bid_id]
+                    plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
+
+                for action in actions:
+                    action : AgentAction
+                    plan.append(action.to_dict())
+                
+                # send to agent
+                self.log(f'bids compared! generating plan with {len(bid_messages)} bid messages and {len(actions)} actions')
+                plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), plan)
+                await self._send_manager_msg(plan_msg, zmq.PUB)
+                self.log(f'actions sent!')
+
+        except asyncio.CancelledError:
+            pass
 
     def log_task_sequence(self, dsc : str, sequence : list, level=logging.DEBUG) -> None:
         """
@@ -1263,15 +1378,26 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - results (`dict`): results to be logged
             - level (`int`): logging level to be used
         """
-        headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v']
+        headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
         data = []
         for task_id in results:
-            for bid in results[task_id]:
-                bid : SubtaskBid
-                task = MeasurementTask(**bid.task)
-                split_id = task.id.split('-')
-                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3)]
-                data.append(line)
+            
+            if isinstance(results[task_id], list):
+                for bid in results[task_id]:
+                    bid : SubtaskBid
+                    task = MeasurementTask(**bid.task)
+                    split_id = task.id.split('-')
+                    line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                    data.append(line)
+            elif isinstance(results[task_id], dict):
+                for bid_index in results[task_id]:
+                    bid : SubtaskBid = results[task_id][bid_index]
+                    task = MeasurementTask(**bid.task)
+                    split_id = task.id.split('-')
+                    line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                    data.append(line)
+            else:
+                raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
 
         df = DataFrame(data, columns=headers)
-        self.log(f'\n{dsc}\n{str(df)}', level)
+        self.log(f'\n{dsc}\n{str(df)}\n', level)

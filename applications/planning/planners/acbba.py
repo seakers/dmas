@@ -96,6 +96,28 @@ class TaskBid(Bid):
             else:
                 self._leave(t)
         
+        elif other.winner is other.NONE:
+            if self.winner == self.bidder:
+                # leave and rebroadcast
+                self._leave(t)
+                return self
+
+            elif self.winner == other.bidder:
+                # update and rebroadcast
+                self._update_info(other, t)
+                return other
+
+            elif self.winner not in [self.bidder, other.bidder]:
+                if other.t_update > self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other
+
+            elif self.winner == self.NONE:
+                # leave and no rebroadcast
+                self._leave(t)
+                return self
+
         elif other.winner == other.bidder:
             if self.winner == self.bidder:
                 if other.winning_bid > self.winning_bid:
@@ -105,14 +127,19 @@ class TaskBid(Bid):
                     
                 elif other.winning_bid == self.winning_bid:
                     # if there's a tie, bidder with the smallest id wins
-                    _, their_id = other.bidder.split('_')
-                    _, my_id = self.bidder.split('_')
-                    their_id = int(their_id); my_id = int(my_id)
-
-                    if their_id < my_id:
+                    if self._tie_breaker(other, self):
                         # update and rebroadcast
                         self._update_info(other, t)
                         return other
+                
+                    # _, their_id = other.bidder.split('_')
+                    # _, my_id = self.bidder.split('_')
+                    # their_id = int(their_id); my_id = int(my_id)
+
+                    # if their_id < my_id:
+                    #     # update and rebroadcast
+                    #     self._update_info(other, t)
+                    #     return other
 
                 if other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
@@ -120,7 +147,7 @@ class TaskBid(Bid):
                     return self
 
             elif self.winner == other.bidder:
-                if other.t_update > self.t_update:
+                if other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
                     return other
@@ -197,15 +224,20 @@ class TaskBid(Bid):
 
                 elif other.winning_bid == self.winning_bid:
                     # if there's a tie, bidder with the smallest id wins
-                    _, their_id = other.bidder.split('_')
-                    _, my_id = self.bidder.split('_')
-
-                    their_id = int(their_id); my_id = int(my_id)
-
-                    if their_id < my_id:
-                        #update and rebroadcast
+                    if self._tie_breaker(other, self):
+                        # update and rebroadcast
                         self._update_info(other, t)
                         return other
+                    
+                    # _, their_id = other.bidder.split('_')
+                    # _, my_id = self.bidder.split('_')
+
+                    # their_id = int(their_id); my_id = int(my_id)
+
+                    # if their_id < my_id:
+                    #     #update and rebroadcast
+                    #     self._update_info(other, t)
+                    #     return other
 
                 elif other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
@@ -258,28 +290,6 @@ class TaskBid(Bid):
                 # update and rebroadcast
                 self._update_info(other, t)
                 return other
-
-        elif other.winner is other.NONE:
-            if self.winner == self.bidder:
-                # leave and rebroadcast
-                self._leave(t)
-                return self
-
-            elif self.winner == other.bidder:
-                # update and rebroadcast
-                self._update_info(other, t)
-                return other
-
-            elif self.winner not in [self.bidder, other.bidder]:
-                if other.t_update > self.t_update:
-                    # update and rebroadcast
-                    self._update_info(other, t)
-                    return other
-
-            elif self.winner == self.NONE:
-                # leave and no rebroadcast
-                self._leave(t)
-                return self
         
         return None
     

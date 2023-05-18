@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # create results directory
     plot_results = True
     save_plot = False
-    scenario_name = 'TEST'
+    scenario_name = 'ACCBBA_TEST'
     results_path = setup_results_directory(scenario_name)
     
     # define simulation config
@@ -76,31 +76,32 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 3
-    task_types = ['VNIR', 'MWR', 'LIDAR']
+    n_tasks = 2
+    task_types = ['MWR', 'IR', 'VNIR']
     
     # create tasks
     tasks = []
     s_max = 1.0
     t_start = 0.0
-    t_end = T
+    t_end = np.Inf
+    t_corr = 1.0
 
     # pos = [1.0, 1.0]   
     # instruments = [task_types[0], task_types[1]]
     # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
-    pos = [1.0, 2.0]   
-    measurements = [task_types[1]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    # pos = [1.0, 2.0]   
+    # measurements = [task_types[1]]
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    pos = [2.0, 1.0]   
-    measurements = [task_types[0]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
-
-    pos = [2.0, 2.0]   
+    pos = [0.0, 3.0]   
     measurements = [task_types[0], task_types[1]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    tasks.append(MeasurementTask(pos, 100, measurements, t_start, t_end, t_corr))
+
+    pos = [4.0, 3.0]   
+    measurements = [task_types[0]]
+    tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
 
     # while len(tasks) < n_tasks:
     #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
@@ -154,7 +155,8 @@ if __name__ == '__main__':
     agents = []
     pos = [0.0, 0.0]
     vel = [0.0, 0.0]
-    instruments = [task_types[0]]
+    task_types = ['MWR', 'IR', 'VNIR']
+    instruments = [task_types[1]]
     agent_id = 0
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
@@ -177,9 +179,9 @@ if __name__ == '__main__':
                                 )
     agents.append(agent)
 
-    pos = [0.0, 0.0]
+    pos = [4.0, 0.0]
     vel = [0.0, 0.0]
-    instruments = [task_types[1]]
+    instruments = [task_types[0]]
     agent_id = 1
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
