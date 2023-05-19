@@ -12,7 +12,8 @@ class ActionTypes(Enum):
     BROADCAST_MSG = 'BROADCAST_MSG'
     BROADCAST_STATE = 'BROADCAST_STATE'
     MOVE = 'MOVE'
-    MEASURE = 'MEASURE'
+    MEASURE_TASK = 'MEASURE_TASK'
+    MEASURE = 'MESURE'
     IDLE = 'IDLE'
     WAIT_FOR_MSG = 'WAIT_FOR_MSG'
 
@@ -25,8 +26,10 @@ def action_from_dict(action_type : str, **kwargs) -> AgentAction:
         return BroadcastStateAction(**kwargs)
     elif action_type == ActionTypes.MOVE.value:
         return MoveAction(**kwargs)
-    elif action_type == ActionTypes.MEASURE.value:
+    elif action_type == ActionTypes.MEASURE_TASK.value:
         return MeasurementTask(**kwargs)
+    elif action_type == ActionTypes.MEASURE.value:
+        return MeasurementAction(**kwargs)
     elif action_type == ActionTypes.IDLE.value:
         return IdleAction(**kwargs)
     elif action_type == ActionTypes.WAIT_FOR_MSG.value:
@@ -157,7 +160,7 @@ class MoveAction(AgentAction):
 
 class MeasurementTask(AgentAction):
     """
-    Describes a measurement task to be performed by agents in the simulation
+    Describes a set of measurements to be performed by agents in the simulation
 
     ### Attributes:
         - pos (`list`): cartesian coordinates of the location of this task
@@ -193,7 +196,7 @@ class MeasurementTask(AgentAction):
             - t_corr (`float`): maximum decorralation time between measurements of different measurements
             - id (`str`) : identifying number for this task in uuid format
         """
-        super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id)
+        super().__init__(ActionTypes.MEASURE_TASK.value, t_start, t_end, status, id)
         self.duration = duration
 
         # check arguments
@@ -324,6 +327,44 @@ class MeasurementTask(AgentAction):
     def __repr__(self):
         task_id = self.id.split('-')
         return f'MeasurementTask_{task_id[0]}'
+
+class MeasurementAction(AgentAction):
+    """
+    Describes a measurement to be performed by agents in the simulation
+
+    ### Attributes:
+        - task (`dict`): dictionary containing the measurement task/request being met by this measurement 
+        - measurement (`list`): name of the measurement that will be performed in this action
+        - duration (`float`): duration of the measurement being performed
+        - t_start (`float`): start time of the measurement of this action in [s] from the beginning of the simulation
+        - t_end (`float`): end time of the measurment of this action in [s] from the beginning of the simulation
+        - t_corr (`float`): maximum decorralation time between measurements of different measurements
+        - id (`str`) : identifying number for this task in uuid format
+    """  
+    def __init__(   self,
+                    task : dict,
+                    sutbask_index : int,
+                    measurement : str,
+                    t_start: Union[float, int], 
+                    t_end: Union[float, int], 
+                    status: str = 'PENDING', 
+                    id: str = None, 
+                    **_) -> None:
+        """
+        Creates an instance of a 
+        ### Arguments:
+            - task (`dict`): dictionary containing the measurement task/request being met by this measurement 
+            - measurement (`list`): name of the measurement that will be performed in this action
+            - duration (`float`): duration of the measurement being performed
+            - t_start (`float`): start time of the measurement of this action in [s] from the beginning of the simulation
+            - t_end (`float`): end time of the measurment of this action in [s] from the beginning of the simulation
+            - t_corr (`float`): maximum decorralation time between measurements of different measurements
+            - id (`str`) : identifying number for this task in uuid format
+        """
+        super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id)
+        self.task = task
+        self.sutbask_index = sutbask_index
+        self.measurement = measurement
 
 class IdleAction(AgentAction):
     """

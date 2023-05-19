@@ -106,7 +106,7 @@ class AgentConnectivityUpdate(SimulationMessage):
         self.target = target
         self.connected = connected
 
-class TaskRequest(SimulationMessage):
+class TaskRequestMessage(SimulationMessage):
     """
     ## Task Request Message 
 

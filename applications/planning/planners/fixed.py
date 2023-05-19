@@ -4,7 +4,7 @@ import math
 from applications.planning.planners.planners import *
 from messages import *
 from states import SimulationAgentState
-from tasks import *
+from actions import *
 from zmq import asyncio as azmq
 from dmas.agents import AgentAction
 from dmas.modules import *

@@ -1,5 +1,5 @@
 from states import SimulationAgentState
-from tasks import MeasurementTask
+from actions import MeasurementTask
 from dmas.modules import *
 import numpy as np
 

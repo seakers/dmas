@@ -15,7 +15,7 @@ import numpy as np
 from planners.planners import *
 from messages import *
 from states import SimulationAgentState
-from tasks import *
+from actions import *
 from zmq import asyncio as azmq
 from dmas.agents import AgentAction
 from dmas.modules import *
@@ -467,7 +467,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
 
                         elif sense['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                             # unpack message
-                            task_req = TaskRequest(**sense)
+                            task_req = TaskRequestMessage(**sense)
                             task_dict : dict = task_req.task
                             task = MeasurementTask(**task_dict)
 

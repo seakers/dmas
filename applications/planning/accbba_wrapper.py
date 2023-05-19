@@ -14,7 +14,7 @@ from dmas.messages import SimulationElementRoles
 from dmas.network import NetworkConfig
 
 from utils import setup_results_directory
-from tasks import MeasurementTask
+from actions import MeasurementTask
 from manager import PlanningSimulationManager
 from monitor import ResultsMonitor
 from environment import SimulationEnvironment
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 15
+    T = 8
     year = 2023
     month = 1
     day = 1

@@ -36,7 +36,9 @@ class PlanningSimulationManager(AbstractManager):
                 tf = t + delay
                 
                 # for t in tqdm (range (1, n_steps+1), desc=desc):
-                with tqdm(total=n_steps + 1, desc=desc) as pbar:
+                # with tqdm(total=n_steps + 1, desc=desc) as pbar:
+                with tqdm(total=delay, desc=desc) as pbar:
+
                     while t < tf:
                         # wait for everyone to ask to fast forward            
                         self.log(f'waiting for tic requests...')

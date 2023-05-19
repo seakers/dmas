@@ -7,7 +7,7 @@ from dmas.environments import *
 from dmas.messages import *
 
 from messages import *
-from tasks import MeasurementTask
+from actions import MeasurementTask
 from zmq import asyncio as azmq
 import numpy as np
 
@@ -71,7 +71,7 @@ class SimulationEnvironment(EnvironmentNode):
         for task in self.tasks:
             task : MeasurementTask
             if task.t_start <= self.get_current_time() <= task.t_end:
-                task_req = TaskRequest(self.get_element_name(), self.get_network_name(), task.to_dict())
+                task_req = TaskRequestMessage(self.get_element_name(), self.get_network_name(), task.to_dict())
                 await self.send_peer_broadcast(task_req)
                 tasks_to_pop.append(task)
             

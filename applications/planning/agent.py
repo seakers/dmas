@@ -5,7 +5,7 @@ from planners.acbba import ACBBAPlannerModule
 from planners.fixed import FixedPlannerModule
 from planners.planners import *
 from utils import setup_results_directory
-from tasks import *
+from actions import *
 from dmas.agents import *
 from dmas.network import NetworkConfig
 
@@ -144,7 +144,7 @@ class SimulationAgent(Agent):
 
             elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                 # save as senses to forward to planner
-                task_msg = TaskRequest(**msg_dict)
+                task_msg = TaskRequestMessage(**msg_dict)
                 task_msg.dst = self.get_element_name()
                 senses.append(task_msg)
 
@@ -168,7 +168,7 @@ class SimulationAgent(Agent):
                     senses.append(AgentStateMessage(**msg_dict))
 
                 elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                    senses.append(TaskRequest(**msg_dict))
+                    senses.append(TaskRequestMessage(**msg_dict))
 
                 elif msg_dict['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
                     senses.append(PlannerResultsMessage(**msg_dict))
@@ -360,10 +360,12 @@ class SimulationAgent(Agent):
             
             elif action_dict['action_type'] == ActionTypes.MEASURE.value:
                 # unpack action 
-                task = MeasurementTask(**action_dict)
+                action = MeasurementAction(**action_dict)
 
                 # perform action
                 self.state : SimulationAgentState
+                task = MeasurementTask(**action.task)
+                
                 dx = task.pos[0] - self.state.pos[0]
                 dy = task.pos[1] - self.state.pos[1]
 

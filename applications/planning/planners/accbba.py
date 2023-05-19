@@ -18,10 +18,10 @@ import numpy as np
 from pandas import DataFrame
 from applications.planning.messages import Union
 from applications.planning.planners.planners import Union
-from applications.planning.tasks import Union
+from applications.planning.actions import Union
 from dmas.modules import Union
 
-from tasks import *
+from actions import *
 from messages import *
 
 from planners.planners import *
@@ -137,17 +137,7 @@ class SubtaskBid(TaskBid):
         return f'{self.task_id},{self.subtask_index},{self.main_measurement},{self.dependencies},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img},{self.t_update}'
 
     def copy(self) -> object:
-        return SubtaskBid(  self.task, 
-                            self.subtask_index,
-                            self.dependencies,
-                            self.bidder,
-                            self.winning_bid,
-                            self.own_bid,
-                            self.winner,
-                            self.t_img,
-                            self.t_update,
-                            self.dt_converge
-                        )
+        return SubtaskBid(  **self.to_dict() )
 
     def subtask_bids_from_task(task : MeasurementTask, bidder : str) -> list:
         """
@@ -258,15 +248,64 @@ class SubtaskBid(TaskBid):
         """
         Checks for mutually exclusive dependency satisfaction
         """
-        for other in others:
-            other : SubtaskBid
-            if other.subtask_index == self.subtask_index:
+        # for other in others:
+        #     other : SubtaskBid
+        #     if other.subtask_index == self.subtask_index:
+        #         continue
+
+        #     if  other.winning_bid <= self.winning_bid and other.dependencies[self.subtask_index] < 0:
+        #         return False
+
+        # return True
+        # calculate total agent bid count
+        agent_bid = self.winning_bid
+        agent_coalition = [self.subtask_index]
+        for bid_i in others:
+            bid_i : SubtaskBid
+            bid_i_index = others.index(bid_i)
+
+            if bid_i_index == self.subtask_index:
                 continue
 
-            if  other.winning_bid <= self.winning_bid and other.dependencies[self.subtask_index] == -1:
-                return False
+            if self.dependencies[bid_i_index] == 1:
+                agent_bid += bid_i.winning_bid
+                agent_coalition.append(bid_i_index)
 
-        return True
+        # initiate coalition bid count
+        ## find all possible coalitions
+        task = MeasurementTask(**self.task)
+        possible_coalitions = []
+        for i in range(len(task.dependency_matrix)):
+            coalition = [i]
+            for j in range(len(task.dependency_matrix[i])):
+                if task.dependency_matrix[i][j] == 1:
+                    coalition.append(j)
+            possible_coalitions.append(coalition)
+        
+        # calculate total mutex bid count
+        max_mutex_bid = 0
+        for coalition in possible_coalitions:
+            mutex_bid = 0
+            for coalition_member in coalition:
+                bid_i : SubtaskBid = others[coalition_member]
+
+                if self.subtask_index == coalition_member:
+                    continue
+                
+                is_mutex = True
+                for agent_coalition_member in agent_coalition:
+                  if task.dependency_matrix[coalition_member][agent_coalition_member] >= 0:
+                    is_mutex = False  
+                    break
+
+                if not is_mutex:
+                    break
+                
+                mutex_bid += bid_i.winning_bid
+
+            max_mutex_bid = max(mutex_bid, max_mutex_bid)
+
+        return agent_bid > max_mutex_bid
 
     def __dep_sat(self, others : list, t : Union[int, float]) -> bool:
         """
@@ -278,7 +317,7 @@ class SubtaskBid(TaskBid):
                 self.__set_violation_timer(t)    
             else:
                 self.__reset_violation_timer(t)
-            return self.__has_timed_out(t)
+            return not self.__has_timed_out(t)
         else:
             return self.N_req == n_sat
 
@@ -389,7 +428,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                         elif sense['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
                             # unpack message
-                            task_req = TaskRequest(**sense)
+                            task_req = TaskRequestMessage(**sense)
                             task_dict : dict = task_req.task
                             task = MeasurementTask(**task_dict)
 
@@ -484,12 +523,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 changes.extend(planner_changes)
 
                 bundle, path, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
-                actions : list
-                    
-                # send actions to broadcaster
-                if len(actions) == 0 or len(changes) == 0:
-                    actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
+                actions : list    
 
+                # send actions to broadcaster
                 change_dicts = [change.to_dict() for change in changes]
                 action_dicts = [action.to_dict() for action in actions]
                 action_dicts.extend(change_dicts)
@@ -507,33 +543,34 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Evaluates incoming bids and updates current results and bundle
         """
         changes = []
-        self.log_results('\nINITIAL RESULTS', results, level=logging.WARNING)
-        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-        self.log_task_sequence('path', path, level=logging.WARNING)
+        level = logging.DEBUG
+        self.log_results('\nINITIAL RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
         
         # compare bids with incoming messages
-        results, bundle, path, comp_changes = await self.compare_results(results, bundle, path, t)
+        results, bundle, path, comp_changes = await self.compare_results(results, bundle, path, t, level)
         changes.extend(comp_changes)
 
-        self.log_results('COMPARED RESULTS', results, level=logging.WARNING)
-        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-        self.log_task_sequence('path', path, level=logging.WARNING)
+        self.log_results('COMPARED RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
         
         # check for expired tasks
-        results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t)
+        results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t, level)
         changes.extend(exp_changes)
 
-        self.log_results('CHECKED EXPIRATION RESULTS', results, level=logging.WARNING)
-        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-        self.log_task_sequence('path', path, level=logging.WARNING)
+        self.log_results('CHECKED EXPIRATION RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
 
         # check task constraint satisfaction
-        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t)
+        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
         changes.extend(cons_changes)
 
-        self.log_results('CONSTRAINT CHECKED RESULTS', results, level=logging.WARNING)
-        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-        self.log_task_sequence('path', path, level=logging.WARNING)
+        self.log_results('CONSTRAINT CHECKED RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
 
         return results, bundle, path, changes
 
@@ -701,6 +738,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         """
         available_tasks : list = self.get_available_tasks(state, bundle, results)
 
+        level = logging.DEBUG
         changes = []
         changes_to_bundle = []
         
@@ -768,10 +806,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 results[measurement_task.id][subtask_index] = new_bid
 
-            self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level=logging.WARNING)
-            self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-            self.log_task_sequence('path', path, level=logging.WARNING)
-            x = 1
+            self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level)
+            self.log_task_sequence('bundle', bundle, level)
+            self.log_task_sequence('path', path, level)
 
         # broadcast changes to bundle
         for measurement_task, subtask_index in changes_to_bundle:
@@ -789,9 +826,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             changes.append(out_msg)
 
 
-        self.log_results('MODIFIED BUNDLE RESULTS', results, level=logging.WARNING)
-        self.log_task_sequence('bundle', bundle, level=logging.WARNING)
-        self.log_task_sequence('path', path, level=logging.WARNING)
+        self.log_results('MODIFIED BUNDLE RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
         
         return results, bundle, path, changes
 
@@ -1183,31 +1220,33 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             if converged < 1:
                 converged += 1
 
-                for measurement_task in bundle:
-                    measurement_task : MeasurementTask
+                # for measurement_task, subtask_index in bundle:
+                #     measurement_task : MeasurementTask
 
-                    new_bid = results[measurement_task.id]
+                #     new_bid : SubtaskBid = results[measurement_task.id][subtask_index]
 
-                    # add to changes broadcast
-                    out_msg = TaskBidMessage(   
-                                            self.get_parent_name(), 
-                                            self.get_parent_name(), 
-                                            new_bid.to_dict()
-                                        )
-                    changes.append(out_msg)
+                #     # add to changes broadcast
+                #     out_msg = TaskBidMessage(   
+                #                             self.get_parent_name(), 
+                #                             self.get_parent_name(), 
+                #                             new_bid.to_dict()
+                #                         )
+                #     changes.append(out_msg)
 
             elif len(plan) == 0:
-                # no plan has been generated yet; generate one
+                # no itemized plan has been generated yet; generate one
                 for i in range(len(path)):
-                    measurement_task : MeasurementTask = path[i]
+                    measurement_task, subtask_index = path[i]
+                    measurement_task : MeasurementTask; subtask_index : int
                     
                     if len(plan) == 0:
                         t_start = t_curr
                     else:
                         i_prev = (i-1)*2
                         prev_move : MoveAction = plan[i_prev]
-                        prev_measure : MeasurementTask = plan[i_prev + 1]
-                        t_start = prev_move.t_end + prev_measure.duration
+                        prev_measure : MeasurementAction = plan[i_prev + 1]
+                        prev_task = MeasurementTask(**prev_measure.task)
+                        t_start = prev_move.t_end + prev_task.duration
 
                     task_pos = measurement_task.pos
                     agent_pos = state.pos
@@ -1225,11 +1264,17 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         if t_end > t_start:
                             t_end += dt
 
-                    move_task = MoveAction(measurement_task.pos, t_start, t_end)
+                    subtask_bid : SubtaskBid = results[measurement_task.id][subtask_index]
+                    move_action = MoveAction(measurement_task.pos, t_start, t_end)
+                    measurement_action = MeasurementAction( measurement_task.to_dict(),
+                                                            subtask_index, 
+                                                            subtask_bid.main_measurement,
+                                                            measurement_task.t_start, 
+                                                            measurement_task.t_end)
 
                     # plan per measurement request: move to plan, perform measurement 
-                    plan.append(move_task)
-                    plan.append(measurement_task)  
+                    plan.append(move_action)
+                    plan.append(measurement_action)  
 
                 actions.append(plan[0])
 
@@ -1238,6 +1283,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 while not self.action_status_inbox.empty():
                     action_msg : AgentActionMessage = await self.action_status_inbox.get()
                     performed_action = AgentAction(**action_msg.action)
+
+                    if len(plan) < 1:
+                        continue
 
                     latest_plan_action : AgentAction = plan[0]
                     if performed_action.id != latest_plan_action.id:
@@ -1256,11 +1304,16 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                     elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
                         # latest action from plan was completed! performing next action in plan
-                        done_task : AgentAction = plan.pop(0)
-                        
-                        if done_task in path:
-                            path.remove(done_task)
-                            bundle.remove(done_task)
+                        done_action : AgentAction = plan.pop(0)
+
+                        if done_action.action_type == ActionTypes.MEASURE.value:
+                            done_action : MeasurementAction
+                            done_task = MeasurementTask(**done_action.task)
+                            
+                            # if a measurement action was completed, remove from bundle and path
+                            if (done_task, done_action.sutbask_index) in path:
+                                path.remove((done_task, done_action.sutbask_index))
+                                bundle.remove((done_task, done_action.sutbask_index))
 
                         if len(plan) > 0:
                             next_task : AgentAction = plan[0]
@@ -1280,8 +1333,43 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # bundle is empty or cannot be executed yet; instructing agent to idle
             plan = []
             converged = 0
+                        
+        if len(actions) == 0:
+            actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
 
         return bundle, path, actions, converged
+
+    def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids of every task in the current path have all of their constraints
+        satisfied by other bids.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        for task, subtask_index in path:
+            # check constraints
+            task : MeasurementTask
+            if not self.check_task_constraints(results, task, subtask_index, t_curr):
+                return False
+            
+            # check local convergence
+            my_bid : SubtaskBid = results[task.id][subtask_index]
+            if t_curr < my_bid.t_update + my_bid.dt_converge:
+                return False
+
+        return True
+
+    def check_task_constraints(self, results : dict, task : MeasurementTask, subtask_index : int, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids in the current results satisfy the constraints of a given task.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        bid : SubtaskBid = results[task.id][subtask_index]
+        bid_copy : SubtaskBid = bid.copy()
+        return bid_copy.check_constraints(results[task.id], t_curr) is None
 
     async def rebroadcaster(self) -> None:
         """
