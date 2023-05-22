@@ -540,14 +540,10 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.stats['planning'].append(dt)
 
                 t_0 = time.perf_counter()
-                bundle, path, plan, actions, converged, out_changes = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
+                bundle, path, plan, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
                 actions : list    
-                changes.extend(out_changes)
                 dt = time.perf_counter() - t_0
                 self.stats['doing'].append(dt)
-
-                if len(out_changes) > 0:
-                    x = 1
 
                 # send actions to broadcaster
                 change_dicts = [change.to_dict() for change in changes]
@@ -1231,69 +1227,65 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Given the state of the current plan, give the agent tasks to perform
         """
         # give agent tasks to perform at the current time
-        out_changes = []
+        for task, subtask_index in path:
+            bid : SubtaskBid = results[task.id][subtask_index]
+            if bid.winner != self.get_parent_name():
+                x = 1
+            elif bid.winning_bid <= 0:
+                x = 1
+            elif bid.t_img < 0:
+                x = 1
+
         actions = []
         if (len(changes) == 0 
             and len(path) > 0
             and self.check_path_constraints(path, results, t_curr)):
-            
-            # if converged < 1:
-            #     converged += 1
 
-                # for measurement_task, subtask_index in bundle:
-                #     measurement_task : MeasurementTask
-
-                #     new_bid : SubtaskBid = results[measurement_task.id][subtask_index]
-
-                #     # add to changes broadcast
-                #     out_msg = TaskBidMessage(   
-                #                             self.get_parent_name(), 
-                #                             self.get_parent_name(),
-                #                             new_bid.to_dict()
-                #                         )
-                #     out_changes.append(out_msg)
-
-            # elif len(plan) == 0:
             if len(plan) == 0:
                 # no itemized plan has been generated yet; generate one
                 measurement_plan = []
                 for i in range(len(path)):
                     measurement_task, subtask_index = path[i]
                     measurement_task : MeasurementTask; subtask_index : int
+                    subtask_bid : SubtaskBid = results[measurement_task.id][subtask_index]
                     
-                    if len(plan) == 0:
-                        t_start = t_curr
+                    if i == 0:
+                        t_move_start = t_curr
+                        prev_pos = state.pos
+
                     else:
-                        i_prev = (i-1)*2
-                        prev_move : MoveAction = plan[i_prev]
-                        prev_measure : MeasurementAction = plan[i_prev + 1]
-                        prev_task = MeasurementTask(**prev_measure.task)
-                        t_start = prev_move.t_end + prev_task.duration
+                        prev_task, prev_subtask_index = path[i-1]
+                        prev_task : MeasurementTask; prev_subtask_index : int
+                        
+                        prev_bid : SubtaskBid = results[prev_task.id][prev_subtask_index]
+                        t_move_start = prev_bid.t_img + prev_task.duration
+                        prev_pos = prev_task.pos
 
                     task_pos = measurement_task.pos
-                    agent_pos = state.pos
-
-                    dx = np.sqrt( (task_pos[0] - agent_pos[0])**2 + (task_pos[1] - agent_pos[1])**2 )
-                    t_end = t_start + dx / state.v_max
+                    dx = np.sqrt( (task_pos[0] - prev_pos[0])**2 + (task_pos[1] - prev_pos[1])**2 )
+                    t_move_end = t_move_start + dx / state.v_max
+                    t_img_start = subtask_bid.t_img
+                    t_img_end = t_img_start + measurement_task.duration
 
                     if isinstance(self._clock_config, FixedTimesStepClockConfig):
                         dt = self._clock_config.dt
-                        if t_start < np.Inf:
-                            t_start = dt * math.floor(t_start/dt)
-                        if t_end < np.Inf:
-                            t_end = dt * math.ceil(t_end/dt)
+                        if t_move_start < np.Inf:
+                            t_move_start = dt * math.floor(t_move_start/dt)
+                        if t_move_end < np.Inf:
+                            t_move_end = dt * math.ceil(t_move_end/dt)
 
-                        # if t_end > t_start:
-                        #     t_end += dt
+                        if t_img_start < np.Inf:
+                            t_img_start = dt * math.floor(t_img_start/dt)
+                        if t_img_end < np.Inf:
+                            t_img_end = dt * math.ceil(t_img_end/dt)
 
-                    subtask_bid : SubtaskBid = results[measurement_task.id][subtask_index]
-                    move_action = MoveAction(measurement_task.pos, t_start, t_end)
+                    move_action = MoveAction(measurement_task.pos, t_move_start, t_move_end)
                     measurement_action = MeasurementAction( measurement_task.to_dict(),
                                                             subtask_index, 
                                                             subtask_bid.main_measurement,
                                                             subtask_bid.winning_bid,
-                                                            measurement_task.t_start, 
-                                                            measurement_task.t_end,)
+                                                            t_img_start, 
+                                                            t_img_end)
 
                     # plan per measurement request: move to plan, perform measurement 
                     plan.append(move_action)
@@ -1362,7 +1354,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         if len(actions) == 0:
             actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
 
-        return bundle, path, plan, actions, converged, out_changes
+        return bundle, path, plan, actions, converged
 
     def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """

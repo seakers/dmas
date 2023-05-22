@@ -1,4 +1,6 @@
 task_id,bidder,own_bid,winner,winning_bid,t_img,t_update
-[<planners.accbba.SubtaskBid object at 0x7fd6542b2a00>, <planners.accbba.SubtaskBid object at 0x7fd6542b29a0>, <planners.accbba.SubtaskBid object at 0x7fd6542b2a30>, <planners.accbba.SubtaskBid object at 0x7fd6542b2a60>]
-[<planners.accbba.SubtaskBid object at 0x7fd6542b2550>]
-[<planners.accbba.SubtaskBid object at 0x7fd6542b27c0>]
+[<planners.accbba.SubtaskBid object at 0x7fe1e5acef40>]
+[<planners.accbba.SubtaskBid object at 0x7fe1e5acee50>]
+[<planners.accbba.SubtaskBid object at 0x7fe1e5aced30>]
+[<planners.accbba.SubtaskBid object at 0x7fe1e5acef10>, <planners.accbba.SubtaskBid object at 0x7fe1e5ae5160>, <planners.accbba.SubtaskBid object at 0x7fe1e5ae50a0>, <planners.accbba.SubtaskBid object at 0x7fe1e5ae5190>]
+[<planners.accbba.SubtaskBid object at 0x7fe1e5acefd0>]

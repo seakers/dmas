@@ -22,15 +22,16 @@ from agent import SimulationAgent
 from planners.planners import PlannerTypes
 from states import *
 
-def random_instruments(task_types : list) -> list:
-    instruments = []
-    n_instruments = random.randint(1, len(task_types))
-    for _ in range(n_instruments):
-        i_ins = random.randint(0, len(task_types)-1)
-        while task_types[i_ins] in instruments:
-            i_ins = random.randint(0, len(task_types)-1)
-        instruments.append(task_types[i_ins])           
-    return instruments
+def random_measurements(measurement_types : list, n_max : int = None) -> list:
+    n_max = n_max if n_max is not None else len(measurement_types)
+    measurements = []
+    n_measurements = random.randint(1, n_max)
+    for _ in range(n_measurements):
+        i_ins = random.randint(0, len(measurement_types)-1)
+        while measurement_types[i_ins] in measurements:
+            i_ins = random.randint(0, len(measurement_types)-1)
+        measurements.append(measurement_types[i_ins])           
+    return measurements
 
 
 if __name__ == '__main__':
@@ -55,7 +56,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 8
+    T = 20
     year = 2023
     month = 1
     day = 1
@@ -76,8 +77,9 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 3
-    task_types = ['MWR', 'IR', 'VNIR']
+    n_tasks = 5
+    # task_types = ['MWR', 'IR', 'VNIR']
+    task_types = ['MWR', 'IR']
     
     # create tasks
     tasks = []
@@ -87,7 +89,7 @@ if __name__ == '__main__':
     t_corr = 1.0
 
     # pos = [1.0, 1.0]   
-    # instruments = [task_types[0], task_types[1]]
+    # instruments = [task_types[0]]
     # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
     # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
 
@@ -95,29 +97,28 @@ if __name__ == '__main__':
     # measurements = [task_types[1]]
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    pos = [3.0, 3.0]   
-    measurements = [task_types[0], task_types[1]]
-    tasks.append(MeasurementTask(pos, 100, measurements, t_start, t_end, t_corr))
+    # pos = [2.0, 1.0]   
+    # measurements = [task_types[1]]
+    # tasks.append(MeasurementTask(pos, 100, measurements, t_start, t_end, t_corr))
 
-    pos = [0.0, 3.0]   
-    measurements = [task_types[1]]
-    tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
+    # pos = [2.0, 2.0]   
+    # measurements = [task_types[1], task_types[0]]
+    # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
 
-    pos = [3.0, 0.0]   
-    measurements = [task_types[0]]
-    tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
+    # pos = [3.0, 0.0]   
+    # measurements = [task_types[0]]
+    # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
 
+    while len(tasks) < n_tasks:
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        pos = [x, y]
+        s_max = 1.0
+        measurements = random_measurements(task_types)
+        # measurements = [task_types[0]]
 
-    # while len(tasks) < n_tasks:
-    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-    #     pos = [x, y]
-    #     s_max = 1.0
-    #     # instruments = random_instruments(task_types)
-    #     measurements = [task_types[0]]
-
-    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
@@ -281,11 +282,16 @@ if __name__ == '__main__':
         # plot task location
         x = []
         y = []
+        print('TASK POSITION')
+        print('id, pos, measurements')
         for task in tasks:
             task : MeasurementTask
             x_i, y_i = task.pos
             x.append(x_i)
             y.append(y_i)
+            task_id = task.id.split('-')[0]
+            print(f'{task_id},{task.pos},{task.measurements}')
+
         task_scat = ax.scatter(x, y, color='r', marker='*')
 
         def update(frame):

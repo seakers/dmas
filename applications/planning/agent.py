@@ -47,7 +47,7 @@ class SimulationAgent(Agent):
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
-                                                    l_bundle=2,
+                                                    l_bundle=3,
                                                     level=level,
                                                     logger=logger)
         elif planner_type is PlannerTypes.FIXED:
@@ -62,7 +62,7 @@ class SimulationAgent(Agent):
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
-                                                    l_bundle=2,
+                                                    l_bundle=3,
                                                     level=level,
                                                     logger=logger)                                  
         else:
