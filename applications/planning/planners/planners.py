@@ -47,6 +47,8 @@ class PlannerModule(InternalModule):
         self.results_path = results_path
         self.parent_id = agent_id
         self.parent_name = f'AGENT_{agent_id}'
+        
+        self.stats = {}
 
     async def sim_wait(self, delay: float) -> None:
         return

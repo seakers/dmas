@@ -13,6 +13,7 @@ import copy
 from itertools import combinations, permutations
 import logging
 import math
+import time
 from typing import Union
 import numpy as np
 from pandas import DataFrame
@@ -370,6 +371,16 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         super().__init__(results_path, manager_port, agent_id, parent_network_config, l_bundle, PlannerTypes.ACCBBA, level, logger)
         self.planner_type = PlannerTypes.ACCBBA
 
+        self.stats = {
+                        "consensus" : [],
+                        "planning" : [],
+                        "doing" : [],
+                        "c_comp_check" : [],
+                        "c_tend_check" : [],
+                        "c_const_check" : [],
+                        "c_check" : []
+                    }
+
     async def listener(self):
         """
         ## Listener 
@@ -515,15 +526,24 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # t_update = t_curr
 
                 # update bundle from new information
+                t_0 = time.perf_counter()
                 results, bundle, path, changes = await self.consensus_phase(results, bundle, path, t_curr)
                 results : dict; bundle : list; path : list; changes : list
+                dt = time.perf_counter() - t_0
+                self.stats['consensus'].append(dt)
 
+                t_0 = time.perf_counter()
                 results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path)
                 planner_changes : list
                 changes.extend(planner_changes)
+                dt = time.perf_counter() - t_0
+                self.stats['planning'].append(dt)
 
+                t_0 = time.perf_counter()
                 bundle, path, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
                 actions : list    
+                dt = time.perf_counter() - t_0
+                self.stats['doing'].append(dt)
 
                 # send actions to broadcaster
                 change_dicts = [change.to_dict() for change in changes]
@@ -542,6 +562,8 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         """
         Evaluates incoming bids and updates current results and bundle
         """
+        t_0_0 = time.perf_counter()
+
         changes = []
         level = logging.DEBUG
         self.log_results('\nINITIAL RESULTS', results, level)
@@ -549,29 +571,40 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         self.log_task_sequence('path', path, level)
         
         # compare bids with incoming messages
+        t_0 = time.perf_counter()
         results, bundle, path, comp_changes = await self.compare_results(results, bundle, path, t, level)
         changes.extend(comp_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_comp_check'].append(dt)
 
         self.log_results('COMPARED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
         
         # check for expired tasks
+        t_0 = time.perf_counter()
         results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t, level)
         changes.extend(exp_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_tend_check'].append(dt)
 
         self.log_results('CHECKED EXPIRATION RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
         # check task constraint satisfaction
+        t_0 = time.perf_counter()
         results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
         changes.extend(cons_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_const_check'].append(dt)
 
         self.log_results('CONSTRAINT CHECKED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
+        dt = time.perf_counter() - t_0_0
+        self.stats['c_check'].append(dt)
         return results, bundle, path, changes
 
     async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
@@ -1451,18 +1484,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - sequence (`list`): list of tasks to be logged
             - level (`int`): logging level to be used
         """
-        out = f'\n{dsc} = ['
-        for task, subtask_index in sequence:
-            task : MeasurementTask
-            subtask_index : int
-            split_id = task.id.split('-')
-            
-            if sequence.index((task, subtask_index)) > 0:
-                out += ', '
-            out += f'({split_id[0]}, {subtask_index})'
-        out += ']\n'
+        if self._logger.getEffectiveLevel() <= level:
+            out = f'\n{dsc} = ['
+            for task, subtask_index in sequence:
+                task : MeasurementTask
+                subtask_index : int
+                split_id = task.id.split('-')
+                
+                if sequence.index((task, subtask_index)) > 0:
+                    out += ', '
+                out += f'({split_id[0]}, {subtask_index})'
+            out += ']\n'
 
-        self.log(out,level)
+            self.log(out,level)
 
     def log_results(self, dsc : str, results : dict, level=logging.DEBUG) -> None:
         """
@@ -1473,26 +1507,27 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - results (`dict`): results to be logged
             - level (`int`): logging level to be used
         """
-        headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
-        data = []
-        for task_id in results:
-            
-            if isinstance(results[task_id], list):
-                for bid in results[task_id]:
-                    bid : SubtaskBid
-                    task = MeasurementTask(**bid.task)
-                    split_id = task.id.split('-')
-                    line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
-                    data.append(line)
-            elif isinstance(results[task_id], dict):
-                for bid_index in results[task_id]:
-                    bid : SubtaskBid = results[task_id][bid_index]
-                    task = MeasurementTask(**bid.task)
-                    split_id = task.id.split('-')
-                    line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
-                    data.append(line)
-            else:
-                raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
+        if self._logger.getEffectiveLevel() <= level:
+            headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            data = []
+            for task_id in results:
+                
+                if isinstance(results[task_id], list):
+                    for bid in results[task_id]:
+                        bid : SubtaskBid
+                        task = MeasurementTask(**bid.task)
+                        split_id = task.id.split('-')
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        data.append(line)
+                elif isinstance(results[task_id], dict):
+                    for bid_index in results[task_id]:
+                        bid : SubtaskBid = results[task_id][bid_index]
+                        task = MeasurementTask(**bid.task)
+                        split_id = task.id.split('-')
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        data.append(line)
+                else:
+                    raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
 
-        df = DataFrame(data, columns=headers)
-        self.log(f'\n{dsc}\n{str(df)}\n', level)
+            df = DataFrame(data, columns=headers)
+            self.log(f'\n{dsc}\n{str(df)}\n', level)
