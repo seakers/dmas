@@ -386,7 +386,9 @@ class SimulationAgent(Agent):
                         # send a measurement data request to the environment
                         measurement = MeasurementResultsRequest(self.get_element_name(),
                                                         SimulationElementRoles.ENVIRONMENT.value, 
-                                                        task.to_dict()
+                                                        self.state.to_dict(), 
+                                                        action_dict
+                                                        # task.to_dict()
                                                         )
 
                         dst, src, measurement_dict = await self.send_peer_message(measurement)

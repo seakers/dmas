@@ -1,5 +1,6 @@
 import copy
 import math
+from actions import MeasurementAction
 from utils import setup_results_directory
 from states import SimulationAgentState
 from dmas.environments import *
@@ -114,8 +115,14 @@ class SimulationEnvironment(EnvironmentNode):
 
                         # find/generate measurement results
                         # TODO look up requested measurement results from database/model
+                        measurement_action = MeasurementAction(**msg.masurement_action)
+                        agent_state= SimulationAgentState(**msg.agent_state)
+                        task = MeasurementTask(**measurement_action.task)
                         measurement_data = {'agent' : msg.src, 
-                                            't_img' : self.get_current_time()}
+                                            't_img' : self.get_current_time(),
+                                            'u' : self.calc_utility(agent_state, task, measurement_action.subtask_index, self.get_current_time()),
+                                            'u_max' : task.s_max,
+                                            'u_exp' : measurement_action.u_exp}
 
                         # repsond to request
                         self.log(f'measurement results obtained! responding to request')
@@ -299,6 +306,42 @@ class SimulationEnvironment(EnvironmentNode):
 
         return range_updates
 
+    def calc_utility(   
+                        self, 
+                        state : SimulationAgentState,
+                        task : MeasurementTask, 
+                        subtask_index : int, 
+                        t_img : float
+                    ) -> float:
+        """
+        Calculates the expected utility of performing a measurement task
+
+        ### Arguments:
+            - state (:obj:`SimulationAgentState`): agent state before performing the task
+            - task (:obj:`MeasurementTask`): task to be performed 
+            - subtask_index (`int`): index of subtask to be performed
+            - t_img (`float`): time at which the task will be performed
+
+        ### Retrurns:
+            - utility (`float`): estimated normalized utility 
+        """
+        # check time constraints
+        if t_img < task.t_start or task.t_end < t_img:
+            return 0.0
+        
+        # calculate urgency factor from task
+        utility = task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+
+        _, dependent_measurements = task.measurement_groups[subtask_index]
+        k = len(dependent_measurements) + 1
+
+        if k / len(task.measurements) == 1.0:
+            alpha = 1.0
+        else:
+            alpha = 1.0/3.0
+
+        return utility * alpha / k
+
     async def teardown(self) -> None:
         # print final time
         self.log(f'Environment shutdown with internal clock of {self.get_current_time()}[s]', level=logging.WARNING)
@@ -342,16 +385,37 @@ class SimulationEnvironment(EnvironmentNode):
 
         # print measurements
         with open(f"{self.results_path}/measurements.csv", "w") as file:
-            title = 'Task Request ID,x_pos,y_pos,t_start,t_end,Measurer,t_img\n'
+            title = 'task_id,measurer,x_pos,y_pos,t_start,t_end,t_corr,t_img,u_max,u_exp,u\n'
             file.write(title)
 
             for msg in self.measurement_history:
                 msg : MeasurementResultsRequest
-                task = MeasurementTask(**msg.masurement_req)
+                measurement_action = MeasurementAction(**msg.masurement_action)
+                task = MeasurementTask(**measurement_action.task)
+                measurement_data : dict = msg.measurement
                 measurer = msg.measurement['agent']
-                t_measurement = msg.measurement['t_img']
+                t_img = msg.measurement['t_img']
 
-                line = f'{task.id},{task.pos[0]},{task.pos[1]},{task.t_start},{task.t_end},{measurer},{t_measurement}\n'
+                line_data = [task.id.split('-')[0],
+                             measurer,
+                             task.pos[0],
+                             task.pos[1],
+                             task.t_start,
+                             task.t_end,
+                             task.t_corr,
+                             t_img,
+                             measurement_data['u_max'],
+                             measurement_data['u_exp'],
+                             measurement_data['u']]
+
+                line = ""
+                for i in range(len(line_data)):
+                    line += str(line_data[i])
+                    if i < len(line_data)-1:
+                        line += ','
+                    else:
+                        line += '\n'
+
                 file.write(line)
 
     async def sim_wait(self, delay: float) -> None:

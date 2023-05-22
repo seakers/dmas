@@ -334,17 +334,18 @@ class MeasurementAction(AgentAction):
 
     ### Attributes:
         - task (`dict`): dictionary containing the measurement task/request being met by this measurement 
+        - subtask_index (`int`): index of the subtask being performed by this measurement
         - measurement (`list`): name of the measurement that will be performed in this action
-        - duration (`float`): duration of the measurement being performed
+        - u_exp (`int` or `float`): expected utility from this measurement
         - t_start (`float`): start time of the measurement of this action in [s] from the beginning of the simulation
         - t_end (`float`): end time of the measurment of this action in [s] from the beginning of the simulation
-        - t_corr (`float`): maximum decorralation time between measurements of different measurements
         - id (`str`) : identifying number for this task in uuid format
     """  
     def __init__(   self,
                     task : dict,
-                    sutbask_index : int,
+                    subtask_index : int,
                     measurement : str,
+                    u_exp : Union[float, int], 
                     t_start: Union[float, int], 
                     t_end: Union[float, int], 
                     status: str = 'PENDING', 
@@ -354,17 +355,18 @@ class MeasurementAction(AgentAction):
         Creates an instance of a 
         ### Arguments:
             - task (`dict`): dictionary containing the measurement task/request being met by this measurement 
+            - subtask_index (`int`): index of the subtask being performed by this measurement
             - measurement (`list`): name of the measurement that will be performed in this action
-            - duration (`float`): duration of the measurement being performed
+            - u_exp (`int` or `float`): expected utility from this measurement
             - t_start (`float`): start time of the measurement of this action in [s] from the beginning of the simulation
             - t_end (`float`): end time of the measurment of this action in [s] from the beginning of the simulation
-            - t_corr (`float`): maximum decorralation time between measurements of different measurements
             - id (`str`) : identifying number for this task in uuid format
         """
         super().__init__(ActionTypes.MEASURE.value, t_start, t_end, status, id)
         self.task = task
-        self.sutbask_index = sutbask_index
+        self.subtask_index = subtask_index
         self.measurement = measurement
+        self.u_exp = u_exp
 
 class IdleAction(AgentAction):
     """

@@ -377,9 +377,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         "doing" : [],
                         "c_comp_check" : [],
                         "c_tend_check" : [],
-                        "c_const_check" : [],
-                        "c_check" : []
+                        "c_const_check" : []
                     }
+        self.plan_history = []
 
     async def listener(self):
         """
@@ -540,10 +540,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.stats['planning'].append(dt)
 
                 t_0 = time.perf_counter()
-                bundle, path, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
+                bundle, path, plan, actions, converged, out_changes = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
                 actions : list    
+                changes.extend(out_changes)
                 dt = time.perf_counter() - t_0
                 self.stats['doing'].append(dt)
+
+                if len(out_changes) > 0:
+                    x = 1
 
                 # send actions to broadcaster
                 change_dicts = [change.to_dict() for change in changes]
@@ -562,8 +566,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         """
         Evaluates incoming bids and updates current results and bundle
         """
-        t_0_0 = time.perf_counter()
-
         changes = []
         level = logging.DEBUG
         self.log_results('\nINITIAL RESULTS', results, level)
@@ -603,8 +605,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
-        dt = time.perf_counter() - t_0_0
-        self.stats['c_check'].append(dt)
         return results, bundle, path, changes
 
     async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
@@ -656,7 +656,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 for _ in range(bid_index, len(bundle)):
                     # remove all subsequent tasks from bundle
-                    measurement_task, subtask_index = bundle.pop(bid_index)
+                    measurement_task, subtask_index, utility = bundle.pop(bid_index)
                     path.remove((measurement_task, subtask_index))
 
                     # if the agent is currently winning this bid, reset results
@@ -696,20 +696,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # remove task from bundle and path
                 task, subtask_index = bundle.pop(bundle_index)
                 path.remove((task, subtask_index))
-
-                # # reset bid
-                # task : MeasurementTask
-                # current_bid : SubtaskBid = results[task.id][subtask_index]
-                # current_bid.reset(t)
-                # results[task.id][subtask_index] = current_bid
-
-                # # register change in results
-                # out_msg = TaskBidMessage(   
-                #                         self.get_parent_name(), 
-                #                         self.get_parent_name(), 
-                #                         current_bid.to_dict()
-                #                     )
-                # changes.append(out_msg)
 
                 self.log_results('PRELIMINARY CHECKED EXPIRATION RESULTS', results, level)
                 self.log_task_sequence('bundle', bundle, level)
@@ -1245,13 +1231,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Given the state of the current plan, give the agent tasks to perform
         """
         # give agent tasks to perform at the current time
+        out_changes = []
         actions = []
         if (len(changes) == 0 
             and len(path) > 0
             and self.check_path_constraints(path, results, t_curr)):
-
-            if converged < 1:
-                converged += 1
+            
+            # if converged < 1:
+            #     converged += 1
 
                 # for measurement_task, subtask_index in bundle:
                 #     measurement_task : MeasurementTask
@@ -1261,13 +1248,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 #     # add to changes broadcast
                 #     out_msg = TaskBidMessage(   
                 #                             self.get_parent_name(), 
-                #                             self.get_parent_name(), 
+                #                             self.get_parent_name(),
                 #                             new_bid.to_dict()
                 #                         )
-                #     changes.append(out_msg)
+                #     out_changes.append(out_msg)
 
-            elif len(plan) == 0:
+            # elif len(plan) == 0:
+            if len(plan) == 0:
                 # no itemized plan has been generated yet; generate one
+                measurement_plan = []
                 for i in range(len(path)):
                     measurement_task, subtask_index = path[i]
                     measurement_task : MeasurementTask; subtask_index : int
@@ -1294,23 +1283,26 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         if t_end < np.Inf:
                             t_end = dt * math.ceil(t_end/dt)
 
-                        if t_end > t_start:
-                            t_end += dt
+                        # if t_end > t_start:
+                        #     t_end += dt
 
                     subtask_bid : SubtaskBid = results[measurement_task.id][subtask_index]
                     move_action = MoveAction(measurement_task.pos, t_start, t_end)
                     measurement_action = MeasurementAction( measurement_task.to_dict(),
                                                             subtask_index, 
                                                             subtask_bid.main_measurement,
+                                                            subtask_bid.winning_bid,
                                                             measurement_task.t_start, 
-                                                            measurement_task.t_end)
+                                                            measurement_task.t_end,)
 
                     # plan per measurement request: move to plan, perform measurement 
                     plan.append(move_action)
                     plan.append(measurement_action)  
 
+                    measurement_plan.append((measurement_task, subtask_index, subtask_bid))
                 actions.append(plan[0])
 
+                self.plan_history.append(measurement_plan)
             else:
                 # plan has already been developed and is being performed; check plan complation status
                 while not self.action_status_inbox.empty():
@@ -1344,9 +1336,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                             done_task = MeasurementTask(**done_action.task)
                             
                             # if a measurement action was completed, remove from bundle and path
-                            if (done_task, done_action.sutbask_index) in path:
-                                path.remove((done_task, done_action.sutbask_index))
-                                bundle.remove((done_task, done_action.sutbask_index))
+                            if (done_task, done_action.subtask_index) in path:
+                                path.remove((done_task, done_action.subtask_index))
+                                bundle.remove((done_task, done_action.subtask_index))
 
                         if len(plan) > 0:
                             next_task : AgentAction = plan[0]
@@ -1370,7 +1362,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         if len(actions) == 0:
             actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
 
-        return bundle, path, actions, converged
+        return bundle, path, plan, actions, converged, out_changes
 
     def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """
@@ -1531,3 +1523,34 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
             df = DataFrame(data, columns=headers)
             self.log(f'\n{dsc}\n{str(df)}\n', level)
+
+    async def teardown(self) -> None:
+        await super().teardown()
+
+        # log plan history
+        self.log('\nPLANNER HISTORY\n', level=logging.WARNING)
+        out = 'plan_index,task_id,subtask_index,t_img,u_exp\n'
+        for i in range(len(self.plan_history)):
+            for task, subtask_index, subtask_bid in self.plan_history[i]:
+                task : MeasurementTask
+                subtask_index : int
+                subtask_bid : SubtaskBid
+                
+                line_data = [   i,
+                                task.id.split('-')[0],
+                                subtask_index,
+                                subtask_bid.t_img,
+                                subtask_bid.winning_bid
+                ]
+
+                for datum in line_data:
+                    out += str(datum)
+                    if datum != line_data[-1]:
+                        out += ','
+                    else:
+                        out += '\n'
+
+        self.log(out, level=logging.WARNING)
+
+        with open(f"{self.results_path}/{self.get_parent_name()}/planner_history.csv", "w") as file:
+            file.write(out)
