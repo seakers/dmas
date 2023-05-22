@@ -1528,7 +1528,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         await super().teardown()
 
         # log plan history
-        self.log('\nPLANNER HISTORY\n', level=logging.WARNING)
         out = 'plan_index,task_id,subtask_index,t_img,u_exp\n'
         for i in range(len(self.plan_history)):
             for task, subtask_index, subtask_bid in self.plan_history[i]:
@@ -1543,14 +1542,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                 subtask_bid.winning_bid
                 ]
 
-                for datum in line_data:
-                    out += str(datum)
-                    if datum != line_data[-1]:
+                for j in range(len(line_data)):
+                    out += str(line_data[j])
+                    if j < len(line_data)-1:
                         out += ','
                     else:
                         out += '\n'
 
-        self.log(out, level=logging.WARNING)
+        self.log(f'\nPLANNER HISTORY\n{out}', level=logging.WARNING)
 
         with open(f"{self.results_path}/{self.get_parent_name()}/planner_history.csv", "w") as file:
             file.write(out)
