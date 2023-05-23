@@ -72,7 +72,7 @@ class TaskBid(Bid):
         """
         return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img},{self.t_update}'
 
-    def update(self, other_dict : dict, t : Union[float, int]) -> object:
+    def update(self, other_dict : dict, t : Union[float, int]) -> tuple:
         """
         Compares bid with another and either updates, resets, or leaves the information contained in this bid
         depending on the rules specified in:
@@ -83,9 +83,12 @@ class TaskBid(Bid):
             - t (`float` or `dict`): time when this information is being updated
 
         ### Returns:
-            - rebroadcast (`TaskBid` or `NoneType`): returns bid information to be rebroadcasted to other agents.
+            - rebroadcast (`TaskBid` or `NoneType`): bid information to be rebroadcasted to other agents.
+            - changed (`bool`): boolean value indicating if a change was made to this bid
         """
         other : TaskBid = TaskBid(**other_dict)
+        prev : TaskBid = self.copy() 
+
         if self.task_id != other.task_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id})')
@@ -93,196 +96,188 @@ class TaskBid(Bid):
         if other.bidder == self.bidder:
             if other.t_update > self.t_update:
                 self._update_info(other,t)
+                return self, prev==self
             else:
                 self._leave(t)
+                return None, False
         
         elif other.winner == other.NONE:
             if self.winner == self.bidder:
                 # leave and rebroadcast
                 self._leave(t)
-                return self
+                return self, False
 
             elif self.winner == other.bidder:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other
+                return other, prev==self
 
             elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
 
             elif self.winner == self.NONE:
                 # leave and no rebroadcast
                 self._leave(t)
-                return self
+                return None, False
 
         elif other.winner == other.bidder:
             if self.winner == self.bidder:
                 if other.winning_bid > self.winning_bid:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
                     
                 elif other.winning_bid == self.winning_bid:
                     # if there's a tie, bidder with the smallest id wins
                     if self._tie_breaker(other, self):
                         # update and rebroadcast
                         self._update_info(other, t)
-                        return other
+                        return other, prev==self
 
                 if other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
                     self.__update_time(t)
-                    return self
+                    return self, prev==self
 
             elif self.winner == other.bidder:
                 if other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
 
                 elif abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
                     self._leave(t)
-                    return None
+                    return None, False
 
                 elif other.t_update < self.t_update:
-                    # leave and not rebroadcast
+                    # leave and no rebroadcast
                     self._leave(t)
-                    return None
+                    return None, False
 
             elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
 
                 elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
                     #leave and rebroadcast
                     self._leave(t)
-                    return self
+                    return self, False
 
                 elif other.winning_bid == self.winning_bid:
                     # leave and rebroadcast
                     self._leave(t)
-                    return self
+                    return self, False
 
                 elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
                     
                 elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
 
             elif self.winner == self.NONE:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other
+                return other, prev==self
 
         elif other.winner == self.bidder:
-            if self.winner == self.bidder:
+            if self.winner == self.NONE:
+                # leave and rebroadcast with current update time
+                self.__update_time(t)
+                return self, prev==self
+
+            elif self.winner == self.bidder:
                 if abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
                     self._leave(t)
-                    return None
+                    return None, False
                 
-            elif self.winner == other.bidder:
+            elif self.winner == other.bidder and other.bidder != self.bidder:
                 # reset and rebroadcast with current update time
                 self.reset(t)
-                return self
+                return self, prev==self
 
             elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 # leave and rebroadcast
                 self._leave(t)
-                return self
-
-            elif self.winner == self.NONE:
-                # leave and rebroadcast with current update time
-                self.__update_time(t)
-                return self
+                return self, False
 
         elif other.winner not in [self.bidder, other.bidder]:
             if self.winner == self.bidder:
                 if other.winning_bid > self.winning_bid:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
 
                 elif other.winning_bid == self.winning_bid:
                     # if there's a tie, bidder with the smallest id wins
                     if self._tie_breaker(other, self):
                         # update and rebroadcast
                         self._update_info(other, t)
-                        return other
-                    
-                    # _, their_id = other.bidder.split('_')
-                    # _, my_id = self.bidder.split('_')
-
-                    # their_id = int(their_id); my_id = int(my_id)
-
-                    # if their_id < my_id:
-                    #     #update and rebroadcast
-                    #     self._update_info(other, t)
-                    #     return other
+                        return other, prev==self
 
                 elif other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
                     self.__update_time(t)
-                    return other
+                    return other, prev==self
 
             elif self.winner == other.bidder:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other
+                return other, prev==self
 
             elif self.winner == other.winner:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
                     
                 elif abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
                     self._leave(t)
-                    return None
+                    return None, False
 
                 elif other.t_update < self.t_update:
                     # leave and rebroadcast
                     self._leave(t)
-                    return self
+                    return self, False
 
             elif self.winner not in [self.bidder, other.bidder, other.winner, self.NONE]:
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
 
                 elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
                     # leave and rebroadcast
                     self._leave(t)
-                    return self
+                    return self, False
                     
                 elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other
+                    return other, prev==self
                     
                 elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
                     # leave and rebroadcast
                     self._leave(t)
-                    return self
+                    return self, prev==self
 
             elif self.winner == self.NONE:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other
+                return other, prev==self
         
-        return None
+        return None, prev==self
     
     def _update_info(self, 
                     other, 

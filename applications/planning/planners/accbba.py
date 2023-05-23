@@ -127,15 +127,17 @@ class SubtaskBid(TaskBid):
             raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_any}.')
         self.bid_any = bid_any
 
-    def update(self, other_dict : dict, t : Union[float, int]) -> object:
-        broadcast_out : TaskBid = super().update(other_dict, t)
+    def update(self, other_dict : dict, t : Union[float, int]) -> tuple:
+        broadcast_out, changed = super().update(other_dict, t)
+        broadcast_out : TaskBid; changed : bool
+
         if broadcast_out is not None:
             other = SubtaskBid(**other_dict)
             if other.bidder == broadcast_out.bidder:
-                return other
+                return other, changed
             else:
-                return self
-        return None
+                return self, changed
+        return None, changed
 
     def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
         """
@@ -161,7 +163,17 @@ class SubtaskBid(TaskBid):
         Returns a string representation of this task bid in the following format:
         - `task_id`, `subtask_index`, `main_measurement`, `dependencies`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`, `t_update`
         """
-        return f'{self.task_id},{self.subtask_index},{self.main_measurement},{self.dependencies},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img},{self.t_update}'
+        task = MeasurementTask(**self.task)
+        split_id = task.id.split('-')
+        line_data = [split_id[0], self.subtask_index, self.main_measurement, self.dependencies, task.pos, self.bidder, round(self.own_bid, 3), self.winner, round(self.winning_bid, 3), round(self.t_img, 3), round(self.t_violation, 3), self.bid_solo, self.bid_any]
+        out = ""
+        for i in range(len(line_data)):
+            line_datum = line_data[i]
+            out += str(line_datum)
+            if i < len(line_data) - 1:
+                out += ','
+
+        return out
 
     def copy(self) -> object:
         return SubtaskBid(  **self.to_dict() )
@@ -259,7 +271,7 @@ class SubtaskBid(TaskBid):
         temp_sat = self.__temp_sat(others, t)
 
         if not mutex_sat or not dep_sat or not temp_sat:
-            self.reset(t)
+            # self.reset(t)
             if self.is_optimistic():
                 self.bid_any -= 1
                 self.bid_any = self.bid_any if self.bid_any > 0 else 0
@@ -490,13 +502,17 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                                         )                            
                             
                                 await self.relevant_changes_inbox.put(out_msg)
-                                await self.outgoing_listen_inbox.put(out_msg)
+                                # await self.outgoing_listen_inbox.put(out_msg)
 
                         elif sense['msg_type'] == SimulationMessageTypes.TASK_BID.value:
                             # unpack message 
                             bid_msg  = TaskBidMessage(**sense)
                             
                             their_bid = SubtaskBid(**bid_msg.bid)
+
+                            if their_bid.bidder == self.get_parent_name():
+                                continue
+
                             self.log(f"received a bid from another agent for task {their_bid.task_id}!")
                             
                             await self.relevant_changes_inbox.put(bid_msg)
@@ -555,10 +571,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # update bundle from new information
                 t_0 = time.perf_counter()
-                results, bundle, path, changes = await self.consensus_phase(results, bundle, path, t_curr, level)
-                results : dict; bundle : list; path : list; changes : list
+                results, bundle, path, changes, rebroadcasts = await self.consensus_phase(results, bundle, path, t_curr, level)
+                results : dict; bundle : list; path : list; changes : list; rebroadcasts : list
+                changes = []
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
+
+                self.log_changes("CHANGES MADE FROM CONSENSUS", changes, level)
 
                 if t_curr > 0.0 and len(changes) > 0:
                     x = 1
@@ -567,8 +586,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path, level)
                 planner_changes : list
                 changes.extend(planner_changes)
+                rebroadcasts.extend(planner_changes)
                 dt = time.perf_counter() - t_0
                 self.stats['planning'].append(dt)
+
+                self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
 
                 if t_curr > 0.0 and len(changes) > 0:
                     x = 1
@@ -580,13 +602,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.stats['doing'].append(dt)
 
                 # send actions to broadcaster
-                change_dicts = [change.to_dict() for change in changes]
+                rebroadcast_dicts = [rebroadcast.to_dict() for rebroadcast in rebroadcasts]
                 action_dicts = [action.to_dict() for action in actions]
-                action_dicts.extend(change_dicts)
+                action_dicts.extend(rebroadcast_dicts)
                 action_bus = BusMessage(self.get_element_name(), self.get_element_name(), action_dicts)
                 await self.outgoing_bundle_builder_inbox.put(action_bus)
 
-
+                # if len(changes) > 0:
                 self.iter_counter += 1
                 
         except asyncio.CancelledError:
@@ -600,17 +622,20 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Evaluates incoming bids and updates current results and bundle
         """
         changes = []
+        rebroadcasts = []
         self.log_results('\nINITIAL RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
         
         # compare bids with incoming messages
         t_0 = time.perf_counter()
-        results, bundle, path, comp_changes = await self.compare_results(results, bundle, path, t, level)
+        results, bundle, path, comp_changes, comp_rebroadcasts, bids_received = await self.compare_results(results, bundle, path, t, level)
         changes.extend(comp_changes)
+        rebroadcasts.extend(comp_rebroadcasts)
         dt = time.perf_counter() - t_0
         self.stats['c_comp_check'].append(dt)
 
+        self.log_results('BIDS RECEIVED', bids_received, level)
         self.log_results('COMPARED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
@@ -619,6 +644,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         t_0 = time.perf_counter()
         results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t, level)
         changes.extend(exp_changes)
+        rebroadcasts.extend(exp_changes)
         dt = time.perf_counter() - t_0
         self.stats['c_tend_check'].append(dt)
 
@@ -630,17 +656,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         t_0 = time.perf_counter()
         results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
         changes.extend(cons_changes)
+        rebroadcasts.extend(cons_changes)
         dt = time.perf_counter() - t_0
         self.stats['c_const_check'].append(dt)
-
-        if t > 0.0 and len(changes) > 0:
-            x = 1
 
         self.log_results('CONSTRAINT CHECKED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
-        return results, bundle, path, changes
+        return results, bundle, path, changes, rebroadcasts
 
     async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
@@ -653,12 +677,17 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - changes
         """
         changes = []
+        rebroadcasts = []
+        bids_received = {}
         while not self.relevant_changes_inbox.empty():
             # get next bid
             bid_msg : TaskBidMessage = await self.relevant_changes_inbox.get()
             
             # unpackage bid
             their_bid = SubtaskBid(**bid_msg.bid)
+            if their_bid.task_id not in bids_received:
+                bids_received[their_bid.task_id] = {}
+            bids_received[their_bid.task_id][their_bid.subtask_index] = their_bid
             
             # check if bid exists for this task
             new_task = their_bid.task_id not in results
@@ -669,9 +698,12 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
             # compare bids
             my_bid : SubtaskBid = results[their_bid.task_id][their_bid.subtask_index]
-            self.log(f'comparing bids...\nmine:  {my_bid}\ntheirs: {their_bid}', level=logging.DEBUG)
-            broadcast_bid : SubtaskBid = my_bid.update(their_bid.to_dict(), t)
-            self.log(f'updated: {my_bid}\n', level=logging.DEBUG)
+            self.log(f'comparing bids...\nmine:  {str(my_bid)}\ntheirs: {str(their_bid)}', level=logging.DEBUG)
+
+            broadcast_bid, changed  = my_bid.update(their_bid.to_dict(), t)
+            broadcast_bid : SubtaskBid; changed : bool
+
+            self.log(f'\nupdated: {my_bid}\n', level=logging.DEBUG)
             results[their_bid.task_id][their_bid.subtask_index] = my_bid
                 
             # if relevant changes were made, add to changes broadcast
@@ -681,6 +713,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                         self.get_parent_name(), 
                                         self.get_parent_name(), 
                                         broadcast_bid.to_dict()
+                                    )
+                rebroadcasts.append(out_msg)
+
+            if changed or new_task:
+                changed_bid = broadcast_bid if not new_task else my_bid
+                out_msg = TaskBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        changed_bid.to_dict()
                                     )
                 changes.append(out_msg)
 
@@ -700,11 +741,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         current_bid.reset(t)
                         results[measurement_task.id][subtask_index] = current_bid
 
-                    self.log_results('PRELIMINARY COMPARED RESULTS', results, level)
-                    self.log_task_sequence('bundle', bundle, level)
-                    self.log_task_sequence('path', path, level)
+                    # self.log_results('PRELIMINARY COMPARED RESULTS', results, level)
+                    # self.log_task_sequence('bundle', bundle, level)
+                    # self.log_task_sequence('path', path, level)
         
-        return results, bundle, path, changes
+        return results, bundle, path, changes, rebroadcasts, bids_received
 
     async def check_task_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
@@ -754,6 +795,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 reset_bid = bid.check_constraints(results[task.id], t)
                 if reset_bid is not None:
                     task_to_remove = (task, subtask_index)
+                    results[task.id][subtask_index] = reset_bid
                     break
                                 
             if task_to_remove is None:
@@ -780,9 +822,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                     )
                 changes.append(out_msg)
 
-                self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
-                self.log_task_sequence('bundle', bundle, level)
-                self.log_task_sequence('path', path, level)
+                # self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
+                # self.log_task_sequence('bundle', bundle, level)
+                # self.log_task_sequence('path', path, level)
 
         return results, bundle, path, changes
    
@@ -862,9 +904,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 results[measurement_task.id][subtask_index] = new_bid
 
-            self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level)
-            self.log_task_sequence('bundle', bundle, level)
-            self.log_task_sequence('path', path, level)
+            # self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level)
+            # self.log_task_sequence('bundle', bundle, level)
+            # self.log_task_sequence('path', path, level)
 
         # broadcast changes to bundle
         for measurement_task, subtask_index in changes_to_bundle:
@@ -880,14 +922,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                     new_bid.to_dict()
                                 )
             changes.append(out_msg)
-
-
-        # self.log_results('MODIFIED BUNDLE RESULTS BEFORE CONSTRAINT', results, level)
-        # self.log_task_sequence('bundle', bundle, level)
-        # self.log_task_sequence('path', path, level)
-        
-        # results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, state.t, level)
-        # changes.extend(cons_changes)
 
         self.log_results('MODIFIED BUNDLE RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
@@ -1261,24 +1295,16 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Given the state of the current plan, give the agent tasks to perform
         """
         # give agent tasks to perform at the current time
-        for task, subtask_index in path:
-            bid : SubtaskBid = results[task.id][subtask_index]
-            if bid.winner != self.get_parent_name():
-                x = 1
-            elif bid.winning_bid <= 0:
-                x = 1
-            elif bid.t_img < 0:
-                x = 1
-
         actions = []
         if (len(changes) == 0 
             and len(path) > 0
             and self.check_path_constraints(path, results, t_curr)):
 
-            if converged < 2:
-                converged += 1
+            # if converged < 2:
+            #     converged += 1
 
-            elif len(plan) == 0:
+            # elif len(plan) == 0:
+            if len(plan) == 0:
                 # no itemized plan has been generated yet; generate one
                 measurement_plan = []
                 for i in range(len(path)):
@@ -1330,66 +1356,66 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                     measurement_plan.append((t_curr, measurement_task, subtask_index, subtask_bid.copy()))
                 
-                # actions.append(plan[0])
+                actions.append(plan[0])
                 self.plan_history.append(measurement_plan)
             else:
+                # plan has already been developed and is being performed; check plan complation status
                 x = 1
-                # # plan has already been developed and is being performed; check plan complation status
-                # while not self.action_status_inbox.empty():
-                #     action_msg : AgentActionMessage = await self.action_status_inbox.get()
-                #     performed_action = AgentAction(**action_msg.action)
+                while not self.action_status_inbox.empty():
+                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                    performed_action = AgentAction(**action_msg.action)
 
-                #     if len(plan) < 1:
-                #         continue
+                    if len(plan) < 1:
+                        continue
 
-                #     latest_plan_action : AgentAction = plan[0]
-                #     if performed_action.id != latest_plan_action.id:
-                #         # some other task was performed; ignoring 
-                #         continue
+                    latest_plan_action : AgentAction = plan[0]
+                    if performed_action.id != latest_plan_action.id:
+                        # some other task was performed; ignoring 
+                        continue
 
-                #     elif performed_action.status == AgentAction.PENDING:
-                #         # latest action from plan was attepted but not completed; performing again
+                    elif performed_action.status == AgentAction.PENDING:
+                        # latest action from plan was attepted but not completed; performing again
                         
-                #         if t_curr < latest_plan_action.t_start:
-                #             # if action was not ready to be performed, wait for a bit
-                #             actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
-                #         else:
-                #             # try to perform action again
-                #             actions.append(plan[0])
+                        if t_curr < latest_plan_action.t_start:
+                            # if action was not ready to be performed, wait for a bit
+                            actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
+                        else:
+                            # try to perform action again
+                            actions.append(plan[0])
 
-                #     elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
-                #         # latest action from plan was completed! performing next action in plan
-                #         done_action : AgentAction = plan.pop(0)
+                    elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
+                        # latest action from plan was completed! performing next action in plan
+                        done_action : AgentAction = plan.pop(0)
 
-                #         if done_action.action_type == ActionTypes.MEASURE.value:
-                #             done_action : MeasurementAction
-                #             done_task = MeasurementTask(**done_action.task)
+                        if done_action.action_type == ActionTypes.MEASURE.value:
+                            done_action : MeasurementAction
+                            done_task = MeasurementTask(**done_action.task)
                             
-                #             # if a measurement action was completed, remove from bundle and path
-                #             if (done_task, done_action.subtask_index) in path:
-                #                 path.remove((done_task, done_action.subtask_index))
-                #                 bundle.remove((done_task, done_action.subtask_index))
+                            # if a measurement action was completed, remove from bundle and path
+                            if (done_task, done_action.subtask_index) in path:
+                                path.remove((done_task, done_action.subtask_index))
+                                bundle.remove((done_task, done_action.subtask_index))
 
-                #         if len(plan) > 0:
-                #             next_task : AgentAction = plan[0]
-                #             if t_curr >= next_task.t_start:
-                #                 actions.append(next_task)
-                #             else:
-                #                 actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                        if len(plan) > 0:
+                            next_task : AgentAction = plan[0]
+                            if t_curr >= next_task.t_start:
+                                actions.append(next_task)
+                            else:
+                                actions.append( WaitForMessages(t_curr, next_task.t_start) )
                 
-                # if len(actions) == 0 and len(plan) > 0:
-                #     next_task : AgentAction = plan[0]
-                #     if t_curr >= next_task.t_start:
-                #         actions.append(next_task)
-                #     else:
-                #         actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                if len(actions) == 0 and len(plan) > 0:
+                    next_task : AgentAction = plan[0]
+                    if t_curr >= next_task.t_start:
+                        actions.append(next_task)
+                    else:
+                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
 
         else:
             # bundle is empty or cannot be executed yet; instructing agent to idle
             plan = []
             converged = 0
                         
-        if len(actions) == 0:
+        if len(actions) == 0 and len(changes) == 0 and len(plan) == 0:
             actions.append( WaitForMessages(t_curr, t_curr + 1/f_update) )
 
         return bundle, path, plan, actions, converged
@@ -1442,6 +1468,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     msg_dict : dict
                     action_type = msg_dict.get('action_type', None)
                     msg_type = msg_dict.get('msg_type', None)
+
                     if action_type is not None:
                         bundle_msgs.append(action_from_dict(**msg_dict))
                     elif msg_type is not None:
@@ -1460,33 +1487,55 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 for msg in listener_msgs:
                     if isinstance(msg, TaskBidMessage):
-                        listener_bid : SubtaskBid = SubtaskBid(**msg.bid)
-                        bid_messages[listener_bid.task_id] = msg
+                        bundle_bid : SubtaskBid = SubtaskBid(**msg.bid)
+                        if bundle_bid.task_id not in bid_messages:
+                            bid_messages[bundle_bid.task_id] = {}
+                            bid_messages[bundle_bid.task_id][bundle_bid.subtask_index] = msg
+
+                        elif bundle_bid.subtask_index not in bid_messages[bundle_bid.task_id]:
+                            bid_messages[bundle_bid.task_id][bundle_bid.subtask_index] = msg
+                            
+                        else:
+                            # only keep most recent information for bids
+                            listener_bid_msg : TaskBidMessage = bid_messages[bundle_bid.task_id][bundle_bid.subtask_index]
+                            listener_bid : SubtaskBid = SubtaskBid(**listener_bid_msg.bid)
+                            if bundle_bid.t_update >= listener_bid.t_update:
+                                bid_messages[bundle_bid.task_id][bundle_bid.subtask_index] = msg
 
                 for msg in bundle_msgs:
                     if isinstance(msg, TaskBidMessage):
                         bundle_bid : SubtaskBid = SubtaskBid(**msg.bid)
                         if bundle_bid.task_id not in bid_messages:
-                            bid_messages[bundle_bid.task_id] = msg
+                            bid_messages[bundle_bid.task_id] = {}
+                            bid_messages[bundle_bid.task_id][bundle_bid.subtask_index] = msg
+
+                        elif bundle_bid.subtask_index not in bid_messages[bundle_bid.task_id]:
+                            bid_messages[bundle_bid.task_id][bundle_bid.subtask_index] = msg
+
                         else:
                             # only keep most recent information for bids
-                            listener_bid_msg : TaskBidMessage = bid_messages[bundle_bid.task_id]
+                            listener_bid_msg : TaskBidMessage = bid_messages[bundle_bid.task_id][bundle_bid.subtask_index]
                             listener_bid : SubtaskBid = SubtaskBid(**listener_bid_msg.bid)
                             if bundle_bid.t_update >= listener_bid.t_update:
-                                bid_messages[bundle_bid.task_id] = msg
+                                bid_messages[bundle_bid.task_id][bundle_bid.subtask_index] = msg
                             
                     elif isinstance(msg, AgentAction):
                         actions.append(msg)                        
         
                 # build plan
                 plan = []
-                for bid_id in bid_messages:
-                    bid_message : TaskBidMessage = bid_messages[bid_id]
-                    plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
+                changes = []
+                for task_id in bid_messages:
+                    for subtask_index in bid_messages[task_id]:
+                        bid_message : TaskBidMessage = bid_messages[task_id][subtask_index]
+                        changes.append(bid_message)
+                        plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
 
                 for action in actions:
                     action : AgentAction
                     plan.append(action.to_dict())
+
+                self.log_changes("CHANGES TO BE SENT", changes, logging.WARNING)
                 
                 # send to agent
                 self.log(f'bids compared! generating plan with {len(bid_messages)} bid messages and {len(actions)} actions')
@@ -1533,7 +1582,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
             data = []
             for task_id in results:
-                
                 if isinstance(results[task_id], list):
                     for bid in results[task_id]:
                         bid : SubtaskBid
@@ -1551,6 +1599,21 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 else:
                     raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
 
+            df = DataFrame(data, columns=headers)
+            self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
+
+    def log_changes(self, dsc : str, changes : list, level=logging.DEBUG) -> None:
+        if self._logger.getEffectiveLevel() <= level:
+            headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            data = []
+            for change in changes:
+                change : TaskBidMessage
+                bid = SubtaskBid(**change.bid)
+                task = MeasurementTask(**bid.task)
+                split_id = task.id.split('-')
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                data.append(line)
+        
             df = DataFrame(data, columns=headers)
             self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
 

@@ -83,7 +83,7 @@ if __name__ == '__main__':
     
     # create tasks
     tasks = []
-    s_max = 1.0
+    s_max = 100.0
     t_start = 0.0
     t_end = T
     t_corr = 1.0

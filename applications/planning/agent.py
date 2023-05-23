@@ -419,8 +419,8 @@ class SimulationAgent(Agent):
                 if not self.external_inbox.empty():
                     action.status = AgentAction.COMPLETED
                 else:
-                    timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
                     receive_broadcast = asyncio.create_task(self.external_inbox.get())
+                    timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
 
                     done, _ = await asyncio.wait([timeout, receive_broadcast], return_when=asyncio.FIRST_COMPLETED)
 

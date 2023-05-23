@@ -115,10 +115,15 @@ class PlanningSimulationManager(AbstractManager):
             received_messages : dict = {}
             read_task = None
 
+            # poller = azmq.Poller()
+            # sub_socket, _ = self._manager_socket_map.get(zmq.SUB)
+            # poller.register(sub_socket, zmq.POLLIN)
+
             while(
                     len(received_messages) < len(self._simulation_element_name_list) - 1
                     and len(self._simulation_element_name_list) > 1
-                ):
+                ):                
+
                 # reset tasks
                 read_task = None
 
