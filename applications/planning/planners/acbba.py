@@ -96,7 +96,7 @@ class TaskBid(Bid):
             else:
                 self._leave(t)
         
-        elif other.winner is other.NONE:
+        elif other.winner == other.NONE:
             if self.winner == self.bidder:
                 # leave and rebroadcast
                 self._leave(t)
@@ -107,7 +107,7 @@ class TaskBid(Bid):
                 self._update_info(other, t)
                 return other
 
-            elif self.winner not in [self.bidder, other.bidder]:
+            elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
@@ -131,15 +131,6 @@ class TaskBid(Bid):
                         # update and rebroadcast
                         self._update_info(other, t)
                         return other
-                
-                    # _, their_id = other.bidder.split('_')
-                    # _, my_id = self.bidder.split('_')
-                    # their_id = int(their_id); my_id = int(my_id)
-
-                    # if their_id < my_id:
-                    #     # update and rebroadcast
-                    #     self._update_info(other, t)
-                    #     return other
 
                 if other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
@@ -162,7 +153,7 @@ class TaskBid(Bid):
                     self._leave(t)
                     return None
 
-            elif self.winner not in [self.bidder, other.bidder]:
+            elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
@@ -205,7 +196,7 @@ class TaskBid(Bid):
                 self.reset(t)
                 return self
 
-            elif self.winner not in [self.bidder, other.bidder]:
+            elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 # leave and rebroadcast
                 self._leave(t)
                 return self
@@ -265,7 +256,7 @@ class TaskBid(Bid):
                     self._leave(t)
                     return self
 
-            elif self.winner not in [self.bidder, other.bidder, other.winner]:
+            elif self.winner not in [self.bidder, other.bidder, other.winner, self.NONE]:
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)

@@ -128,7 +128,14 @@ class SubtaskBid(TaskBid):
         self.bid_any = bid_any
 
     def update(self, other_dict : dict, t : Union[float, int]) -> object:
-        return self if super().update(other_dict, t) is not None else None
+        broadcast_out : TaskBid = super().update(other_dict, t)
+        if broadcast_out is not None:
+            other = SubtaskBid(**other_dict)
+            if other.bidder == broadcast_out.bidder:
+                return other
+            else:
+                return self
+        return None
 
     def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
         """
@@ -142,9 +149,11 @@ class SubtaskBid(TaskBid):
         self.own_bid = new_bid
         # if new_bid < self.winning_bid:
         #     raise ValueError(f"`new_bid` can only be set with values higher than the original bid. Currently has a winning bid of {new_bid} and was given a bid of {self.winning_bid}.")
-        self.winning_bid = new_bid if new_bid > self.winning_bid else self.winning_bid
-        self.t_img = t_img
-        self.t_violation = -1
+        if new_bid > self.winning_bid:
+            self.winning_bid = new_bid
+            self.winner = self.bidder
+            self.t_img = t_img
+            self.t_violation = -1
         self.t_update = t_update
 
     def __str__(self) -> str:
@@ -397,6 +406,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         "c_const_check" : []
                     }
         self.plan_history = []
+        self.iter_counter = 0
 
     async def listener(self):
         """
@@ -515,6 +525,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         f_update = 4
         plan = []
         converged = 0
+        level = logging.WARNING
 
         try:
             while True:
@@ -544,7 +555,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # update bundle from new information
                 t_0 = time.perf_counter()
-                results, bundle, path, changes = await self.consensus_phase(results, bundle, path, t_curr)
+                results, bundle, path, changes = await self.consensus_phase(results, bundle, path, t_curr, level)
                 results : dict; bundle : list; path : list; changes : list
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
@@ -553,7 +564,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     x = 1
 
                 t_0 = time.perf_counter()
-                results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path)
+                results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path, level)
                 planner_changes : list
                 changes.extend(planner_changes)
                 dt = time.perf_counter() - t_0
@@ -574,6 +585,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 action_dicts.extend(change_dicts)
                 action_bus = BusMessage(self.get_element_name(), self.get_element_name(), action_dicts)
                 await self.outgoing_bundle_builder_inbox.put(action_bus)
+
+
+                self.iter_counter += 1
                 
         except asyncio.CancelledError:
             return
@@ -581,12 +595,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         finally:
             self.bundle_builder_results = results
 
-    async def consensus_phase(self, results, bundle, path, t) -> None:
+    async def consensus_phase(self, results : dict, bundle : list, path : list, t : Union[int, float], level : int = logging.DEBUG) -> None:
         """
         Evaluates incoming bids and updates current results and bundle
         """
         changes = []
-        level = logging.WARNING
         self.log_results('\nINITIAL RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
@@ -670,7 +683,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                         broadcast_bid.to_dict()
                                     )
                 changes.append(out_msg)
-            
+
             # if outbid for a task in the bundle, release subsequent tasks in bundle and path
             bid_task = MeasurementTask(**my_bid.task)
             if (bid_task, my_bid.subtask_index) in bundle and my_bid.winner != self.get_parent_name():
@@ -773,13 +786,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
         return results, bundle, path, changes
    
-    async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list) -> None:
+    async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list, level : int = logging.DEBUG) -> None:
         """
         Uses the most updates results information to construct a path
         """
         available_tasks : list = self.get_available_tasks(state, bundle, results)
-
-        level = logging.DEBUG
         changes = []
         changes_to_bundle = []
         
@@ -871,12 +882,12 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             changes.append(out_msg)
 
 
-        self.log_results('MODIFIED BUNDLE RESULTS BEFORE CONSTRAINT', results, level)
-        self.log_task_sequence('bundle', bundle, level)
-        self.log_task_sequence('path', path, level)
+        # self.log_results('MODIFIED BUNDLE RESULTS BEFORE CONSTRAINT', results, level)
+        # self.log_task_sequence('bundle', bundle, level)
+        # self.log_task_sequence('path', path, level)
         
-        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, state.t, level)
-        changes.extend(cons_changes)
+        # results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, state.t, level)
+        # changes.extend(cons_changes)
 
         self.log_results('MODIFIED BUNDLE RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
@@ -1496,7 +1507,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             - level (`int`): logging level to be used
         """
         if self._logger.getEffectiveLevel() <= level:
-            out = f'\n{dsc} = ['
+            out = f'\n{dsc} [Iter {self.iter_counter}] = ['
             for task, subtask_index in sequence:
                 task : MeasurementTask
                 subtask_index : int
@@ -1528,20 +1539,20 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         bid : SubtaskBid
                         task = MeasurementTask(**bid.task)
                         split_id = task.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
                 elif isinstance(results[task_id], dict):
                     for bid_index in results[task_id]:
                         bid : SubtaskBid = results[task_id][bid_index]
                         task = MeasurementTask(**bid.task)
                         split_id = task.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.winner, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
                 else:
                     raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
 
             df = DataFrame(data, columns=headers)
-            self.log(f'\n{dsc}\n{str(df)}\n', level)
+            self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
 
     async def teardown(self) -> None:
         await super().teardown()

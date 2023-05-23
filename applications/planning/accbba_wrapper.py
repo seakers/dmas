@@ -56,7 +56,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 20
+    T = 5
     year = 2023
     month = 1
     day = 1
@@ -88,13 +88,13 @@ if __name__ == '__main__':
     t_end = T
     t_corr = 1.0
 
-    # pos = [0.0, 1.0]   
-    # measurements = [task_types[0]]
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    pos = [0.0, 2.0]   
+    measurements = [task_types[0]]
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    # pos = [1.0, 2.0]   
-    # measurements = [task_types[1]]
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    pos = [1.0, 2.0]   
+    measurements = [task_types[0], task_types[1]]
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [0.0, 3.0]   
     # measurements = [task_types[1], task_types[0]]
@@ -108,16 +108,16 @@ if __name__ == '__main__':
     # measurements = [task_types[1], task_types[0]]
     # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
 
-    while len(tasks) < n_tasks:
-        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        pos = [x, y]
-        s_max = 1.0
-        measurements = random_measurements(task_types)
-        # measurements = [task_types[0]]
+    # while len(tasks) < n_tasks:
+    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+    #     pos = [x, y]
+    #     s_max = 1.0
+    #     measurements = random_measurements(task_types)
+    #     # measurements = [task_types[0]]
 
-        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
@@ -161,7 +161,7 @@ if __name__ == '__main__':
     pos = [0.0, 0.0]
     vel = [0.0, 0.0]
     task_types = ['MWR', 'IR', 'VNIR']
-    instruments = [task_types[1]]
+    instruments = [task_types[0]]
     agent_id = 0
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
@@ -184,9 +184,9 @@ if __name__ == '__main__':
                                 )
     agents.append(agent)
 
-    pos = [0.0, 0.0]
+    pos = [1.0, 0.0]
     vel = [0.0, 0.0]
-    instruments = [task_types[0]]
+    instruments = [task_types[1]]
     agent_id = 1
     initial_state = SimulationAgentState(   pos, 
                                             x_bounds, 
