@@ -77,7 +77,7 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 5
+    n_tasks = 10
     # task_types = ['MWR', 'IR', 'VNIR']
     task_types = ['MWR', 'IR']
     
@@ -88,25 +88,24 @@ if __name__ == '__main__':
     t_end = T
     t_corr = 1.0
 
-    # pos = [1.0, 1.0]   
-    # instruments = [task_types[0]]
-    # task = MeasurementTask(pos, s_max, instruments, t_start, t_end)
-    # tasks.append(MeasurementTask(pos, s_max, instruments, t_start, t_end))
+    # pos = [0.0, 1.0]   
+    # measurements = [task_types[0]]
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [1.0, 2.0]   
     # measurements = [task_types[1]]
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    # pos = [2.0, 1.0]   
-    # measurements = [task_types[1]]
+    # pos = [0.0, 3.0]   
+    # measurements = [task_types[1], task_types[0]]
     # tasks.append(MeasurementTask(pos, 100, measurements, t_start, t_end, t_corr))
 
-    # pos = [2.0, 2.0]   
+    # pos = [2.0, 3.0]   
     # measurements = [task_types[1], task_types[0]]
     # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
 
-    # pos = [3.0, 0.0]   
-    # measurements = [task_types[0]]
+    # pos = [3.0, 4.0]   
+    # measurements = [task_types[1], task_types[0]]
     # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
 
     while len(tasks) < n_tasks:

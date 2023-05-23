@@ -75,8 +75,8 @@ class SubtaskBid(TaskBid):
                     dt_converge: Union[float, int] = 0.0, 
                     t_violation: Union[float, int] = -1, 
                     dt_violoation: Union[float, int] = 0.0,
-                    bid_solo : int = 10,
-                    bid_any : int = 10, 
+                    bid_solo : int = 3,
+                    bid_any : int = 3, 
                     **_
                 ) -> object:
         """
@@ -129,6 +129,23 @@ class SubtaskBid(TaskBid):
 
     def update(self, other_dict : dict, t : Union[float, int]) -> object:
         return self if super().update(other_dict, t) is not None else None
+
+    def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
+        """
+        Sets new values for this bid
+
+        ### Arguments: 
+            - new_bid (`int` or `float`): new bid value
+            - t_img (`int` or `float`): new imaging time
+            - t_update (`int` or `float`): update time
+        """
+        self.own_bid = new_bid
+        # if new_bid < self.winning_bid:
+        #     raise ValueError(f"`new_bid` can only be set with values higher than the original bid. Currently has a winning bid of {new_bid} and was given a bid of {self.winning_bid}.")
+        self.winning_bid = new_bid if new_bid > self.winning_bid else self.winning_bid
+        self.t_img = t_img
+        self.t_violation = -1
+        self.t_update = t_update
 
     def __str__(self) -> str:
         """
@@ -199,7 +216,7 @@ class SubtaskBid(TaskBid):
         if self.t_violation < 0:
             return False
 
-        return t > self.dt_violation + self.t_violation
+        return t >= self.dt_violation + self.t_violation
     
 
     def count_coal_conts_satisied(self, others : list) -> int:
@@ -239,7 +256,7 @@ class SubtaskBid(TaskBid):
                 self.bid_any = self.bid_any if self.bid_any > 0 else 0
 
                 self.bid_solo -= 1
-                self.bid_solo = self.bid_solo if self.bid_solo > 0 else 0
+                self.bid_solo = self.bid_solo if self.bid_solo >= 0 else 0
             
             return self
 
@@ -495,7 +512,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         path = []
         t_curr = 0.0
         t_next = 0.0
-        f_update = 0.25
+        f_update = 4
         plan = []
         converged = 0
 
@@ -532,12 +549,18 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
 
+                if t_curr > 0.0 and len(changes) > 0:
+                    x = 1
+
                 t_0 = time.perf_counter()
                 results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path)
                 planner_changes : list
                 changes.extend(planner_changes)
                 dt = time.perf_counter() - t_0
                 self.stats['planning'].append(dt)
+
+                if t_curr > 0.0 and len(changes) > 0:
+                    x = 1
 
                 t_0 = time.perf_counter()
                 bundle, path, plan, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
@@ -563,7 +586,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Evaluates incoming bids and updates current results and bundle
         """
         changes = []
-        level = logging.DEBUG
+        level = logging.WARNING
         self.log_results('\nINITIAL RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
@@ -596,6 +619,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         changes.extend(cons_changes)
         dt = time.perf_counter() - t_0
         self.stats['c_const_check'].append(dt)
+
+        if t > 0.0 and len(changes) > 0:
+            x = 1
 
         self.log_results('CONSTRAINT CHECKED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
@@ -652,7 +678,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 for _ in range(bid_index, len(bundle)):
                     # remove all subsequent tasks from bundle
-                    measurement_task, subtask_index, utility = bundle.pop(bid_index)
+                    measurement_task, subtask_index = bundle.pop(bid_index)
                     path.remove((measurement_task, subtask_index))
 
                     # if the agent is currently winning this bid, reset results
@@ -815,7 +841,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 measurement_task : MeasurementTask
                 subtask_index : int
                 new_bid : TaskBid = max_path_bids[measurement_task.id][subtask_index]
+                old_bid : TaskBid = results[measurement_task.id][subtask_index]
                 
+                if old_bid.task_id != new_bid.task_id:
+                    x = 1
+
                 if results[measurement_task.id][subtask_index] != new_bid:
                     changes_to_bundle.append((measurement_task, subtask_index))
 
@@ -841,10 +871,17 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             changes.append(out_msg)
 
 
-        self.log_results('MODIFIED BUNDLE RESULTS', results, level)
+        self.log_results('MODIFIED BUNDLE RESULTS BEFORE CONSTRAINT', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
         
+        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, state.t, level)
+        changes.extend(cons_changes)
+
+        self.log_results('MODIFIED BUNDLE RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
         return results, bundle, path, changes
 
     def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
@@ -985,22 +1022,8 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 utility = self.calc_utility(prev_state, task_i, subtask_j, t_img)
 
                 # create bid
-                main_measurement, _ = task_i.measurement_groups[subtask_j]
-                dependencies = task_i.dependency_matrix[subtask_j]
-                time_constraints = task_i.time_dependency_matrix[subtask_j]
-                bid = SubtaskBid(  
-                                task_i.to_dict(),
-                                subtask_j,
-                                main_measurement,
-                                dependencies,
-                                time_constraints,
-                                self.get_parent_name(),
-                                utility,
-                                utility,
-                                self.get_parent_name(),
-                                t_img,
-                                state.t
-                            )
+                bid : SubtaskBid = original_results[task_i.id][subtask_j].copy()
+                bid.set_bid(utility, t_img, state.t)
                 
                 if task_i.id not in bids:
                     bids[task_i.id] = {}    
@@ -1241,7 +1264,10 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             and len(path) > 0
             and self.check_path_constraints(path, results, t_curr)):
 
-            if len(plan) == 0:
+            if converged < 2:
+                converged += 1
+
+            elif len(plan) == 0:
                 # no itemized plan has been generated yet; generate one
                 measurement_plan = []
                 for i in range(len(path)):
@@ -1291,60 +1317,61 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     plan.append(move_action)
                     plan.append(measurement_action)  
 
-                    measurement_plan.append((measurement_task, subtask_index, subtask_bid))
-                actions.append(plan[0])
-
+                    measurement_plan.append((t_curr, measurement_task, subtask_index, subtask_bid.copy()))
+                
+                # actions.append(plan[0])
                 self.plan_history.append(measurement_plan)
             else:
-                # plan has already been developed and is being performed; check plan complation status
-                while not self.action_status_inbox.empty():
-                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
-                    performed_action = AgentAction(**action_msg.action)
+                x = 1
+                # # plan has already been developed and is being performed; check plan complation status
+                # while not self.action_status_inbox.empty():
+                #     action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                #     performed_action = AgentAction(**action_msg.action)
 
-                    if len(plan) < 1:
-                        continue
+                #     if len(plan) < 1:
+                #         continue
 
-                    latest_plan_action : AgentAction = plan[0]
-                    if performed_action.id != latest_plan_action.id:
-                        # some other task was performed; ignoring 
-                        continue
+                #     latest_plan_action : AgentAction = plan[0]
+                #     if performed_action.id != latest_plan_action.id:
+                #         # some other task was performed; ignoring 
+                #         continue
 
-                    elif performed_action.status == AgentAction.PENDING:
-                        # latest action from plan was attepted but not completed; performing again
+                #     elif performed_action.status == AgentAction.PENDING:
+                #         # latest action from plan was attepted but not completed; performing again
                         
-                        if t_curr < latest_plan_action.t_start:
-                            # if action was not ready to be performed, wait for a bit
-                            actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
-                        else:
-                            # try to perform action again
-                            actions.append(plan[0])
+                #         if t_curr < latest_plan_action.t_start:
+                #             # if action was not ready to be performed, wait for a bit
+                #             actions.append( WaitForMessages(t_curr, latest_plan_action.t_start - t_curr) )
+                #         else:
+                #             # try to perform action again
+                #             actions.append(plan[0])
 
-                    elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
-                        # latest action from plan was completed! performing next action in plan
-                        done_action : AgentAction = plan.pop(0)
+                #     elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
+                #         # latest action from plan was completed! performing next action in plan
+                #         done_action : AgentAction = plan.pop(0)
 
-                        if done_action.action_type == ActionTypes.MEASURE.value:
-                            done_action : MeasurementAction
-                            done_task = MeasurementTask(**done_action.task)
+                #         if done_action.action_type == ActionTypes.MEASURE.value:
+                #             done_action : MeasurementAction
+                #             done_task = MeasurementTask(**done_action.task)
                             
-                            # if a measurement action was completed, remove from bundle and path
-                            if (done_task, done_action.subtask_index) in path:
-                                path.remove((done_task, done_action.subtask_index))
-                                bundle.remove((done_task, done_action.subtask_index))
+                #             # if a measurement action was completed, remove from bundle and path
+                #             if (done_task, done_action.subtask_index) in path:
+                #                 path.remove((done_task, done_action.subtask_index))
+                #                 bundle.remove((done_task, done_action.subtask_index))
 
-                        if len(plan) > 0:
-                            next_task : AgentAction = plan[0]
-                            if t_curr >= next_task.t_start:
-                                actions.append(next_task)
-                            else:
-                                actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                #         if len(plan) > 0:
+                #             next_task : AgentAction = plan[0]
+                #             if t_curr >= next_task.t_start:
+                #                 actions.append(next_task)
+                #             else:
+                #                 actions.append( WaitForMessages(t_curr, next_task.t_start) )
                 
-                if len(actions) == 0 and len(plan) > 0:
-                    next_task : AgentAction = plan[0]
-                    if t_curr >= next_task.t_start:
-                        actions.append(next_task)
-                    else:
-                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                # if len(actions) == 0 and len(plan) > 0:
+                #     next_task : AgentAction = plan[0]
+                #     if t_curr >= next_task.t_start:
+                #         actions.append(next_task)
+                #     else:
+                #         actions.append( WaitForMessages(t_curr, next_task.t_start) )
 
         else:
             # bundle is empty or cannot be executed yet; instructing agent to idle
@@ -1520,18 +1547,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         await super().teardown()
 
         # log plan history
-        out = 'plan_index,task_id,subtask_index,t_img,u_exp\n'
+        out = 'plan_index,t,task_id,subtask_index,t_img,u_exp\n'
         for i in range(len(self.plan_history)):
-            for task, subtask_index, subtask_bid in self.plan_history[i]:
+            for t, task, subtask_index, subtask_bid in self.plan_history[i]:
                 task : MeasurementTask
                 subtask_index : int
                 subtask_bid : SubtaskBid
                 
                 line_data = [   i,
+                                t,
                                 task.id.split('-')[0],
                                 subtask_index,
-                                subtask_bid.t_img,
-                                subtask_bid.winning_bid
+                                np.round(subtask_bid.t_img,3 ),
+                                np.round(subtask_bid.winning_bid,3)
                 ]
 
                 for j in range(len(line_data)):
