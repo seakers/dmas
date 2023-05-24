@@ -311,7 +311,7 @@ class ConsensusPlanner(PlannerModule):
         self.bundle_builder_results = None
 
     @abstractmethod
-    def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+    def path_constraint_sat(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """
         Checks if the bids of every task in the current path have all of their constraints
         satisfied by other bids.

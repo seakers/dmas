@@ -379,9 +379,10 @@ class ACBBAPlannerModule(ConsensusPlanner):
         try:
             listener_task = asyncio.create_task(self.listener(), name='listener()')
             bundle_builder_task = asyncio.create_task(self.bundle_builder(), name='bundle_builder()')
-            rebroadcaster_task = asyncio.create_task(self.rebroadcaster(), name='rebroadcaster()')
+            # rebroadcaster_task = asyncio.create_task(self.rebroadcaster(), name='rebroadcaster()')
             
-            tasks = [listener_task, bundle_builder_task, rebroadcaster_task]
+            # tasks = [listener_task, bundle_builder_task, rebroadcaster_task]
+            tasks = [listener_task, bundle_builder_task]
 
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
@@ -703,7 +704,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
                 actions = []
                 if (len(changes) == 0 
                     and len(path) > 0
-                    and self.check_path_constraints(path, results, t_curr)):
+                    and self.path_constraint_sat(path, results, t_curr)):
 
                     if converged < 1:
                         converged += 1
@@ -849,7 +850,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
         # calculate urgency factor from task
         return task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
 
-    def check_path_constraints(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+    def path_constraint_sat(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """
         Checks if the bids of every task in the current path have all of their constraints
         satisfied by other bids.
