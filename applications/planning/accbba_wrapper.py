@@ -56,7 +56,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 5
+    T = 10
     year = 2023
     month = 1
     day = 1
@@ -78,8 +78,8 @@ if __name__ == '__main__':
 
     ### random tasks 
     n_tasks = 10
-    # task_types = ['MWR', 'IR', 'VNIR']
-    task_types = ['MWR', 'IR']
+    task_types = ['MWR', 'IR', 'VNIR']
+    # task_types = ['MWR', 'IR']
     
     # create tasks
     tasks = []
@@ -95,6 +95,10 @@ if __name__ == '__main__':
 
     pos = [1.0, 2.0]   
     measurements = [task_types[0], task_types[1]]
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+
+    pos = [1.0, 3.0]   
+    measurements = [task_types[2], task_types[1]]
     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [0.0, 3.0]   
