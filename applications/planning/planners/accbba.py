@@ -692,7 +692,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         Generates a lsit of AgentActions from the current path
         """
         plan = []
-        measurement_plan = []
         for i in range(len(path)):
             measurement_task, subtask_index = path[i]
             measurement_task : MeasurementTask; subtask_index : int
@@ -703,12 +702,16 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 prev_pos = state.pos
 
             else:
-                prev_task, prev_subtask_index = path[i-1]
-                prev_task : MeasurementTask; prev_subtask_index : int
-                
-                prev_bid : SubtaskBid = results[prev_task.id][prev_subtask_index]
-                t_move_start = prev_bid.t_img + prev_task.duration
+                prev_measurement : MeasurementAction = plan[(i-1)*2 + 1]
+                t_move_start = prev_measurement.t_end
+                prev_task = MeasurementTask(**prev_measurement.task)
                 prev_pos = prev_task.pos
+                # prev_task, prev_subtask_index = path[i-1]
+                # prev_task : MeasurementTask; prev_subtask_index : int
+                
+                # prev_bid : SubtaskBid = results[prev_task.id][prev_subtask_index]
+                # t_move_start = prev_bid.t_img + prev_task.duration
+                # prev_pos = prev_task.pos
 
             task_pos = measurement_task.pos
             dx = np.sqrt( (task_pos[0] - prev_pos[0])**2 + (task_pos[1] - prev_pos[1])**2 )
@@ -739,10 +742,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # plan per measurement request: move to plan, perform measurement 
             plan.append(move_action)
             plan.append(measurement_action)  
-
-            measurement_plan.append((state.t, measurement_task, subtask_index, subtask_bid.copy()))
         
-        # self.plan_history.append(measurement_plan)
         return plan
 
     async def get_next_actions(self, bundle : list, path : list, plan : list, t_curr : Union[int, float]) -> None:
