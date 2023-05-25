@@ -552,7 +552,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         try:
             results, bundle, path, plan = {}, [], [], []
             t_curr = 0
-            level = logging.WARNING
+            level = logging.DEBUG
 
             while True:
                  # wait for next agent plan check
@@ -580,15 +580,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 if changes_to_bundle or len(comp_rebroadcasts) > 0:
                     # broadcast changes
-                    await self.bid_broadcaster(comp_rebroadcasts, t_curr)
+                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
                     
                     # replan
                     results, bundle, path, plan = await self.create_plan(state, results, comp_bundle, comp_path, level)
-                else:
-                    # execute plan
-                    pass
-
-                x = 1
+                
+                # execute plan
+                bundle, path, plan, next_actions = await self.get_next_actions(bundle, path, plan, t_curr)
+                await self.action_broadcaster(next_actions)
                 
         except asyncio.CancelledError:
             return 
@@ -716,14 +715,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             dt = time.perf_counter() - t_0
             self.stats['planning'].append(dt)
 
-            self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
-            self.log_changes("CHANGES MADE FROM CONSENSUS", consensus_changes, level)
+            # self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
+            # self.log_changes("CHANGES MADE FROM CONSENSUS", consensus_changes, level)
 
             # Broadcast changes to bundle and any changes from consensus
             broadcast_bids : list = consensus_rebroadcasts
             broadcast_bids.extend(planner_changes)
             self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
-            await self.bid_broadcaster(broadcast_bids, t_curr, True)
+            wait_for_response = not converged
+            await self.bid_broadcaster(broadcast_bids, t_curr, wait_for_response, level)
 
             # Phase 2: Consensus 
             t_0 = time.perf_counter()
@@ -740,6 +740,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             self.iter_counter += 1
             
         # create plan from path
+        level = logging.WARNING
         self.log_results('PLAN CREATED', results, level)
         self.log_task_sequence('Bundle', bundle, level)
         self.log_task_sequence('Path', path, level)
@@ -808,6 +809,66 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         
         self.plan_history.append(measurement_plan)
         return plan
+
+    async def get_next_actions(self, bundle : list, path : list, plan : list, t_curr : Union[int, float]) -> None:
+        """
+        A plan has already been developed and is being performed; check plan complation status
+        """
+        actions = []
+        while not self.action_status_inbox.empty():
+            action_msg : AgentActionMessage = await self.action_status_inbox.get()
+            performed_action = AgentAction(**action_msg.action)
+
+            if len(plan) < 1:
+                continue
+
+            latest_plan_action : AgentAction = plan[0]
+            if performed_action.id != latest_plan_action.id:
+                # some other task was performed; ignoring 
+                continue
+
+            elif performed_action.status == AgentAction.PENDING:
+                # latest action from plan was attepted but not completed; performing again
+                
+                if t_curr < performed_action.t_start:
+                    # if action was not ready to be performed, wait for a bit
+                    actions.append( WaitForMessages(t_curr, performed_action.t_start) )
+                else:
+                    # try to perform action again
+                    actions.append(plan[0])
+
+            elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
+                # latest action from plan was completed! performing next action in plan
+                done_action : AgentAction = plan.pop(0)
+
+                if done_action.action_type == ActionTypes.MEASURE.value:
+                    done_action : MeasurementAction
+                    done_task = MeasurementTask(**done_action.task)
+                    
+                    # if a measurement action was completed, remove from bundle and path
+                    if (done_task, done_action.subtask_index) in path:
+                        path.remove((done_task, done_action.subtask_index))
+                        bundle.remove((done_task, done_action.subtask_index))
+
+                if len(plan) > 0:
+                    next_task : AgentAction = plan[0]
+                    if t_curr >= next_task.t_start:
+                        actions.append(next_task)
+                    else:
+                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
+        
+        if len(actions) == 0:
+            if len(plan) > 0:
+                next_task : AgentAction = plan[0]
+                if t_curr >= next_task.t_start:
+                    actions.append(next_task)
+                else:
+                    actions.append( WaitForMessages(t_curr, next_task.t_start) )
+        
+            else:
+                actions.append( WaitForMessages(t_curr, t_curr + 1) )
+
+        return bundle, path, plan, actions
 
     # async def bundle_builder(self) -> None:
     #     """
@@ -1651,15 +1712,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         constraint_sat, _ = bid_copy.check_constraints(results[task.id], t_curr)
         return constraint_sat is None
 
-    async def bid_broadcaster(self, bids : list, t_curr : Union[int, float], wait_for_response : bool = False) -> None:
+    async def bid_broadcaster(self, bids : list, t_curr : Union[int, float], wait_for_response : bool = False, level : int = logging.DEBUG) -> None:
         """
         Sends bids to parent agent for broadcasting. Only sends the most recent bid of a particular task.
 
         ### Arguments:
             - bids (`list`): bids to be broadcasted
         """
-        if len(bids) == 0:
-            return
 
         bid_messages = {}
         for msg in bids:
@@ -1712,8 +1771,23 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         for action_msg in misc_action_msgs:
             await self.action_status_inbox.put(action_msg)
 
-        self.log_changes("CHANGES TO BE SENT", changes, logging.WARNING)
+        self.log_changes("BROADCASTS SENT", changes, level)
 
+    async def action_broadcaster(self, next_actions : list) -> None:
+        """
+        Sends the parent agent a list of actions to be performed
+        """
+        # generate plan dictionaries for transmission
+        actions_dict = [action.to_dict() for action in next_actions]
+
+        # send plan to agent
+        self.log(f'bids compared! generating plan with {len(next_actions)} action(s).')
+        plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), actions_dict)
+        await self._send_manager_msg(plan_msg, zmq.PUB)
+        self.log(f'actions sent!')
+
+
+        self.log(f'plan sent {[action.action_type for action in next_actions]}', level=logging.WARNING)
     # async def rebroadcaster(self) -> None:
     #     """
     #     ## Rebroadcaster
@@ -1793,9 +1867,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
     #                     changes.append(bid_message)
     #                     plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
 
-    #             for action in actions:
-    #                 action : AgentAction
-    #                 plan.append(action.to_dict())
+                # for action in actions:
+                #     action : AgentAction
+                #     plan.append(action.to_dict())
 
     #             self.log_changes("CHANGES TO BE SENT", changes, logging.WARNING)
                 

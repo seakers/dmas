@@ -203,7 +203,7 @@ class SimulationAgent(Agent):
             if content['msg_type'] == SimulationMessageTypes.PLAN.value:
                 msg = PlanMessage(**content)
                 for action_dict in msg.plan:
-                    self.log(f"received an action of type {action_dict['action_type']}")
+                    self.log(f"received an action of type {action_dict['action_type']}", level=logging.WARNING)
                     actions.append(action_dict)  
         
         self.log(f"plan of {len(actions)} actions received from planner module!")
