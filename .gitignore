@@ -70,6 +70,9 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Simulation-generated data
+*.csv
+
 # Translations
 *.mo
 *.pot
