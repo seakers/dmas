@@ -213,7 +213,7 @@ class SimulationAgent(Agent):
 
     async def do(self, actions: list) -> dict:
         statuses = []
-        self.log(f'performing {len(actions)} actions')
+        self.log(f'performing {len(actions)} actions', level=logging.DEBUG)
         
         for action_dict in actions:
             action_dict : dict
@@ -457,7 +457,7 @@ class SimulationAgent(Agent):
                     self.stats[action_dict['action_type']] = []    
                 self.stats[action_dict['action_type']].append(dt)
 
-        self.log(f'returning {len(statuses)} statuses')
+        self.log(f'returning {len(statuses)} statuses', level=logging.DEBUG)
         return statuses
 
     async def teardown(self) -> None:

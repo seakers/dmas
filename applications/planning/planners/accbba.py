@@ -151,11 +151,15 @@ class SubtaskBid(TaskBid):
         self.own_bid = new_bid
         # if new_bid < self.winning_bid:
         #     raise ValueError(f"`new_bid` can only be set with values higher than the original bid. Currently has a winning bid of {new_bid} and was given a bid of {self.winning_bid}.")
-        if new_bid > self.winning_bid:
-            self.winning_bid = new_bid
-            self.winner = self.bidder
-            self.t_img = t_img
-            self.t_violation = -1
+        # if new_bid > self.winning_bid:
+            # self.winning_bid = new_bid
+            # self.winner = self.bidder
+            # self.t_img = t_img
+            # self.t_violation = -1
+        self.winning_bid = new_bid
+        self.winner = self.bidder
+        self.t_img = t_img
+        self.t_violation = -1
         self.t_update = t_update
 
     def __str__(self) -> str:
@@ -548,7 +552,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
     async def planner(self) -> None:
         try:
-            results, bundle, path, plan = {}, [], [], []
+            results, bundle, path, plan, prev_actions = {}, [], [], [], []
             t_curr = 0
             level = logging.DEBUG
 
@@ -602,10 +606,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # execute plan
                 t_0 = time.perf_counter()
-                bundle, path, plan, next_actions = await self.get_next_actions(bundle, path, plan, t_curr)
+                bundle, path, plan, next_actions = await self.get_next_actions(bundle, path, plan, prev_actions, t_curr)
                 await self.action_broadcaster(next_actions)
                 dt = time.perf_counter() - t_0
                 self.stats['doing'].append(dt)
+                prev_actions = next_actions
                                 
         except asyncio.CancelledError:
             return 
@@ -657,16 +662,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # Check for convergence
             if converged:
                 break
-            converged = (len(planner_changes) == len(consensus_changes) == 0 
-                         and self.path_constraint_sat(path, results, t_curr))
+            converged = self.path_constraint_sat(path, results, t_curr)
 
             # Broadcast changes to bundle and any changes from consensus
             broadcast_bids : list = consensus_rebroadcasts
             broadcast_bids.extend(planner_changes)
             self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
             wait_for_response = not converged
-            if len(broadcast_bids) == 0:
-                x = 1
             await self.bid_broadcaster(broadcast_bids, t_curr, wait_for_response, level)
             
             # Update State
@@ -706,12 +708,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 t_move_start = prev_measurement.t_end
                 prev_task = MeasurementTask(**prev_measurement.task)
                 prev_pos = prev_task.pos
-                # prev_task, prev_subtask_index = path[i-1]
-                # prev_task : MeasurementTask; prev_subtask_index : int
-                
-                # prev_bid : SubtaskBid = results[prev_task.id][prev_subtask_index]
-                # t_move_start = prev_bid.t_img + prev_task.duration
-                # prev_pos = prev_task.pos
 
             task_pos = measurement_task.pos
             dx = np.sqrt( (task_pos[0] - prev_pos[0])**2 + (task_pos[1] - prev_pos[1])**2 )
@@ -745,52 +741,71 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         
         return plan
 
-    async def get_next_actions(self, bundle : list, path : list, plan : list, t_curr : Union[int, float]) -> None:
+    async def get_next_actions(self, bundle : list, path : list, plan : list, prev_actions : list, t_curr : Union[int, float]) -> None:
         """
         A plan has already been developed and is being performed; check plan complation status
         """
         actions = []
-        while not self.action_status_inbox.empty():
-            action_msg : AgentActionMessage = await self.action_status_inbox.get()
-            performed_action = AgentAction(**action_msg.action)
 
-            if len(plan) < 1:
-                continue
-
-            latest_plan_action : AgentAction = plan[0]
-            if performed_action.id != latest_plan_action.id:
-                # some other task was performed; ignoring 
-                continue
-
-            elif performed_action.status == AgentAction.PENDING:
-                # latest action from plan was attepted but not completed; performing again
-                
-                if t_curr < performed_action.t_start:
-                    # if action was not ready to be performed, wait for a bit
-                    actions.append( WaitForMessages(t_curr, performed_action.t_start) )
+        if len(prev_actions) == 0:
+            if len(plan) > 0:
+                next_task : AgentAction = plan[0]
+                if t_curr >= next_task.t_start:
+                    actions.append(next_task)
                 else:
-                    # try to perform action again
-                    actions.append(plan[0])
+                    actions.append( WaitForMessages(t_curr, next_task.t_start) )
+        
+        else:
+            if self.action_status_inbox.empty():
+                # wait for task completion statuses to arrive from parent agent
+                await self.action_status_inbox.put(await self.action_status_inbox.get())
 
-            elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
-                # latest action from plan was completed! performing next action in plan
-                done_action : AgentAction = plan.pop(0)
+            while not self.action_status_inbox.empty():
+                action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                performed_action = AgentAction(**action_msg.action)
+                self.log(f'Reveived action status for action of type {performed_action.action_type}!', level=logging.DEBUG)
 
-                if done_action.action_type == ActionTypes.MEASURE.value:
-                    done_action : MeasurementAction
-                    done_task = MeasurementTask(**done_action.task)
+                if len(plan) < 1:
+                    continue
+
+                latest_plan_action : AgentAction = plan[0]
+                if performed_action.id != latest_plan_action.id:
+                    # some other task was performed; ignoring 
+                    self.log(f'Action of type {performed_action.action_type} was not part of original plan. Ignoring completion status.', level=logging.DEBUG)
+                    continue
+
+                elif performed_action.status == AgentAction.PENDING:
+                    # latest action from plan was attepted but not completed; performing again
                     
-                    # if a measurement action was completed, remove from bundle and path
-                    if (done_task, done_action.subtask_index) in path:
-                        path.remove((done_task, done_action.subtask_index))
-                        bundle.remove((done_task, done_action.subtask_index))
-
-                if len(plan) > 0:
-                    next_task : AgentAction = plan[0]
-                    if t_curr >= next_task.t_start:
-                        actions.append(next_task)
+                    if t_curr < performed_action.t_start:
+                        # if action was not ready to be performed, wait for a bit
+                        self.log(f'Action of type {performed_action.action_type} was attempted before its start time. Waiting for a bit...', level=logging.DEBUG)
+                        actions.append( WaitForMessages(t_curr, performed_action.t_start) )
                     else:
-                        actions.append( WaitForMessages(t_curr, next_task.t_start) )
+                        # try to perform action again
+                        self.log(f'Action of type {performed_action.action_type} was attempted but not completed. Trying again...', level=logging.DEBUG)
+                        actions.append(plan[0])
+
+                elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
+                    # latest action from plan was completed! performing next action in plan
+                    done_action : AgentAction = plan.pop(0)
+                    self.log(f'Completed action of type {done_action.action_type}!', level=logging.DEBUG)
+
+                    if done_action.action_type == ActionTypes.MEASURE.value:
+                        done_action : MeasurementAction
+                        done_task = MeasurementTask(**done_action.task)
+                        
+                        # if a measurement action was completed, remove from bundle and path
+                        if (done_task, done_action.subtask_index) in path:
+                            path.remove((done_task, done_action.subtask_index))
+                            bundle.remove((done_task, done_action.subtask_index))
+
+                    if len(plan) > 0:
+                        next_task : AgentAction = plan[0]
+                        if t_curr >= next_task.t_start:
+                            actions.append(next_task)
+                        else:
+                            actions.append( WaitForMessages(t_curr, next_task.t_start) )
         
         if len(actions) == 0:
             if len(plan) > 0:
@@ -1077,7 +1092,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 if (max_task is None or projected_path_utility > max_path_utility):
 
                     # check for cualition and mutex satisfaction
-                    proposed_bid :SubtaskBid = projected_bids[measurement_task.id][subtask_index]
+                    proposed_bid : SubtaskBid = projected_bids[measurement_task.id][subtask_index]
                     passed_coalition_test = self.coalition_test(results, proposed_bid)
                     passed_mutex_test = self.mutex_test(results, proposed_bid)
                     if not passed_coalition_test or not passed_mutex_test:
@@ -1287,6 +1302,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 winning_bids = bids
                 winning_path_utility = path_utility
 
+
         return winning_path, winning_bids, winning_path_utility
 
     def calc_imaging_time(self, state : SimulationAgentState, current_results : dict, path : list, bids : dict, task : MeasurementTask, subtask_index : int) -> float:
@@ -1342,6 +1358,9 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # else:
                 # other agent images before my earliest time; expect other bidder to met my schedule
                 # or `t_img` satisfies this time constraint; no action required
+
+        if t_prev > 2.0 and t_img <= t_prev and task_prev.id != task.id:
+            x = 1
 
         return t_img
         
@@ -1591,7 +1610,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), actions_dict)
         await self._send_manager_msg(plan_msg, zmq.PUB)
         self.log(f'actions sent!')
-
 
         self.log(f'plan sent {[action.action_type for action in next_actions]}', level=logging.DEBUG)
     
