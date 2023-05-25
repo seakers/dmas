@@ -419,33 +419,35 @@ class SimulationAgent(Agent):
                 if not self.external_inbox.empty():
                     action.status = AgentAction.COMPLETED
                 else:
-                    receive_broadcast = asyncio.create_task(self.external_inbox.get())
-                    timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
+                    await self.external_inbox.put(await self.external_inbox.get())
+                    action.status = AgentAction.COMPLETED
+                    # receive_broadcast = asyncio.create_task(self.external_inbox.get())
+                    # timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
 
-                    done, _ = await asyncio.wait([timeout, receive_broadcast], return_when=asyncio.FIRST_COMPLETED)
+                    # done, _ = await asyncio.wait([timeout, receive_broadcast], return_when=asyncio.FIRST_COMPLETED)
 
-                    if receive_broadcast in done:
-                        # a mesasge was received before the timer ran out; cancel timer
-                        try:
-                            timeout.cancel()
-                            await timeout
-                        except asyncio.CancelledError:
-                            # restore message to inbox so it can be processed during `sense()`
-                            await self.external_inbox.put(receive_broadcast.result())    
+                    # if receive_broadcast in done:
+                    #     # a mesasge was received before the timer ran out; cancel timer
+                    #     try:
+                    #         timeout.cancel()
+                    #         await timeout
+                    #     except asyncio.CancelledError:
+                    #         # restore message to inbox so it can be processed during `sense()`
+                    #         await self.external_inbox.put(receive_broadcast.result())    
 
-                            # update action completion status
-                            action.status = AgentAction.COMPLETED                
-                    else:
-                        # timer ran out or time advanced
-                        try:
-                            receive_broadcast.cancel()
-                            await receive_broadcast
-                        except asyncio.CancelledError:
-                            # update action completion status
-                            if self.external_inbox.empty():
-                                action.status = AgentAction.PENDING
-                            else:
-                                action.status = AgentAction.COMPLETED
+                    #         # update action completion status
+                    #         action.status = AgentAction.COMPLETED                
+                    # else:
+                    #     # timer ran out or time advanced
+                    #     try:
+                    #         receive_broadcast.cancel()
+                    #         await receive_broadcast
+                    #     except asyncio.CancelledError:
+                    #         # update action completion status
+                    #         if self.external_inbox.empty():
+                    #             action.status = AgentAction.PENDING
+                    #         else:
+                    #             action.status = AgentAction.COMPLETED
             else:
                 # ignore action
                 self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
