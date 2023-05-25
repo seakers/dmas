@@ -1,5 +1,7 @@
 import copy
 import math
+
+from pandas import DataFrame
 from actions import MeasurementAction
 from utils import setup_results_directory
 from states import SimulationAgentState
@@ -347,24 +349,24 @@ class SimulationEnvironment(EnvironmentNode):
         self.log(f'Environment shutdown with internal clock of {self.get_current_time()}[s]', level=logging.WARNING)
         
         # log connectiviy history
-        out = '\nConnectivity history'
+        # out = '\nConnectivity history'
 
-        for t, agent_connectivity in self.agent_connectivity_history:  
-            connected = []
-            for src in agent_connectivity:
-                for dst in agent_connectivity[src]:
-                    if src == dst:
-                        continue
-                    if (dst, src) in connected:
-                        continue
-                    if agent_connectivity[src][dst] == 1:
-                        connected.append((src, dst))
+        # for t, agent_connectivity in self.agent_connectivity_history:  
+        #     connected = []
+        #     for src in agent_connectivity:
+        #         for dst in agent_connectivity[src]:
+        #             if src == dst:
+        #                 continue
+        #             if (dst, src) in connected:
+        #                 continue
+        #             if agent_connectivity[src][dst] == 1:
+        #                 connected.append((src, dst))
 
-            if len(connected) > 0:
-                out += f'\nt:={t}[s]\n'
-                for src, dst in connected:
-                    out += f'\t{src} <-> {dst}\n'
-        self.log(out, level=logging.WARNING)
+        #     if len(connected) > 0:
+        #         out += f'\nt:={t}[s]\n'
+        #         for src, dst in connected:
+        #             out += f'\t{src} <-> {dst}\n'
+        # self.log(out, level=logging.WARNING)
         
         # print connectivity history
         with open(f"{self.results_path}/connectivity.csv", "w") as file:
@@ -384,39 +386,31 @@ class SimulationEnvironment(EnvironmentNode):
                     file.write(line)
 
         # print measurements
-        with open(f"{self.results_path}/measurements.csv", "w") as file:
-            title = 'task_id,measurer,x_pos,y_pos,t_start,t_end,t_corr,t_img,u_max,u_exp,u\n'
-            file.write(title)
+        headers = ['task_id','measurer','pos','t_start','t_end','t_corr','t_img','u_max','u_exp','u']
+        data = []
+        for msg in self.measurement_history:
+            msg : MeasurementResultsRequest
+            measurement_action = MeasurementAction(**msg.masurement_action)
+            task = MeasurementTask(**measurement_action.task)
+            measurement_data : dict = msg.measurement
+            measurer = msg.measurement['agent']
+            t_img = msg.measurement['t_img']
 
-            for msg in self.measurement_history:
-                msg : MeasurementResultsRequest
-                measurement_action = MeasurementAction(**msg.masurement_action)
-                task = MeasurementTask(**measurement_action.task)
-                measurement_data : dict = msg.measurement
-                measurer = msg.measurement['agent']
-                t_img = msg.measurement['t_img']
+            line_data = [task.id.split('-')[0],
+                            measurer,
+                            task.pos,
+                            task.t_start,
+                            task.t_end,
+                            task.t_corr,
+                            t_img,
+                            measurement_data['u_max'],
+                            measurement_data['u_exp'],
+                            measurement_data['u']]
+            data.append(line_data)
 
-                line_data = [task.id.split('-')[0],
-                             measurer,
-                             task.pos[0],
-                             task.pos[1],
-                             task.t_start,
-                             task.t_end,
-                             task.t_corr,
-                             t_img,
-                             measurement_data['u_max'],
-                             measurement_data['u_exp'],
-                             measurement_data['u']]
-
-                line = ""
-                for i in range(len(line_data)):
-                    line += str(line_data[i])
-                    if i < len(line_data)-1:
-                        line += ','
-                    else:
-                        line += '\n'
-
-                file.write(line)
+        measurements_df = DataFrame(data, columns=headers)
+        self.log(f"MEASUREMENTS RECEIVED:\n{str(measurements_df)}\n", level=logging.WARNING)
+        measurements_df.to_csv(f"{self.results_path}/measurements.csv", index=False)
 
     async def sim_wait(self, delay: float) -> None:
         try:
