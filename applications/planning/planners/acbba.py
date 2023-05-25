@@ -12,6 +12,7 @@
 import math
 
 import numpy as np
+from pandas import DataFrame
 from planners.planners import *
 from messages import *
 from states import SimulationAgentState
@@ -378,7 +379,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
         """
         try:
             listener_task = asyncio.create_task(self.listener(), name='listener()')
-            bundle_builder_task = asyncio.create_task(self.bundle_builder(), name='bundle_builder()')
+            bundle_builder_task = asyncio.create_task(self.planner(), name='bundle_builder()')
             # rebroadcaster_task = asyncio.create_task(self.rebroadcaster(), name='rebroadcaster()')
             
             # tasks = [listener_task, bundle_builder_task, rebroadcaster_task]
@@ -494,7 +495,7 @@ class ACBBAPlannerModule(ConsensusPlanner):
         finally:
             self.listener_results = results
 
-    async def bundle_builder(self) -> None:
+    async def planner(self) -> None:
         """
         ## Bundle-builder
 
@@ -1013,37 +1014,25 @@ class ACBBAPlannerModule(ConsensusPlanner):
 
     async def teardown(self) -> None:
         # log performance stats
-        out = '\nPLANNER ROUTINE RUN-TIME STATS'
-        out += '\nroutine\t\tt_avg\tt_std\tt_med\tn\n'
+        headers = ['routine','t_avg','t_std','t_med', 'n']
+        data = []
+
         n_decimals = 5
         for routine in self.stats:
             t_avg = np.mean(self.stats[routine])
             t_std = np.std(self.stats[routine])
             t_median = np.median(self.stats[routine])
             n = len(self.stats[routine])
-            if len(routine) < 5:
-                out += f'`{routine}`:\t\t'
-            elif len(routine) < 13:
-                out += f'`{routine}`:\t'
-            else:
-                out += f'`{routine}`:'
-            out += f'{np.round(t_avg,n_decimals)}\t{np.round(t_std,n_decimals)}\t{np.round(t_median,n_decimals)}\t{n}\n'
-        self.log(out, level=logging.WARNING)
 
-        # print listener bidding results
-        with open(f"{self.results_path}/{self.get_parent_name()}/listener_bids.csv", "w") as file:
-            title = "task_id,bidder,own_bid,winner,winning_bid,t_img,t_update"
-            file.write(title)
-
-            for task_id in self.listener_results:
-                bid : TaskBid = self.listener_results[task_id]
-                file.write('\n' + str(bid))
-
-        # print bundle-builder bidding results
-        with open(f"{self.results_path}/{self.get_parent_name()}/bundle_builder_bids.csv", "w") as file:
-            title = "task_id,bidder,own_bid,winner,winning_bid,t_img,t_update"
-            file.write(title)
-
-            for task_id in self.bundle_builder_results:
-                bid : TaskBid = self.bundle_builder_results[task_id]
-                file.write('\n' + str(bid))
+            line_data = [ 
+                            routine,
+                            np.round(t_avg,n_decimals),
+                            np.round(t_std,n_decimals),
+                            np.round(t_median,n_decimals),
+                            n
+                            ]
+            data.append(line_data)
+            
+        df = DataFrame(data, columns=headers)
+        self.log(f'\nPLANNER RUN-TIME STATS\n{str(df)}\n', level=logging.WARNING)
+        df.to_csv(f"{self.results_path}/{self.get_parent_name()}/planner_runtime_stats.csv", index=False)

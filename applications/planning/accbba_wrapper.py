@@ -271,8 +271,8 @@ if __name__ == '__main__':
         for agent in agent_data:
             agent : str
             _, id = agent.split('_')
-            x.append( agent_data[agent]['x_pos'][0] )
-            y.append( agent_data[agent]['y_pos'][0] )
+            x.append( agent_data[agent]['pos'][0] )
+            y.append( agent_data[agent]['pos'][1] )
         agent_scat = ax.scatter(x, y, color='b')
         
         # load measurement location

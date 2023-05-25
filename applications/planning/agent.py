@@ -1,5 +1,7 @@
 import logging
 import math
+
+from pandas import DataFrame
 from planners.accbba import ACCBBAPlannerModule
 from planners.acbba import ACBBAPlannerModule
 from planners.fixed import FixedPlannerModule
@@ -406,7 +408,7 @@ class SimulationAgent(Agent):
                 else:
                     if isinstance(self._clock_config, FixedTimesStepClockConfig):
                         # give the agent time to finish sending/processing messages before submitting a tic-request
-                        await asyncio.sleep(1e-3)
+                        await asyncio.sleep(5e-3)
 
                     receive_broadcast = asyncio.create_task(self.external_inbox.get())
                     timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))
@@ -463,37 +465,51 @@ class SimulationAgent(Agent):
         out = f'\ninstruments: {self.instruments}'
 
         # log state 
-        out += '\nt, pos, vel, status\n'
+        headers = ['t', 'pos', 'vel', 'status']
+        data = []
+
+        # out += '\nt, pos, vel, status\n'
         for state_dict in self.state.history:
-            out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
+            line_data = [
+                            np.round(state_dict['t'],3),
+                            [np.round(state_dict['pos'][0],3),
+                            np.round(state_dict['pos'][1],3)],
+                            [np.round(state_dict['vel'][0],3),
+                            np.round(state_dict['vel'][1],3)],
+                            state_dict['status']
+            ]
+            data.append(line_data)
+            # out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
         
+        state_df = DataFrame(data,columns=headers)
+        self.log(f'\ninstruments: {self.instruments}\nSTATE HISTORY\n{str(state_df)}\n', level=logging.WARNING)
+        state_df.to_csv(f"{self.results_path}/states.csv", index=False)
+
         # log performance stats
-        out += '\nROUTINE RUN-TIME STATS'
-        out += '\nroutine\t\tt_avg\tt_std\tt_med\tn\n'
+        headers = ['routine','t_avg','t_std','t_med','n']
+        data = []
+
+        # out += '\nROUTINE RUN-TIME STATS'
+        # out += '\nroutine\t\tt_avg\tt_std\tt_med\tn\n'
         n_decimals = 5
         for routine in self.stats:
             t_avg = np.mean(self.stats[routine])
             t_std = np.std(self.stats[routine])
             t_median = np.median(self.stats[routine])
             n = len(self.stats[routine])
-            if len(routine) < 5:
-                out += f'`{routine}`:\t\t'
-            elif len(routine) < 13:
-                out += f'`{routine}`:\t'
-            else:
-                out += f'`{routine}`:'
-            out += f'{np.round(t_avg,n_decimals)}\t{np.round(t_std,n_decimals)}\t{np.round(t_median,n_decimals)}\t{n}\n'
-        self.log(out, level=logging.WARNING)
 
-        # print agent states
-        with open(f"{self.results_path}/states.csv", "w") as file:
-            title = 't,x_pos,y_pos,x_vel,y_vel,status'
-            file.write(title)
+            line_data = [ 
+                            routine,
+                            np.round(t_avg,n_decimals),
+                            np.round(t_std,n_decimals),
+                            np.round(t_median,n_decimals),
+                            n
+                            ]
+            data.append(line_data)
 
-            for state_dict in self.state.history:
-                pos = state_dict['pos']
-                vel = state_dict['vel']
-                file.write(f"\n{state_dict['t']},{pos[0]},{pos[1]},{vel[0]},{vel[1]},{state_dict['status']}")
+        stats_df = DataFrame(data, columns=headers)
+        self.log(f'\nAGENT RUN-TIME STATS\n{str(stats_df)}\n', level=logging.WARNING)
+        stats_df.to_csv(f"{self.results_path}/agent_runtime_stats.csv", index=False)
 
     async def sim_wait(self, delay: float) -> None:
         try:  
