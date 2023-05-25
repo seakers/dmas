@@ -668,7 +668,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             broadcast_bids : list = consensus_rebroadcasts
             broadcast_bids.extend(planner_changes)
             self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
-            wait_for_response = not converged
+            wait_for_response = self.has_bundle_dependencies(bundle)
             await self.bid_broadcaster(broadcast_bids, t_curr, wait_for_response, level)
             
             # Update State
@@ -684,6 +684,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         self.log_task_sequence('Path', path, level)
 
         return results, bundle, path
+
+    def has_bundle_dependencies(self, bundle : list) -> bool:
+        """
+        Checks if a bundle contains task with dependencies
+        """
+        for task, subtask_index in bundle:
+            task : MeasurementTask; subtask_index : int
+            dependencies = task.dependency_matrix[subtask_index]
+            for dependency in dependencies:
+                if dependency > 0:
+                    return True
+        
+        return False
 
     def plan_from_path( self, 
                         state : SimulationAgentState, 

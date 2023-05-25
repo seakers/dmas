@@ -85,8 +85,8 @@ if __name__ == '__main__':
     tasks = []
     s_max = 100.0
     t_start = 0.0
-    t_end = np.Inf
-    # t_end = T
+    # t_end = np.Inf
+    t_end = T
     t_corr = 1.0
 
     pos = [0.0, 2.0]   
@@ -97,9 +97,9 @@ if __name__ == '__main__':
     measurements = [task_types[0], task_types[1]]
     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    pos = [1.0, 3.0]   
-    measurements = [task_types[2], task_types[1]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    # pos = [1.0, 3.0]   
+    # measurements = [task_types[2], task_types[1]]
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [0.0, 3.0]   
     # measurements = [task_types[1], task_types[0]]
@@ -276,8 +276,13 @@ if __name__ == '__main__':
         for agent in agent_data:
             agent : str
             _, id = agent.split('_')
-            x.append( agent_data[agent]['pos'][0] )
-            y.append( agent_data[agent]['pos'][1] )
+            pos_str : str = agent_data[agent]['pos'][0]
+            pos_str = pos_str.replace("[","")
+            pos_str = pos_str.replace("]","")
+            x_str, y_str = pos_str.split(', ')
+
+            x.append( float(x_str) )
+            y.append( float(y_str) )
         agent_scat = ax.scatter(x, y, color='b')
         
         # load measurement location
@@ -303,8 +308,13 @@ if __name__ == '__main__':
             x = []
             y = []
             for agent in agent_data: 
-                x.append( agent_data[agent]['x_pos'][frame] )
-                y.append( agent_data[agent]['y_pos'][frame] )
+                pos_str : str = agent_data[agent]['pos'][frame]
+                pos_str = pos_str.replace("[","")
+                pos_str = pos_str.replace("]","")
+                x_str, y_str = pos_str.split(', ')
+                
+                x.append( float(x_str) )
+                y.append( float(y_str) )
             
             data = np.stack([x,y]).T
             agent_scat.set_offsets(data)
@@ -318,8 +328,11 @@ if __name__ == '__main__':
                 updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_img'] <= t_curr]
                 updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_img'] >= t_prev]
                 for _, row in updated_measurements.iterrows():
-                    x_pos, y_pos = row['x_pos'], row['y_pos']
-                    task_scat = ax.scatter(x_pos, y_pos, color='g', marker='*')
+                    pos_str = row['pos']
+                    pos_str = pos_str.replace("[","")
+                    pos_str = pos_str.replace("]","")
+                    x_str, y_str = pos_str.split(', ')
+                    task_scat = ax.scatter(float(x_str), float(y_str), color='g', marker='*')
             else:
                 for task in tasks:
                     task : MeasurementTask
