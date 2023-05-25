@@ -180,7 +180,7 @@ class SimulationAgent(Agent):
 
     async def think(self, senses: list) -> list:
         # send all sensed messages to planner
-        self.log(f'sending {len(senses)} senses to planning module...')
+        self.log(f'sending {len(senses)} senses to planning module...', level=logging.WARNING)
         senses_dict = []
         state_dict = None
         for sense in senses:
@@ -341,21 +341,6 @@ class SimulationAgent(Agent):
                     except asyncio.CancelledError:
                         return
 
-                    # ## Check if destination has been reached
-                    # self.state.update_state(self.get_current_time(), status=SimulationAgentState.TRAVELING)
-
-                    # ## calculate new direction 
-                    # if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    #     is_at_taget = self.state.is_goal_state(action.pos, action.t_end, self._clock_config.dt)
-                    # else:
-                    #     is_at_taget = self.state.is_goal_state(action.pos, action.t_end)
-
-                    # # update action completion status
-                    # if is_at_taget:
-                    #     action.status = AgentAction.COMPLETED
-                    # else:
-                    #     action.status = AgentAction.PENDING
-
                     action.status = AgentAction.PENDING
             
             elif action_dict['action_type'] == ActionTypes.MEASURE.value:
@@ -431,6 +416,7 @@ class SimulationAgent(Agent):
                     #     try:
                     #         timeout.cancel()
                     #         await timeout
+
                     #     except asyncio.CancelledError:
                     #         # restore message to inbox so it can be processed during `sense()`
                     #         await self.external_inbox.put(receive_broadcast.result())    
@@ -442,6 +428,7 @@ class SimulationAgent(Agent):
                     #     try:
                     #         receive_broadcast.cancel()
                     #         await receive_broadcast
+
                     #     except asyncio.CancelledError:
                     #         # update action completion status
                     #         if self.external_inbox.empty():

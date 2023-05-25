@@ -467,7 +467,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     return
 
                 elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
-                    self.log(f"received senses from parent agent!")
+                    self.log(f"received senses from parent agent!", level=logging.WARNING)
 
                     # unpack message 
                     senses_msg : SensesMessage = SensesMessage(**content)
@@ -555,7 +555,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             level = logging.DEBUG
 
             while True:
-                 # wait for next agent plan check
+                # wait for next agent plan check
                 state_msg : AgentStateMessage = await self.states_inbox.get()
                 state = SimulationAgentState(**state_msg.state)
                 t_curr = state.t
@@ -724,6 +724,12 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
             wait_for_response = not converged
             await self.bid_broadcaster(broadcast_bids, t_curr, wait_for_response, level)
+            
+            # Update State
+            state_msg : AgentStateMessage = await self.states_inbox.get()
+            state = SimulationAgentState(**state_msg.state)
+            t_curr = state.t
+            await self.update_current_time(t_curr)  
 
             # Phase 2: Consensus 
             t_0 = time.perf_counter()
@@ -866,7 +872,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     actions.append( WaitForMessages(t_curr, next_task.t_start) )
         
             else:
-                actions.append( WaitForMessages(t_curr, t_curr + 1) )
+                actions.append( IdleAction(t_curr, t_curr + 1) )
 
         return bundle, path, plan, actions
 

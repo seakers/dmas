@@ -1,0 +1,3 @@
+task_id,bidder,own_bid,winner,winning_bid,t_img,t_update
+[<planners.accbba.SubtaskBid object at 0x7f8e3375e490>]
+[<planners.accbba.SubtaskBid object at 0x7f8e3375e3a0>, <planners.accbba.SubtaskBid object at 0x7f8e3375e730>, <planners.accbba.SubtaskBid object at 0x7f8e3375e3d0>, <planners.accbba.SubtaskBid object at 0x7f8e3375e760>]
