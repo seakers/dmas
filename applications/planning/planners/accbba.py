@@ -467,7 +467,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     return
 
                 elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
-                    self.log(f"received senses from parent agent!", level=logging.WARNING)
+                    self.log(f"received senses from parent agent!", level=logging.DEBUG)
 
                     # unpack message 
                     senses_msg : SensesMessage = SensesMessage(**content)
@@ -586,9 +586,12 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     results, bundle, path, plan = await self.create_plan(state, results, comp_bundle, comp_path, level)
                 
                 # execute plan
+                t_0 = time.perf_counter()
                 bundle, path, plan, next_actions = await self.get_next_actions(bundle, path, plan, t_curr)
                 await self.action_broadcaster(next_actions)
-                
+                dt = time.perf_counter() - t_0
+                self.stats['doing'].append(dt)
+                                
         except asyncio.CancelledError:
             return 
 
@@ -872,7 +875,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     actions.append( WaitForMessages(t_curr, next_task.t_start) )
         
             else:
-                actions.append( IdleAction(t_curr, t_curr + 1) )
+                actions.append( WaitForMessages(t_curr, t_curr + 1) )
 
         return bundle, path, plan, actions
 
@@ -928,10 +931,10 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 #     x = 1
                 
     #             # perform plan
-    #             t_0 = time.perf_counter()
-    #             bundle, path, plan, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
-    #             dt = time.perf_counter() - t_0
-    #             self.stats['doing'].append(dt)
+                # t_0 = time.perf_counter()
+                # bundle, path, plan, actions, converged = await self.doing_phase(state, results, bundle, path, plan, changes, t_curr, f_update, converged)
+                # dt = time.perf_counter() - t_0
+                # self.stats['doing'].append(dt)
 
     #             # send actions to broadcaster
     #             rebroadcast_dicts = [rebroadcast.to_dict() for rebroadcast in rebroadcasts]
@@ -1793,7 +1796,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         self.log(f'actions sent!')
 
 
-        self.log(f'plan sent {[action.action_type for action in next_actions]}', level=logging.WARNING)
+        self.log(f'plan sent {[action.action_type for action in next_actions]}', level=logging.DEBUG)
     # async def rebroadcaster(self) -> None:
     #     """
     #     ## Rebroadcaster
