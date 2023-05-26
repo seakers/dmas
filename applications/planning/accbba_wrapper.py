@@ -97,9 +97,9 @@ if __name__ == '__main__':
     measurements = [task_types[0], task_types[1]]
     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    # pos = [1.0, 3.0]   
-    # measurements = [task_types[2], task_types[1]]
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    pos = [1.0, 3.0]   
+    measurements = [task_types[2], task_types[1]]
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [0.0, 3.0]   
     # measurements = [task_types[1], task_types[0]]

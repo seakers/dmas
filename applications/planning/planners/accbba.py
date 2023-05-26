@@ -75,8 +75,8 @@ class SubtaskBid(TaskBid):
                     dt_converge: Union[float, int] = 0.0, 
                     t_violation: Union[float, int] = -1, 
                     dt_violoation: Union[float, int] = 0.0,
-                    bid_solo : int = 3,
-                    bid_any : int = 3, 
+                    bid_solo : int = 1,
+                    bid_any : int = 1, 
                     **_
                 ) -> object:
         """
