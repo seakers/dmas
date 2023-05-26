@@ -650,6 +650,10 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # Update iteration counter
             self.iter_counter += 1
 
+            # self.log_results('CURRENT RESULTS CREATED', results, logging.WARNING)
+            # self.log_task_sequence('Bundle', bundle, logging.WARNING)
+            # self.log_task_sequence('Path', path, logging.WARNING)
+
             # Phase 1: Create Plan from latest information
             t_0 = time.perf_counter()
             results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path, level)
@@ -668,7 +672,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             broadcast_bids : list = consensus_rebroadcasts
             broadcast_bids.extend(planner_changes)
             self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
-            wait_for_response = self.has_bundle_dependencies(bundle)
+            wait_for_response = self.has_bundle_dependencies(bundle) and not converged
             await self.bid_broadcaster(broadcast_bids, t_curr, wait_for_response, level)
             
             # Update State
@@ -1085,6 +1089,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             max_path_bids[task.id][subtask_index] = results[task.id][subtask_index]
 
         max_path_utility = self.sum_path_utility(path, current_bids)
+        max_utility = 0.0
         max_task = -1
 
         while len(bundle) < self.l_bundle and len(available_tasks) > 0 and max_task is not None:                   
@@ -1102,7 +1107,11 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     continue
                 
                 # compare to maximum task
-                if (max_task is None or projected_path_utility > max_path_utility):
+                bid_utility = projected_bids[measurement_task.id][subtask_index].winning_bid
+                if (max_task is None 
+                    # or projected_path_utility > max_path_utility
+                    or bid_utility > max_utility
+                    ):
 
                     # check for cualition and mutex satisfaction
                     proposed_bid : SubtaskBid = projected_bids[measurement_task.id][subtask_index]
@@ -1117,6 +1126,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     max_subtask = subtask_index
                     max_path_bids = projected_bids
                     max_path_utility = projected_path_utility
+                    max_utility = projected_bids[measurement_task.id][subtask_index].winning_bid
 
             if max_task is not None:
                 # max bid found! place task with the best bid in the bundle and the path
@@ -1260,6 +1270,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         winning_bids = None
         winning_path_utility = 0.0
 
+        # check if the subtask is mutually exclusive with something in the bundle
+        for task_i, subtask_j in original_path:
+            task_i : MeasurementTask; subtask_j : int
+            if task_i.id == task.id:
+                if task.dependency_matrix[subtask_j][subtask_index] < 0:
+                    return winning_path, winning_bids, winning_path_utility
+
         # find best placement in path
         # self.log_task_sequence('original path', original_path, level=logging.WARNING)
         for i in range(len(original_path)+1):
@@ -1314,7 +1331,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 winning_path = path
                 winning_bids = bids
                 winning_path_utility = path_utility
-
 
         return winning_path, winning_bids, winning_path_utility
 

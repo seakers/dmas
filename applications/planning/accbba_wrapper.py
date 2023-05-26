@@ -85,8 +85,8 @@ if __name__ == '__main__':
     tasks = []
     s_max = 100.0
     t_start = 0.0
-    # t_end = np.Inf
-    t_end = T
+    t_end = np.Inf
+    # t_end = T
     t_corr = 1.0
 
     pos = [0.0, 2.0]   
