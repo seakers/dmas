@@ -740,7 +740,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     t_move_end = dt * math.ceil(t_move_end/dt)
 
                 if t_img_start < np.Inf:
-                    t_img_start = dt * math.floor(t_img_start/dt)
+                    t_img_start = dt * math.ceil(t_img_start/dt)
                 if t_img_end < np.Inf:
                     t_img_end = dt * math.ceil(t_img_end/dt)
 
