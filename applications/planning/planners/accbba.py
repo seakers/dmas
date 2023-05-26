@@ -742,7 +742,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 if t_img_start < np.Inf:
                     t_img_start = dt * math.ceil(t_img_start/dt)
                 if t_img_end < np.Inf:
-                    t_img_end = dt * math.ceil(t_img_end/dt)
+                    t_img_end = dt * math.ceil((t_img_start + measurement_task.duration)/dt)
 
             move_action = MoveAction(measurement_task.pos, t_move_start, t_move_end)
             measurement_action = MeasurementAction( measurement_task.to_dict(),
