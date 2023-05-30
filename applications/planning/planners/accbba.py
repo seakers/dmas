@@ -586,14 +586,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
                     
                     # replan
-                    results, bundle, path = await self.update_bundle(state, 
+                    state, results, bundle, path = await self.update_bundle(state, 
                                                                         results, 
                                                                         comp_bundle, 
                                                                         comp_path, 
                                                                         level)
 
                     plan = self.plan_from_path(state, results, path)
-                    self.log_plan(results, plan, state.t, level=logging.WARNING)
+                    self.log_plan(results, plan, state.t, level)
 
                     # log plan
                     measurement_plan = []
@@ -621,14 +621,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 else:                   
                     # replan
-                    results, bundle, path = await self.update_bundle(state, 
+                    state, results, bundle, path = await self.update_bundle(state, 
                                                                         results, 
                                                                         comp_bundle, 
                                                                         comp_path, 
                                                                         level)
-
+                    
                     plan = self.plan_from_path(state, results, path)
-                    self.log_plan(results, plan, state.t, level=logging.WARNING)
+                    self.log_plan(results, plan, state.t, level)
 
                     # log plan
                     measurement_plan = []
@@ -724,7 +724,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         self.log_task_sequence('Bundle', bundle, level)
         self.log_task_sequence('Path', path, level)
 
-        return results, bundle, path
+        return state, results, bundle, path
 
     def has_bundle_dependencies(self, bundle : list) -> bool:
         """

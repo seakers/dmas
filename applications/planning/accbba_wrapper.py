@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     ## agents
     n_agents = 2
-    comms_range = 20
+    comms_range = 2
     v_max = 1
 
     ## clock configuration
@@ -65,9 +65,9 @@ if __name__ == '__main__':
     ss = 00
     start_date = datetime(year, month, day, hh, mm, ss)
     end_date = datetime(year, month, day, hh, mm, ss+T)
-    dt = 1.0/4.0
-    clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    dt = 1.0/8.0
 
+    clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
     # clock_config = EventDrivenClockConfig(start_date, end_date)
 
     ## network
@@ -85,26 +85,29 @@ if __name__ == '__main__':
     tasks = []
     s_max = 100.0
     t_start = 0.0
-    # t_end = np.Inf
-    t_end = T
+    t_end = np.Inf
+    # t_end = T
     t_corr = 1.0
 
-    # pos = [0.0, 2.0]   
-    # measurements = [task_types[0]]
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
-
-    # pos = [1.0, 2.0]   
-    # measurements = [task_types[0]]
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
-
-    # pos = [1.0, 3.0]   
-    # measurements = [task_types[0]]
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
-
-    # pos = [2, 3]   
-    # measurements = [task_types[0]]
+    pos = [0.0, 2.0]   
+    measurements = [task_types[0], task_types[1]]
     # s_max = 100 * len(measurements) / len(task_types)
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+
+    pos = [1.0, 2.0]   
+    measurements = [task_types[0]]
+    # s_max = 100 * len(measurements) / len(task_types)
+    tasks.append(MeasurementTask(pos, s_max/3.0, measurements, t_start, t_end))
+
+    pos = [1.0, 3.0]   
+    measurements = [task_types[1]]
+    # s_max = 100 * len(measurements) / len(task_types)
+    tasks.append(MeasurementTask(pos, s_max/3.0, measurements, t_start, t_end))
+
+    pos = [2, 3]   
+    measurements = [task_types[0], task_types[1]]
+    # s_max = 100 * len(measurements) / len(task_types)
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
     # pos = [0.582485975658269, 3.176375584717473]
     # measurements = [task_types[1], task_types[0]]
@@ -116,16 +119,16 @@ if __name__ == '__main__':
     # s_max = 100 * len(measurements) / len(task_types)
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # while len(tasks) < n_tasks:
-    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-    #     pos = [x, y]
-    #     measurements = random_measurements(task_types)
-    #     # measurements = [task_types[0]]
-    #     s_max = 100 * len(measurements) / len(task_types)
+    while len(tasks) < n_tasks:
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        pos = [x, y]
+        measurements = random_measurements(task_types)
+        # measurements = [task_types[0]]
+        s_max = 100 * len(measurements) / len(task_types)
 
-    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
@@ -168,7 +171,6 @@ if __name__ == '__main__':
     agents = []
     pos = [0.0, 0.0]
     vel = [0.0, 0.0]
-    task_types = ['MWR', 'IR', 'VNIR']
     instruments = [task_types[0]]
     agent_id = 0
     initial_state = SimulationAgentState(   pos, 
@@ -192,7 +194,7 @@ if __name__ == '__main__':
                                 )
     agents.append(agent)
 
-    pos = [1.0, 0.0]
+    pos = [0.0, 5.0]
     vel = [0.0, 0.0]
     instruments = [task_types[1]]
     agent_id = 1
