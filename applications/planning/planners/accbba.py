@@ -593,6 +593,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                                                                         level)
 
                     plan = self.plan_from_path(state, results, path)
+                    self.log_plan(results, plan, state.t, level=logging.WARNING)
 
                     # log plan
                     measurement_plan = []
@@ -729,7 +730,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             task_pos = measurement_task.pos
             dx = np.sqrt( (task_pos[0] - prev_pos[0])**2 + (task_pos[1] - prev_pos[1])**2 )
             t_move_end = t_move_start + dx / state.v_max
-            t_img_start = subtask_bid.t_img
+            t_img_start = max(subtask_bid.t_img, t_move_end)
             t_img_end = t_img_start + measurement_task.duration
 
             if isinstance(self._clock_config, FixedTimesStepClockConfig):
@@ -1388,9 +1389,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # other agent images before my earliest time; expect other bidder to met my schedule
                 # or `t_img` satisfies this time constraint; no action required
 
-        if t_prev > 2.0 and t_img <= t_prev and task_prev.id != task.id:
-            x = 1
-
         return t_img
         
     def calc_utility(   
@@ -1712,6 +1710,38 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         
             df = DataFrame(data, columns=headers)
             self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
+
+    def log_plan(self, results : dict, plan : list, t : Union[int, float], level=logging.DEBUG) -> None:
+        headers = ['t', 'task_id', 'subtask_index', 't_start', 't_end', 't_img', 'u_exp']
+        data = []
+
+        for action in plan:
+            if isinstance(action, MeasurementAction):
+                task = MeasurementTask(**action.task)
+                task_id = task.id.split('-')[0]
+                subtask_index : int = action.subtask_index
+                subtask_bid : SubtaskBid = results[task.id][subtask_index]
+                t_img = subtask_bid.t_img
+                winning_bid = subtask_bid.winning_bid
+            else:
+                task : MoveAction = action
+                task_id = task.id.split('-')[0]
+                subtask_index = -1
+                t_img = -1
+                winning_bid = -1
+            
+            line_data = [   t,
+                            task_id,
+                            subtask_index,
+                            np.round(action.t_start,3 ),
+                            np.round(action.t_end,3 ),
+                            np.round(t_img,3 ),
+                            np.round(winning_bid,3)
+            ]
+            data.append(line_data)
+
+        df = DataFrame(data, columns=headers)
+        self.log(f'\nPLANNER HISTORY\n{str(df)}\n', level)
 
     async def teardown(self) -> None:
         # log plan history

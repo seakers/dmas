@@ -56,7 +56,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 10
+    T = 20
     year = 2023
     month = 1
     day = 1
@@ -77,52 +77,55 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 10
-    task_types = ['MWR', 'IR', 'VNIR']
-    # task_types = ['MWR', 'IR']
+    n_tasks = 4
+    # task_types = ['MWR', 'IR', 'VNIR']
+    task_types = ['MWR', 'IR']
     
     # create tasks
     tasks = []
     s_max = 100.0
     t_start = 0.0
-    t_end = np.Inf
-    # t_end = T
+    # t_end = np.Inf
+    t_end = T
     t_corr = 1.0
 
-    pos = [0.0, 2.0]   
-    measurements = [task_types[0]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    # pos = [0.0, 2.0]   
+    # measurements = [task_types[0]]
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    pos = [1.0, 2.0]   
-    measurements = [task_types[0], task_types[1]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    # pos = [1.0, 2.0]   
+    # measurements = [task_types[0], task_types[1]]
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    pos = [1.0, 3.0]   
-    measurements = [task_types[2], task_types[1]]
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    # pos = [1.0, 3.0]   
+    # measurements = [task_types[2], task_types[1]]
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    # pos = [0.0, 3.0]   
+    # pos = [3.0588888800943232, 2.269208174629097]   
     # measurements = [task_types[1], task_types[0]]
-    # tasks.append(MeasurementTask(pos, 100, measurements, t_start, t_end, t_corr))
+    # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [2.0, 3.0]   
+    # pos = [0.582485975658269, 3.176375584717473]
     # measurements = [task_types[1], task_types[0]]
-    # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
+    # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [3.0, 4.0]   
-    # measurements = [task_types[1], task_types[0]]
-    # tasks.append(MeasurementTask(pos, 30, measurements, t_start, t_end, t_corr))
+    # pos = [4.42695251546435, 1.6151251855783162] 
+    # measurements = [task_types[0]]
+    # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # while len(tasks) < n_tasks:
-    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-    #     pos = [x, y]
-    #     s_max = 1.0
-    #     measurements = random_measurements(task_types)
-    #     # measurements = [task_types[0]]
+    while len(tasks) < n_tasks:
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        pos = [x, y]
+        measurements = random_measurements(task_types)
+        s_max = 100 * len(measurements) / len(task_types)
+        # measurements = [task_types[0]]
 
-    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
