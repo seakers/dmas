@@ -94,15 +94,15 @@ if __name__ == '__main__':
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [1.0, 2.0]   
-    # measurements = [task_types[0], task_types[1]]
+    # measurements = [task_types[0]]
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # pos = [1.0, 3.0]   
-    # measurements = [task_types[2], task_types[1]]
+    # measurements = [task_types[0]]
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
-    # pos = [3.0588888800943232, 2.269208174629097]   
-    # measurements = [task_types[1], task_types[0]]
+    # pos = [2, 3]   
+    # measurements = [task_types[0]]
     # s_max = 100 * len(measurements) / len(task_types)
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
@@ -116,16 +116,16 @@ if __name__ == '__main__':
     # s_max = 100 * len(measurements) / len(task_types)
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    while len(tasks) < n_tasks:
-        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        pos = [x, y]
-        measurements = random_measurements(task_types)
-        s_max = 100 * len(measurements) / len(task_types)
-        # measurements = [task_types[0]]
+    # while len(tasks) < n_tasks:
+    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+    #     pos = [x, y]
+    #     measurements = random_measurements(task_types)
+    #     # measurements = [task_types[0]]
+    #     s_max = 100 * len(measurements) / len(task_types)
 
-        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'

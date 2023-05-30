@@ -607,11 +607,47 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # execute plan
                 t_0 = time.perf_counter()
-                bundle, path, plan, next_actions = await self.get_next_actions(bundle, path, plan, prev_actions, t_curr)
-                await self.action_broadcaster(next_actions)
-                dt = time.perf_counter() - t_0
-                self.stats['doing'].append(dt)
-                prev_actions = next_actions
+                comp_bundle, comp_path, plan, next_actions = await self.get_next_actions( copy.copy(bundle), copy.copy(path), plan, prev_actions, t_curr)
+                
+                # determine if bundle was affected by executing a task from the plan
+                changes_to_bundle : bool = not self.compare_bundles(bundle, comp_bundle)
+
+                if not changes_to_bundle: 
+                    # continue plan execution
+                    await self.action_broadcaster(next_actions)
+                    dt = time.perf_counter() - t_0
+                    self.stats['doing'].append(dt)
+                    prev_actions = next_actions                
+
+                else:                   
+                    # replan
+                    results, bundle, path = await self.update_bundle(state, 
+                                                                        results, 
+                                                                        comp_bundle, 
+                                                                        comp_path, 
+                                                                        level)
+
+                    plan = self.plan_from_path(state, results, path)
+                    self.log_plan(results, plan, state.t, level=logging.WARNING)
+
+                    # log plan
+                    measurement_plan = []
+                    for action in plan:
+                        if isinstance(action, MeasurementAction):
+                            measurement_task = MeasurementTask(**action.task)
+                            subtask_index : int = action.subtask_index
+                            subtask_bid : SubtaskBid = results[measurement_task.id][subtask_index]  
+                            measurement_plan.append((t_curr, measurement_task, subtask_index, subtask_bid.copy()))
+                    self.plan_history.append(measurement_plan)
+
+                    # execute plan
+                    t_0 = time.perf_counter()
+                    comp_bundle, comp_path, plan, next_actions = await self.get_next_actions( copy.copy(bundle), copy.copy(path), plan, [], t_curr)
+
+                    await self.action_broadcaster(next_actions)
+                    dt = time.perf_counter() - t_0
+                    self.stats['doing'].append(dt)
+                    prev_actions = next_actions   
                                 
         except asyncio.CancelledError:
             return 

@@ -49,7 +49,7 @@ class SimulationAgent(Agent):
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
-                                                    l_bundle=3,
+                                                    l_bundle=1,
                                                     level=level,
                                                     logger=logger)
         elif planner_type is PlannerTypes.FIXED:
@@ -64,7 +64,7 @@ class SimulationAgent(Agent):
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
-                                                    l_bundle=3,
+                                                    l_bundle=2,
                                                     level=level,
                                                     logger=logger)                                  
         else:
@@ -199,7 +199,7 @@ class SimulationAgent(Agent):
         self.log(f'senses sent! waiting on response from planner module...')
         actions = []
         
-        while len(actions) == 0:
+        while True:
             _, _, content = await self.internal_inbox.get()
             
             if content['msg_type'] == SimulationMessageTypes.PLAN.value:
@@ -207,6 +207,7 @@ class SimulationAgent(Agent):
                 for action_dict in msg.plan:
                     self.log(f"received an action of type {action_dict['action_type']}", level=logging.DEBUG)
                     actions.append(action_dict)  
+                break
         
         self.log(f"plan of {len(actions)} actions received from planner module!")
         return actions
