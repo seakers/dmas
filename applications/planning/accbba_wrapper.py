@@ -56,7 +56,7 @@ if __name__ == '__main__':
     v_max = 1
 
     ## clock configuration
-    T = 6
+    T = 20
     year = 2023
     month = 1
     day = 1
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 5
+    n_tasks = 6
     # task_types = ['MWR', 'IR', 'VNIR']
     task_types = ['MWR', 'IR']
     
@@ -90,62 +90,67 @@ if __name__ == '__main__':
     t_end = T
     t_corr = 1.0
 
-    pos = [0.0, 2.0]   
+    # pos = [0.0, 2.0]   
+    # measurements = [task_types[0], task_types[1]]
+    # # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+
+    # pos = [1.0, 2.0]   
+    # measurements = [task_types[0]]
+    # # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max/3.0, measurements, t_start, t_end))
+
+    # pos = [1.0, 3.0]   
+    # measurements = [task_types[1]]
+    # # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max/3.0, measurements, t_start, t_end))
+
+    # pos = [2, 3]   
+    # measurements = [task_types[0], task_types[1]]
+    # # s_max = 100 * len(measurements) / len(task_types)
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+
+    pos = [1.6584931928268665, 2.2686453819071453]
     measurements = [task_types[0], task_types[1]]
-    # s_max = 100 * len(measurements) / len(task_types)
-    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
-
-    pos = [1.0, 2.0]   
-    measurements = [task_types[0]]
-    # s_max = 100 * len(measurements) / len(task_types)
-    tasks.append(MeasurementTask(pos, s_max/3.0, measurements, t_start, t_end))
-
-    pos = [1.0, 3.0]   
-    measurements = [task_types[1]]
-    # s_max = 100 * len(measurements) / len(task_types)
-    tasks.append(MeasurementTask(pos, s_max/3.0, measurements, t_start, t_end))
-
-    pos = [2, 3]   
-    measurements = [task_types[0], task_types[1]]
-    # s_max = 100 * len(measurements) / len(task_types)
+    s_max = 100 if len(measurements) > 1 else 30.0
     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [1.6584931928268665, 2.2686453819071453]
-    # measurements = [task_types[0], task_types[1]]
-    # s_max = 100 if len(measurements) > 1 else 30.0
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+    pos = [3.8193647821146692, 2.46260804354465]
+    measurements = [task_types[0], task_types[1]]
+    s_max = 100 if len(measurements) > 1 else 30.0
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [3.8193647821146692, 2.46260804354465]
-    # measurements = [task_types[0], task_types[1]]
-    # s_max = 100 if len(measurements) > 1 else 30.0
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+    pos = [3.0840459880745765, 1.5328625005614467]
+    measurements = [task_types[1], task_types[0]]
+    s_max = 100 if len(measurements) > 1 else 30.0
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [3.0840459880745765, 1.5328625005614467]
-    # measurements = [task_types[1], task_types[0]]
-    # s_max = 100 if len(measurements) > 1 else 30.0
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+    pos = [1.5, 3.5]
+    measurements = [task_types[0], task_types[1]]
+    s_max = 100 if len(measurements) > 1 else 30.0
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [0.9905327277237774, 4.669576037201175]
-    # measurements = [task_types[0]]
-    # s_max = 100 if len(measurements) > 1 else 30.0
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+    pos = [1.117248843260703, 2.563973829177466]
+    measurements = [task_types[1], task_types[0]]
+    s_max = 100 if len(measurements) > 1 else 30.0
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [1.117248843260703, 2.563973829177466]
-    # measurements = [task_types[1], task_types[0]]
-    # s_max = 100 if len(measurements) > 1 else 30.0
-    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+    pos = [3.83865515189413, 1.6213132637921683]
+    measurements = [task_types[1]]
+    s_max = 100 if len(measurements) > 1 else 30.0
+    tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # while len(tasks) < n_tasks:
-    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-    #     pos = [x, y]
-    #     measurements = random_measurements(task_types, 2)
-    #     # measurements = [task_types[0]]
-    #     # s_max = 100 * len(measurements) / len(task_types)
-    #     s_max = 100 if len(measurements) > 1 else 30.0
+    while len(tasks) < n_tasks:
+        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+        pos = [x, y]
+        measurements = random_measurements(task_types, 2)
+        # measurements = [task_types[0]]
+        # s_max = 100 * len(measurements) / len(task_types)
+        s_max = 100 if len(measurements) > 1 else 30.0
 
-    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
@@ -392,5 +397,6 @@ if __name__ == '__main__':
     if save_plot:
         ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
         plt.close() 
+        print(f'Animated plot saved at: `{results_path}/animation.gif`')
 
     print('SIM DONE')

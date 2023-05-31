@@ -64,7 +64,7 @@ class SimulationAgent(Agent):
                                                     manager_port,
                                                     id,
                                                     agent_network_config,
-                                                    l_bundle=3,
+                                                    l_bundle=5,
                                                     level=level,
                                                     logger=logger)                                  
         else:

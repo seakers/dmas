@@ -577,14 +577,10 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
 
-                # t_0 = time.perf_counter()
-                # results, comp_bundle, comp_path, _, comp_rebroadcasts, bids_received = await self.compare_results(results, copy.copy(bundle), copy.copy(path), t_curr)
-                # dt = time.perf_counter() - t_0
-                # self.stats['c_comp_check'].append(dt)
-
                 t_0 = time.perf_counter()
                 t_curr = state.t
                 results, comp_bundle, comp_path, _, comp_rebroadcasts = await self.consensus_phase(results, copy.copy(bundle), copy.copy(path), t_curr, level)
+                comp_rebroadcasts : list
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
 
@@ -595,22 +591,34 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # determine if bundle was affected by incoming bids
                 changes_to_bundle : bool = not self.compare_bundles(bundle, comp_bundle)
+
                 if changes_to_bundle or len(comp_rebroadcasts) > 0:
                     # replan
                     state, results, bundle, path = await self.update_bundle(state, 
                                                                         results, 
-                                                                        comp_bundle, 
-                                                                        comp_path, 
+                                                                        copy.copy(comp_bundle), 
+                                                                        copy.copy(comp_path), 
                                                                         level)
-                    # broadcast changes
+                    # broadcast plan 
+                    if not self.compare_bundles(bundle, comp_bundle):
+                        for task, subtask_index in bundle:
+                            task : MeasurementTask; subtask_index : int
+                            bid : SubtaskBid = results[task.id][subtask_index]
+                            bid_change_msg = TaskBidMessage(
+                                                            self.get_parent_name(),
+                                                            self.get_parent_name(),
+                                                            bid.to_dict()
+                            )
+                            comp_rebroadcasts.append(bid_change_msg)
                     await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
-                
 
+                    state : SimulationAgentState
+                    t_curr = state.t
                     plan = self.plan_from_path(state, results, path)
-                    self.log_plan(results, plan, state.t, level)
+                    self.log_plan(results, plan, t_curr, level)
 
                     # log plan
-                    measurement_plan = []
+                    measurement_plan = []   
                     for action in plan:
                         if isinstance(action, MeasurementAction):
                             measurement_task = MeasurementTask(**action.task)
@@ -625,7 +633,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 
                 # determine if bundle was affected by executing a task from the plan
                 changes_to_bundle : bool = not self.compare_bundles(bundle, comp_bundle)
-
+                
                 if not changes_to_bundle: 
                     # continue plan execution
                     await self.action_broadcaster(next_actions)
@@ -634,20 +642,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     prev_actions = next_actions                
 
                 else:                  
-                    # broadcast changes
-                    comp_rebroadcasts = []
-                    for task, subtask_index in bundle:
-                        task : MeasurementTask; subtask_index : int
-                        current_bid : SubtaskBid = results[task.id][subtask_index]
-                        out_msg = TaskBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        current_bid.to_dict()
-                                    )
-                        comp_rebroadcasts.append(out_msg)
-                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, False, level=level)
-                    self.log_plan(results, plan, state.t, level)
-
                     # replan
                     state, results, bundle, path = await self.update_bundle(state, 
                                                                         results, 
@@ -657,6 +651,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     
                     plan = self.plan_from_path(state, results, path)
                     self.log_plan(results, plan, state.t, level)
+
+                    # broadcast plan 
+                    comp_rebroadcasts = []
+                    for task, subtask_index in bundle:
+                        task : MeasurementTask; subtask_index : int
+                        bid : SubtaskBid = results[task.id][subtask_index]
+                        bid_change_msg = TaskBidMessage(
+                                                        self.get_parent_name(),
+                                                        self.get_parent_name(),
+                                                        bid.to_dict()
+                        )
+                        comp_rebroadcasts.append(bid_change_msg)
+                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
 
                     # log plan
                     measurement_plan = []
@@ -716,10 +723,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             # Update iteration counter
             self.iter_counter += 1
 
-            # self.log_results('CURRENT RESULTS CREATED', results, logging.WARNING)
-            # self.log_task_sequence('Bundle', bundle, logging.WARNING)
-            # self.log_task_sequence('Path', path, logging.WARNING)
-
             # Phase 1: Create Plan from latest information
             t_0 = time.perf_counter()
             results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path, level)
@@ -747,17 +750,17 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             t_curr = state.t
             await self.update_current_time(t_curr)  
 
+        # level = logging.WARNING
+        self.log_results('PLAN CREATED', results, level)
+        self.log_task_sequence('Bundle', bundle, level)
+        self.log_task_sequence('Path', path, level)
+        
         # reset planning counters
         for task_id in results:
             for subtask_index in range(len(results[task_id])):
                 bid : SubtaskBid = results[task_id][subtask_index]
                 bid.reset_bid_counters()
                 results[task_id][subtask_index] = bid
-
-        # level = logging.WARNING
-        self.log_results('PLAN CREATED', results, level)
-        self.log_task_sequence('Bundle', bundle, level)
-        self.log_task_sequence('Path', path, level)
 
         return state, results, bundle, path
 
@@ -780,8 +783,13 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         path : list
                     ) -> list:
         """
-        Generates a lsit of AgentActions from the current path
+        Generates a list of AgentActions from the current path.
+
+        Agents look to move to their designated measurement target and perform the measurement.
+
+        They broadcast their current bundle before executing an action.
         """
+
         plan = []
         for i in range(len(path)):
             measurement_task, subtask_index = path[i]
@@ -793,7 +801,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 prev_pos = state.pos
 
             else:
-                prev_measurement : MeasurementAction = plan[(i-1)*2 + 1]
+                prev_measurement : MeasurementAction = plan[(i)*(2) - 1]
                 t_move_start = prev_measurement.t_end
                 prev_task = MeasurementTask(**prev_measurement.task)
                 prev_pos = prev_task.pos
@@ -815,17 +823,18 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     t_img_start = dt * math.ceil(t_img_start/dt)
                 if t_img_end < np.Inf:
                     t_img_end = dt * math.ceil((t_img_start + measurement_task.duration)/dt)
-
+            
+            # move to target
             move_action = MoveAction(measurement_task.pos, t_move_start, t_move_end)
+            plan.append(move_action)
+            
+            # perform measurement
             measurement_action = MeasurementAction( measurement_task.to_dict(),
                                                     subtask_index, 
                                                     subtask_bid.main_measurement,
                                                     subtask_bid.winning_bid,
                                                     t_img_start, 
                                                     t_img_end)
-
-            # plan per measurement request: move to plan, perform measurement 
-            plan.append(move_action)
             plan.append(measurement_action)  
         
         return plan
@@ -1101,7 +1110,6 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         task_to_remove = None
         for task, subtask_index in bundle:
             task : MeasurementTask
-            # current_bid : SubtaskBid = results[task.id][subtask_index]
 
             for subtask_bid in results[task.id]:
                 subtask_bid : SubtaskBid
@@ -1877,12 +1885,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 subtask_bid : SubtaskBid = results[task.id][subtask_index]
                 t_img = subtask_bid.t_img
                 winning_bid = subtask_bid.winning_bid
-            else:
+            elif isinstance(action, MoveAction):
                 task : MoveAction = action
                 task_id = task.id.split('-')[0]
                 subtask_index = -1
                 t_img = -1
                 winning_bid = -1
+            else:
+                continue
             
             line_data = [   t,
                             task_id,

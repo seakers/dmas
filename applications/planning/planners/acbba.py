@@ -849,7 +849,11 @@ class ACBBAPlannerModule(ConsensusPlanner):
             return 0.0
         
         # calculate urgency factor from task
-        return task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+        # return task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+        # if task.t_end == numpy.Inf:
+        #     return task.s_max
+        # else:
+        return task.s_max * (t_img - task.t_end) / (task.t_start - task.t_end)
 
     def path_constraint_sat(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
         """
