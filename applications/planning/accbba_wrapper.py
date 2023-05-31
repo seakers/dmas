@@ -39,10 +39,9 @@ if __name__ == '__main__':
     """
     Wrapper for planner simulation using DMAS
     """    
-
     # create results directory
     plot_results = True
-    save_plot = True
+    save_plot = False
     scenario_name = 'ACCBBA_TEST'
     results_path = setup_results_directory(scenario_name)
     
@@ -53,11 +52,11 @@ if __name__ == '__main__':
 
     ## agents
     n_agents = 2
-    comms_range = 20
+    comms_range = 3
     v_max = 1
 
     ## clock configuration
-    T = 20
+    T = 6
     year = 2023
     month = 1
     day = 1
@@ -275,196 +274,123 @@ if __name__ == '__main__':
             pool.submit(agent.run, *[])    
 
     # # plot results
-    if plot_results:
-        t = None
+    t = None
 
-        # load agent data
-        agent_data = {}
-        for id in range(n_agents):
-            df = pandas.read_csv(f"{results_path}/AGENT_{id}/states.csv")
-            agent_data[f'AGENT_{id}'] = df
-            if t is None or len(df['t']) < len(t):
-                t = df['t']
+    # load agent data
+    agent_data = {}
+    for id in range(n_agents):
+        df = pandas.read_csv(f"{results_path}/AGENT_{id}/states.csv")
+        agent_data[f'AGENT_{id}'] = df
+        if t is None or len(df['t']) < len(t):
+            t = df['t']
 
-        # initialize plot
-        fig, ax = plt.subplots()
+    # initialize plot
+    fig, ax = plt.subplots()
 
-        # # plot original agent position
-        # agent_scats = {}
-        # agent_lines = {}
-        # for agent in agent_data:
-        #     agent : str
-        #     _, id = agent.split('_')
-        #     pos_str : str = agent_data[agent]['pos'][0]
-        #     pos_str = pos_str.replace("[","")
-        #     pos_str = pos_str.replace("]","")
-        #     x_str, y_str = pos_str.split(', ')
+    # plot original agent position
+    agent_scats = {}
+    agent_lines = {}
+    for agent in agent_data:
+        agent : str
+        _, id = agent.split('_')
+        pos_str : str = agent_data[agent]['pos'][0]
+        pos_str = pos_str.replace("[","")
+        pos_str = pos_str.replace("]","")
+        x_str, y_str = pos_str.split(', ')
 
-        #     agent_scats[agent] = ax.scatter([float(x_str)], [float(y_str)], label=f'{agent}')
-        #     agent_lines[agent] = ax.plot([float(x_str)], [float(y_str)])
-
-
-        # # load measurement location
-        # measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
-        
-        # # plot task location
-        # print('TASK POSITION')
-        # print('id, pos, measurements')
-        # x_tasks = []
-        # y_tasks = []
-        # for task in tasks:
-        #     task : MeasurementTask
-        #     x_i, y_i = task.pos
-        #     x_tasks.append(x_i)
-        #     y_tasks.append(y_i)
-        #     # x, y = [x_i], [y_i]
-        #     task_id = task.id.split('-')[0]
-        #     print(f'{task_id},{task.pos},{task.measurements}')
-
-        # task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
-
-        # plt.grid(True)
-        # ax.set(xlim=x_bounds, ylim=y_bounds, xlabel='x', ylabel='y')
-        # ax.legend()
-
-        # def update(frame):
-        #     # update agent states
-        #     for agent in agent_data: 
-        #         x = []
-        #         y = []
-        #         pos_strs : list = agent_data[agent]['pos'][:frame]
-        #         for pos_str in pos_strs:
-        #             pos_str : str
-        #             pos_str = pos_str.replace("[","")
-        #             pos_str = pos_str.replace("]","")
-        #             x_str, y_str = pos_str.split(', ')
-                    
-        #             x.append( float(x_str) )
-        #             y.append( float(y_str) )
-
-        #         agent_lines[agent][0].set_xdata(x)
-        #         agent_lines[agent][0].set_ydata(y)
-        #         # agent_lines[agent].set_offsets(data)
-
-        #         if len(x) > 0:
-        #             x, y = [x[-1]], [y[-1]]
-        #         data = np.stack([x,y]).T
-        #         agent_scats[agent].set_offsets(data)
-
-        #     # update task status
-        #     x_tasks = []
-        #     y_tasks = []
-        #     if frame > 0:
-        #         t_curr = t[frame]
-        #         t_prev = t[frame-1]
-        #         updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_img'] <= t_curr]
-        #         updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_img'] >= t_prev]
-        #         for _, row in updated_measurements.iterrows():
-        #             pos_str = row['pos']
-        #             pos_str = pos_str.replace("[","")
-        #             pos_str = pos_str.replace("]","")
-        #             x_str, y_str = pos_str.split(', ')
-        #             x_tasks.append(float(x_str))
-        #             y_tasks.append(float(y_str))
-
-        #         task_scat = ax.scatter(x_tasks, y_tasks, color='g', marker='*')
-        #     # else:
-        #     #     for task in tasks:
-        #     #         task : MeasurementTask
-        #     #         x_i, y_i = task.pos
-        #     #         x_tasks.append(x_i)
-        #     #         y_tasks.append(y_i)
-        #     #     task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
+        agent_scats[agent] = ax.scatter([float(x_str)], [float(y_str)], label=f'{agent}')
+        agent_lines[agent] = ax.plot([float(x_str)], [float(y_str)])
 
 
-        #     ax.set_title(f't={t[frame]}[s]')
-        #     out = [agent_scats[agent] for agent in agent_scats]
-        #     out.extend([agent_lines[agent][0] for agent in agent_lines])
-            
-        #     if frame > 0:
-        #         out.append(task_scat)
+    # load measurement location
+    measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
+    
+    # plot task location
+    print('TASK POSITION')
+    print('id, pos, measurements')
+    x_tasks = []
+    y_tasks = []
+    for task in tasks:
+        task : MeasurementTask
+        x_i, y_i = task.pos
+        x_tasks.append(x_i)
+        y_tasks.append(y_i)
+        # x, y = [x_i], [y_i]
+        task_id = task.id.split('-')[0]
+        print(f'{task_id},{task.pos},{task.measurements}')
 
-        #     ax.set_title(f't={t[frame]}[s]')
-        #     return (p for p in out)
+    task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
 
-        # plot original agent position
-        x = []
-        y = []
-        for agent in agent_data:
-            agent : str
-            _, id = agent.split('_')
-            pos_str : str = agent_data[agent]['pos'][0]
-            pos_str = pos_str.replace("[","")
-            pos_str = pos_str.replace("]","")
-            x_str, y_str = pos_str.split(', ')
+    plt.grid(True)
+    ax.set(xlim=x_bounds, ylim=y_bounds, xlabel='x', ylabel='y')
+    ax.legend()
 
-            x.append( float(x_str) )
-            y.append( float(y_str) )
-        agent_scat = ax.scatter(x, y, color='b')
-        # agent_line = 
-        
-        # load measurement location
-        measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
-
-        # plot task location
-        x = []
-        y = []
-        print('TASK POSITION')
-        print('id, pos, measurements')
-        for task in tasks:
-            task : MeasurementTask
-            x_i, y_i = task.pos
-            x.append(x_i)
-            y.append(y_i)
-            task_id = task.id.split('-')[0]
-            print(f'{task_id},{task.pos},{task.measurements}')
-
-        task_scat = ax.scatter(x, y, color='r', marker='*')
-
-        def update(frame):
-            # update agent states
+    def update(frame):
+        # update agent states
+        for agent in agent_data: 
             x = []
             y = []
-            for agent in agent_data: 
-                pos_str : str = agent_data[agent]['pos'][frame]
+            pos_strs : list = agent_data[agent]['pos'][:frame]
+            for pos_str in pos_strs:
+                pos_str : str
                 pos_str = pos_str.replace("[","")
                 pos_str = pos_str.replace("]","")
                 x_str, y_str = pos_str.split(', ')
                 
                 x.append( float(x_str) )
                 y.append( float(y_str) )
-            
+
+            agent_lines[agent][0].set_xdata(x)
+            agent_lines[agent][0].set_ydata(y)
+            # agent_lines[agent].set_offsets(data)
+
+            if len(x) > 0:
+                x, y = [x[-1]], [y[-1]]
             data = np.stack([x,y]).T
-            agent_scat.set_offsets(data)
+            agent_scats[agent].set_offsets(data)
 
-            # TODO update task states
-            x_tasks = []
-            y_tasks = []
-            if frame > 0:
-                t_curr = t[frame]
-                t_prev = t[frame-1]
-                updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_img'] <= t_curr]
-                updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_img'] >= t_prev]
-                for _, row in updated_measurements.iterrows():
-                    pos_str = row['pos']
-                    pos_str = pos_str.replace("[","")
-                    pos_str = pos_str.replace("]","")
-                    x_str, y_str = pos_str.split(', ')
-                    task_scat = ax.scatter(float(x_str), float(y_str), color='g', marker='*')
-            else:
-                for task in tasks:
-                    task : MeasurementTask
-                    x_i, y_i = task.pos
-                    x_tasks.append(x_i)
-                    y_tasks.append(y_i)
-                task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
+        # update task status
+        x_tasks = []
+        y_tasks = []
+        if frame > 0:
+            t_curr = t[frame]
+            t_prev = t[frame-1]
+            updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_img'] <= t_curr]
+            updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_img'] >= t_prev]
+            for _, row in updated_measurements.iterrows():
+                pos_str = row['pos']
+                pos_str = pos_str.replace("[","")
+                pos_str = pos_str.replace("]","")
+                x_str, y_str = pos_str.split(', ')
+                x_tasks.append(float(x_str))
+                y_tasks.append(float(y_str))
 
-            ax.set_title(f't={t[frame]}[s]')
-            return agent_scat
-        
-        ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=50)
+            task_scat = ax.scatter(x_tasks, y_tasks, color='g', marker='*')
+        else:
+            for task in tasks:
+                task : MeasurementTask
+                x_i, y_i = task.pos
+                x_tasks.append(x_i)
+                y_tasks.append(y_i)
+            task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
+
+
+        ax.set_title(f't={t[frame]}[s]')
+        out = [agent_scats[agent] for agent in agent_scats]
+        out.extend([agent_lines[agent][0] for agent in agent_lines])
+        out.append(task_scat)
+
+        ax.set_title(f't={t[frame]}[s]')
+        return (p for p in out)
+    
+    ani = animation.FuncAnimation(fig=fig, func=update, frames=len(t), interval=50)
+    
+
+    if plot_results:
         plt.show()
-        
-        if save_plot:
-            ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
-            plt.close() 
+    
+    if save_plot:
+        ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
+        plt.close() 
+
+    print('SIM DONE')

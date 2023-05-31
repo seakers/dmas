@@ -577,12 +577,18 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
 
-                t_0 = time.perf_counter()
-                results, comp_bundle, comp_path, _, comp_rebroadcasts, bids_received = await self.compare_results(results, copy.copy(bundle), copy.copy(path), t_curr)
-                dt = time.perf_counter() - t_0
-                self.stats['c_comp_check'].append(dt)
+                # t_0 = time.perf_counter()
+                # results, comp_bundle, comp_path, _, comp_rebroadcasts, bids_received = await self.compare_results(results, copy.copy(bundle), copy.copy(path), t_curr)
+                # dt = time.perf_counter() - t_0
+                # self.stats['c_comp_check'].append(dt)
 
-                self.log_results('BIDS RECEIVED', bids_received, level)
+                t_0 = time.perf_counter()
+                t_curr = state.t
+                results, comp_bundle, comp_path, _, comp_rebroadcasts = await self.consensus_phase(results, copy.copy(bundle), copy.copy(path), t_curr, level)
+                dt = time.perf_counter() - t_0
+                self.stats['consensus'].append(dt)
+
+                # self.log_results('BIDS RECEIVED', bids_received, level)
                 self.log_results('COMPARED RESULTS', results, level)
                 self.log_task_sequence('bundle', comp_bundle, level)
                 self.log_task_sequence('path', comp_path, level)
@@ -627,7 +633,21 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                     self.stats['doing'].append(dt)
                     prev_actions = next_actions                
 
-                else:                   
+                else:                  
+                    # broadcast changes
+                    comp_rebroadcasts = []
+                    for task, subtask_index in bundle:
+                        task : MeasurementTask; subtask_index : int
+                        current_bid : SubtaskBid = results[task.id][subtask_index]
+                        out_msg = TaskBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        current_bid.to_dict()
+                                    )
+                        comp_rebroadcasts.append(out_msg)
+                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, False, level=level)
+                    self.log_plan(results, plan, state.t, level)
+
                     # replan
                     state, results, bundle, path = await self.update_bundle(state, 
                                                                         results, 
@@ -683,6 +703,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         """
         converged = False
         self.iter_counter = -1
+        # level = logging.WARNING
 
         while True:
             # Phase 2: Consensus 
@@ -730,7 +751,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         for task_id in results:
             for subtask_index in range(len(results[task_id])):
                 bid : SubtaskBid = results[task_id][subtask_index]
-                # bid.reset_bid_counters()
+                bid.reset_bid_counters()
                 results[task_id][subtask_index] = bid
 
         # level = logging.WARNING
@@ -923,6 +944,18 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
+        # check for already performed tasks
+        t_0 = time.perf_counter()
+        results, bundle, path, done_changes = await self.check_task_completion(results, bundle, path, t, level)
+        changes.extend(done_changes)
+        rebroadcasts.extend(done_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_t_end_check'].append(dt)
+
+        self.log_results('CHECKED EXPIRATION RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
         # check task constraint satisfaction
         t_0 = time.perf_counter()
         results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
@@ -1051,6 +1084,61 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 self.log_results('PRELIMINARY CHECKED EXPIRATION RESULTS', results, level)
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
+
+        return results, bundle, path, changes
+
+    async def check_task_completion(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+        """
+        Checks if tasks have already been performed by someone else
+
+        ### Returns
+            - results
+            - bundle
+            - path
+            - changes
+        """
+        changes = []
+        task_to_remove = None
+        for task, subtask_index in bundle:
+            task : MeasurementTask
+            # current_bid : SubtaskBid = results[task.id][subtask_index]
+
+            for subtask_bid in results[task.id]:
+                subtask_bid : SubtaskBid
+                bid_index = results[task.id].index(subtask_bid)
+
+                if (subtask_bid.t_img >= 0.0
+                    and subtask_bid.t_img < t
+                    and task.dependency_matrix[subtask_index][bid_index] < 0
+                    ):
+                    task_to_remove = (task, subtask_index)
+                    break   
+
+            if task_to_remove is not None:
+                break
+
+        if task_to_remove is not None:
+            bundle_index = bundle.index(task_to_remove)
+            
+            # level=logging.WARNING
+            self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
+            self.log_task_sequence('bundle', bundle, level)
+            self.log_task_sequence('path', path, level)
+
+            for _ in range(bundle_index, len(bundle)):
+                # remove task from bundle and path
+                task, subtask_index = bundle.pop(bundle_index)
+                path.remove((task, subtask_index))
+
+                bid : SubtaskBid = results[task.id][subtask_index]
+                bid.reset(t)
+                results[task.id][subtask_index] = bid
+
+                self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
+
+            x = 1
 
         return results, bundle, path, changes
 
@@ -1302,13 +1390,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
         return False
 
     def task_has_been_performed(self, results : dict, task : MeasurementTask, subtask_index : int, t : Union[int, float]) -> bool:
-        subtask_bid : SubtaskBid = results[task.id][subtask_index]
-        subtask_already_performed = t > subtask_bid.t_img and subtask_bid.winner != SubtaskBid.NONE
+        current_bid : SubtaskBid = results[task.id][subtask_index]
+        subtask_already_performed = t > current_bid.t_img and current_bid.winner != SubtaskBid.NONE
         if subtask_already_performed:
             return True
 
         for subtask_bid in results[task.id]:
             subtask_bid : SubtaskBid
+            
             if t > subtask_bid.t_img and subtask_bid.winner != SubtaskBid.NONE:
                 return True
         

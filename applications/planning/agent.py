@@ -435,9 +435,6 @@ class SimulationAgent(Agent):
                             receive_broadcast.cancel()
                             await receive_broadcast
 
-                            # place blank message in inbox
-                            # blank_msg = 
-
                         except asyncio.CancelledError:
                             # update action completion status
                             if self.external_inbox.empty():
