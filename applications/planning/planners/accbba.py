@@ -120,12 +120,14 @@ class SubtaskBid(TaskBid):
         elif bid_solo < 0:
             raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_solo}.')
         self.bid_solo = bid_solo
+        self.bid_solo_max = bid_solo
 
         if not isinstance(bid_any, int):
             raise ValueError(f'`bid_solo` must be of type `int`. Is of type {type(bid_any)}')
         elif bid_any < 0:
             raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_any}.')
         self.bid_any = bid_any
+        self.bid_any_max = bid_any
 
     def update(self, other_dict : dict, t : Union[float, int]) -> tuple:
         broadcast_out, changed = super().update(other_dict, t)
@@ -178,6 +180,13 @@ class SubtaskBid(TaskBid):
                 out += ','
 
         return out
+    
+    def reset_bid_counters(self) -> None:
+        """
+        Resets this bid's bid counters for optimistic bidding strategies when replanning
+        """
+        self.bid_solo = self.bid_solo_max
+        self.bid_any = self.bid_any_max
 
     def copy(self) -> object:
         return SubtaskBid(  **self.to_dict() )
@@ -580,17 +589,16 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 # determine if bundle was affected by incoming bids
                 changes_to_bundle : bool = not self.compare_bundles(bundle, comp_bundle)
-
                 if changes_to_bundle or len(comp_rebroadcasts) > 0:
-                    # broadcast changes
-                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
-                    
                     # replan
                     state, results, bundle, path = await self.update_bundle(state, 
                                                                         results, 
                                                                         comp_bundle, 
                                                                         comp_path, 
                                                                         level)
+                    # broadcast changes
+                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
+                
 
                     plan = self.plan_from_path(state, results, path)
                     self.log_plan(results, plan, state.t, level)
@@ -717,9 +725,15 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
             state = SimulationAgentState(**state_msg.state)
             t_curr = state.t
             await self.update_current_time(t_curr)  
-            
-        # create plan from path
-        level = logging.WARNING
+
+        # reset planning counters
+        for task_id in results:
+            for subtask_index in range(len(results[task_id])):
+                bid : SubtaskBid = results[task_id][subtask_index]
+                # bid.reset_bid_counters()
+                results[task_id][subtask_index] = bid
+
+        # level = logging.WARNING
         self.log_results('PLAN CREATED', results, level)
         self.log_task_sequence('Bundle', bundle, level)
         self.log_task_sequence('Path', path, level)
@@ -1228,7 +1242,8 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
                 is_biddable = self.can_bid(state, task, subtask_index, results[task_id]) 
                 already_in_bundle = (task, subtaskbid.subtask_index) in bundle 
-                already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
+                # already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
+                already_performed = self.task_has_been_performed(results, task, subtask_index, state.t)
                 
                 if is_biddable and (not already_in_bundle) and (not already_performed):
                     available.append((task, subtaskbid.subtask_index))
@@ -1284,6 +1299,19 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 # either the existing subtask in the bundle is mutually exclusive with the subtask to be added or viceversa
                 return True
             
+        return False
+
+    def task_has_been_performed(self, results : dict, task : MeasurementTask, subtask_index : int, t : Union[int, float]) -> bool:
+        subtask_bid : SubtaskBid = results[task.id][subtask_index]
+        subtask_already_performed = t > subtask_bid.t_img and subtask_bid.winner != SubtaskBid.NONE
+        if subtask_already_performed:
+            return True
+
+        for subtask_bid in results[task.id]:
+            subtask_bid : SubtaskBid
+            if t > subtask_bid.t_img and subtask_bid.winner != SubtaskBid.NONE:
+                return True
+        
         return False
 
     def sum_path_utility(self, path : list, bids : dict) -> float:
@@ -1653,6 +1681,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
 
             if action_completed.id in plan_ids:
                 plan_ids.remove(action_completed.id)
+            
             else:
                 misc_action_msgs.append(action_msg)
 

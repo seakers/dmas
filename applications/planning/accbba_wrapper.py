@@ -22,10 +22,11 @@ from agent import SimulationAgent
 from planners.planners import PlannerTypes
 from states import *
 
-def random_measurements(measurement_types : list, n_max : int = None) -> list:
+def random_measurements(measurement_types : list, n_max : int = None, n_min : int = None) -> list:
     n_max = n_max if n_max is not None else len(measurement_types)
+    n_min = n_min if n_min is not None else 1
     measurements = []
-    n_measurements = random.randint(1, n_max)
+    n_measurements = random.randint(n_min, n_max)
     for _ in range(n_measurements):
         i_ins = random.randint(0, len(measurement_types)-1)
         while measurement_types[i_ins] in measurements:
@@ -41,7 +42,7 @@ if __name__ == '__main__':
 
     # create results directory
     plot_results = True
-    save_plot = False
+    save_plot = True
     scenario_name = 'ACCBBA_TEST'
     results_path = setup_results_directory(scenario_name)
     
@@ -52,7 +53,7 @@ if __name__ == '__main__':
 
     ## agents
     n_agents = 2
-    comms_range = 2
+    comms_range = 20
     v_max = 1
 
     ## clock configuration
@@ -66,6 +67,7 @@ if __name__ == '__main__':
     start_date = datetime(year, month, day, hh, mm, ss)
     end_date = datetime(year, month, day, hh, mm, ss+T)
     dt = 1.0/8.0
+    # dt = 0.12
 
     clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
     # clock_config = EventDrivenClockConfig(start_date, end_date)
@@ -77,7 +79,7 @@ if __name__ == '__main__':
     level = logging.WARNING
 
     ### random tasks 
-    n_tasks = 4
+    n_tasks = 5
     # task_types = ['MWR', 'IR', 'VNIR']
     task_types = ['MWR', 'IR']
     
@@ -85,8 +87,8 @@ if __name__ == '__main__':
     tasks = []
     s_max = 100.0
     t_start = 0.0
-    t_end = np.Inf
-    # t_end = T
+    # t_end = np.Inf
+    t_end = T
     t_corr = 1.0
 
     pos = [0.0, 2.0]   
@@ -109,26 +111,42 @@ if __name__ == '__main__':
     # s_max = 100 * len(measurements) / len(task_types)
     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [0.582485975658269, 3.176375584717473]
+    # pos = [1.6584931928268665, 2.2686453819071453]
+    # measurements = [task_types[0], task_types[1]]
+    # s_max = 100 if len(measurements) > 1 else 30.0
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+
+    # pos = [3.8193647821146692, 2.46260804354465]
+    # measurements = [task_types[0], task_types[1]]
+    # s_max = 100 if len(measurements) > 1 else 30.0
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
+
+    # pos = [3.0840459880745765, 1.5328625005614467]
     # measurements = [task_types[1], task_types[0]]
-    # s_max = 100 * len(measurements) / len(task_types)
+    # s_max = 100 if len(measurements) > 1 else 30.0
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    # pos = [4.42695251546435, 1.6151251855783162] 
+    # pos = [0.9905327277237774, 4.669576037201175]
     # measurements = [task_types[0]]
-    # s_max = 100 * len(measurements) / len(task_types)
+    # s_max = 100 if len(measurements) > 1 else 30.0
     # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-    while len(tasks) < n_tasks:
-        x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
-        y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
-        pos = [x, y]
-        measurements = random_measurements(task_types)
-        # measurements = [task_types[0]]
-        s_max = 100 * len(measurements) / len(task_types)
+    # pos = [1.117248843260703, 2.563973829177466]
+    # measurements = [task_types[1], task_types[0]]
+    # s_max = 100 if len(measurements) > 1 else 30.0
+    # tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end, t_corr))
 
-        task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
-        tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
+    # while len(tasks) < n_tasks:
+    #     x = x_bounds[0] + (x_bounds[1] - x_bounds[0]) * random.random()
+    #     y = y_bounds[0] + (y_bounds[1] - y_bounds[0]) * random.random()
+    #     pos = [x, y]
+    #     measurements = random_measurements(task_types, 2)
+    #     # measurements = [task_types[0]]
+    #     # s_max = 100 * len(measurements) / len(task_types)
+    #     s_max = 100 if len(measurements) > 1 else 30.0
+
+    #     task = MeasurementTask(pos, s_max, measurements, t_start, t_end)
+    #     tasks.append(MeasurementTask(pos, s_max, measurements, t_start, t_end))
 
     # create simulation manager
     network_name = 'PLANNING_NETWORK'
@@ -268,12 +286,106 @@ if __name__ == '__main__':
             if t is None or len(df['t']) < len(t):
                 t = df['t']
 
+        # initialize plot
         fig, ax = plt.subplots()
-        plt.grid(True)
-        ax.set_xlim(x_bounds[0], x_bounds[1]) 
-        ax.set_ylim(y_bounds[0], y_bounds[1]) 
-        ax.set_xlabel('x')
-        ax.set_ylabel('x')
+
+        # # plot original agent position
+        # agent_scats = {}
+        # agent_lines = {}
+        # for agent in agent_data:
+        #     agent : str
+        #     _, id = agent.split('_')
+        #     pos_str : str = agent_data[agent]['pos'][0]
+        #     pos_str = pos_str.replace("[","")
+        #     pos_str = pos_str.replace("]","")
+        #     x_str, y_str = pos_str.split(', ')
+
+        #     agent_scats[agent] = ax.scatter([float(x_str)], [float(y_str)], label=f'{agent}')
+        #     agent_lines[agent] = ax.plot([float(x_str)], [float(y_str)])
+
+
+        # # load measurement location
+        # measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
+        
+        # # plot task location
+        # print('TASK POSITION')
+        # print('id, pos, measurements')
+        # x_tasks = []
+        # y_tasks = []
+        # for task in tasks:
+        #     task : MeasurementTask
+        #     x_i, y_i = task.pos
+        #     x_tasks.append(x_i)
+        #     y_tasks.append(y_i)
+        #     # x, y = [x_i], [y_i]
+        #     task_id = task.id.split('-')[0]
+        #     print(f'{task_id},{task.pos},{task.measurements}')
+
+        # task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
+
+        # plt.grid(True)
+        # ax.set(xlim=x_bounds, ylim=y_bounds, xlabel='x', ylabel='y')
+        # ax.legend()
+
+        # def update(frame):
+        #     # update agent states
+        #     for agent in agent_data: 
+        #         x = []
+        #         y = []
+        #         pos_strs : list = agent_data[agent]['pos'][:frame]
+        #         for pos_str in pos_strs:
+        #             pos_str : str
+        #             pos_str = pos_str.replace("[","")
+        #             pos_str = pos_str.replace("]","")
+        #             x_str, y_str = pos_str.split(', ')
+                    
+        #             x.append( float(x_str) )
+        #             y.append( float(y_str) )
+
+        #         agent_lines[agent][0].set_xdata(x)
+        #         agent_lines[agent][0].set_ydata(y)
+        #         # agent_lines[agent].set_offsets(data)
+
+        #         if len(x) > 0:
+        #             x, y = [x[-1]], [y[-1]]
+        #         data = np.stack([x,y]).T
+        #         agent_scats[agent].set_offsets(data)
+
+        #     # update task status
+        #     x_tasks = []
+        #     y_tasks = []
+        #     if frame > 0:
+        #         t_curr = t[frame]
+        #         t_prev = t[frame-1]
+        #         updated_measurements : pandas.DataFrame = measurement_data[measurement_data['t_img'] <= t_curr]
+        #         updated_measurements : pandas.DataFrame = updated_measurements[updated_measurements['t_img'] >= t_prev]
+        #         for _, row in updated_measurements.iterrows():
+        #             pos_str = row['pos']
+        #             pos_str = pos_str.replace("[","")
+        #             pos_str = pos_str.replace("]","")
+        #             x_str, y_str = pos_str.split(', ')
+        #             x_tasks.append(float(x_str))
+        #             y_tasks.append(float(y_str))
+
+        #         task_scat = ax.scatter(x_tasks, y_tasks, color='g', marker='*')
+        #     # else:
+        #     #     for task in tasks:
+        #     #         task : MeasurementTask
+        #     #         x_i, y_i = task.pos
+        #     #         x_tasks.append(x_i)
+        #     #         y_tasks.append(y_i)
+        #     #     task_scat = ax.scatter(x_tasks, y_tasks, color='r', marker='*')
+
+
+        #     ax.set_title(f't={t[frame]}[s]')
+        #     out = [agent_scats[agent] for agent in agent_scats]
+        #     out.extend([agent_lines[agent][0] for agent in agent_lines])
+            
+        #     if frame > 0:
+        #         out.append(task_scat)
+
+        #     ax.set_title(f't={t[frame]}[s]')
+        #     return (p for p in out)
 
         # plot original agent position
         x = []
@@ -289,6 +401,7 @@ if __name__ == '__main__':
             x.append( float(x_str) )
             y.append( float(y_str) )
         agent_scat = ax.scatter(x, y, color='b')
+        # agent_line = 
         
         # load measurement location
         measurement_data = pandas.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")

@@ -431,8 +431,12 @@ class SimulationAgent(Agent):
                     else:
                         # timer ran out or time advanced
                         try:
+                            # cancel listen to broadcast
                             receive_broadcast.cancel()
                             await receive_broadcast
+
+                            # place blank message in inbox
+                            # blank_msg = 
 
                         except asyncio.CancelledError:
                             # update action completion status
