@@ -40,7 +40,7 @@ if __name__ == '__main__':
     """    
 
     # create results directory
-    plot_results = True
+    plot_results = False
     save_plot = False
     scenario_name = 'ACCBBA_TEST'
     results_path = setup_results_directory(scenario_name)
@@ -350,3 +350,4 @@ if __name__ == '__main__':
         if save_plot:
             ani.save(f'{results_path}/animation.gif', writer='imagemagick')      
             plt.close() 
+        
