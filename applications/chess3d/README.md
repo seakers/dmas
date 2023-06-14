@@ -111,9 +111,9 @@ This information will be shared to and amongst agents as `TaskRequest` messages.
 
 
 #
-## Running this Application
+## Running DMAS - 3DCHESS
 Open a terminal in this directory and run `main.py` by entering the following command:
 
-    python main.py <scenario description JSON>
+    python main.py <scenario name>
 
-To create a scenario JSON, see `README.md` in `./scenarios` directory.
+To create a scenario, see `README.md` in `./scenarios` directory.
