@@ -1,6 +1,16 @@
+from enum import Enum
 import os
 import shutil
 
+class CoordinateTypes(Enum):
+    """
+    # Coordinate Type
+
+    Describes the type of coordinate being described by a position vector
+    """
+    CARTESIAN = 'CARTESIAN'
+    KEPLERIAN = 'KEPLERIAN'
+    LATLON = 'LATLON'
 
 def setup_results_directory(scenario_name) -> str:
     """

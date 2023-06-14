@@ -17,17 +17,14 @@ CHESS sensor web with that of status quo architectures in
 the context of a multi-sensor inland hydrologic and ecologic
 monitoring system.
 
-## Generalized Scenario Description:
+## Simulation Overview:
 ![DMAS network framework diagram](./docs/diagrams/architecture/simulation.png)
-
-- The simulation environment creates an initial population of tasks and announces them to the ground station agents.
-- Ground Station agents broadcast new tasks to all agents
-- Satellite and UAV agents receive the task broadcasts and perform a task-assignment procedure using MACCBBA
-- The environment may stochastically generate new tasks throughout the simulation and announce them to Ground Station Agents (PENDING)
-- 
+- A Ground Station agent generates and broadcast new tasks to all agents when in range.
+- Sensing agents (Satellites and UAVs) receive task broadcasts and perform a task-assignment procedure using various planning strategies (i.e. MACCBBA)
+- Sensing agents may geenrate new tasks throughout the simulation based on their measurements and announce them toall agents (PENDING)
 
 #
-## Simulation Element Description
+## Simulation Architecture Description
 ## Manager:
 In charge of keeping time in the simulation. 
 - Listens for all agents to request a time to fast-forward to. 
@@ -35,70 +32,88 @@ In charge of keeping time in the simulation.
 - This will be repeated until the final time has been reached.
 
 ## Monitor:
-Currently
+Receive messages in real-time and inform user of simulation status (PENDING)
 
-## Environment:
-The simulation environment is in charge of outlining the space in which the agents will live during the simulation. The environment also tracks the position of each agent and the state of each measurement task. 
+## Environment Server:
+Is in charge of simulating the Earth-system in which the agents will live during the simulation. Can be sensed by the agents via REQ-REP messages. These senses may include information such as:
 
-It may create new tasks and publish them to the agents and it may also inform agents that they are no longer in range of one and other and thus are unable to communicate until they are back in range. This range is defined within the environment. 
+1. The sensing agent's own position or velocity
+2. A Ground Point's measurement data
+
+The environment server tracks the position and velocity of every satellite agent using precomputed orbital trajectories using `OrbitPy`.
+
+Access-times between agents is also precomputed and broadcasted by the Environment Server. Connectivity between every satellite and ground station agent is precomputed using `OrbityPy`, whereas UAV agents are assumed to always be in range of the Ground Station agent.
+
+The data being sensed by the agents when performing a measurement is precomputed (citation and development PENDING).
 
 ## Agent:
 
-Agents exist in a 2D environment with defined borders. They may move in any direction within said 2D space at a fixed speed. Agents may also perform measurement tasks if they possess the proper insturments and share information with other agents. 
-    
-Tasks do NOT require collaboration between agents in this example. 
+![DMAS agent architecture layout](./docs/diagrams/architecture/agent.png)
+### Agent Architecture:
 
-Agent's physical limitations beyond their travel speed and instruments are not considered in this example.
+Agents consist of a main `live()` thread and a three modules. The `Engineering Module` is in charge of keeping track of an agent's components' states, as to simulate the physical aspects of the agent in question. The `Science Module` processes any incoming measurement information and creates new observation requests if it deems it necessary. The `Planning Module` is in charge of receiving said requests and scheduling them in the agent's operations plan. 
+
+At each time-step, the agents' `live()` thread iterates through an internal `sense`->`think`->`do` loop, while the modules are constantly listening for incoming messages.
+
+During the agents' `sense` routine, agents will inform their `Engineering Module` of any actions that were just performed along with the latest simulation time and any connectivity updates from the environment. This will instruct the `Engineering Module` to update its state. Agents will also listen for any message coming from other agents during the `sense` routine. If an environment message instructs the agent to alter its connectivity to other agents, it will do so by unsubscribing or subscribing to the PUB port of the desired agent.
+
+Once all incoming transmissions are received, the agent will `think` its next set of actions to perform. It does so by sending all incoming agent messages to the `Planning` and `Science Module` and then waiting for a message containing its next plan. The `Science Module` will use this incoming information to update its internal models and possibly detect areas of interest that may need further observations. The `Planning Module` will then use these findings along with the messages from the parent agent to schedule its next set of tasks to do.
+
+The agent enters its `do` routine as soon as a plan is received and starts to perform actions as instructed. Agents update their state at the beginning of each time-step as well as before and after an action is performed. If an action leads to the a failure state within the `Engineering Module`, the agent will shut down and inform the Manager. The status of completion of each action is tracked by the agent and then sent back to the `sense` routine, which repeats the an iteration of the `sense`->`think`->`do` loop.
 
 ### Agent State:
-Tracks the position and velocity vector of the agent, a list of tasks performed by the agent, and the current status of the agent at a given time. The status of an agent may be idling, traveling, or performing a measurement.
+Represented as the state of the components and subsystems described in the `Engineering Module`, it characterizes the agent's position and velocity as well as the state of its internal components and the action being performed by the agent at a given time. The actions performed by an agent may be:
+1. Idling
+2. Traveling
+3. Maneuvering
+4. Messaging another agent
+5. Waiting for a message
+6. Performing a measurement
 
-Agents are responsible of tracking their own state and publishing it to the environment and monitor at each time-step. 
+All agents are responsible of tracking their own state. The specifics of each state depend onf the type of agent. 
 
-### Agent Architecture:
-Agents consist of a main `live()` process and a planning module.
+Satellite agents exist in a predefined orbit and are unable to change it. Their position and velocity is precalculated using the `OrbitPy` library, however they can perform slewing maneuvers to alter their orientation. Their `Engineering Module` contains ADCS, payload, and EPS subsystems.
 
-At the beginning of each time-step, the agent's `live()` process will listen for any environment message. If this message instructs the agent to alter its connectivity to other agents, it will do so by unsubscribing or subscribing to the PUB port of the desired agent.
+UAV agents can move in any direction and at predefined a maximum speed. They possess a kinematic model that calculates their position during the simulation.  Their `Engineering Module` only contains the payload and EPS subsystems.
 
-Once this environment message is handled, the agent's `live()` process will listen for any incoming messages from either its internal planning module or any external simulation elements.
-
-All messages from other agents will be forwarded to the planning module. Messages from the internal planning module contain actions which the agent will perform as soon as these messages are received. If a clock update message from the simulation manager is received, it will update its clock with the newly announced time and will repeat this this procedure until the agent receives an end-of-simulation message from the environment. 
-
-Agents update their state at the beginning of each time-step as well as before and after an action is performed.
+The Ground Station agent's state is much simpler and has unlimited internal resources. It does not track its posistion and velocity and is unable to perform measurements. It can only communicate with other agents and generate measurement requests.
 
 #
 ## Planners
-The internal planning module within each agents is in charge of instructing the agent on which actions to perform. 
+Different planning strategies are to be tested with this platform along with various utility functions. 
 
-When planning, this module waits for messages from the environment announcing new tasks to perform or for messages from other agents informing of the status of their plans. to perform the tasks being announced and schedules tasks to be performed by its parent agent given this information. 
+A preliminary set of utility functions include:
+- U(x,i,t) = R * exp( (t - t_start) * urgency ) - C         
+- U(x,i,t) = R * (t - t_end) / (t_start - t_end) - C
 
-Different planning strategies are to be tested with this platform. All of the using the utility function:
-
-    U(x,i,t) = R * exp( (t - t_start) * urgency ) - C
-
-This utility function returns a value of 0 if:
-- The agent is not in the same position as the task at the time of measurement.
-- The agent does not pocess the instrument required for the measurement. 
-- The time of measurement `t` is not within the interval `(t_start, t_end)`.
+These utility functions returns a value of 0 if:
+- The agent is not in observing the target of the task at the time of measurement.
+- The agent does not pocess the required capabilities for the measurement. 
+- The time of measurement `t` is not within the interval `[t_start, t_end]`.
 
 `C` represents a fixed cost of performing a task. 
 
+The set of planning strategies being tested include:
+ - MILP onboard each agent ("centralized" strategy)
+ - Individual Greedy search (fully decentralized strategy)
+ - MCCBBA (decentralized strategy)
+
 ### Measurement Task Description:
 Measurement Tasks are defined by a tuple containing their:
-1. Location
-2. Reward
+1. Location (lat [°], lon [°], alt [km])
+2. Max Reward (defined by the `Science Module`)
 3. Start Time
 4. End Time
-6. Instrument
+6. List of Required Information
 7. Task ID
 
 This information will be shared to and amongst agents as `TaskRequest` messages. 
 
-### Asynchronous Consensus-Based Bundle Algorithm - ACBBA 
-
 
 #
-## Running this example
+## Running this Application
 Open a terminal in this directory and run `main.py` by entering the following command:
 
-    python main.py
+    python main.py <scenario description JSON>
+
+To create a scenario JSON, see `README.md` in `./scenarios` directory.
