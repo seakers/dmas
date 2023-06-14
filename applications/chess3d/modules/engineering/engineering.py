@@ -215,4 +215,10 @@ class AbstractSubsystem(ABC):
 
         
 class EngineeringModule():
-    pass
+    
+    def __init__(self,
+                name : str,
+                subsystems : list,
+                id : str = None
+                ) -> None:
+        pass
