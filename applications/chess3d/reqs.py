@@ -1,16 +1,17 @@
+import copy
 from ctypes import Union
+from itertools import combinations, permutations
 import uuid
 import numpy
 
-
 class MeasurementRequest(object):
     """
-    Describes a set of measurements to be performed by agents in the simulation
+    Describes a measurement request to be performed by agents in the simulation
 
     ### Attributes:
-        - pos (`list`): cartesian coordinates of the location of this task
+        - pos (`list`): lat-lon-alt coordinates of the location of this task
         - s_max (`float`): maximum score attained from performing this task
-        - instruments (`list`): name of the instruments that can perform this task
+        - measurements (`list`): measurement types required to perform this task
         - duration (`float`): duration of the measurement being performed
         - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
         - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
@@ -32,9 +33,10 @@ class MeasurementRequest(object):
         Creates an instance of a task 
 
         ### Arguments:
-            - pos (`list`): cartesian coordinates of the location of this task
+            - pos (`list`): lat-lon-alt coordinates of the location of this task
             - s_max (`float`): maximum score attained from performing this task
-            - measurements (`list`): list of the measurements that are needed to fully perform this task
+            - measurements (`list`): measurement types required to perform this task
+            - duration (`float`): duration of the measurement being performed
             - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
             - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
             - t_corr (`float`): maximum decorralation time between measurements of different measurements
@@ -45,8 +47,6 @@ class MeasurementRequest(object):
             raise AttributeError(f'`pos` must be of type `list`. is of type {type(pos)}.')
         elif len(pos) != 3:
             raise ValueError(f'`pos` must be a list of 3 values (lat, lon, alt). is of length {len(pos)}.')
-        
-
         if not isinstance(s_max, float) and not isinstance(s_max, int):
             raise AttributeError(f'`s_max` must be of type `float` or type `int`. is of type {type(s_max)}.')
         if not isinstance(measurements, list):
@@ -56,6 +56,7 @@ class MeasurementRequest(object):
                 if not isinstance(measurement, str):
                     raise AttributeError(f'`measurements` must a `list` of elements of type `str`. contains elements of type {type(measurement)}.')
         
+        # initialize
         self.t_start = t_start
         self.t_end = t_end
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
@@ -123,17 +124,10 @@ class MeasurementRequest(object):
                     dependencies.append(0)
                     # continue
 
-                elif len(dependents_a) != len(dependents_b):
-                    # dependency_matrix[index_a][index_b] = -1
-                    # dependency_matrix[index_b][index_a] = -1
                     dependencies.append(-1)
                 elif main_a not in dependents_b or main_b not in dependents_a:
-                    # dependency_matrix[index_a][index_b] = -1
-                    # dependency_matrix[index_b][index_a] = -1
                     dependencies.append(-1)
                 elif main_a == main_b:
-                    # dependency_matrix[index_a][index_b] = -1
-                    # dependency_matrix[index_b][index_a] = -1
                     dependencies.append(-1)
                 else:
                     dependents_a_extended : list = copy.deepcopy(dependents_a)
@@ -142,12 +136,8 @@ class MeasurementRequest(object):
                     dependents_b_extended.remove(main_a)
 
                     if dependents_a_extended == dependents_b_extended:
-                        # dependency_matrix[index_a][index_b] = 1
-                        # dependency_matrix[index_b][index_a] = 1
                         dependencies.append(1)
                     else:
-                        # dependency_matrix[index_a][index_b] = -1
-                        # dependency_matrix[index_b][index_a] = -1
                         dependencies.append(-1)
             
             dependency_matrix.append(dependencies)
@@ -155,17 +145,14 @@ class MeasurementRequest(object):
         return dependency_matrix
 
     def generate_time_dependency_matrix(self) -> list:
-        # time_dependency_matrix = numpy.zeros((len(self.measurement_groups), len(self.measurement_groups)))
         time_dependency_matrix = []
 
         for index_a in range(len(self.measurement_groups)):
             time_dependencies = []
             for index_b in range(len(self.measurement_groups)):
                 if self.dependency_matrix[index_a][index_b] > 0:
-                    # time_dependency_matrix[index_a][index_b] = self.t_corr
                     time_dependencies.append(self.t_corr)
                 else:
-                    # time_dependency_matrix[index_a][index_b] = numpy.Inf
                     time_dependencies.append(numpy.Inf)
             time_dependency_matrix.append(time_dependencies)
 
