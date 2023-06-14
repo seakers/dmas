@@ -16,3 +16,6 @@ class SubsystemAction(ABC):
     Describes an action to be performed on or by an engineering module subsystem
     """
     pass
+
+class ComponentActuateAction(ComponentAction):
+    pass

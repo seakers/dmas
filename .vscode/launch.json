@@ -57,6 +57,19 @@
                 "PYTHONPATH": "${workspaceRoot}"
             },
             "args" : "TEST"
+        },
+
+        {
+            "name": "3D CHESS - ENGINEERING TESTER",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/agents/engineering/test.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            }
         }
     ],
 

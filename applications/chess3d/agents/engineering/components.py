@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Union
 import uuid
 
-from agents.engineering.actions import ComponentAction
+from applications.chess3d.agents.engineering.actions import ComponentAction
 
 
 class AbstractComponent(ABC):

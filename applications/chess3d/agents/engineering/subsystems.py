@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import uuid
-from agents.engineering.components import AbstractComponent
-from agents.engineering.actions import SubsystemAction
+from applications.chess3d.agents.engineering.actions import SubsystemAction
+from applications.chess3d.agents.engineering.components import AbstractComponent
 
 
 class AbstractSubsystem(ABC):
@@ -114,3 +114,6 @@ class AbstractSubsystem(ABC):
         Crates a dictionary containing all information contained in this agent state object
         """
         return dict(self.__dict__)
+
+class ExampleSubsystem(AbstractSubsystem):
+    pass
