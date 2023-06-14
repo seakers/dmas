@@ -5,8 +5,8 @@ from dmas.agents import AgentState
 class SimulationAgentState(AgentState):
     IDLING = 'IDLING'
     TRAVELING = 'TRAVELING'
+    MANEUVERING = 'MANEUVERING'
     MEASURING = 'MEASURING'
-    MESSAGING = 'MESSAGING'
     SENSING = 'SENSING'
     THINKING = 'THINKING'
     LISTENING = 'LISTENING'
