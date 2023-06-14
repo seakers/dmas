@@ -12,6 +12,14 @@ class CoordinateTypes(Enum):
     KEPLERIAN = 'KEPLERIAN'
     LATLON = 'LATLON'
 
+class ModuleTypes(Enum):
+    """
+    # Types of Internal Modules for agents 
+    """
+    PLANNER = 'PLANNER'
+    SCIENCE = 'SCIENCE'
+    ENGINEERING = 'ENGINEERING'
+
 def setup_results_directory(scenario_name) -> str:
     """
     Creates an empty results directory within the current working directory
