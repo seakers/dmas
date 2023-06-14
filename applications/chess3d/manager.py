@@ -2,7 +2,18 @@ import math
 from dmas.managers import *
 from messages import *
 
-class PlanningSimulationManager(AbstractManager):
+class SimulationManager(AbstractManager):
+    """
+    ## Simulation Manager
+
+    Describes the simulation manager of a 3D CHESS simulation
+
+    In charge of keeping time in the simulation.
+        - Listens for all agents to request a time to fast-forward to.
+        - Once all agents have done so, the manager will perform a time-step increase in the simulation clock and announce the new time to every member of the simulation.
+        - This will be repeated until the final time has been reached.
+
+    """
     def _check_element_list(self):
         env_count = 0
         for sim_element_name in self._simulation_element_name_list:
@@ -31,12 +42,9 @@ class PlanningSimulationManager(AbstractManager):
 
             elif isinstance(self._clock_config, FixedTimesStepClockConfig):
                 dt = self._clock_config.dt
-                n_steps = math.ceil(delay/dt)
                 t = 0
                 tf = t + delay
                 
-                # for t in tqdm (range (1, n_steps+1), desc=desc):
-                # with tqdm(total=n_steps + 1, desc=desc) as pbar:
                 with tqdm(total=delay, desc=desc) as pbar:
 
                     while t < tf:
@@ -115,10 +123,6 @@ class PlanningSimulationManager(AbstractManager):
             received_messages : dict = {}
             read_task = None
 
-            # poller = azmq.Poller()
-            # sub_socket, _ = self._manager_socket_map.get(zmq.SUB)
-            # poller.register(sub_socket, zmq.POLLIN)
-
             while(
                     len(received_messages) < len(self._simulation_element_name_list) - 1
                     and len(self._simulation_element_name_list) > 1
@@ -161,8 +165,6 @@ class PlanningSimulationManager(AbstractManager):
                         self.log(f'{src} has now reported reported its tic request  to the simulation manager. Wait status: ({len(received_messages)}/{len(self._simulation_element_name_list) - 1})')
 
                 elif NodeMessageTypes[msg_type] == NodeMessageTypes.CANCEL_TIC_REQ:
-                    # unpack message
-                    cancelled_tic_req = CancelTicRequest(**msg_dict)
 
                     # log subscriber cancellation
                     if src not in self._simulation_element_name_list and self.get_network_name() + '/' + src not in self._simulation_element_name_list:
@@ -181,6 +183,7 @@ class PlanningSimulationManager(AbstractManager):
             return received_messages
 
         except asyncio.CancelledError:            
+            # wait cancelled
             return
 
         except Exception as e:
