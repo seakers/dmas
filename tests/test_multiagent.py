@@ -118,14 +118,14 @@ class TestMultiagentSim(unittest.TestCase):
 							random.random(),
 							random.random()]
 				
-		def is_critial(self) -> bool:
-			return False
-
-		def is_failure(self) -> bool:
-			return False
-				
 		def update_state(self, pos, **_):
 			self.pos = pos
+
+		def perform_action(self) -> None:
+			return
+
+		def is_failure(self, **kwargs) -> None:
+			return False
 
 		def get_pos(self):
 			return self.pos
@@ -371,7 +371,7 @@ class TestMultiagentSim(unittest.TestCase):
 			await asyncio.sleep(delay)
 
 	def test_agent_init(self):
-		port = 5555
+		port = random.randint(5555,9999)
 		network_name = 'TEST_NETWORK'
 		level = logging.WARNING
 
@@ -389,6 +389,9 @@ class TestMultiagentSim(unittest.TestCase):
 													zmq.REQ: [f'tcp://*:{port+3}'],
 													zmq.PUB: [f'tcp://*:{port+4}'],
 													zmq.SUB: [f'tcp://*:{port+5}']
+											},
+											internal_address_map = {
+													zmq.SUB: [f'tcp://*:{port+6}']
 											})
 
 		manager_network_config = NetworkConfig( network_name,
@@ -413,6 +416,9 @@ class TestMultiagentSim(unittest.TestCase):
 											external_address_map = {
 													zmq.PUB: [f'tcp://*:{port+4}'],
 													zmq.SUB: [f'tcp://*:{port+5}']
+											},
+											internal_address_map = {
+													zmq.SUB: [f'tcp://*:{port+6}']
 											})	
 			TestMultiagentSim.TestAgent('TEST_AGENT', 
 										agent_network_config, 
@@ -429,6 +435,9 @@ class TestMultiagentSim(unittest.TestCase):
 											external_address_map = {
 													zmq.REQ: [f'tcp://*:{port+3}'],
 													zmq.SUB: [f'tcp://*:{port+5}']
+											},
+											internal_address_map = {
+													zmq.SUB: [f'tcp://*:{port+6}']
 											})	
 			TestMultiagentSim.TestAgent('TEST_AGENT', 
 										agent_network_config, 
@@ -445,6 +454,9 @@ class TestMultiagentSim(unittest.TestCase):
 											external_address_map = {
 													zmq.REQ: [f'tcp://*:{port+3}'],
 													zmq.PUB: [f'tcp://*:{port+4}']
+											},
+											internal_address_map = {
+													zmq.SUB: [f'tcp://*:{port+6}']
 											})	
 			TestMultiagentSim.TestAgent('TEST_AGENT', 
 										agent_network_config, 
@@ -454,7 +466,7 @@ class TestMultiagentSim(unittest.TestCase):
 		
 	def test_multiagent(self):
 		print(f'AGENT-ENV TEST:')
-		port = 5555
+		port = random.randint(5555,9999)
 		level = logging.WARNING
 		
 		year = 2023
@@ -490,7 +502,9 @@ class TestMultiagentSim(unittest.TestCase):
 													zmq.PUSH: [f'tcp://localhost:{port+2}']},
 											external_address_map = {
 													zmq.REP: [f'tcp://*:{port+3}'],
-													zmq.PUB: [f'tcp://*:{port+4}']
+													zmq.PUB: [f'tcp://*:{port+4}']},
+											internal_address_map = {
+													zmq.SUB: [f'tcp://*:{port+8}']
 											})
 		environment = TestMultiagentSim.TestEnvironment(env_network_config, 
 						  								manager.get_network_config(), 
@@ -506,7 +520,9 @@ class TestMultiagentSim(unittest.TestCase):
 												external_address_map = {
 														zmq.REQ: [f'tcp://*:{port+5}'],
 														zmq.PUB: [f'tcp://*:{port+6}'],
-														zmq.SUB: [f'tcp://*:{port+7}']
+														zmq.SUB: [f'tcp://*:{port+7}']},
+												internal_address_map = {
+														zmq.SUB: [f'tcp://*:{port+9}']
 											})
 		initial_state = TestMultiagentSim.TestAgentState(x0 = 0, y0 = 0, z0 = 0)
 		agent = TestMultiagentSim.TestAgent(TestMultiagentSim.AgentNames.AGENT_1.value,

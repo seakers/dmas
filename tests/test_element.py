@@ -1,4 +1,5 @@
 
+import random
 import unittest
 import concurrent.futures
 
@@ -241,7 +242,7 @@ class TestSimulationElement(unittest.TestCase):
 
     def test_run(self):
         print('\nTESTING SIMULATION ELEMENT SYNC ROUTINE')
-        port = 5556
+        port = random.randint(5555,9999)
         n_clients = 10
 
         server = TestSimulationElement.Server(port, n_clients, level=logging.WARNING)

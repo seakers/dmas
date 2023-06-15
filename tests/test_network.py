@@ -13,9 +13,10 @@ from dmas.network import *
 class TestNetworkConfig(unittest.TestCase): 
     def test_init(self):
         network_name = 'TEST_NETWORK'
-        internal_address_map = {zmq.PUB: ['http://localhost.5555']}
-        external_address_map = {zmq.SUB: ['http://localhost.5556']}
-        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
+        port = random.randint(5555,9999)
+        internal_address_map = {zmq.PUB: [f'http://localhost.{port}']}
+        external_address_map = {zmq.SUB: [f'http://localhost.{port+1}']}
+        manager_address_map = {zmq.REQ: [f'http://localhost.{port+2}']}
         
         network_config = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
         self.assertEqual(type(network_config), NetworkConfig)
@@ -43,9 +44,10 @@ class TestNetworkConfig(unittest.TestCase):
             
     def test_eq(self):
         network_name = 'TEST_NETWORK'
-        internal_address_map = {zmq.PUB: ['http://localhost.5555']}
-        external_address_map = {zmq.SUB: ['http://localhost.5556']}
-        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
+        port = random.randint(5555,9999)
+        internal_address_map = {zmq.PUB: [f'http://localhost.{port}']}
+        external_address_map = {zmq.SUB: [f'http://localhost.{port+1}']}
+        manager_address_map = {zmq.REQ: [f'http://localhost.{port+2}']}
         
         config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
         config_2 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
@@ -85,9 +87,10 @@ class TestNetworkConfig(unittest.TestCase):
 
     def test_dict(self):
         network_name = 'TEST_NETWORK'
-        internal_address_map = {zmq.PUB: ['http://localhost.5555']}
-        external_address_map = {zmq.SUB: ['http://localhost.5556']}
-        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
+        port = random.randint(5555,9999)
+        internal_address_map = {zmq.PUB: [f'http://localhost.{port}']}
+        external_address_map = {zmq.SUB: [f'http://localhost.{port+1}']}
+        manager_address_map = {zmq.REQ: [f'http://localhost.{port+2}']}
 
         network_config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
         network_config_2 = NetworkConfig(network_name, manager_address_map, dict(), external_address_map)
@@ -99,9 +102,10 @@ class TestNetworkConfig(unittest.TestCase):
 
     def test_json(self):
         network_name = 'TEST_NETWORK'
-        internal_address_map = {zmq.PUB: ['http://localhost.5555']}
-        external_address_map = {zmq.SUB: ['http://localhost.5556']}
-        manager_address_map = {zmq.REQ: ['http://localhost.5557']}
+        port = random.randint(5555,9999)
+        internal_address_map = {zmq.PUB: [f'http://localhost.{port}']}
+        external_address_map = {zmq.SUB: [f'http://localhost.{port+1}']}
+        manager_address_map = {zmq.REQ: [f'http://localhost.{port+2}']}
 
         network_config_1 = NetworkConfig(network_name, manager_address_map, internal_address_map, external_address_map)
         network_config_2 = NetworkConfig(network_name, manager_address_map, dict(), external_address_map)
@@ -608,7 +612,7 @@ class TestNetworkElement(unittest.TestCase):
             TestNetworkElement.DummyElement('TEST', NetworkConfig('TEST', dict()), logging.WARNING, logger=1)
 
     def test_message_broadcast(self):
-        port = 5555
+        port = random.randint(5555,9999)
         listeners = [1, 20]
         n_messages = 20
         level = logging.WARNING
@@ -635,7 +639,7 @@ class TestNetworkElement(unittest.TestCase):
             print('\n')
 
     def test_message_distribution(self):
-        port = 5555
+        port = random.randint(5555,9999)
         listeners = [1, 20]
         n_messages = 20
 
@@ -661,7 +665,7 @@ class TestNetworkElement(unittest.TestCase):
             print('\n')
 
     def test_p2p_message(self):
-        port = 5555
+        port = random.randint(5555,9999)
         n_messages = 20
         level=logging.DEBUG
 

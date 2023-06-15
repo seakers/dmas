@@ -155,23 +155,22 @@ class TestSimulationMessages(unittest.TestCase):
         
     def test_node_messages(self):
         src = 'TEST_SRC'
+        dst = 'TEST_DST'
         network_config = NetworkConfig('TEST_NETWORK')
-        msg = NodeSyncRequestMessage(src, network_config.to_dict())
-        msg_dif = NodeSyncRequestMessage(src, network_config.to_dict())
+        msg = NodeSyncRequestMessage(src, dst, network_config.to_dict())
+        msg_dif = NodeSyncRequestMessage(src, dst, network_config.to_dict())
 
         self.assertEqual(msg, NodeSyncRequestMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeSyncRequestMessage(**json.loads(msg_dif.to_json())))
         
-        src = 'TEST_SRC'
-        msg = NodeReadyMessage(src)
-        msg_dif = NodeReadyMessage(src)
+        msg = NodeReadyMessage(src, dst)
+        msg_dif = NodeReadyMessage(src, dst)
 
         self.assertEqual(msg, NodeReadyMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeReadyMessage(**json.loads(msg_dif.to_json())))
     
-        src = 'TEST_SRC'
-        msg = NodeDeactivatedMessage(src)
-        msg_dif = NodeDeactivatedMessage(src)
+        msg = NodeDeactivatedMessage(src, dst)
+        msg_dif = NodeDeactivatedMessage(src, dst)
 
         self.assertEqual(msg, NodeDeactivatedMessage(**json.loads(msg.to_json())))
         self.assertNotEqual(msg, NodeDeactivatedMessage(**json.loads(msg_dif.to_json())))

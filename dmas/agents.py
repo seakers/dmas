@@ -23,52 +23,21 @@ class AgentState(ABC):
     @abstractmethod
     def update_state(self, **kwargs) -> None:
         """
-        Updates the state of this agent
-        """
-        pass
-
-    @abstractmethod
-    def propagate_state(self, **kwargs) -> object:
-        """
         Propagates the current state
         """
         pass
 
     @abstractmethod
-    def is_goal_state(self, **kwargs) -> bool:
+    def perform_action(self, **kwargs) -> None:
         """
-        Returns true if a goal state has been reached
-        """
-
-    @abstractmethod
-    def is_critial(self, **kwargs) -> bool:
-        """
-        Returns true if the state is a critical state
+        Performs an action that may alter the current state
         """
         pass
 
     @abstractmethod
-    def is_failure(self, **kwargs) -> bool:
+    def is_failure(self, **kwargs) -> None:
         """
-        Returns true if the state is a failure state
-        """
-        pass
-
-    @abstractmethod
-    def predict_critical(self, **kwags) -> float:
-        """
-        Given the current state of the agent, this method predicts when a critical state will be reached.
-
-        Returns the time where this will ocurr in simulation seconds.
-        """
-        pass
-
-    @abstractmethod
-    def predict_failure(self, **kwags) -> float:
-        """
-        Given the current state of the agent, this method predicts when a failure state will be reached.
-
-        Returns the time where this will ocurr in simulation seconds.
+        Checks if the current state is a failure state
         """
         pass
 
