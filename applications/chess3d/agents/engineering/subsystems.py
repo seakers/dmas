@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import uuid
-from applications.chess3d.agents.engineering.actions import SubsystemAction
-from applications.chess3d.agents.engineering.components import AbstractComponent
+from agents.engineering.actions import SubsystemAction
+from agents.engineering.components import Component
 
 
-class AbstractSubsystem(ABC):
+class Subsystem(ABC):
     """
     Represents a subsystem onboard an agent's Engineering Module
     
@@ -42,7 +42,7 @@ class AbstractSubsystem(ABC):
         if not isinstance(components, list):
             raise ValueError(f'`components` must be of type `list`. is of type {type(components)}.')
         for component in components:
-            if not isinstance(component, AbstractComponent):
+            if not isinstance(component, Component):
                 raise ValueError(f'elements of list `components` must be of type `Component`. contains element of type {type(component)}.')
         
         # assign values
@@ -115,5 +115,5 @@ class AbstractSubsystem(ABC):
         """
         return dict(self.__dict__)
 
-class ExampleSubsystem(AbstractSubsystem):
+class ExampleSubsystem(Subsystem):
     pass

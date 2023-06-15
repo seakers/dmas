@@ -8,7 +8,7 @@ import concurrent.futures
 
 import zmq
 from tqdm import tqdm
-from dmas.agents import Agent, AgentState, AgentAction
+from dmas.agents import Agent, AbstractAgentState, AgentAction
 from dmas.elements import SimulationElement
 from dmas.environments import EnvironmentNode
 from dmas.managers import AbstractManager
@@ -100,7 +100,7 @@ class TestMultiagentSim(unittest.TestCase):
 			except asyncio.CancelledError:
 				return
 
-	class TestAgentState(AgentState):
+	class TestAgentState(AbstractAgentState):
 		def __init__(self, 
 	       				x0 : float = None, y0 : float = None, z0 : float = None,
 						x_max : float = None, y_max : float = None, z_max : float = None) -> None:
@@ -305,7 +305,7 @@ class TestMultiagentSim(unittest.TestCase):
 	       				agent_name: str, 
 						agent_network_config: NetworkConfig, 
 						manager_network_config: NetworkConfig, 
-						initial_state: AgentState, 
+						initial_state: AbstractAgentState, 
 						level: int = logging.INFO, logger: logging.Logger = None) -> None:
 			super().__init__(agent_name, agent_network_config, manager_network_config, initial_state, [], level, logger)
 			self.pos_hist = []

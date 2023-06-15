@@ -109,7 +109,6 @@ Measurement Tasks are defined by a tuple containing their:
 
 This information will be shared to and amongst agents as `TaskRequest` messages. 
 
-
 #
 ## Running DMAS - 3DCHESS
 Open a terminal in this directory and run `main.py` by entering the following command:

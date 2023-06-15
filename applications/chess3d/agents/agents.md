@@ -1,0 +1,1 @@
+![DMAS agent architecture layout](../docs/diagrams/architecture/agent.png)

@@ -4,7 +4,7 @@ from applications.chess3d.utils import ModuleTypes
 from dmas.modules import InternalModule
 from dmas.network import NetworkConfig
 
-from agents.engineering.subsystems import AbstractSubsystem
+from agents.engineering.subsystems import Subsystem
        
 class EngineeringModule(InternalModule):
     """
@@ -29,7 +29,7 @@ class EngineeringModule(InternalModule):
         if not isinstance(subsystems, list):
             raise ValueError(f'`subsystems` must be of type `list`. is of type {type(subsystems)}.')
         for component in subsystems:
-            if not isinstance(component, AbstractSubsystem):
+            if not isinstance(component, Subsystem):
                 raise ValueError(f'elements of list `subsystems` must be of type `Subsystem`. contains element of type {type(component)}.')
             
         self.subsystems = subsystems

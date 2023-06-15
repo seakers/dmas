@@ -1,10 +1,10 @@
 import copy
 from typing import Union
 import numpy as np
-from dmas.agents import AgentState
+from dmas.agents import AbstractAgentState
 from dmas.clocks import FixedTimesStepClockConfig
 
-class SimulationAgentState(AgentState):
+class SimulationAgentState(AbstractAgentState):
     IDLING = 'IDLING'
     TRAVELING = 'TRAVELING'
     MEASURING = 'MEASURING'

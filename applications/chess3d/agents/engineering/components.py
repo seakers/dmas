@@ -2,10 +2,10 @@ from abc import ABC, abstractmethod
 from typing import Union
 import uuid
 
-from applications.chess3d.agents.engineering.actions import ComponentAction
+from agents.engineering.actions import ComponentAction
 
 
-class AbstractComponent(ABC):
+class Component(ABC):
     """
     # Abstract Component 
 
@@ -101,3 +101,9 @@ class AbstractComponent(ABC):
         Crates a dictionary containing all information contained in this component object
         """
         return dict(self.__dict__)
+
+class Instrument(Component):
+    def __init__(   self, 
+                    name: str, 
+                    id: str = None) -> None:
+        super().__init__(name, id=id)

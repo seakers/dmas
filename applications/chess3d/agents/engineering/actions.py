@@ -1,7 +1,9 @@
 from abc import ABC
 
+from dmas.agents import AgentAction
 
-class ComponentAction(ABC):
+
+class ComponentAction(AgentAction):
     """ 
     # Component Action
     
@@ -9,7 +11,7 @@ class ComponentAction(ABC):
     """
     pass
 
-class SubsystemAction(ABC):
+class SubsystemAction(AgentAction):
     """ 
     # Subsystem Action
     

@@ -1,8 +1,12 @@
 from typing import Union
 import numpy as np
-from dmas.agents import AgentState
+from dmas.agents import AbstractAgentState
 
-class SimulationAgentState(AgentState):
+class SimulationAgentState(AbstractAgentState):
+    """
+    Describes the state of a 3D-CHESS agent
+    """
+    
     IDLING = 'IDLING'
     TRAVELING = 'TRAVELING'
     MANEUVERING = 'MANEUVERING'
@@ -11,10 +15,12 @@ class SimulationAgentState(AgentState):
     THINKING = 'THINKING'
     LISTENING = 'LISTENING'
 
-    def __init__(self, 
-                status : str,
-                t : Union[float, int]=0,
-                **_
+    def __init__(   self, 
+                    pos : list,
+                    vel : list,
+                    status : str,
+                    t : Union[float, int]=0,
+                    **_
                 ) -> None:
         super().__init__()
         self.status = status

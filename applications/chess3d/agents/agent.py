@@ -1,7 +1,9 @@
+import copy
 import logging
 import math
 
 from pandas import DataFrame
+from agents.engineering.components import Instrument
 from utils import setup_results_directory
 from actions import *
 from dmas.agents import *
@@ -12,14 +14,17 @@ from states import *
 
 class SimulationAgent(Agent):
     def __init__(   self, 
+                    scenario_name : str,
                     agent_name: str, 
                     agent_network_config: NetworkConfig, 
                     manager_network_config: NetworkConfig, 
-                    initial_state: AgentState, 
+                    initial_state: AbstractAgentState, 
+                    payload = list,
                     modules: list = ..., 
                     level: int = logging.INFO, 
                     logger: logging.Logger = None
                     ) -> None:
+
         super().__init__(agent_name, 
                         agent_network_config, 
                         manager_network_config, 
@@ -28,34 +33,15 @@ class SimulationAgent(Agent):
                         level, 
                         logger)
 
-    # def __init__(   self, 
-
-    #                 results_path : str, 
-    #                 agent_network_config : NetworkConfig,
-    #                 manager_network_config: NetworkConfig, 
-    #                 planner_type: PlannerTypes,
-    #                 instruments: list,
-    #                 initial_state: SimulationAgentState, 
-    #                 level: int = logging.INFO, 
-    #                 logger: logging.Logger = None) -> None:
+        if not isinstance(payload, list):
+            raise AttributeError(f'`payload` must be of type `list`; is of type {type(payload)}')
+        for insturment in payload:
+            if not isinstance(insturment, Instrument):
+                raise AttributeError(f'`payload` must be a `list` containing elements of type `Instrument`; contains elements of type {type(insturment)}')
+        self.paylaod = copy.copy(payload)
         
-        
-    #     super().__init__(f'AGENT_{id}', 
-    #                     agent_network_config, 
-    #                     manager_network_config, 
-    #                     initial_state, 
-    #                     [planning_module], 
-    #                     level=level, 
-    #                     logger=logger)
-
-    #     if not isinstance(instruments, list):
-    #         raise AttributeError(f'`instruments` must be of type `list`; is of type {type(instruments)}')
-
-    #     self.id = id
-    #     self.instruments : list = instruments.copy()
-        
-    #     # setup results folder:
-    #     self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
+        # setup results folder:
+        self.results_path = setup_results_directory(f'./results' + scenario_name + '/' + self.get_element_name())
 
     async def setup(self) -> None:
         return

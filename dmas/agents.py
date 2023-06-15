@@ -16,7 +16,7 @@ from dmas.nodes import Node
 class FailureStateException(Exception):
     pass
 
-class AgentState(ABC):
+class AbstractAgentState(ABC):
     """
     Describes the state of an agent
     """
@@ -152,7 +152,7 @@ class Agent(Node):
                     agent_name: str, 
                     agent_network_config: NetworkConfig, 
                     manager_network_config: NetworkConfig, 
-                    initial_state: AgentState,
+                    initial_state: AbstractAgentState,
                     modules: list = [], 
                     level: int = logging.INFO, 
                     logger: logging.Logger = None
@@ -184,7 +184,7 @@ class Agent(Node):
         if zmq.SUB not in agent_network_config.get_external_addresses():
             raise AttributeError(f'`node_network_config` must contain a SUB port and an address within its external address map.')
 
-        self.state : AgentState = initial_state
+        self.state : AbstractAgentState = initial_state
         self.stats = {
                         'sense' : [],
                         'think' : [],
