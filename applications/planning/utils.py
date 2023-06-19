@@ -6,7 +6,7 @@ def setup_results_directory(scenario_name) -> str:
     """
     Creates an empty results directory within the current working directory
     """
-    results_path = f'{scenario_name}' if scenario_name[0]=='.' else f'./{scenario_name}'
+    results_path = f'{scenario_name}' if './results/' in scenario_name else f'./results/{scenario_name}'
 
     if not os.path.exists(results_path):
         # create results directory if it doesn't exist

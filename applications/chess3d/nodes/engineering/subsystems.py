@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import uuid
-from agents.engineering.actions import SubsystemAction
-from agents.engineering.components import Component
+from nodes.engineering.actions import SubsystemAction
+from nodes.engineering.components import Component
 
 
 class Subsystem(ABC):
@@ -57,7 +57,7 @@ class Subsystem(ABC):
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
 
     @abstractmethod
-    def update(self, **kwargs) -> None:
+    def update_state(self, **kwargs) -> None:
         """
         Propagates and updates the current state of the subsystem.
         """
@@ -78,7 +78,7 @@ class Subsystem(ABC):
         self.t = t
 
     @abstractmethod
-    def is_critial(self, **kwargs) -> bool:
+    def is_critical(self, **kwargs) -> bool:
         """
         Returns true if the subsystem is in a critical state
         """

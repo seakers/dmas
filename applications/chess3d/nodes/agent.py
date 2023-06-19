@@ -2,29 +2,134 @@ import copy
 import logging
 import math
 
+import numpy as np
 from pandas import DataFrame
-from agents.engineering.components import Instrument
+from nodes.engineering.components import Instrument
+from nodes.engineering.engineering import EngineeringModule
+from nodes.engineering.actions import SubsystemAction, ComponentAction
+from nodes.planning.planners import PlanningModule
+from nodes.science.science import ScienceModule
 from utils import setup_results_directory
 from actions import *
 from dmas.agents import *
 from dmas.network import NetworkConfig
 
 from messages import *
-from states import *
+
+class SimulationAgentState(AbstractAgentState):
+    """
+    Describes the state of a 3D-CHESS agent
+    """
+    
+    IDLING = 'IDLING'
+    MESSAGING = 'MESSAGING'
+    TRAVELING = 'TRAVELING'
+    MANEUVERING = 'MANEUVERING'
+    MEASURING = 'MEASURING'
+    SENSING = 'SENSING'
+    THINKING = 'THINKING'
+    LISTENING = 'LISTENING'
+
+    def __init__(   self, 
+                    pos : list,
+                    vel : list,
+                    engineering_module : EngineeringModule = None,
+                    status : str = IDLING,
+                    t : Union[float, int]=0,
+                    **_
+                ) -> None:
+        super().__init__()
+        
+        self.pos : list = pos
+        self.vel : list = vel
+        self.engineering_module : EngineeringModule = engineering_module
+        self.status : str = status
+        self.t : float = t
+
+    def update_state(self, t : Union[int, float], status : str = None) -> None:
+        # update internal components
+        if self.engineering_module is not None:
+            self.engineering_module.update_state(t)
+
+        # update position and velocity
+        self.pos, self.vel = self.kinmatic_model(t)
+
+        self.t = t 
+        self.status = status if status is not None else self.status
+
+    @abstractmethod
+    def kinmatic_model(self, t : Union[int, float]) -> tuple:
+        """
+        Kinematic model describing the propagation of the agent's dynamics through time.
+
+        ### Arguments 
+            - t (`int` or `float`) : propagation end time
+
+        ### Returns:
+            - pos, vel (`tuple`) : tuple of updated position and velocity vectors
+        """
+        pass
+
+    def perform_action(self, action : AgentAction, t : Union[int, float]) -> tuple:
+        """
+        Performs an action that may affect the agent's state.
+
+        ### Arguments:
+            - action (:obj:`AgentAction`):
+            - t (`int` or `double`):
+        
+
+        ### Returns:
+            - status (`str`): action completion status
+            - dt (`float`): time to be waited by the agent
+        """
+        if isinstance(action, SubsystemAction):
+            pass
+        elif isinstance(action, ComponentAction):
+            pass
+        elif isinstance(action, TravelAction):
+            pass
+        elif isinstance(action, ManeuverAction):
+            pass
+        else:
+            pass
+    
+    def __repr__(self) -> str:
+        return str(self.to_dict())
+
+    def __str__(self):
+        return str(dict(self.__dict__))
+    
+    def to_dict(self) -> dict:
+        return self.__dict__
+
 
 class SimulationAgent(Agent):
     def __init__(   self, 
-                    scenario_name : str,
                     agent_name: str, 
-                    agent_network_config: NetworkConfig, 
+                    scenario_name: str,
                     manager_network_config: NetworkConfig, 
-                    initial_state: AbstractAgentState, 
-                    payload = list,
-                    modules: list = ..., 
+                    agent_network_config: NetworkConfig,
+                    initial_state : SimulationAgentState,
+                    payload : list,
+                    planning_module : PlanningModule = None,
+                    science_module : ScienceModule = None,
                     level: int = logging.INFO, 
                     logger: logging.Logger = None
                     ) -> None:
 
+        # load agent modules
+        modules = []
+        if planning_module is not None:
+            if not isinstance(planning_module, PlanningModule):
+                raise AttributeError(f'`planning_module` must be of type `PlanningModule`; is of type {type(planning_module)}')
+            modules.append(planning_module)
+        if science_module is not None:
+            if not isinstance(science_module, ScienceModule):
+                raise AttributeError(f'`science_module` must be of type `ScienceModule`; is of type {type(science_module)}')
+            modules.append(science_module)
+
+        # initialize agent
         super().__init__(agent_name, 
                         agent_network_config, 
                         manager_network_config, 
@@ -35,17 +140,17 @@ class SimulationAgent(Agent):
 
         if not isinstance(payload, list):
             raise AttributeError(f'`payload` must be of type `list`; is of type {type(payload)}')
-        for insturment in payload:
-            if not isinstance(insturment, Instrument):
-                raise AttributeError(f'`payload` must be a `list` containing elements of type `Instrument`; contains elements of type {type(insturment)}')
-        self.paylaod = copy.copy(payload)
+        for instrument in payload:
+            if not isinstance(instrument, Instrument):
+                raise AttributeError(f'`payload` must be a `list` containing elements of type `Instrument`; contains elements of type {type(instrument)}')
+        
+        self.payload = payload
+        self.state_history = []
         
         # setup results folder:
         self.results_path = setup_results_directory(f'./results' + scenario_name + '/' + self.get_element_name())
+          
 
-    async def setup(self) -> None:
-        return
-    
     async def sense(self, statuses: list) -> list:
         # initiate senses array
         senses = []
@@ -69,6 +174,7 @@ class SimulationAgent(Agent):
         # update state
         self.state.update_state(self.get_current_time(), 
                                 status=SimulationAgentState.SENSING)
+        self.state_history.append(self.state.to_dict())
 
         # inform environment of new state
         state_msg = AgentStateMessage(  self.get_element_name(), 
@@ -77,7 +183,7 @@ class SimulationAgent(Agent):
                                     )
         await self.send_peer_message(state_msg)
 
-        # save state as sensed state
+        # save state message
         state_msg.dst = self.get_element_name()
         senses.append(state_msg)
 
@@ -95,39 +201,23 @@ class SimulationAgent(Agent):
                     self.unsubscribe_to_broadcasts(connectivity_msg.target)
                 senses.append(connectivity_msg)
 
-            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                # save as senses to forward to planner
-                task_msg = TaskRequestMessage(**msg_dict)
-                task_msg.dst = self.get_element_name()
-                senses.append(task_msg)
-
             elif msg_dict['msg_type'] == NodeMessageTypes.RECEPTION_ACK.value:
                 # no relevant information was sent by the environment
                 break
         
         # handle peer broadcasts
         while not self.external_inbox.empty():
-            _, _, content = await self.external_inbox.get()
+            _, _, msg_dict = await self.external_inbox.get()
 
-            if content['msg_type'] == SimulationMessageTypes.BUS.value:
-                msg = BusMessage(**content)
-                msg_dicts = msg.contents
-            else:
-                msg_dicts = [content]
+            # save as senses to forward to planner
+            if msg_dict['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                senses.append(AgentStateMessage(**msg_dict))
 
-            for msg_dict in msg_dicts:
-                # save as senses to forward to planner
-                if msg_dict['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                    senses.append(AgentStateMessage(**msg_dict))
+            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
+                senses.append(TaskRequestMessage(**msg_dict))
 
-                elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_REQ.value:
-                    senses.append(TaskRequestMessage(**msg_dict))
-
-                elif msg_dict['msg_type'] == SimulationMessageTypes.PLANNER_RESULTS.value:
-                    senses.append(PlannerResultsMessage(**msg_dict))
-
-                elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_BID.value:
-                    senses.append(TaskBidMessage(**msg_dict))
+            elif msg_dict['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                senses.append(TaskBidMessage(**msg_dict))
 
         return senses
 
@@ -185,175 +275,57 @@ class SimulationAgent(Agent):
                 continue
 
             self.log(f"performing action of type {action_dict['action_type']}...", level=logging.INFO)    
-            if action_dict['action_type'] == ActionTypes.PEER_MSG.value:
-                # unpack action
-                action = PeerMessageAction(**action_dict)
+            if (action_dict['action_type'] == ActionTypes.IDLE.value 
+                or action_dict['action_type'] == ActionTypes.TRAVEL.value
+                or action_dict['action_type'] == ActionTypes.MANEUVER.value):
+                
+                # this action affects the agent's state
 
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                await self.send_peer_message(action.msg)
-                
-                # update action completion status
-                action.status = AgentAction.COMPLETED
-            
-            elif action_dict['action_type'] == ActionTypes.BROADCAST_STATE.value:
-                # unpack action
-                action = BroadcastStateAction(**action_dict)
+                # unpackage action
+                action = action_from_dict(action_dict)
+                t = self.get_current_time()
 
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
-                msg = AgentStateMessage(self.get_element_name(), self.get_network_name(), self.state.to_dict())
-                await self.send_peer_broadcast(msg)
-                
+                # modify the agent's state
+                status, dt = self.state.perform_action(action, t)
+
+                if dt > 0:
+                    try:
+                        # perfrom time wait if needed
+                        await self.sim_wait(dt)
+
+                        # modify the agent's state
+                        t = self.get_current_time()
+                        status, dt = self.state.perform_action(action, t)
+
+                    except asyncio.CancelledError:
+                        return
+
                 # update action completion status
-                action.status = AgentAction.COMPLETED
-                
+                action.status = status
+
             elif action_dict['action_type'] == ActionTypes.BROADCAST_MSG.value:
                 # unpack action
                 action = BroadcastMessageAction(**action_dict)
+                msg_out = message_from_dict(action.msg)
 
-                # perform action
+                # update state
                 self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
+                self.state_history.append(self.state.to_dict())
                 
-                if action.msg['msg_type'] == SimulationMessageTypes.TASK_BID.value:
+                # perform action
+                msg_out.dst = self.get_network_name()
+                await self.send_peer_broadcast(msg_out)
 
-                    msg_out = TaskBidMessage(**action.msg)
-                    msg_out.dst = self.get_network_name()
-                    await self.send_peer_broadcast(msg_out)
-
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
-                    
-                elif action.msg['msg_type'] == SimulationMessageTypes.BUS.value:
-
-                    msg_out = BusMessage(**action.msg)
-                    msg_out.dst = self.get_network_name()
-                    await self.send_peer_broadcast(msg_out)
-
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
-
-                else:
-                    # message type not supported
-                    action.status = AgentAction.ABORTED
+                # set task complation
+                action.status = AgentAction.COMPLETED
             
-            elif action_dict['action_type'] == ActionTypes.IDLE.value:
-                # unpack action 
-                action = IdleAction(**action_dict)
-
-                # perform action
-                self.state.update_state(self.get_current_time(), status=SimulationAgentState.IDLING)
-                delay = action.t_end - self.get_current_time()
-                
-                try:
-                    await self.sim_wait(delay)
-                except asyncio.CancelledError:
-                    return
-
-                # update action completion status
-                if self.get_current_time() >= action.t_end:
-                    action.status = AgentAction.COMPLETED
-                else:
-                    action.status = AgentAction.PENDING
-
-            elif action_dict['action_type'] == ActionTypes.MOVE.value:
-                # unpack action 
-                action = MoveAction(**action_dict)
-
-                # perform action
-                if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    is_at_taget = self.state.is_goal_state(action.pos, self._clock_config.dt)
-                else:
-                    is_at_taget = self.state.is_goal_state(action.pos)
-
-                if is_at_taget:
-                    self.log('agent has reached its desired position. stopping.', level=logging.DEBUG)
-                    ## stop agent 
-                    self.state.update_state(self.get_current_time(), vel = [0,0], status=SimulationAgentState.TRAVELING)
-
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
-                else:
-                    ## calculate new direction 
-                    dx = action.pos[0] - self.state.pos[0]
-                    dy = action.pos[1] - self.state.pos[1]
-                    norm = math.sqrt(dx**2 + dy**2)     
-                    dx = dx / norm
-                    dy = dy / norm
-
-                    ## change velocity towards destination
-                    new_vel = [ dx*self.state.v_max, 
-                                dy*self.state.v_max]
-
-                    self.log(f'agent has NOT reached its desired position. updating velocity to {new_vel}', level=logging.DEBUG)
-                    self.state.update_state(self.get_current_time(), vel = new_vel, status=SimulationAgentState.TRAVELING)
-
-                    ## wait until destination is reached
-                    delay = norm / self.state.v_max
-                    try:
-                        await self.sim_wait(delay)
-                    except asyncio.CancelledError:
-                        return
-
-                    action.status = AgentAction.PENDING
             
-            elif action_dict['action_type'] == ActionTypes.MEASURE.value:
-                # unpack action 
-                action = MeasurementAction(**action_dict)
-
-                # perform action
-                self.state : SimulationAgentState
-                task = MeasurementTask(**action.task)
-                
-                dx = task.pos[0] - self.state.pos[0]
-                dy = task.pos[1] - self.state.pos[1]
-
-                norm = math.sqrt(dx**2 + dy**2)
-
-                ## Check if point has been reached
-                if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                    eps = self.state.v_max * self._clock_config.dt / 2.0
-                else:
-                    eps = 1e-6
-
-                if norm < eps:
-                    ### agent has reached its desired position
-                    # perform measurement
-                    self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
-                    
-                    try:
-                        # send a measurement data request to the environment
-                        measurement = MeasurementResultsRequest(self.get_element_name(),
-                                                        SimulationElementRoles.ENVIRONMENT.value, 
-                                                        self.state.to_dict(), 
-                                                        action_dict
-                                                        # task.to_dict()
-                                                        )
-
-                        dst, src, measurement_dict = await self.send_peer_message(measurement)
-
-                        # add measurement to environment inbox to be processed during `sensing()`
-                        await self.environment_inbox.put((dst, src, measurement_dict))
-
-                        # wait for the designated duration of the measurmeent 
-                        await self.sim_wait(task.duration)  # TODO only compensate for the time lost between queries
-                        
-                    except asyncio.CancelledError:
-                        return
-
-                    # update action completion status
-                    action.status = AgentAction.COMPLETED
-
-                else:
-                    ### agent has NOT reached its desired position
-                    # update action completion status
-                    action.status = AgentAction.ABORTED
-
             elif action_dict['action_type'] == ActionTypes.WAIT_FOR_MSG.value:
                 # unpack action 
                 task = WaitForMessages(**action_dict)
                 t_curr = self.get_current_time()
                 self.state.update_state(t_curr, status=SimulationAgentState.LISTENING)
+                self.state_history.append(self.state.to_dict())
 
                 if not self.external_inbox.empty():
                     action.status = AgentAction.COMPLETED
@@ -392,6 +364,59 @@ class SimulationAgent(Agent):
                                 action.status = AgentAction.PENDING
                             else:
                                 action.status = AgentAction.COMPLETED
+            
+            # elif action_dict['action_type'] == ActionTypes.MEASURE.value:
+                # # unpack action 
+                # action = MeasurementAction(**action_dict)
+
+                # # perform action
+                # self.state : SimulationAgentState
+                # task = MeasurementTask(**action.task)
+                
+                # dx = task.pos[0] - self.state.pos[0]
+                # dy = task.pos[1] - self.state.pos[1]
+
+                # norm = math.sqrt(dx**2 + dy**2)
+
+                # ## Check if point has been reached
+                # if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                #     eps = self.state.v_max * self._clock_config.dt / 2.0
+                # else:
+                #     eps = 1e-6
+
+                # if norm < eps:
+                #     ### agent has reached its desired position
+                #     # perform measurement
+                #     self.state.update_state(self.get_current_time(), status=SimulationAgentState.MEASURING)
+                    
+                #     try:
+                #         # send a measurement data request to the environment
+                #         measurement = MeasurementResultsRequest(self.get_element_name(),
+                #                                         SimulationElementRoles.ENVIRONMENT.value, 
+                #                                         self.state.to_dict(), 
+                #                                         action_dict
+                #                                         # task.to_dict()
+                #                                         )
+
+                #         dst, src, measurement_dict = await self.send_peer_message(measurement)
+
+                #         # add measurement to environment inbox to be processed during `sensing()`
+                #         await self.environment_inbox.put((dst, src, measurement_dict))
+
+                #         # wait for the designated duration of the measurmeent 
+                #         await self.sim_wait(task.duration)  # TODO only compensate for the time lost between queries
+                        
+                #     except asyncio.CancelledError:
+                #         return
+
+                #     # update action completion status
+                #     action.status = AgentAction.COMPLETED
+
+                # else:
+                #     ### agent has NOT reached its desired position
+                #     # update action completion status
+                #     action.status = AgentAction.ABORTED
+
             else:
                 # ignore action
                 self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)
@@ -415,36 +440,37 @@ class SimulationAgent(Agent):
 
     async def teardown(self) -> None:
         # log agent capabilities
-        out = f'\ninstruments: {self.instruments}'
-
         # log state 
+        n_decimals = 3
         headers = ['t', 'pos', 'vel', 'status']
         data = []
 
         # out += '\nt, pos, vel, status\n'
-        for state_dict in self.state.history:
+        for state_dict in self.state_history:
             line_data = [
                             np.round(state_dict['t'],3),
-                            [np.round(state_dict['pos'][0],3),
-                            np.round(state_dict['pos'][1],3)],
-                            [np.round(state_dict['vel'][0],3),
-                            np.round(state_dict['vel'][1],3)],
+                            [
+                                np.round(state_dict['pos'][0],n_decimals),
+                                np.round(state_dict['pos'][1],n_decimals),
+                                np.round(state_dict['pos'][2],n_decimals)
+                            ],
+                            [
+                                np.round(state_dict['vel'][0],n_decimals),
+                                np.round(state_dict['vel'][1],n_decimals),
+                                np.round(state_dict['vel'][2],n_decimals)
+                            ],
                             state_dict['status']
             ]
             data.append(line_data)
-            # out += f"{np.round(state_dict['t'],3)},\t[{np.round(state_dict['pos'][0],3)}, {np.round(state_dict['pos'][1],3)}], [{np.round(state_dict['vel'][0],3)}, {np.round(state_dict['vel'][1],3)}], {state_dict['status']}\n"    
         
         state_df = DataFrame(data,columns=headers)
-        self.log(f'\ninstruments: {self.instruments}\nSTATE HISTORY\n{str(state_df)}\n', level=logging.WARNING)
+        self.log(f'\payload: {self.payload}\nSTATE HISTORY\n{str(state_df)}\n', level=logging.WARNING)
         state_df.to_csv(f"{self.results_path}/states.csv", index=False)
 
         # log performance stats
         headers = ['routine','t_avg','t_std','t_med','n']
         data = []
 
-        # out += '\nROUTINE RUN-TIME STATS'
-        # out += '\nroutine\t\tt_avg\tt_std\tt_med\tn\n'
-        n_decimals = 5
         for routine in self.stats:
             t_avg = np.mean(self.stats[routine])
             t_std = np.std(self.stats[routine])
@@ -479,12 +505,12 @@ class SimulationAgent(Agent):
                 tf = t0 + delay
 
                 # check if failure or critical state will be reached first
-                t_failure = self.state.predict_failure() 
-                t_crit = self.state.predict_critical()
-                if t_failure < tf:
-                    tf = t_failure
-                elif t_crit < tf:
-                    tf = t_crit
+                self.state : SimulationAgentState
+                if self.state.engineering_module is not None:
+                    t_failure = self.state.engineering_module.predict_failure() 
+                    t_crit = self.state.engineering_module.predict_critical()
+                    t_min = min(t_failure, t_crit)
+                    tf = t_min if t_min < tf else tf
                 
                 # wait for time update        
                 ignored = []   

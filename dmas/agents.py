@@ -28,7 +28,7 @@ class AbstractAgentState(ABC):
         pass
 
     @abstractmethod
-    def perform_action(self, **kwargs) -> None:
+    def perform_action(self, **kwargs) -> tuple:
         """
         Performs an action that may alter the current state
         """

@@ -52,11 +52,11 @@
             "program": "${workspaceRoot}/applications/chess3d/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/planning",
+            "cwd": "${workspaceRoot}/applications/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
-            "args" : "TEST"
+            "args" : "test"
         },
 
         {
