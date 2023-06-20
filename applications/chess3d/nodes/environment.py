@@ -2,15 +2,15 @@ import copy
 import math
 
 from pandas import DataFrame
-from actions import MeasurementAction
+from nodes.orbitdata import OrbitData
+from nodes.actions import MeasurementAction
 from utils import setup_results_directory
-from agent import SimulationAgentState
+from nodes.agent import SimulationAgentState
 from dmas.environments import *
 
 from dmas.messages import *
 
 from messages import *
-from actions import MeasurementAction
 from zmq import asyncio as azmq
 import numpy as np
 
@@ -24,7 +24,7 @@ class SimulationEnvironment(EnvironmentNode):
     
     """
     def __init__(self, 
-                scenario_dict : dict,
+                scenario_path : dict,
                 results_path : str, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
@@ -33,36 +33,15 @@ class SimulationEnvironment(EnvironmentNode):
         super().__init__(env_network_config, manager_network_config, [], level, logger)
 
         # setup results folder:
-        self.results_path = setup_results_directory(results_path+'/'+self.get_element_name())
+        self.results_path = setup_results_directory(results_path+'/'+ self.get_element_name().swapcase())
+
+        # load observation data
+        self.orbitdata = OrbitData.from_directory(scenario_path)
+
+        x = 1
 
     async def setup(self) -> None:
-        # listen for 
         pass
-
-        # # initiate state trackers   
-        # self.states_tracker = {agent_name : None for agent_name in self._external_address_ledger}
-        # self.agent_connectivity = {agent_name : {target_name : 0 for target_name in self._external_address_ledger} for agent_name in self._external_address_ledger}
-
-        # self.agent_connectivity_history = []
-        # self.pulished_task_history = []
-        # self.measurement_history = []
-
-        # if isinstance(self._clock_config, FixedTimesStepClockConfig):
-        #     tasks = []
-        #     for task in self.tasks:
-        #         task : MeasurementTask
-        #         dt = self._clock_config.dt
-        #         prev_t_start = task.t_start
-        #         prev_t_end = task.t_end
-        #         if task.t_start < np.Inf:
-        #             task.t_start = dt * math.floor(task.t_start/dt)
-        #         if task.t_end < np.Inf:
-        #             task.t_end = dt * math.ceil(task.t_end/dt)
-
-        #         if task.t_end > task.t_start:
-        #             task.t_end += dt
-        #         tasks.append(task)
-        #     self.tasks = tasks
 
     async def publish_tasks(self):
         self.log(f'publishing {len(self.tasks)} task requests to all agents...')
@@ -304,41 +283,41 @@ class SimulationEnvironment(EnvironmentNode):
 
         return range_updates
 
-    def calc_utility(   
-                        self, 
-                        state : SimulationAgentState,
-                        task : MeasurementTask, 
-                        subtask_index : int, 
-                        t_img : float
-                    ) -> float:
-        """
-        Calculates the expected utility of performing a measurement task
+    # def calc_utility(   
+    #                     self, 
+    #                     state : SimulationAgentState,
+    #                     task : MeasurementTask, 
+    #                     subtask_index : int, 
+    #                     t_img : float
+    #                 ) -> float:
+    #     """
+    #     Calculates the expected utility of performing a measurement task
 
-        ### Arguments:
-            - state (:obj:`SimulationAgentState`): agent state before performing the task
-            - task (:obj:`MeasurementTask`): task to be performed 
-            - subtask_index (`int`): index of subtask to be performed
-            - t_img (`float`): time at which the task will be performed
+    #     ### Arguments:
+    #         - state (:obj:`SimulationAgentState`): agent state before performing the task
+    #         - task (:obj:`MeasurementTask`): task to be performed 
+    #         - subtask_index (`int`): index of subtask to be performed
+    #         - t_img (`float`): time at which the task will be performed
 
-        ### Retrurns:
-            - utility (`float`): estimated normalized utility 
-        """
-        # check time constraints
-        if t_img < task.t_start or task.t_end < t_img:
-            return 0.0
+    #     ### Retrurns:
+    #         - utility (`float`): estimated normalized utility 
+    #     """
+    #     # check time constraints
+    #     if t_img < task.t_start or task.t_end < t_img:
+    #         return 0.0
         
-        # calculate urgency factor from task
-        utility = task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+    #     # calculate urgency factor from task
+    #     utility = task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
 
-        _, dependent_measurements = task.measurement_groups[subtask_index]
-        k = len(dependent_measurements) + 1
+    #     _, dependent_measurements = task.measurement_groups[subtask_index]
+    #     k = len(dependent_measurements) + 1
 
-        if k / len(task.measurements) == 1.0:
-            alpha = 1.0
-        else:
-            alpha = 1.0/3.0
+    #     if k / len(task.measurements) == 1.0:
+    #         alpha = 1.0
+    #     else:
+    #         alpha = 1.0/3.0
 
-        return utility * alpha / k
+    #     return utility * alpha / k
 
     async def teardown(self) -> None:
         # print final time

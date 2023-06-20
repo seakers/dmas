@@ -30,6 +30,7 @@ def print_welcome(scenario_name) -> None:
     out += "\n======================================================"
     out += '\n\tTexas A&M University - SEAK Lab ©'
     out += "\n======================================================"
+    out += f"\nSCENARIO: {scenario_name}"
     print(out)
 
 def setup_results_directory(scenario_name) -> str:
@@ -56,7 +57,11 @@ def setup_results_directory(scenario_name) -> str:
 
     return results_path
 
-def setup_orbitdata_directory(scenario_name) -> str:
+def precompute_orbitdata(scenario_name) -> str:
+    """
+    Pre-calculates coverage and position data for a given scenario
+    """
+    
     scenario_dir = f'{scenario_name}' if './scenarios/' in scenario_name else f'./scenarios/{scenario_name}/'
     data_dir = f'{scenario_name}' if './scenarios/' in scenario_name and 'orbitdata/' in scenario_name else f'./scenarios/{scenario_name}/orbitdata/'
    
@@ -65,8 +70,12 @@ def setup_orbitdata_directory(scenario_name) -> str:
         # check if data has been previously calculated
         if os.path.exists(data_dir + 'MissionSpecs.json'):
             with open(data_dir +'MissionSpecs.json', 'r') as mission_specs:
-                scenario_dict = json.load(scenario_specs)
+                scenario_dict : dict = json.load(scenario_specs)
                 mission_dict = json.load(mission_specs)
+
+                scenario_dict.pop('settings')
+                mission_dict.pop('settings')
+
                 if scenario_dict != mission_dict:
                     changes_to_scenario = True
         else:
@@ -87,7 +96,7 @@ def setup_orbitdata_directory(scenario_name) -> str:
         else:
             print('Orbit data not found.')
 
-        print('Clearing \'orbit_data\' directory...')    
+        # print('Clearing \'orbitdata\' directory...')    
         # clear files if they exist
         if os.path.exists(data_dir):
             for f in os.listdir(data_dir):
@@ -97,27 +106,27 @@ def setup_orbitdata_directory(scenario_name) -> str:
                     os.rmdir(data_dir + f)
                 else:
                     os.remove(os.path.join(data_dir, f)) 
-        print('\'orbit_data\' cleared!')
+        # print('\'orbitddata\' cleared!')
 
         with open(scenario_dir +'MissionSpecs.json', 'r') as scenario_specs:
             # load json file as dictionary
             mission_dict : dict = json.load(scenario_specs)
 
-            # save specifications of propagation in the orbit data directory
-            with open(data_dir +'MissionSpecs.json', 'w') as mission_specs:
-                mission_specs.write(json.dumps(mission_dict, indent=4))
-
             # set output directory to orbit data directory
             if mission_dict.get("settings", None) is not None:
-                mission_dict["settings"]["outDir"] = scenario_dir + '/orbit_data/'
+                mission_dict["settings"]["outDir"] = scenario_dir + '/orbitdata/'
             else:
                 mission_dict["settings"] = {}
-                mission_dict["settings"]["outDir"] = scenario_dir + '/orbit_data/'
+                mission_dict["settings"]["outDir"] = scenario_dir + '/orbitdata/'
 
             # propagate data and save to orbit data directory
             print("Propagating orbits...")
             mission : Mission = Mission.from_json(mission_dict)  
             mission.execute()                
             print("Propagation done!")
+
+            # save specifications of propagation in the orbit data directory
+            with open(data_dir +'MissionSpecs.json', 'w') as mission_specs:
+                mission_specs.write(json.dumps(mission_dict, indent=4))
 
     return data_dir

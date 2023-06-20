@@ -10,7 +10,7 @@ from nodes.engineering.actions import SubsystemAction, ComponentAction
 from nodes.planning.planners import PlanningModule
 from nodes.science.science import ScienceModule
 from utils import setup_results_directory
-from actions import *
+from nodes.actions import *
 from dmas.agents import *
 from dmas.network import NetworkConfig
 
