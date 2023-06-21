@@ -10,13 +10,14 @@ class SimulationMessageTypes(Enum):
     PLAN = 'PLAN'
     SENSES = 'SENSES'
     MEASUREMENT = 'MEASUREMENT'
+    BUS = 'BUS'
 
 def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
     """
     Creates the appropriate message from a given dictionary in the correct format
     """
     if msg_type == SimulationMessageTypes.TASK_REQ.value:
-        return TaskBidMessage(**kwargs)
+        return TaskRequestMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.AGENT_ACTION.value:
         return AgentActionMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.AGENT_STATE.value:
@@ -220,3 +221,20 @@ class AgentActionMessage(SimulationMessage):
         self.action = action
         self.status = None
         self.status = status if status is not None else action.get('status', None)
+
+class BusMessage(SimulationMessage):
+    """
+    ## Bus Message
+
+    A longer message containing a list of other messages to be sent in the same transmission
+    """
+    def __init__(self, src: str, dst: str, msgs : list, id: str = None, **_):
+        super().__init__(src, dst, SimulationMessageTypes.BUS.value, id)
+        
+        if not isinstance(msgs, list):
+            raise AttributeError(f'`msgs` must be of type `list`; is of type {type(msgs)}')
+        for msg in msgs:
+            if not isinstance(msg, dict):
+                raise AttributeError(f'elements of the list `msgs` must be of type `dict`; contains elements of type {type(msg)}')
+
+        self.msgs = msgs

@@ -1,18 +1,22 @@
 import copy
 import math
+import numpy as np
+from zmq import asyncio as azmq
 
 from pandas import DataFrame
+from nodes.science.reqs import MeasurementRequest
+from nodes.satellite import SatelliteAgentState
 from nodes.orbitdata import OrbitData
+from nodes.groundstat import GroundStationAgentState
+from nodes.uav import UAVAgentState
 from nodes.actions import MeasurementAction
-from utils import setup_results_directory
 from nodes.agent import SimulationAgentState
-from dmas.environments import *
+from messages import *
+from utils import setup_results_directory
 
+from dmas.environments import *
 from dmas.messages import *
 
-from messages import *
-from zmq import asyncio as azmq
-import numpy as np
 
 class SimulationEnvironment(EnvironmentNode):
     """
@@ -23,6 +27,10 @@ class SimulationEnvironment(EnvironmentNode):
     of eachother.
     
     """
+    SPACECRAFT = 'SPACECRAFT'
+    UAV = 'UAV'
+    GROUND_STATION = 'GROUND_STATION'
+
     def __init__(self, 
                 scenario_path : dict,
                 results_path : str, 
@@ -38,27 +46,46 @@ class SimulationEnvironment(EnvironmentNode):
         # load observation data
         self.orbitdata = OrbitData.from_directory(scenario_path)
 
-        x = 1
+        # load agent names and types
+        self.agents = {}
+        with open(scenario_path + 'MissionSpecs.json', 'r') as scenario_specs:
+            scenario_dict : dict = json.load(scenario_specs)
+            
+            # load satellite names
+            sat_names = []
+            sat_list : dict = scenario_dict.get('spacecraft', None)
+            if sat_list:
+                for sat in sat_list:
+                    sat : dict
+                    sat_name = sat.get('name')
+                    sat_names.append(sat_name)
+            self.agents[self.SPACECRAFT] = sat_names
+
+            # load uav names
+            uav_names = []
+            uav_list : dict = scenario_dict.get('uav', None)
+            if uav_list:
+                for uav in uav_list:
+                    uav : dict
+                    uav_name = uav.get('name')
+                    uav_names.append(uav_name)
+            self.agents[self.UAV] = uav_names
+
+            # load GS agent names
+            gs_names = []
+            gs_list : dict = scenario_dict.get('groundStation', None)
+            if gs_list:
+                for gs in gs_list:
+                    gs : dict
+                    gs_name = gs.get('name')
+                    gs_names.append(gs_name)
+            self.agents[self.GROUND_STATION] = gs_names
+
+        # 
+        self.measurement_history = []
 
     async def setup(self) -> None:
         pass
-
-    async def publish_tasks(self):
-        self.log(f'publishing {len(self.tasks)} task requests to all agents...')
-        tasks_to_pop = []
-        for task in self.tasks:
-            task : MeasurementTask
-            if task.t_start <= self.get_current_time() <= task.t_end:
-                task_req = TaskRequestMessage(self.get_element_name(), self.get_network_name(), task.to_dict())
-                await self.send_peer_broadcast(task_req)
-                tasks_to_pop.append(task)
-            
-                self.pulished_task_history.append((task, self.get_current_time()))
-
-        for task in tasks_to_pop:
-            self.tasks.remove(task)
-
-        self.log('tasks published!')
 
     async def live(self) -> None:
         try:
@@ -71,12 +98,6 @@ class SimulationEnvironment(EnvironmentNode):
             poller.register(manager_socket, zmq.POLLIN)
             poller.register(peer_socket, zmq.POLLIN)
             
-            # track agent and simulation states
-            await asyncio.sleep(1e-3)
-
-            # publish initial set of tasks
-            await self.publish_tasks()
-
             # track agent and simulation states
             while True:
                 socks = dict(await poller.poll())
@@ -94,7 +115,7 @@ class SimulationEnvironment(EnvironmentNode):
                         # TODO look up requested measurement results from database/model
                         measurement_action = MeasurementAction(**msg.masurement_action)
                         agent_state= SimulationAgentState(**msg.agent_state)
-                        task = MeasurementTask(**measurement_action.task)
+                        task = MeasurementRequest(**measurement_action.measurement_req)
                         measurement_data = {'agent' : msg.src, 
                                             't_img' : self.get_current_time(),
                                             'u' : self.calc_utility(agent_state, task, measurement_action.subtask_index, self.get_current_time()),
@@ -112,51 +133,53 @@ class SimulationEnvironment(EnvironmentNode):
 
                         await self.respond_peer_message(resp) 
 
-                    elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                    if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                         # unpack message
                         msg = AgentStateMessage(**content)
                         self.log(f'state message received from {msg.src}. updating state tracker...')
 
-                        # update state tracker
-                        self.states_tracker[src] = SimulationAgentState(**msg.state)
-                        self.log(f'state tracker updated! sending response acknowledgement')
+                        # initiate response
+                        resp_msgs = []
 
-                        # send confirmation response
-                        resp = NodeReceptionAckMessage(self.get_element_name(), src)
-                        await self.respond_peer_message(resp)
-                        self.log('response sent! checking if all states are in the same time...')
+                        # check current state
+                        updated_state = None
+                        if src in self.agents[self.SPACECRAFT]:
+                            # look up orbitdata and update state
+                            current_state = SatelliteAgentState(**msg.state)
+                            data : OrbitData = self.orbitdata[src]
+                            pos, vel, eclipse = data.get_orbit_state(current_state.t)
 
-                        # Check if all states are of the same time
-                        if not self.same_state_times():
-                            continue
+                            updated_state = current_state
+                            updated_state.pos = pos
+                            updated_state.vel = vel
+                            updated_state.eclipse = eclipse
 
-                        # check for range and announce chances in connectivity 
-                        self.log('states are all from the same time! checking agent connectivity...')
-                        range_updates : list = self.check_agent_connectivity()
+                        elif src in self.agents[self.UAV]:
+                            # Do NOT update
+                            updated_state = UAVAgentState(**msg.state)
 
-                        if len(range_updates) > 0:
-                            self.log(f'connectivity checked. sending {len(range_updates)} connectivity updates...')
-                            for range_update in range_updates:
-                                range_update : AgentConnectivityUpdate
-                                await self.send_peer_broadcast(range_update)
-                            self.log('connectivity updates sent!')
+                        elif src in self.agents[self.GROUND_STATION]:
+                            # Do NOT update state
+                            updated_state = GroundStationAgentState(**msg.state)
+                        
+                        updated_state_msg = AgentStateMessage(src, src, updated_state.to_dict())
+                        resp_msgs.append(updated_state_msg.to_dict())
 
-                        if len(self.tasks) > 0:
-                            await self.publish_tasks()
+                        # check connectivity status
+                        for target_type in self.agents:
+                            for target in self.agents[target_type]:
+                                if target == src:
+                                    continue
+                                
+                                connected = self.check_agent_connectivity(src, target, target_type)
+                                connectivity_update = AgentConnectivityUpdate(src, target, connected)
+                                resp_msgs.append(connectivity_update.to_dict())
 
-                        else:
-                            self.log(f'connectivity checked. no connectivity updates...')
+                        # package response
+                        resp_msg = BusMessage(self.get_element_name(), src, resp_msgs)
 
-                        ok_msg = NodeReceptionAckMessage(self.get_element_name(), self.get_network_name())
-                        await self.send_peer_broadcast(ok_msg)                        
-
-                        # save connectivity state to history
-                        agent_connectivity = {}
-                        for src in self.agent_connectivity:
-                            connections = {dst : self.agent_connectivity[src][dst] for dst in self.agent_connectivity[src]}
-                            agent_connectivity[src] = connections
-
-                        self.agent_connectivity_history.append((self.get_current_time(), agent_connectivity.copy()))
+                        # send response
+                        await self.respond_peer_message(resp_msg)
 
                     else:
                         # message is of an unsopported type. send blank response
@@ -202,122 +225,95 @@ class SimulationEnvironment(EnvironmentNode):
             self.log(f'`live()` failed. {e}', level=logging.ERROR)
             raise e
 
-    def same_state_times(self) -> bool:
+    def check_agent_connectivity(self, src : str, target : str, target_type : str) -> bool:
         """
-        Checks if all agents' states being tracked are of the same time-step
+        Checks if an agent is in communication range with another agent
         """
-        t = -1
-        for agent in self.states_tracker:
-            state : SimulationAgentState = self.states_tracker[agent]
-
-            if state is None:
-                if t == -1:
-                    t = None
-                    continue
-
-                elif t is None:
-                    continue
-
-                elif t != None:
-                    return False                    
-            else:
-                if t == -1:
-                    t = state.t 
-                    continue
+        connected = False
+        if target_type == self.SPACECRAFT:
+            if src in self.agents[self.SPACECRAFT]:
+                # check orbit data
+                src_data : OrbitData = self.orbitdata[src]
+                connected = src_data.is_accessing_agent(target, self.get_current_time())
                 
-                elif t is None:
-                    return False
-
-                if abs(t - state.t) > 1e-6:
-                    return False
-
-        return True
-
-    def check_agent_connectivity(self) -> list:
-        """
-        Checks if agents are in communication range of each other
-        """
-        # get list of agents
-        agent_names = list(self._external_address_ledger.keys())
-
-        if len(agent_names) < 2:
-            return []
-
-        range_updates = []
-        for i in range(len(agent_names)):
-            agent_a = agent_names[i]
-
-            if agent_a == self.get_element_name():
-                # agents cannot re-connect to environment
-                continue
+            elif src in self.agents[self.UAV]:
+                # check orbit data with nearest GS
+                target_data : OrbitData = self.orbitdata[target]
+                connected = target_data.is_accessing_ground_station(self.get_current_time())
             
-            for j in range(i+1, len(agent_names)):
-                agent_b = agent_names[j]
-
-                if agent_b == self.get_element_name():
-                    # agents cannot disconnect to environment
-                    continue
-
-                if agent_b == agent_a:
-                    # agents cannot connect to themselves
-                    continue
-                
-                # check for changes in agent connectivity based on distance and comms range
-                state_a : SimulationAgentState = self.states_tracker[agent_a]
-                pos_a = state_a.pos
-                state_b : SimulationAgentState = self.states_tracker[agent_b]
-                pos_b = state_b.pos
-
-                dist = numpy.sqrt( (pos_a[0] - pos_b[0])**2 + (pos_a[1] - pos_b[1])**2 )
-                
-                connected = 1 if dist <= self.comms_range else 0
-
-                # only notify agents if a change in connectivity has occurred
-                if self.agent_connectivity[agent_a][agent_b] != connected:
-                    range_updates.append(AgentConnectivityUpdate(agent_a, agent_b, connected))
-                    self.agent_connectivity[agent_a][agent_b] = connected
-
-                if self.agent_connectivity[agent_b][agent_a] != connected:
-                    range_updates.append(AgentConnectivityUpdate(agent_b, agent_a, connected))
-                    self.agent_connectivity[agent_b][agent_a] = connected
-
-        return range_updates
-
-    # def calc_utility(   
-    #                     self, 
-    #                     state : SimulationAgentState,
-    #                     task : MeasurementTask, 
-    #                     subtask_index : int, 
-    #                     t_img : float
-    #                 ) -> float:
-    #     """
-    #     Calculates the expected utility of performing a measurement task
-
-    #     ### Arguments:
-    #         - state (:obj:`SimulationAgentState`): agent state before performing the task
-    #         - task (:obj:`MeasurementTask`): task to be performed 
-    #         - subtask_index (`int`): index of subtask to be performed
-    #         - t_img (`float`): time at which the task will be performed
-
-    #     ### Retrurns:
-    #         - utility (`float`): estimated normalized utility 
-    #     """
-    #     # check time constraints
-    #     if t_img < task.t_start or task.t_end < t_img:
-    #         return 0.0
+            elif src in self.agents[self.GROUND_STATION]:
+                # check orbit data
+                target_data : OrbitData = self.orbitdata[target]
+                connected = target_data.is_accessing_ground_station(self.get_current_time())
         
-    #     # calculate urgency factor from task
-    #     utility = task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+        elif target_type == self.UAV:
+            if src in self.agents[self.SPACECRAFT]:
+                # check orbit data with nearest GS
+                src_data : OrbitData = self.orbitdata[src]
+                connected = src_data.is_accessing_ground_station(self.get_current_time())
 
-    #     _, dependent_measurements = task.measurement_groups[subtask_index]
-    #     k = len(dependent_measurements) + 1
+            elif src in self.agents[self.UAV]:
+                # always connected
+                connected = True
 
-    #     if k / len(task.measurements) == 1.0:
-    #         alpha = 1.0
-    #     else:
-    #         alpha = 1.0/3.0
+            elif src in self.agents[self.GROUND_STATION]:
+                # always connected
+                connected = True
+        
+        elif target_type == self.GROUND_STATION:
+            if src in self.agents[self.SPACECRAFT]:
+                # check orbit data
+                src_data : OrbitData = self.orbitdata[src]
+                connected = src_data.is_accessing_ground_station(self.get_current_time())
 
-    #     return utility * alpha / k
+            elif src in self.agents[self.UAV]:
+                # always connected
+                connected = True
+
+            elif src in self.agents[self.GROUND_STATION]:
+                # always connected
+                connected = True
+
+        return 1 if connected else 0
+
+    def calc_utility(   
+                        self, 
+                        state : SimulationAgentState,
+                        task : MeasurementRequest, 
+                        subtask_index : int, 
+                        t_img : float
+                    ) -> float:
+        """
+        Calculates the expected utility of performing a measurement task
+
+        ### Arguments:
+            - state (:obj:`SimulationAgentState`): agent state before performing the task
+            - task (:obj:`MeasurementRequest`): task request to be performed 
+            - subtask_index (`int`): index of subtask to be performed
+            - t_img (`float`): time at which the task will be performed
+
+        ### Retrurns:
+            - utility (`float`): estimated normalized utility 
+        """
+        # TODO 
+        return 0.0
+
+        # # check time constraints
+        # if t_img < task.t_start or task.t_end < t_img:
+        #     return 0.0
+        
+        # # calculate urgency factor from task
+        # utility = task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
+
+        # _, dependent_measurements = task.measurement_groups[subtask_index]
+        # k = len(dependent_measurements) + 1
+
+        # if k / len(task.measurements) == 1.0:
+        #     alpha = 1.0
+        # else:
+        #     alpha = 1.0/3.0
+
+        # return utility * alpha / k
 
     async def teardown(self) -> None:
         # print final time
@@ -342,23 +338,6 @@ class SimulationEnvironment(EnvironmentNode):
         #         for src, dst in connected:
         #             out += f'\t{src} <-> {dst}\n'
         # self.log(out, level=logging.WARNING)
-        
-        # print connectivity history
-        with open(f"{self.results_path}/connectivity.csv", "w") as file:
-            dsts = []
-            title = f"t,src"
-            for src in self.agent_connectivity:
-                title += f',dst:{src}'
-                dsts.append(src)
-            file.write(title)
-
-            for t, agent_connectivity in self.agent_connectivity_history:  
-                for src in agent_connectivity:
-                    line = f'\n{t}, {src}'
-                    for dst in dsts:
-                        connected = agent_connectivity[src][dst]
-                        line += f', {connected}'
-                    file.write(line)
 
         # print measurements
         headers = ['task_id','measurer','pos','t_start','t_end','t_corr','t_img','u_max','u_exp','u']
@@ -366,7 +345,7 @@ class SimulationEnvironment(EnvironmentNode):
         for msg in self.measurement_history:
             msg : MeasurementResultsRequest
             measurement_action = MeasurementAction(**msg.masurement_action)
-            task = MeasurementTask(**measurement_action.task)
+            task = MeasurementRequest(**measurement_action.measurement_req)
             measurement_data : dict = msg.measurement
             measurer = msg.measurement['agent']
             t_img = msg.measurement['t_img']
