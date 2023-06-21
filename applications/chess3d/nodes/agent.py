@@ -15,6 +15,11 @@ from dmas.network import NetworkConfig
 
 from messages import *
 
+class SimulationAgentTypes(Enum):
+    SATELLITE = 'SATELLITE'
+    UAV = 'UAV'
+    GROUND_STATION = 'GROUND_STATION'
+
 class SimulationAgentState(AbstractAgentState):
     """
     Describes the state of a 3D-CHESS agent
@@ -30,6 +35,7 @@ class SimulationAgentState(AbstractAgentState):
     LISTENING = 'LISTENING'
 
     def __init__(   self, 
+                    state_type : str,
                     pos : list,
                     vel : list,
                     engineering_module : EngineeringModule = None,
@@ -37,8 +43,12 @@ class SimulationAgentState(AbstractAgentState):
                     t : Union[float, int]=0,
                     **_
                 ) -> None:
+        """
+        Creates an instance of an Abstract Agent State
+        """
         super().__init__()
         
+        self.state_type = state_type
         self.pos : list = pos
         self.vel : list = vel
         self.engineering_module : EngineeringModule = engineering_module

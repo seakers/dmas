@@ -23,7 +23,7 @@ class AbstractAgentState(ABC):
     @abstractmethod
     def update_state(self, **kwargs) -> None:
         """
-        Propagates the current state
+        Updates the current state
         """
         pass
 

@@ -1,14 +1,19 @@
 import copy
 from ctypes import Union
+from enum import Enum
 from itertools import combinations, permutations
 import uuid
 import numpy
+
+class MeasurementRequetTypes(Enum):
+    GROUND_POINT = 'GROUND_POINT'
 
 class MeasurementRequest(object):
     """
     Describes a generic measurement request to be performed by agents in the simulation
 
     ### Attributes:
+        - request_type (`str`): type of measurement request
         - s_max (`float`): maximum score attained from performing this task
         - measurements (`list`): measurement types required to perform this task
         - duration (`float`): duration of the measurement being performed
@@ -18,6 +23,7 @@ class MeasurementRequest(object):
         - id (`str`) : identifying number for this task in uuid format
     """        
     def __init__(self, 
+                request_type : str,
                 s_max : float,
                 measurements : list,
                 t_start: Union[float, int], 
@@ -32,7 +38,7 @@ class MeasurementRequest(object):
         Creates an instance of a measurement request 
 
         ### Arguments:
-            - pos (`list`): lat-lon-alt coordinates of the location of this task
+            - request_type (`str`): type of measurement request
             - s_max (`float`): maximum score attained from performing this task
             - measurements (`list`): measurement types required to perform this task
             - duration (`float`): duration of the measurement being performed
@@ -52,6 +58,7 @@ class MeasurementRequest(object):
                     raise AttributeError(f'`measurements` must a `list` of elements of type `str`. contains elements of type {type(measurement)}.')
         
         # initialize
+        self.request_type = request_type
         self.t_start = t_start
         self.t_end = t_end
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
@@ -162,6 +169,7 @@ class GroundPointMeasurementRequest(MeasurementRequest):
 
     ### Attributes:
         - pos (`list`): lat-lon-alt coordinates of the location of this task
+        - request_type (`str`): type of measurement request
         - s_max (`float`): maximum score attained from performing this task
         - measurements (`list`): measurement types required to perform this task
         - duration (`float`): duration of the measurement being performed
@@ -195,7 +203,16 @@ class GroundPointMeasurementRequest(MeasurementRequest):
             - t_corr (`float`): maximum decorralation time between measurements of different measurements
             - id (`str`) : identifying number for this task in uuid format
         """
-        super().__init__(s_max, measurements, t_start, t_end, t_corr, duration, urgency, id, **_)
+        super().__init__(MeasurementRequetTypes.GROUND_POINT.value, 
+                        s_max, 
+                        measurements, 
+                        t_start, 
+                        t_end, 
+                        t_corr, 
+                        duration, 
+                        urgency, 
+                        id, 
+                        **_)
         
         # check arguments
         if not isinstance(pos, list):
