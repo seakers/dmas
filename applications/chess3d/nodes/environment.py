@@ -36,6 +36,7 @@ class SimulationEnvironment(EnvironmentNode):
                 results_path : str, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
+                utility_func : function, 
                 level: int = logging.INFO, 
                 logger: logging.Logger = None) -> None:
         super().__init__(env_network_config, manager_network_config, [], level, logger)
@@ -81,29 +82,31 @@ class SimulationEnvironment(EnvironmentNode):
                     gs_names.append(gs_name)
             self.agents[self.GROUND_STATION] = gs_names
 
-        # 
+        # initialize parameters
+        self.utility_func = utility_func
         self.measurement_history = []
 
     async def setup(self) -> None:
+        # nothing to set up
         pass
 
     async def live(self) -> None:
         try:
-            # create poller 
+            # create port poller 
             poller = azmq.Poller()
 
             manager_socket, _ = self._manager_socket_map.get(zmq.SUB)
-            peer_socket, _ = self._external_socket_map.get(zmq.REP)
+            agent_socket, _ = self._external_socket_map.get(zmq.REP)
 
             poller.register(manager_socket, zmq.POLLIN)
-            poller.register(peer_socket, zmq.POLLIN)
+            poller.register(agent_socket, zmq.POLLIN)
             
             # track agent and simulation states
             while True:
                 socks = dict(await poller.poll())
 
-                if peer_socket in socks:
-                    # read message from socket
+                if agent_socket in socks:
+                    # read message from agents
                     dst, src, content = await self.listen_peer_message()
                     
                     if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
@@ -118,7 +121,7 @@ class SimulationEnvironment(EnvironmentNode):
                         task = MeasurementRequest(**measurement_action.measurement_req)
                         measurement_data = {'agent' : msg.src, 
                                             't_img' : self.get_current_time(),
-                                            'u' : self.calc_utility(agent_state, task, measurement_action.subtask_index, self.get_current_time()),
+                                            'u' : self.utility_func(agent_state, task, measurement_action.subtask_index, self.get_current_time()),
                                             'u_max' : task.s_max,
                                             'u_exp' : measurement_action.u_exp}
 
@@ -199,7 +202,6 @@ class SimulationEnvironment(EnvironmentNode):
                         ):
                         # sim end message received
                         self.log(f"received message of type {content['msg_type']}. ending simulation...")
-                        # raise asyncio.CancelledError(f"received message of type {content['msg_type']}")
                         return
 
                     elif content['msg_type'] == ManagerMessageTypes.TOC.value:
@@ -220,7 +222,9 @@ class SimulationEnvironment(EnvironmentNode):
                         self.log(f"received message of type {content['msg_type']}. ignoring message...")
 
         except asyncio.CancelledError:
+            self.log(f'`live()` interrupted. {e}', level=logging.DEBUG)
             return
+
         except Exception as e:
             self.log(f'`live()` failed. {e}', level=logging.ERROR)
             raise e
@@ -276,69 +280,10 @@ class SimulationEnvironment(EnvironmentNode):
 
         return 1 if connected else 0
 
-    def calc_utility(   
-                        self, 
-                        state : SimulationAgentState,
-                        task : MeasurementRequest, 
-                        subtask_index : int, 
-                        t_img : float
-                    ) -> float:
-        """
-        Calculates the expected utility of performing a measurement task
-
-        ### Arguments:
-            - state (:obj:`SimulationAgentState`): agent state before performing the task
-            - task (:obj:`MeasurementRequest`): task request to be performed 
-            - subtask_index (`int`): index of subtask to be performed
-            - t_img (`float`): time at which the task will be performed
-
-        ### Retrurns:
-            - utility (`float`): estimated normalized utility 
-        """
-        # TODO 
-        return 0.0
-
-        # # check time constraints
-        # if t_img < task.t_start or task.t_end < t_img:
-        #     return 0.0
-        
-        # # calculate urgency factor from task
-        # utility = task.s_max * np.exp( - task.urgency * (t_img - task.t_start) )
-
-        # _, dependent_measurements = task.measurement_groups[subtask_index]
-        # k = len(dependent_measurements) + 1
-
-        # if k / len(task.measurements) == 1.0:
-        #     alpha = 1.0
-        # else:
-        #     alpha = 1.0/3.0
-
-        # return utility * alpha / k
-
     async def teardown(self) -> None:
         # print final time
         self.log(f'Environment shutdown with internal clock of {self.get_current_time()}[s]', level=logging.WARNING)
         
-        # log connectiviy history
-        # out = '\nConnectivity history'
-
-        # for t, agent_connectivity in self.agent_connectivity_history:  
-        #     connected = []
-        #     for src in agent_connectivity:
-        #         for dst in agent_connectivity[src]:
-        #             if src == dst:
-        #                 continue
-        #             if (dst, src) in connected:
-        #                 continue
-        #             if agent_connectivity[src][dst] == 1:
-        #                 connected.append((src, dst))
-
-        #     if len(connected) > 0:
-        #         out += f'\nt:={t}[s]\n'
-        #         for src, dst in connected:
-        #             out += f'\t{src} <-> {dst}\n'
-        # self.log(out, level=logging.WARNING)
-
         # print measurements
         headers = ['task_id','measurer','pos','t_start','t_end','t_corr','t_img','u_max','u_exp','u']
         data = []

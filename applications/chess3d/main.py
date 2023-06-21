@@ -6,6 +6,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from nodes.utility import linear_utility
 from nodes.agent import SimulationAgent
 from utils import *
 from dmas.messages import SimulationElementRoles
@@ -136,7 +137,8 @@ if __name__ == "__main__":
     environment = SimulationEnvironment(scenario_path, 
                                         results_path, 
                                         env_network_config, 
-                                        manager_network_config, 
+                                        manager_network_config,
+                                        linear_utility, 
                                         logger=logger)
     
     # TODO create agents 
