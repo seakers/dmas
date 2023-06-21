@@ -209,7 +209,7 @@ class MeasurementAction(AgentAction):
         self.measurement_req = measurement_req
         self.subtask_index = subtask_index
         self.instrument_name = instrument_name
-        self.u_exp = u_exp
+        self.u_exp = u_exp 
 
 class WaitForMessages(AgentAction):
     """

@@ -19,7 +19,7 @@ class GroundStationAgentState(SimulationAgentState):
         
         super().__init__(pos, vel, None, status, t, **_)
 
-    def kinmatic_model(self, _: Union[int, float]) -> tuple:
+    def propagate(self, _: Union[int, float]) -> tuple:
         # agent does not move
         return self.pos, self.vel
 

@@ -115,15 +115,10 @@ class SimulationEnvironment(EnvironmentNode):
                         self.log(f'received masurement data request from {msg.src}. quering measurement results...')
 
                         # find/generate measurement results
-                        # TODO look up requested measurement results from database/model
                         measurement_action = MeasurementAction(**msg.masurement_action)
                         agent_state= SimulationAgentState(**msg.agent_state)
-                        task = MeasurementRequest(**measurement_action.measurement_req)
-                        measurement_data = {'agent' : msg.src, 
-                                            't_img' : self.get_current_time(),
-                                            'u' : self.utility_func(agent_state, task, measurement_action.subtask_index, self.get_current_time()),
-                                            'u_max' : task.s_max,
-                                            'u_exp' : measurement_action.u_exp}
+                        measurement_req = MeasurementRequest(**measurement_action.measurement_req)
+                        measurement_data = self.query_measurement_date(agent_state, measurement_req, measurement_action)
 
                         # repsond to request
                         self.log(f'measurement results obtained! responding to request')
@@ -147,11 +142,12 @@ class SimulationEnvironment(EnvironmentNode):
                         # check current state
                         updated_state = None
                         if src in self.agents[self.SPACECRAFT]:
-                            # look up orbitdata and update state
+                            # look up orbitdata
                             current_state = SatelliteAgentState(**msg.state)
                             data : OrbitData = self.orbitdata[src]
                             pos, vel, eclipse = data.get_orbit_state(current_state.t)
 
+                            # update state
                             updated_state = current_state
                             updated_state.pos = pos
                             updated_state.vel = vel
@@ -232,6 +228,14 @@ class SimulationEnvironment(EnvironmentNode):
     def check_agent_connectivity(self, src : str, target : str, target_type : str) -> bool:
         """
         Checks if an agent is in communication range with another agent
+
+        #### Arguments:
+            - src (`str`): name of agent starting the connection
+            - target (`str`): name of agent receving the connection
+            - target_type (`str`): type of agent receving the connection
+
+        #### Returns:
+            - connected (`int`): binary value representing if the `src` and `target` are connected
         """
         connected = False
         if target_type == self.SPACECRAFT:
@@ -279,6 +283,20 @@ class SimulationEnvironment(EnvironmentNode):
                 connected = True
 
         return 1 if connected else 0
+
+    def query_measurement_date( self, 
+                                agent_state : SimulationAgentState, 
+                                measurement_req : MeasurementRequest, 
+                                measurement_action : MeasurementAction
+                                ) -> dict:
+        """
+        Queries internal models or data and returns observation information being sensed by the agent
+        """
+        # TODO look up requested measurement results from database/model
+        return  {   't_img' : self.get_current_time(),
+                    'u' : self.utility_func(agent_state, measurement_req, measurement_action.subtask_index, self.get_current_time()),
+                    'u_max' : measurement_req.s_max,
+                    'u_exp' : measurement_action.u_exp}
 
     async def teardown(self) -> None:
         # print final time
