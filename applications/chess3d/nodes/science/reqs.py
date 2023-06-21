@@ -6,10 +6,9 @@ import numpy
 
 class MeasurementRequest(object):
     """
-    Describes a measurement request to be performed by agents in the simulation
+    Describes a generic measurement request to be performed by agents in the simulation
 
     ### Attributes:
-        - pos (`list`): lat-lon-alt coordinates of the location of this task
         - s_max (`float`): maximum score attained from performing this task
         - measurements (`list`): measurement types required to perform this task
         - duration (`float`): duration of the measurement being performed
@@ -19,7 +18,6 @@ class MeasurementRequest(object):
         - id (`str`) : identifying number for this task in uuid format
     """        
     def __init__(self, 
-                pos : list, 
                 s_max : float,
                 measurements : list,
                 t_start: Union[float, int], 
@@ -27,10 +25,11 @@ class MeasurementRequest(object):
                 t_corr: Union[float, int] = 0.0,
                 duration: Union[float, int] = 0.0, 
                 urgency: Union[float, int] = None,  
-                id: str = None, **_
+                id: str = None, 
+                **_
                 ) -> None:
         """
-        Creates an instance of a task 
+        Creates an instance of a measurement request 
 
         ### Arguments:
             - pos (`list`): lat-lon-alt coordinates of the location of this task
@@ -43,10 +42,6 @@ class MeasurementRequest(object):
             - id (`str`) : identifying number for this task in uuid format
         """
         # check arguments
-        if not isinstance(pos, list):
-            raise AttributeError(f'`pos` must be of type `list`. is of type {type(pos)}.')
-        elif len(pos) != 3:
-            raise ValueError(f'`pos` must be a list of 3 values (lat, lon, alt). is of length {len(pos)}.')
         if not isinstance(s_max, float) and not isinstance(s_max, int):
             raise AttributeError(f'`s_max` must be of type `float` or type `int`. is of type {type(s_max)}.')
         if not isinstance(measurements, list):
@@ -61,7 +56,6 @@ class MeasurementRequest(object):
         self.t_end = t_end
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
         self.duration = duration
-        self.pos = pos
         self.s_max = s_max
         self.measurements = measurements    
         self.t_corr = t_corr
@@ -161,3 +155,52 @@ class MeasurementRequest(object):
     def __repr__(self):
         task_id = self.id.split('-')
         return f'MeasurementTask_{task_id[0]}'
+
+class GroundPointMeasurementRequest(MeasurementRequest):
+    """
+    Describes a measurement reques of a specific Ground Point to be performed by agents in the simulation
+
+    ### Attributes:
+        - pos (`list`): lat-lon-alt coordinates of the location of this task
+        - s_max (`float`): maximum score attained from performing this task
+        - measurements (`list`): measurement types required to perform this task
+        - duration (`float`): duration of the measurement being performed
+        - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
+        - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+        - t_corr (`float`): maximum decorralation time between measurements of different measurements
+        - id (`str`) : identifying number for this task in uuid format
+    """        
+    def __init__(self, 
+                pos : list,
+                s_max : float,
+                measurements : list,
+                t_start: Union[float, int], 
+                t_end: Union[float, int], 
+                t_corr: Union[float, int] = 0.0,
+                duration: Union[float, int] = 0.0, 
+                urgency: Union[float, int] = None,  
+                id: str = None, 
+                **_
+                ) -> None:
+        """
+        Creates an instance of a ground point measurement request 
+
+        ### Arguments:
+            - pos (`list`): lat-lon-alt coordinates of the location of this task
+            - s_max (`float`): maximum score attained from performing this task
+            - measurements (`list`): measurement types required to perform this task
+            - duration (`float`): duration of the measurement being performed
+            - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
+            - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
+            - t_corr (`float`): maximum decorralation time between measurements of different measurements
+            - id (`str`) : identifying number for this task in uuid format
+        """
+        super().__init__(s_max, measurements, t_start, t_end, t_corr, duration, urgency, id, **_)
+        
+        # check arguments
+        if not isinstance(pos, list):
+            raise AttributeError(f'`pos` must be of type `list`. is of type {type(pos)}.')
+        elif len(pos) != 3:
+            raise ValueError(f'`pos` must be a list of 3 values (lat, lon, alt). is of length {len(pos)}.')
+    
+        self.pos = pos
