@@ -63,7 +63,7 @@
             "name": "3D CHESS - ENGINEERING TESTER",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/agents/engineering/test.py",
+            "program": "${workspaceRoot}/applications/chess3d/nodes/engineering/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceRoot}/applications/chess3d",

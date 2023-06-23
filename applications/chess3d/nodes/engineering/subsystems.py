@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import uuid
-from nodes.engineering.actions import SubsystemAction
-from nodes.engineering.components import Component
+from actions import SubsystemAction
+from components import Component
 
 
 class Subsystem(ABC):
@@ -21,7 +21,7 @@ class Subsystem(ABC):
 
     def __init__(   self, 
                     name : str,
-                    components : list,
+                    components : list = [],
                     status : str = DISABLED,
                     t : float = 0.0,
                     id : str = None
@@ -37,7 +37,7 @@ class Subsystem(ABC):
             - id (`str`) : identifying number for this task in uuid format
         """
         super().__init__()
-                
+
         # check parameters
         if not isinstance(components, list):
             raise ValueError(f'`components` must be of type `list`. is of type {type(components)}.')
@@ -116,4 +116,14 @@ class Subsystem(ABC):
         return dict(self.__dict__)
 
 class ExampleSubsystem(Subsystem):
-    pass
+    def predict_failure(self, **kwags) -> float:
+        return 1e6
+
+    def __init__(self, 
+                name: str, 
+                components: list = [],
+                status: str = Subsystem.DISABLED, 
+                t: float = 0, 
+                id: str = None) -> None:
+        
+        super().__init__(name, components, status, t, id)
