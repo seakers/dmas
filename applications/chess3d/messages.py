@@ -33,7 +33,7 @@ def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
     elif msg_type == SimulationMessageTypes.MEASUREMENT.value:
         return MeasurementResultsRequest(**kwargs)
     else:
-        raise NotImplemented(f'Action of type {msg_type} not yet implemented.')
+        raise NotImplementedError(f'Action of type {msg_type} not yet implemented.')
 
 class AgentStateMessage(SimulationMessage):
     """

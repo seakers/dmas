@@ -6,10 +6,8 @@ from zmq import asyncio as azmq
 
 from pandas import DataFrame
 from nodes.science.reqs import MeasurementRequest
-from nodes.satellite import SatelliteAgentState
 from nodes.orbitdata import OrbitData
-from nodes.groundstat import GroundStationAgentState
-from nodes.uav import UAVAgentState
+from nodes.states import GroundStationAgentState, UAVAgentState, SatelliteAgentState
 from nodes.actions import MeasurementAction
 from nodes.agent import SimulationAgentState
 from messages import *
@@ -89,7 +87,7 @@ class SimulationEnvironment(EnvironmentNode):
 
     async def setup(self) -> None:
         # nothing to set up
-        pass
+        return
 
     async def live(self) -> None:
         try:

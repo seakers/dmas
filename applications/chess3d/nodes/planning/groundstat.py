@@ -1,8 +1,6 @@
 import asyncio
 import logging
-from nodes.groundstat import GroundStationAgentState
-from nodes.satellite import SatelliteAgentState
-from nodes.uav import UAVAgentState
+from nodes.states import GroundStationAgentState, SatelliteAgentState, UAVAgentState
 from nodes.agent import *
 from messages import *
 from dmas.messages import ManagerMessageTypes
@@ -15,15 +13,13 @@ class GroundStationPlanner(PlanningModule):
                 results_path: str, 
                 parent_name: str, 
                 measurement_reqs : list,
-                module_network_config: NetworkConfig, 
                 parent_network_config: NetworkConfig, 
-                utility_func: function, 
+                utility_func: Callable[[], Any],
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
         super().__init__(   results_path, 
                             parent_name, 
-                            module_network_config, 
                             parent_network_config, 
                             utility_func, 
                             level, 
@@ -172,12 +168,12 @@ class GroundStationPlanner(PlanningModule):
                         plan_out.append(action.to_dict())
                         break
 
-                    if len(plan_out) == 0:
-                        # if no plan left, just idle for a time-step
-                        self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                        t_idle = 1e6                        
-                        action = IdleAction(t_curr, t_idle)
-                        plan_out.append(action.to_dict())
+                if len(plan_out) == 0:
+                    # if no plan left, just idle for a time-step
+                    self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
+                    t_idle = 1e6                        
+                    action = IdleAction(t_curr, t_idle)
+                    plan_out.append(action.to_dict())
                     
                 self.log(f'sending {len(plan_out)} actions to agent...')
                 plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)

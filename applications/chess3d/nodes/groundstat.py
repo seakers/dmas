@@ -1,60 +1,65 @@
 import logging
 from typing import Any, Callable, Union
-from nodes.science.science import ScienceModule
 from dmas.agents import AgentAction
 from dmas.network import NetworkConfig
+from nodes.planning.groundstat import GroundStationPlanner
+from nodes.science.science import ScienceModule
 from nodes.agent import SimulationAgentState, SimulationAgent
 import numpy as np
-
-class GroundStationAgentState(SimulationAgentState):
-    """
-    Descibes the state of a Ground Station Agent
-    """
-    def __init__(self, 
-                lat: float, 
-                lon: float,
-                alt: float, 
-                status: str = SimulationAgentState.IDLING, 
-                t: Union[float, int] = 0, **_) -> None:
-        
-        R = 6.3781363e+003 + alt
-        pos = [
-                R * np.cos( lat * np.pi / 180.0) * np.cos( lon * np.pi / 180.0),
-                R * np.cos( lat * np.pi / 180.0) * np.sin( lon * np.pi / 180.0),
-                R * np.sin( lat * np.pi / 180.0)
-        ]
-        vel = [0, 0, 0]
-        
-        super().__init__(pos, vel, None, status, t, **_)
-
-    def propagate(self, _: Union[int, float]) -> tuple:
-        # agent does not move
-        return self.pos, self.vel
-
-    def is_failure(self) -> None:
-        # agent never fails
-        return False
-
-    def perform_travel(action: AgentAction, t: Union[int, float]) -> tuple:
-        # agent cannot travel
-        return action.ABORTED, 0.0
-
-    def perform_maneuver(action: AgentAction, t: Union[int, float]) -> tuple:
-        # agent cannot maneuver
-        return action.ABORTED, 0.0
+import zmq
 
 class GroundStationAgent(SimulationAgent):
     def __init__(self, 
                     agent_name: str, 
                     scenario_name: str, 
+                    port : int,
                     manager_network_config: NetworkConfig, 
-                    agent_network_config: NetworkConfig,
                     initial_state: SimulationAgentState, 
                     utility_func: Callable[[], Any],  
+                    measurement_reqs : list = [],
                     science_module : ScienceModule = None,
                     level: int = logging.INFO, 
                     logger: logging.Logger = None
                 ) -> None:
+
+
+        manager_addresses : dict = manager_network_config.get_manager_addresses()
+        req_address : str = manager_addresses.get(zmq.REP)[0]
+        req_address = req_address.replace('*', 'localhost')
+
+        sub_address : str = manager_addresses.get(zmq.PUB)[0]
+        sub_address = sub_address.replace('*', 'localhost')
+
+        pub_address : str = manager_addresses.get(zmq.SUB)[0]
+        pub_address = pub_address.replace('*', 'localhost')
+
+        push_address : str = manager_addresses.get(zmq.PUSH)[0]
+
+        agent_network_config = NetworkConfig( 	scenario_name,
+												manager_address_map = {
+														zmq.REQ: [req_address],
+														zmq.SUB: [sub_address],
+														zmq.PUB: [pub_address],
+                                                        zmq.PUSH: [push_address]},
+												external_address_map = {
+														zmq.REQ: [],
+														zmq.SUB: [f'tcp://localhost:{port+1}'],
+														zmq.PUB: [f'tcp://*:{port+2}']},
+                                                internal_address_map = {
+														zmq.REP: [f'tcp://*:{port+3}'],
+														zmq.PUB: [f'tcp://*:{port+4}'],
+														zmq.SUB: [f'tcp://localhost:{port+5}']
+											})
+
+        results_path = f'./results' + scenario_name + '/' + agent_name
+        planning_module = GroundStationPlanner( results_path, 
+                                                agent_name, 
+                                                measurement_reqs, 
+                                                agent_network_config, 
+                                                utility_func,
+                                                level,
+                                                logger)
+
         super().__init__(   agent_name, 
                             scenario_name,
                             manager_network_config, 
@@ -66,3 +71,7 @@ class GroundStationAgent(SimulationAgent):
                             science_module, 
                             level, 
                             logger)
+
+    async def setup(self) -> None:
+        # nothing to setup
+        return

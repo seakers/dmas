@@ -270,7 +270,8 @@ class SimulationAgent(Agent):
         env_resp = BusMessage(**content)
         for resp in env_resp.msgs:
             # unpackage message
-            resp_msg : SimulationMessage = message_from_dict(resp)
+            resp : dict
+            resp_msg : SimulationMessage = message_from_dict(**resp)
 
             if isinstance(resp_msg, AgentStateMessage):
                 # update state
@@ -288,14 +289,14 @@ class SimulationAgent(Agent):
         while not self.environment_inbox.empty():
             # save as senses to forward to planner
             _, _, msg_dict = await self.environment_inbox.get()
-            msg = message_from_dict(msg_dict)
+            msg = message_from_dict(**msg_dict)
             senses.append(msg)
 
         # handle peer broadcasts
         while not self.external_inbox.empty():
             # save as senses to forward to planner
             _, _, msg_dict = await self.external_inbox.get()
-            msg = message_from_dict(msg_dict)
+            msg = message_from_dict(**msg_dict)
             senses.append(msg)
 
         return senses
@@ -361,7 +362,7 @@ class SimulationAgent(Agent):
                 # this action affects the agent's state
 
                 # unpackage action
-                action = action_from_dict(action_dict)
+                action = action_from_dict(**action_dict)
                 t = self.get_current_time()
 
                 # modify the agent's state
@@ -385,7 +386,7 @@ class SimulationAgent(Agent):
             elif action_dict['action_type'] == ActionTypes.BROADCAST_MSG.value:
                 # unpack action
                 action = BroadcastMessageAction(**action_dict)
-                msg_out = message_from_dict(action.msg)
+                msg_out = message_from_dict(**action.msg)
 
                 # update state
                 self.state.update_state(self.get_current_time(), status=SimulationAgentState.MESSAGING)
@@ -519,7 +520,7 @@ class SimulationAgent(Agent):
             data.append(line_data)
         
         state_df = DataFrame(data,columns=headers)
-        self.log(f'\payload: {self.payload}\nSTATE HISTORY\n{str(state_df)}\n', level=logging.WARNING)
+        self.log(f'\nPayload: {self.payload}\nSTATE HISTORY\n{str(state_df)}\n', level=logging.WARNING)
         state_df.to_csv(f"{self.results_path}/states.csv", index=False)
 
         # log performance stats

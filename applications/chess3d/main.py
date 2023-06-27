@@ -6,6 +6,8 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from nodes.states import GroundStationAgentState
+from nodes.groundstat import GroundStationAgent
 from nodes.utility import linear_utility
 from nodes.agent import SimulationAgent
 from utils import *
@@ -35,7 +37,7 @@ if __name__ == "__main__":
     scenario_name = sys.argv[1]
     plot_results = True
     save_plot = False
-    level = logging.WARNING
+    level = logging.DEBUG
 
     # terminal welcome message
     print_welcome(scenario_name)
@@ -140,23 +142,44 @@ if __name__ == "__main__":
                                         manager_network_config,
                                         linear_utility, 
                                         logger=logger)
+    port += 6
     
     # Create agents 
     agents = []
     if spacecraft_dict is not None:
         for d in spacecraft_dict:
             # TODO Create spacecraft agents
+            port += 5
             pass
             
     if uav_dict is not None:
         for d in uav_dict:
             # TODO Create UAV agents
+            port += 5
             pass
 
     if gstation_dict is not None:
         for d in gstation_dict:
             # Create ground station agents
-            pass
+            d : dict
+            agent_name = d['name']
+            lat = d['latitude']
+            lon = d['longitude']
+            alt = d['altitude']
+            initial_state = GroundStationAgentState(lat,
+                                                    lon,
+                                                    alt)
+
+            agent = GroundStationAgent(agent_name, 
+                                        scenario_name,
+                                        port,
+                                        manager_network_config,
+                                        initial_state,
+                                        linear_utility,
+                                        logger=logger)
+            agents.append(agent)
+            port += 5
+            
 
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
