@@ -141,8 +141,22 @@ if __name__ == "__main__":
                                         linear_utility, 
                                         logger=logger)
     
-    # TODO create agents 
+    # Create agents 
     agents = []
+    if spacecraft_dict is not None:
+        for d in spacecraft_dict:
+            # TODO Create spacecraft agents
+            pass
+            
+    if uav_dict is not None:
+        for d in uav_dict:
+            # TODO Create UAV agents
+            pass
+
+    if gstation_dict is not None:
+        for d in gstation_dict:
+            # Create ground station agents
+            pass
 
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:

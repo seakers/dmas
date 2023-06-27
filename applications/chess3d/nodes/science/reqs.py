@@ -1,5 +1,5 @@
 import copy
-from ctypes import Union
+from typing import Union
 from enum import Enum
 from itertools import combinations, permutations
 import uuid
@@ -162,6 +162,12 @@ class MeasurementRequest(object):
     def __repr__(self):
         task_id = self.id.split('-')
         return f'MeasurementTask_{task_id[0]}'
+
+    def to_dict(self) -> dict:
+        """
+        Crates a dictionary containing all information contained in this measurement request object
+        """
+        return dict(self.__dict__)
 
 class GroundPointMeasurementRequest(MeasurementRequest):
     """

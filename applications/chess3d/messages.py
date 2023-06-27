@@ -2,7 +2,7 @@ from enum import Enum
 from dmas.messages import *
 
 class SimulationMessageTypes(Enum):
-    TASK_REQ = 'TASK_REQUEST'
+    MEASUREMENT_REQ = 'MEASUREMENT_REQ'
     AGENT_ACTION = 'AGENT_ACTION'
     AGENT_STATE = 'AGENT_STATE'
     CONNECTIVITY_UPDATE = 'CONNECTIVITY_UPDATE'
@@ -16,8 +16,8 @@ def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
     """
     Creates the appropriate message from a given dictionary in the correct format
     """
-    if msg_type == SimulationMessageTypes.TASK_REQ.value:
-        return TaskRequestMessage(**kwargs)
+    if msg_type == SimulationMessageTypes.MEASUREMENT_REQ.value:
+        return MeasurementRequestMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.AGENT_ACTION.value:
         return AgentActionMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.AGENT_STATE.value:
@@ -80,7 +80,7 @@ class AgentConnectivityUpdate(SimulationMessage):
         self.target = target
         self.connected = connected
 
-class TaskRequestMessage(SimulationMessage):
+class MeasurementRequestMessage(SimulationMessage):
     """
     ## Task Request Message 
 
@@ -94,7 +94,7 @@ class TaskRequestMessage(SimulationMessage):
         - task (`dict`) : task request to be performed
     """
     def __init__(self, src: str, dst: str, task : dict, id: str = None, **_):
-        super().__init__(src, dst, SimulationMessageTypes.TASK_REQ.value, id)
+        super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT_REQ.value, id)
         
         if not isinstance(task, dict):
             raise AttributeError(f'`task` must be of type `dict`; is of type {type(task)}.')

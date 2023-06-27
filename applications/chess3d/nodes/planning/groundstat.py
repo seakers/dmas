@@ -30,12 +30,21 @@ class GroundStationPlanner(PlanningModule):
                             logger
                         )
         self.measurement_reqs = measurement_reqs
+        
 
     async def setup(self) -> None:
         # initialize internal messaging queues
         self.states_inbox = asyncio.Queue()
         self.relevant_changes_inbox = asyncio.Queue()
         self.action_status_inbox = asyncio.Queue()
+
+        # create an initial plan
+        for measurement_req in self.measurement_reqs:
+            # broadcast every initialy known measurement requests
+            measurement_req : MeasurementRequest
+            msg = MeasurementRequestMessage(self.get_parent_name(), self.get_parent_name(), measurement_req.to_dict())
+            action = BroadcastMessageAction(msg, measurement_req.t_start)
+            self.plan.append(action)
 
     async def live(self) -> None:
         """
@@ -102,23 +111,11 @@ class GroundStationPlanner(PlanningModule):
                             # unpack message 
                             state_msg : AgentStateMessage = AgentStateMessage(**sense)
                             self.log(f"received agent state message! sending to bundle-builder...")
-                            
-                            # update current time:
-                            if state_msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
-                                state = SatelliteAgentState(**state_msg.state)
-                            elif state_msg.state['state_type'] == SimulationAgentTypes.UAV.value:
-                                state = UAVAgentState(**state_msg.state)
-                            elif state_msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
-                                state = GroundStationAgentState(**state_msg.state)
-                            else:
-                                raise NotImplementedError(f"`state_type` {state_msg.state['state_type']} not supported.")
-
-                            
-                            if t_curr < state.t:
-                                t_curr = state.t
-
+                                                        
                             # send to bundle builder 
                             await self.states_inbox.put(state_msg) 
+
+                        # TODO support down-linked information processing
 
         except asyncio.CancelledError:
             return
@@ -127,4 +124,74 @@ class GroundStationPlanner(PlanningModule):
             self.listener_results = results
 
     async def planner(self) -> None:
-        pass
+        try:
+            t_curr = 0
+            while True:
+                plan_out = []
+                msg : SimulationMessage = await self.states_inbox.get()
+
+                # update current time:
+                if isinstance(msg, AgentStateMessage):
+                    if msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
+                        state = SatelliteAgentState(**msg.state)
+                    elif msg.state['state_type'] == SimulationAgentTypes.UAV.value:
+                        state = UAVAgentState(**msg.state)
+                    elif msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
+                        state = GroundStationAgentState(**msg.state)
+                    else:
+                        raise NotImplementedError(f"`state_type` {msg.state['state_type']} not supported.")
+
+                    if t_curr < state.t:
+                        t_curr = state.t
+
+                elif isinstance(msg, AgentActionMessage):
+                    if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
+                        # if action wasn't completed, re-try
+                        action_dict : dict = msg.action
+                        self.log(f'action {action_dict} not completed yet! trying again...')
+                        plan_out.append(action_dict)
+
+                    elif msg.status == AgentAction.COMPLETED:
+                        # if action was completed, remove from plan
+                        action_dict : dict = msg.action
+                        completed_action = AgentAction(**action_dict)
+                        removed = None
+                        for action in self.plan:
+                            action : AgentAction
+                            if action.id == completed_action.id:
+                                removed = action
+                                break
+
+                        if removed is not None:
+                            self.plan.remove(removed)
+
+                
+                for action in self.plan:
+                    action : AgentAction
+                    if action.t_start <= t_curr <= action.t_end:
+                        plan_out.append(action.to_dict())
+                        break
+
+                    if len(plan_out) == 0:
+                        # if no plan left, just idle for a time-step
+                        self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
+                        t_idle = 1e6                        
+                        action = IdleAction(t_curr, t_idle)
+                        plan_out.append(action.to_dict())
+                    
+                self.log(f'sending {len(plan_out)} actions to agent...')
+                plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
+                await self._send_manager_msg(plan_msg, zmq.PUB)
+
+                self.log(f'actions sent!')
+
+        except asyncio.CancelledError:
+            return
+
+        except Exception as e:
+            self.log(f'routine failed. {e}')
+            raise e
+
+    async def teardown(self) -> None:
+        # nothing to tear-down
+        return

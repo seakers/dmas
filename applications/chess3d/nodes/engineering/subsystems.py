@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import uuid
-from actions import SubsystemAction
-from components import Component
+from nodes.engineering.components import Component
+from nodes.engineering.actions import SubsystemAction
 
 
 class Subsystem(ABC):

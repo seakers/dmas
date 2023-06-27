@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 import uuid
 
-from actions import ComponentAction
+from nodes.engineering.actions import ComponentAction
 
 
 class Component(ABC):

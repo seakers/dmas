@@ -1,5 +1,6 @@
 import logging
-from typing import Union
+from typing import Any, Callable, Union
+from nodes.science.science import ScienceModule
 from dmas.agents import AgentAction
 from dmas.network import NetworkConfig
 from nodes.agent import SimulationAgentState, SimulationAgent
@@ -49,9 +50,19 @@ class GroundStationAgent(SimulationAgent):
                     manager_network_config: NetworkConfig, 
                     agent_network_config: NetworkConfig,
                     initial_state: SimulationAgentState, 
-                    payload: list, 
-                    utility_func: function,  
+                    utility_func: Callable[[], Any],  
+                    science_module : ScienceModule = None,
                     level: int = logging.INFO, 
                     logger: logging.Logger = None
                 ) -> None:
-        super().__init__(agent_name, scenario_name, manager_network_config, agent_network_config, initial_state, payload, utility_func, planning_module, science_module, level, logger)
+        super().__init__(   agent_name, 
+                            scenario_name,
+                            manager_network_config, 
+                            agent_network_config, 
+                            initial_state, 
+                            [], 
+                            utility_func, 
+                            planning_module, 
+                            science_module, 
+                            level, 
+                            logger)

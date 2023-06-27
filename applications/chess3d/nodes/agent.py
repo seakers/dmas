@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Callable
 import numpy as np
 from pandas import DataFrame
 
@@ -178,7 +179,7 @@ class SimulationAgent(Agent):
                     agent_network_config: NetworkConfig,
                     initial_state : SimulationAgentState,
                     payload : list,
-                    utility_func : function,
+                    utility_func : Callable[[], Any],
                     planning_module : PlanningModule = None,
                     science_module : ScienceModule = None,
                     level: int = logging.INFO, 

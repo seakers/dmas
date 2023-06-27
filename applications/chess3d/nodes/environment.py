@@ -1,5 +1,6 @@
 import copy
 import math
+from typing import Any, Callable
 import numpy as np
 from zmq import asyncio as azmq
 
@@ -36,7 +37,7 @@ class SimulationEnvironment(EnvironmentNode):
                 results_path : str, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
-                utility_func : function, 
+                utility_func : Callable[[], Any], 
                 level: int = logging.INFO, 
                 logger: logging.Logger = None) -> None:
         super().__init__(env_network_config, manager_network_config, [], level, logger)

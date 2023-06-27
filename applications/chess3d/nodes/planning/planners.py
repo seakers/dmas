@@ -1,3 +1,4 @@
+from typing import Any, Callable
 from dmas.modules import *
 import numpy as np
 
@@ -7,7 +8,7 @@ class PlanningModule(InternalModule):
                 parent_name : str,
                 module_network_config : NetworkConfig,
                 parent_network_config: NetworkConfig, 
-                utility_func : function,
+                utility_func : Callable[[], Any],
                 level: int = logging.INFO, 
                 logger: logging.Logger = None
                 ) -> None:
@@ -21,6 +22,7 @@ class PlanningModule(InternalModule):
         self.results_path = results_path
         self.parent_name = parent_name
         self.utility_func = utility_func
+        self.plan = []
 
         self.stats = {}
 
