@@ -6,6 +6,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from nodes.planning.planners import PlannerTypes
 from nodes.states import GroundStationAgentState
 from nodes.groundstat import GroundStationAgent
 from nodes.utility import linear_utility
@@ -37,7 +38,7 @@ if __name__ == "__main__":
     scenario_name = sys.argv[1]
     plot_results = True
     save_plot = False
-    level = logging.DEBUG
+    level = logging.WARNING
 
     # terminal welcome message
     print_welcome(scenario_name)
@@ -148,9 +149,57 @@ if __name__ == "__main__":
     agents = []
     if spacecraft_dict is not None:
         for d in spacecraft_dict:
-            # TODO Create spacecraft agents
+            # Create spacecraft agents
+            
+            ## unpack mission specs
+            agent_name = d['name']
+            planner = d.get('planner', None)
+            science = d.get('science', None)
+
+            ## create agent network config
+            manager_addresses : dict = manager_network_config.get_manager_addresses()
+            req_address : str = manager_addresses.get(zmq.REP)[0]
+            req_address = req_address.replace('*', 'localhost')
+
+            sub_address : str = manager_addresses.get(zmq.PUB)[0]
+            sub_address = sub_address.replace('*', 'localhost')
+
+            pub_address : str = manager_addresses.get(zmq.SUB)[0]
+            pub_address = pub_address.replace('*', 'localhost')
+
+            push_address : str = manager_addresses.get(zmq.PUSH)[0]
+
+            agent_network_config = NetworkConfig( 	scenario_name,
+                                                    manager_address_map = {
+                                                            zmq.REQ: [req_address],
+                                                            zmq.SUB: [sub_address],
+                                                            zmq.PUB: [pub_address],
+                                                            zmq.PUSH: [push_address]},
+                                                    external_address_map = {
+                                                            zmq.REQ: [],
+                                                            zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                            zmq.PUB: [f'tcp://*:{port+2}']},
+                                                    internal_address_map = {
+                                                            zmq.REP: [f'tcp://*:{port+3}'],
+                                                            zmq.PUB: [f'tcp://*:{port+4}'],
+                                                            zmq.SUB: [f'tcp://localhost:{port+5}']
+                                                })
+
+            ## load planner module
+            if planner is not None:
+                planner_type = planner['@type']
+                if planner_type == PlannerTypes.FIXED.value:
+                    pass
+                else:
+                    raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
+
+            ## load science module
+            if science is not None:
+                raise NotImplementedError(f"Science module not yet implemented.")
+
+            ## create agent
+
             port += 5
-            pass
             
     if uav_dict is not None:
         for d in uav_dict:

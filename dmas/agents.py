@@ -255,8 +255,8 @@ class Agent(Node):
         except asyncio.CancelledError:
             return        
         
-        except FailureStateException:
-            return
+        # except FailureStateException:
+        #     return
                 
     async def listen_to_broadcasts(self):
         """

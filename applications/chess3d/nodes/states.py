@@ -58,18 +58,40 @@ class SatelliteAgentState(SimulationAgentState):
     """
     Describes the state of a Satellite Agent
     """
-    def __init__(self, 
-                    pos: list, 
-                    vel: list, 
-                    eclise: bool,
+    def __init__( self, 
+                    # data_dir : str, 
+                    t: Union[float, int], 
+                    pos: list = None, 
+                    vel: list = None, 
+                    attitude : float = 0.0,
+                    
+                    eclipse: bool = None,
                     engineering_module: EngineeringModule = None, 
                     status: str = ..., 
-                    t: Union[float, int] = 0, 
                     **_
                 ) -> None:
+        # self.data_dir = data_dir
         super().__init__(pos, vel, engineering_module, status, t, **_)
-        self.eclipse = eclise
+        self.eclipse = eclipse
+        self.attitude = attitude
 
+    def propagate(self, _: Union[int, float]) -> tuple:
+        # uses pre-computed data from 
+        return self.pos, self.vel
+
+    def is_failure(self) -> None:
+        if self.engineering_module:
+            # agent only fails if internal components fail
+            return self.engineering_module.is_failure()
+        return False
+
+    def perform_travel(action: AgentAction, t: Union[int, float]) -> tuple:
+        # agent cannot travel
+        return action.ABORTED, 0.0
+
+    def perform_maneuver(action: AgentAction, t: Union[int, float]) -> tuple:
+        # agent cannot maneuver
+        return action.ABORTED, 0.0
 
 class UAVAgentState(SimulationAgentState):
     """

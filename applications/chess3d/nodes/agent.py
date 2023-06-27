@@ -152,7 +152,7 @@ class SimulationAgentState(AbstractAgentState):
         return str(dict(self.__dict__))
     
     def to_dict(self) -> dict:
-        return self.__dict__
+        return dict(self.__dict__)
 
 
 class SimulationAgent(Agent):

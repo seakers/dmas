@@ -1,6 +1,10 @@
 from typing import Any, Callable
 from dmas.modules import *
-import numpy as np
+
+class PlannerTypes(Enum):
+    FIXED = 'FIXED'
+    GREEDY = 'GREEDY'
+    MACCBBA = 'MACCBBA'
 
 class PlanningModule(InternalModule):
     def __init__(self, 
