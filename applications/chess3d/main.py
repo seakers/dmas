@@ -6,6 +6,8 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from applications.chess3d.nodes.satellite import SatelliteAgent
+from nodes.planning.fixed import FixedPlanner
 from nodes.planning.planners import PlannerTypes
 from nodes.states import GroundStationAgentState
 from nodes.groundstat import GroundStationAgent
@@ -153,8 +155,9 @@ if __name__ == "__main__":
             
             ## unpack mission specs
             agent_name = d['name']
-            planner = d.get('planner', None)
-            science = d.get('science', None)
+            planner_dict = d.get('planner', None)
+            science_dict = d.get('science', None)
+            instrument = d.get('instrument', None)
 
             ## create agent network config
             manager_addresses : dict = manager_network_config.get_manager_addresses()
@@ -186,19 +189,34 @@ if __name__ == "__main__":
                                                 })
 
             ## load planner module
-            if planner is not None:
-                planner_type = planner['@type']
+            if planner_dict is not None:
+                planner_type = planner_dict['@type']
                 if planner_type == PlannerTypes.FIXED.value:
-                    pass
+                    planner = FixedPlanner(results_path, 
+                                           agent_name,
+                                           [], 
+                                           agent_network_config,
+                                           linear_utility, 
+                                           logger=logger)
                 else:
                     raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
 
             ## load science module
-            if science is not None:
+            if science_dict is not None:
                 raise NotImplementedError(f"Science module not yet implemented.")
-
+            else:
+                science = None
             ## create agent
-
+            agent = SatelliteAgent(agent_name,
+                                    scenario_name,
+                                    manager_network_config,
+                                    agent_network_config,
+                                    initial_state, 
+                                    planner,
+                                    payload,
+                                    linear_utility,
+                                    science,
+                                    logger=logger)
             port += 5
             
     if uav_dict is not None:
