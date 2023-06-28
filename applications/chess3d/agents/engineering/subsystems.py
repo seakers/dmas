@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Union
 import uuid
-from nodes.engineering.components import Component
-from nodes.engineering.actions import SubsystemAction
+from agents.engineering.components import AbstractComponent
+from agents.engineering.actions import SubsystemAction
 
 
-class Subsystem(ABC):
+class AbstractSubsystem(ABC):
     """
     Represents a subsystem onboard an agent's Engineering Module
     
@@ -21,7 +21,7 @@ class Subsystem(ABC):
 
     def __init__(   self, 
                     name : str,
-                    components : list = [],
+                    components : list,
                     status : str = DISABLED,
                     t : float = 0.0,
                     id : str = None
@@ -42,11 +42,11 @@ class Subsystem(ABC):
         if not isinstance(components, list):
             raise ValueError(f'`components` must be of type `list`. is of type {type(components)}.')
         for component in components:
-            if not isinstance(component, Component):
+            if not isinstance(component, AbstractComponent):
                 raise ValueError(f'elements of list `components` must be of type `Component`. contains element of type {type(component)}.')
         
         # assign values
-        self.name = name
+        self.name = EPsubsystem
         self.components = components
         self.status = status
 
@@ -57,7 +57,7 @@ class Subsystem(ABC):
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
 
     @abstractmethod
-    def update_state(self, **kwargs) -> None:
+    def update(self, **kwargs) -> None:
         """
         Propagates and updates the current state of the subsystem.
         """
@@ -78,7 +78,7 @@ class Subsystem(ABC):
         self.t = t
 
     @abstractmethod
-    def is_critical(self, **kwargs) -> bool:
+    def is_critial(self, **kwargs) -> bool:
         """
         Returns true if the subsystem is in a critical state
         """
@@ -114,52 +114,4 @@ class Subsystem(ABC):
         Crates a dictionary containing all information contained in this agent state object
         """
         return dict(self.__dict__)
-class ACDS(Subsystem):
-    """
-    Attitude Control and Determination Subsystem of Agent's Engineeering Module
     
-    ### Attributes:
-        - name (`str`) : name of the subsystem
-        - status (`str`) : current status of the subsystem
-        - t (`float` or `int`) : last updated time
-        - id (`str`) : identifying number for this subsystem in uuid format
-    """
-    ENABLED = 'ENABLED'
-    DISABLED = 'DISABLED'
-    FAILED = 'FAILED'
-    def __init__(self, 
-                 name: str, 
-                 components: list,
-                 I_craft = float,
-                 I_spin = float,
-                 I_transverse = float,
-                 Allow_err = float,
-                 T_disturb = float, 
-                 status: str = DISABLED, 
-                 t: float = 0, 
-                 id: str = None
-                 )-> None:
-        super().__init__(name, components, status, t, id)
-
-        # check parameters
-        if not isinstance(components, list):
-            raise ValueError(f'`components` must be of type `list`. is of type {type(components)}.')
-        for component in components:
-            if not isinstance(component, Component):
-                raise ValueError(f'elements of list `components` must be of type `Component`. contains element of type {type(component)}.')
-        
-        # assign values
-        self.name = 'EP'
-        self.components = components
-        self.I_craft = I_craft
-        self.I_spin = I_spin
-        self.I_transverse = I_transverse
-        self.Allow_err = Allow_err
-        self.T_disturb = T_disturb
-        self.status = status
-
-        self.name = name
-        self.status = status
-        self.components = components
-        self.t = t
-    pass
