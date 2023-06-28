@@ -1,14 +1,13 @@
 import copy
 import math
+from typing import Any, Callable
 import numpy as np
 from zmq import asyncio as azmq
 
 from pandas import DataFrame
 from nodes.science.reqs import MeasurementRequest
-from nodes.satellite import SatelliteAgentState
 from nodes.orbitdata import OrbitData
-from nodes.groundstat import GroundStationAgentState
-from nodes.uav import UAVAgentState
+from nodes.states import GroundStationAgentState, UAVAgentState, SatelliteAgentState
 from nodes.actions import MeasurementAction
 from nodes.agent import SimulationAgentState
 from messages import *
@@ -36,7 +35,7 @@ class SimulationEnvironment(EnvironmentNode):
                 results_path : str, 
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
-                utility_func : function, 
+                utility_func : Callable[[], Any], 
                 level: int = logging.INFO, 
                 logger: logging.Logger = None) -> None:
         super().__init__(env_network_config, manager_network_config, [], level, logger)
@@ -88,7 +87,7 @@ class SimulationEnvironment(EnvironmentNode):
 
     async def setup(self) -> None:
         # nothing to set up
-        pass
+        return
 
     async def live(self) -> None:
         try:
