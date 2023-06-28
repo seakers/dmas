@@ -1,12 +1,15 @@
 from datetime import datetime, timedelta
 import json
 import logging
+from instrupy.base import Instrument
+import orbitpy.util
 import pandas as pd
 import random
 import sys
 import zmq
 import concurrent.futures
-from applications.chess3d.nodes.satellite import SatelliteAgent
+from nodes.satellite import SatelliteAgent
+from nodes.states import SatelliteAgentState
 from nodes.planning.fixed import FixedPlanner
 from nodes.planning.planners import PlannerTypes
 from nodes.states import GroundStationAgentState
@@ -157,7 +160,8 @@ if __name__ == "__main__":
             agent_name = d['name']
             planner_dict = d.get('planner', None)
             science_dict = d.get('science', None)
-            instrument = d.get('instrument', None)
+            instruments_dict = d.get('instrument', None)
+            orbit_state_dict = d.get('orbitState', None)
 
             ## create agent network config
             manager_addresses : dict = manager_network_config.get_manager_addresses()
@@ -200,12 +204,31 @@ if __name__ == "__main__":
                                            logger=logger)
                 else:
                     raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
+            else:
+                # add default planner if no planner was specified
+                # TODO create default planner (idea: only listens for plans from the ground)
+                planner = FixedPlanner(results_path, 
+                                           agent_name,
+                                           [], 
+                                           agent_network_config,
+                                           linear_utility, 
+                                           logger=logger)
 
             ## load science module
             if science_dict is not None:
                 raise NotImplementedError(f"Science module not yet implemented.")
             else:
                 science = None
+
+            ## load payload
+            if instruments_dict:
+                payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
+            else:
+                payload = []
+
+            ## load initial state 
+            initial_state = SatelliteAgentState(orbit_state_dict) 
+
             ## create agent
             agent = SatelliteAgent(agent_name,
                                     scenario_name,

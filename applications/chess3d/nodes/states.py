@@ -4,6 +4,9 @@ from typing import Union
 from nodes.agent import SimulationAgentState, SimulationAgentTypes
 from nodes.engineering.engineering import EngineeringModule
 from dmas.agents import AgentAction
+from orbitpy.util import OrbitState
+from orbitpy.propagator import J2AnalyticalPropagator
+import propcov
 
 class GroundStationAgentState(SimulationAgentState):
     """
@@ -59,24 +62,58 @@ class SatelliteAgentState(SimulationAgentState):
     Describes the state of a Satellite Agent
     """
     def __init__( self, 
-                    # data_dir : str, 
-                    t: Union[float, int], 
-                    pos: list = None, 
-                    vel: list = None, 
-                    attitude : float = 0.0,
-                    
-                    eclipse: bool = None,
+                    # # data_dir : str, 
+                    orbit_state : dict,
+                    t: Union[float, int] = 0.0, 
                     engineering_module: EngineeringModule = None, 
                     status: str = ..., 
                     **_
                 ) -> None:
-        # self.data_dir = data_dir
+        
+        self.propagator = J2AnalyticalPropagator()
+        self.orbit_state : OrbitState = OrbitState.from_dict(orbit_state)
+        self.keplerian_state = self.orbit_state.get_keplerian_earth_centered_inertial_state()
+        
+        cartesian_state = self.orbit_state.get_cartesian_earth_centered_inertial_state()
+        pos = cartesian_state[0:3]
+        vel = cartesian_state[3:]
+        
         super().__init__(pos, vel, engineering_module, status, t, **_)
-        self.eclipse = eclipse
-        self.attitude = attitude
 
-    def propagate(self, _: Union[int, float]) -> tuple:
-        # uses pre-computed data from 
+    def propagate(self, t: Union[int, float]) -> tuple:
+        # propagates orbit
+
+        # form the propcov.Spacecraft object
+        attitude = propcov.NadirPointingAttitude()
+        interp = propcov.LagrangeInterpolator()
+
+        # following snippet is required, because any copy, changes to the propcov objects in the input spacecraft is reflected outside the function.
+        spc_date = propcov.AbsoluteDate()
+        spc_date.SetJulianDate(self.orbit_state.date.GetJulianDate())
+        spc_orbitstate = self.orbit_state.state
+        
+        spc = propcov.Spacecraft(spc_date, spc_orbitstate, attitude, interp, 0, 0, 0, 1, 2, 3) # TODO: initialization to the correct orientation of spacecraft is not necessary for the purpose of orbit-propagation, so ignored for time-being.
+        start_date = spc_date
+
+        # following snippet is required, because any copy, changes to the input start_date is reflected outside the function. (Similar to pass by reference in C++.)
+        # so instead a separate copy of the start_date is made and is used within this function.
+        _start_date = propcov.AbsoluteDate()
+        _start_date.SetJulianDate(start_date.GetJulianDate())
+
+        # form the propcov.Propagator object
+        prop = propcov.Propagator(spc)
+
+        # propagate to the specified start date since the date at which the orbit-state is defined
+        # could be different from the specified start_date (propagation could be either forwards or backwards)
+        prop.Propagate(_start_date)
+        
+        date = _start_date
+        date.Advance(t - self.t)
+        prop.Propagate(date)
+        
+        cart_state = spc.GetCartesianState().GetRealArray()
+        kep_state = spc.GetKeplerianState().GetRealArray()
+       
         return self.pos, self.vel
 
     def is_failure(self) -> None:

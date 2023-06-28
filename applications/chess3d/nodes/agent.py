@@ -232,7 +232,7 @@ class SimulationAgent(Agent):
         self.state_history : list = []
         
         # setup results folder:
-        self.results_path = setup_results_directory(f'./results' + scenario_name + '/' + self.get_element_name())
+        self.results_path = setup_results_directory(f'./results/' + scenario_name + '/' + self.get_element_name())
           
 
     async def sense(self, statuses: list) -> list:
