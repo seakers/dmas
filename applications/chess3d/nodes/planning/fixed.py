@@ -30,8 +30,8 @@ class FixedPlanner(PlanningModule):
     async def setup(self) -> None:
         # initialize internal messaging queues
         self.states_inbox = asyncio.Queue()
-        self.relevant_changes_inbox = asyncio.Queue()
         self.action_status_inbox = asyncio.Queue()
+        self.measurement_req_inbox = asyncio.Queue()
 
     async def live(self) -> None:
         """
@@ -88,22 +88,27 @@ class FixedPlanner(PlanningModule):
                         if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
                             # unpack message 
                             action_msg = AgentActionMessage(**sense)
-                            self.log(f"received agent action of status {action_msg.status}! sending to bundle-builder...")
+                            self.log(f"received agent action of status {action_msg.status}!")
                             
-                            # send to bundle builder 
+                            # send to planner
                             await self.action_status_inbox.put(action_msg)
 
                         elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                             # unpack message 
                             state_msg : AgentStateMessage = AgentStateMessage(**sense)
-                            self.log(f"received agent state message! sending to bundle-builder...")
+                            self.log(f"received agent state message!")
                                                         
-                            # send to bundle builder 
+                            # send to planner
                             await self.states_inbox.put(state_msg) 
 
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
-                            x = 1
+                            # unpack message 
+                            req_msg = MeasurementRequestMessage(**sense)
+                            self.log(f"received measurement request message!")
                             
+                            # send to planner
+                            await self.measurement_req_inbox.put(req_msg)
+
                         # TODO support down-linked information processing
 
         except asyncio.CancelledError:
@@ -154,6 +159,10 @@ class FixedPlanner(PlanningModule):
 
                         if removed is not None:
                             self.plan.remove(removed)
+
+                while not self.measurement_req_inbox.empty():
+                    # ignore measurement requests
+                    msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
                 
                 for action in self.plan:
                     action : AgentAction

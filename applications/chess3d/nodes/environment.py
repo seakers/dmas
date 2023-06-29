@@ -85,6 +85,11 @@ class SimulationEnvironment(EnvironmentNode):
                     agent_names.append(gs_name)
             self.agents[self.GROUND_STATION] = gs_names
 
+            # load connectivity settings
+            scenario_dict : dict = scenario_dict.get('scenario', None)
+            connectivity = scenario_dict.get('connectivity', None) if scenario_dict else None
+            self.connectivity = connectivity == 'FULL'
+
         # initialize parameters
         self.utility_func = utility_func
         self.measurement_history = []
@@ -255,6 +260,9 @@ class SimulationEnvironment(EnvironmentNode):
         #### Returns:
             - connected (`int`): binary value representing if the `src` and `target` are connected
         """
+        if self.connectivity:
+            return True
+
         connected = False
         if target_type == self.SPACECRAFT:
             if src in self.agents[self.SPACECRAFT]:
