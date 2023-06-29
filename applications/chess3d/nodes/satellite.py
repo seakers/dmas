@@ -36,3 +36,7 @@ class SatelliteAgent(SimulationAgent):
                         science_module, 
                         level, 
                         logger)
+
+    async def setup(self) -> None:
+        # nothing to setup
+        return

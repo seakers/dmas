@@ -240,13 +240,17 @@ if __name__ == "__main__":
                                     linear_utility,
                                     science,
                                     logger=logger)
-            port += 5
+            agents.append(agent)
+            port += 6
             
     if uav_dict is not None:
         for d in uav_dict:
             # TODO Create UAV agents
-            port += 5
             pass
+            agent = None 
+            agents.append(agent)
+
+            port += 6
 
     if gstation_dict is not None:
         for d in gstation_dict:
@@ -268,7 +272,7 @@ if __name__ == "__main__":
                                         linear_utility,
                                         logger=logger)
             agents.append(agent)
-            port += 5
+            port += 6
             
 
     # run simulation

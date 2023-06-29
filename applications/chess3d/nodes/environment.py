@@ -143,14 +143,14 @@ class SimulationEnvironment(EnvironmentNode):
                         if src in self.agents[self.SPACECRAFT]:
                             # look up orbitdata
                             current_state = SatelliteAgentState(**msg.state)
-                            data : OrbitData = self.orbitdata[src]
-                            pos, vel, eclipse = data.get_orbit_state(current_state.t)
+                            # data : OrbitData = self.orbitdata[src]
+                            # pos, vel, eclipse = data.get_orbit_state(current_state.t)
 
                             # update state
                             updated_state = current_state
-                            updated_state.pos = pos
-                            updated_state.vel = vel
-                            updated_state.eclipse = eclipse
+                            # updated_state.pos = pos
+                            # updated_state.vel = vel
+                            # updated_state.eclipse = int(eclipse)
 
                         elif src in self.agents[self.UAV]:
                             # Do NOT update

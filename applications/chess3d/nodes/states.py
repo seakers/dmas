@@ -64,24 +64,49 @@ class SatelliteAgentState(SimulationAgentState):
     def __init__( self, 
                     # # data_dir : str, 
                     orbit_state : dict,
+                    pos : list = None,
+                    vel : list = None,
+                    # keplerian_state : dict = None,
                     t: Union[float, int] = 0.0, 
+                    eclipse : int = 0,
                     engineering_module: EngineeringModule = None, 
                     status: str = ..., 
                     **_
                 ) -> None:
         
-        self.propagator = J2AnalyticalPropagator()
-        self.orbit_state : OrbitState = OrbitState.from_dict(orbit_state)
-        self.keplerian_state = self.orbit_state.get_keplerian_earth_centered_inertial_state()
+        self.orbit_state = orbit_state
+
+        if pos is None and vel is None:
+            orbit_state : OrbitState = OrbitState.from_dict(self.orbit_state)
+            cartesian_state = orbit_state.get_cartesian_earth_centered_inertial_state()
+            pos = cartesian_state[0:3]
+            vel = cartesian_state[3:]
+
+
+            # keplerian_state = orbit_state.get_keplerian_earth_centered_inertial_state()
+            # self.keplerian_state = {"aop" : keplerian_state.aop,
+            #                         "ecc" : keplerian_state.ecc,
+            #                         "sma" : keplerian_state.sma,
+            #                         "inc" : keplerian_state.inc,
+            #                         "raan" : keplerian_state.raan,
+            #                         "ta" : keplerian_state.ta}
         
-        cartesian_state = self.orbit_state.get_cartesian_earth_centered_inertial_state()
-        pos = cartesian_state[0:3]
-        vel = cartesian_state[3:]
+        # elif keplerian_state is not None:
+        #     self.keplerian_state = keplerian_state
         
-        super().__init__(pos, vel, engineering_module, status, t, **_)
+        super().__init__(   SimulationAgentTypes.SATELLITE.value, 
+                            pos, 
+                            vel, 
+                            engineering_module, 
+                            status, 
+                            t)
+        
+        self.eclipse = eclipse
 
     def propagate(self, t: Union[int, float]) -> tuple:
         # propagates orbit
+        if abs(self.t - t) < 1e-6:
+            return self.pos, self.vel
 
         # form the propcov.Spacecraft object
         attitude = propcov.NadirPointingAttitude()
@@ -89,8 +114,9 @@ class SatelliteAgentState(SimulationAgentState):
 
         # following snippet is required, because any copy, changes to the propcov objects in the input spacecraft is reflected outside the function.
         spc_date = propcov.AbsoluteDate()
-        spc_date.SetJulianDate(self.orbit_state.date.GetJulianDate())
-        spc_orbitstate = self.orbit_state.state
+        orbit_state : OrbitState = OrbitState.from_dict(self.orbit_state)
+        spc_date.SetJulianDate(orbit_state.date.GetJulianDate())
+        spc_orbitstate = orbit_state.state
         
         spc = propcov.Spacecraft(spc_date, spc_orbitstate, attitude, interp, 0, 0, 0, 1, 2, 3) # TODO: initialization to the correct orientation of spacecraft is not necessary for the purpose of orbit-propagation, so ignored for time-being.
         start_date = spc_date
@@ -108,13 +134,23 @@ class SatelliteAgentState(SimulationAgentState):
         prop.Propagate(_start_date)
         
         date = _start_date
-        date.Advance(t - self.t)
+        dt = t - self.t
+        date.Advance(dt)
         prop.Propagate(date)
         
-        cart_state = spc.GetCartesianState().GetRealArray()
-        kep_state = spc.GetKeplerianState().GetRealArray()
+        cartesian_state = spc.GetCartesianState().GetRealArray()
+        pos = cartesian_state[0:3]
+        vel = cartesian_state[3:]
+
+        keplerian_state = spc.GetKeplerianState().GetRealArray()
+        self.keplerian_state = {"sma" : keplerian_state[0],
+                                "ecc" : keplerian_state[1],
+                                "inc" : keplerian_state[2],
+                                "raan" : keplerian_state[3],
+                                "aop" : keplerian_state[4],
+                                "ta" : keplerian_state[5]}                                
        
-        return self.pos, self.vel
+        return pos, vel
 
     def is_failure(self) -> None:
         if self.engineering_module:
