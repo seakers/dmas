@@ -48,6 +48,7 @@ class SimulationEnvironment(EnvironmentNode):
 
         # load agent names and types
         self.agents = {}
+        agent_names = []
         with open(scenario_path + 'MissionSpecs.json', 'r') as scenario_specs:
             scenario_dict : dict = json.load(scenario_specs)
             
@@ -59,6 +60,7 @@ class SimulationEnvironment(EnvironmentNode):
                     sat : dict
                     sat_name = sat.get('name')
                     sat_names.append(sat_name)
+                    agent_names.append(sat_name)
             self.agents[self.SPACECRAFT] = sat_names
 
             # load uav names
@@ -69,6 +71,7 @@ class SimulationEnvironment(EnvironmentNode):
                     uav : dict
                     uav_name = uav.get('name')
                     uav_names.append(uav_name)
+                    agent_names.append(uav_name)
             self.agents[self.UAV] = uav_names
 
             # load GS agent names
@@ -79,11 +82,19 @@ class SimulationEnvironment(EnvironmentNode):
                     gs : dict
                     gs_name = gs.get('name')
                     gs_names.append(gs_name)
+                    agent_names.append(gs_name)
             self.agents[self.GROUND_STATION] = gs_names
 
         # initialize parameters
         self.utility_func = utility_func
         self.measurement_history = []
+        self.agent_connectivity = {}
+        for src in agent_names:
+            for target in agent_names:
+                if src not in self.agent_connectivity:
+                    self.agent_connectivity[src] = {}    
+                
+                self.agent_connectivity[src][target] = -1
 
     async def setup(self) -> None:
         # nothing to set up
@@ -160,7 +171,7 @@ class SimulationEnvironment(EnvironmentNode):
                             # Do NOT update state
                             updated_state = GroundStationAgentState(**msg.state)
                         
-                        updated_state_msg = AgentStateMessage(src, src, updated_state.to_dict())
+                        updated_state_msg = AgentStateMessage(self.get_element_name(), src, updated_state.to_dict())
                         resp_msgs.append(updated_state_msg.to_dict())
 
                         # check connectivity status
@@ -170,8 +181,16 @@ class SimulationEnvironment(EnvironmentNode):
                                     continue
                                 
                                 connected = self.check_agent_connectivity(src, target, target_type)
-                                connectivity_update = AgentConnectivityUpdate(src, target, connected)
-                                resp_msgs.append(connectivity_update.to_dict())
+                                
+                                if connected == 0 and self.agent_connectivity[src][target] == -1:
+                                    self.agent_connectivity[src][target] = connected
+                                    continue
+
+                                if self.agent_connectivity[src][target] != connected:
+                                    # only announce if changes to connectivity have been made
+                                    connectivity_update = AgentConnectivityUpdate(src, target, connected)
+                                    resp_msgs.append(connectivity_update.to_dict())
+                                    self.agent_connectivity[src][target] = connected
 
                         # package response
                         resp_msg = BusMessage(self.get_element_name(), src, resp_msgs)
@@ -246,18 +265,18 @@ class SimulationEnvironment(EnvironmentNode):
             elif src in self.agents[self.UAV]:
                 # check orbit data with nearest GS
                 target_data : OrbitData = self.orbitdata[target]
-                connected = target_data.is_accessing_ground_station(self.get_current_time())
+                connected = target_data.is_accessing_ground_station(target, self.get_current_time())
             
             elif src in self.agents[self.GROUND_STATION]:
                 # check orbit data
                 target_data : OrbitData = self.orbitdata[target]
-                connected = target_data.is_accessing_ground_station(self.get_current_time())
+                connected = target_data.is_accessing_ground_station(target, self.get_current_time())
         
         elif target_type == self.UAV:
             if src in self.agents[self.SPACECRAFT]:
                 # check orbit data with nearest GS
                 src_data : OrbitData = self.orbitdata[src]
-                connected = src_data.is_accessing_ground_station(self.get_current_time())
+                connected = src_data.is_accessing_ground_station(target, self.get_current_time())
 
             elif src in self.agents[self.UAV]:
                 # always connected
@@ -271,7 +290,7 @@ class SimulationEnvironment(EnvironmentNode):
             if src in self.agents[self.SPACECRAFT]:
                 # check orbit data
                 src_data : OrbitData = self.orbitdata[src]
-                connected = src_data.is_accessing_ground_station(self.get_current_time())
+                connected = src_data.is_accessing_ground_station(target, self.get_current_time())
 
             elif src in self.agents[self.UAV]:
                 # always connected
@@ -281,7 +300,7 @@ class SimulationEnvironment(EnvironmentNode):
                 # always connected
                 connected = True
 
-        return 1 if connected else 0
+        return int(connected)
 
     def query_measurement_date( self, 
                                 agent_state : SimulationAgentState, 

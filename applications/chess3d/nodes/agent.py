@@ -170,7 +170,7 @@ class SimulationAgent(Agent):
         state_dict = None
         for sense in senses:
             sense : SimulationMessage
-            if isinstance(sense, AgentStateMessage) and sense.src == self.get_element_name():
+            if isinstance(sense, AgentStateMessage):
                 state_dict = sense.to_dict()
             else:
                 senses_dict.append(sense.to_dict())

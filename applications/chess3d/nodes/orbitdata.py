@@ -130,11 +130,9 @@ class OrbitData:
                
         return bool(nrows > 0)
 
-    def is_accessing_ground_station(self, t: float) -> bool:
+    def is_accessing_ground_station(self, target : str, t: float) -> bool:
         t = t/self.time_step
-        # nrows, _ = self.gs_access_data.query('`start index` <= @t & @t <= `end index` & `gndStn name` == @target').shape
-        nrows, _ = self.gs_access_data.query('`start index` <= @t & @t <= `end index`').shape
-               
+        nrows, _ = self.gs_access_data.query('`start index` <= @t & @t <= `end index` & `gndStn name` == @target').shape
         return bool(nrows > 0)
 
     def is_accessing_ground_point(self, lat: float, lon: float, t: float):
