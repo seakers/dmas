@@ -8,6 +8,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from nodes.actions import TravelAction
 from nodes.satellite import SatelliteAgent
 from nodes.states import SatelliteAgentState
 from nodes.planning.fixed import FixedPlanner
@@ -19,7 +20,7 @@ from nodes.agent import SimulationAgent
 from utils import *
 from dmas.messages import SimulationElementRoles
 from dmas.network import NetworkConfig
-from dmas.clocks import FixedTimesStepClockConfig
+from dmas.clocks import FixedTimesStepClockConfig, EventDrivenClockConfig
 from manager import SimulationManager
 from monitor import ResultsMonitor
 from nodes.environment import SimulationEnvironment
@@ -107,7 +108,8 @@ if __name__ == "__main__":
     else:
         dt = delta.total_seconds()/100
 
-    clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    clock_config = EventDrivenClockConfig(start_date, end_date)
 
     # initialize manager
     manager_network_config = NetworkConfig( scenario_name,
@@ -206,10 +208,19 @@ if __name__ == "__main__":
                     raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
             else:
                 # add default planner if no planner was specified
-                # TODO create default planner (idea: only listens for plans from the ground)
+                # TODO create a dummy default planner that  only listens for plans from the ground and executes them
+                
+                # DEBUG PURPOSES ONLY:
+                final_pos = [
+                            -5648.93720785008,
+                                2766.212880510714,
+                                2766.184076935999
+                            ]
+                plan = [ TravelAction(final_pos, 0.0) ]
+
                 planner = FixedPlanner(results_path, 
                                            agent_name,
-                                           [], 
+                                           plan, 
                                            agent_network_config,
                                            linear_utility, 
                                            logger=logger)
@@ -227,7 +238,7 @@ if __name__ == "__main__":
                 payload = []
 
             ## load initial state 
-            initial_state = SatelliteAgentState(orbit_state_dict) 
+            initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
 
             ## create agent
             agent = SatelliteAgent(agent_name,

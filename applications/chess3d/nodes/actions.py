@@ -1,10 +1,9 @@
 from enum import Enum
 from typing import Union
 
-import numpy
+import numpy as np
 from applications.chess3d.utils import CoordinateTypes
 from dmas.agents import AgentAction
-from dmas.messages import SimulationMessage
    
 class ActionTypes(Enum):
     IDLE = 'IDLE'
@@ -94,7 +93,7 @@ class TravelAction(AgentAction):
             - id (`str`) : identifying number for this action in uuid format
         """
             
-        super().__init__(ActionTypes.TRAVEL.value, t_start, status=status, id=id)
+        super().__init__(ActionTypes.TRAVEL.value, t_start, np.Inf, status=status, id=id)
         
         if not isinstance(final_pos, list):
             raise AttributeError(f'`final_pos` must be of type `list`. is of type {type(final_pos)}.')

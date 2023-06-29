@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from ctypes import Union
 import logging
 import uuid
@@ -103,15 +104,17 @@ class EngineeringModule(object):
         
         return t_min
 
-    # def perform_action(self, action : Union[SubsystemAction, ComponentAction], t : Union[int, float]) -> bool:
-    #     """
-    #     Performs an action on this subsystem
+    @abstractmethod
+    def perform_action(self, action : Union[AgentAction, SubsystemAction, ComponentAction], t : Union[int, float]) -> bool:
+        """
+        Performs an action on this subsystem
 
-    #     ### Arguments:
-    #         - action (:obj:`SubsystemAction`) : action to be performed
-    #         - t (`float` or `int`) : current simulation time in [s]
+        ### Arguments:
+            - action (:obj:`SubsystemAction`) : action to be performed
+            - t (`float` or `int`) : current simulation time in [s]
 
-    #     ### Returns:
-    #         - boolean value indicating if performing the action was successful or not
-    #     """
-    #     self.t = t
+        ### Returns:
+            - status (`str`): action completion status
+            - dt (`float`): time to be waited by the agent
+        """
+        pass

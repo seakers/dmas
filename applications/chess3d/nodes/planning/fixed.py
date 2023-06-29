@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from nodes.states import GroundStationAgentState, SatelliteAgentState, UAVAgentState
+from nodes.states import GroundStationAgentState, SatelliteAgentState, SimulationAgentTypes, UAVAgentState
 from nodes.agent import *
 from messages import *
 from dmas.messages import ManagerMessageTypes
@@ -161,8 +161,8 @@ class FixedPlanner(PlanningModule):
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    t_idle = 1e6                        
-                    action = IdleAction(t_curr, t_idle)
+                    t_idle = 1e6 # TODO find end of simulation time        
+                    action = WaitForMessages(t_curr, t_idle)
                     plan_out.append(action.to_dict())
                     
                 self.log(f'sending {len(plan_out)} actions to agent...')

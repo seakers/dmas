@@ -82,12 +82,9 @@ class SimulationManager(AbstractManager):
                         reqs = await self.wait_for_tic_requests()
                         self.log(f'tic requests received!')
 
-                        t_next = tf
-                        for src in reqs:
-                            tic_req : TicRequest
-                            tic_req = reqs[src]
-                            if tic_req.tf < t_next:
-                                t_next = tic_req.tf
+                        tic_reqs = [reqs[src].tf for src in reqs]
+                        tic_reqs.append(tf)
+                        t_next = min(tic_reqs)
                         
                         # announce new time to simulation elements
                         self.log(f'sending toc for time {t_next}[s]...', level=logging.INFO)

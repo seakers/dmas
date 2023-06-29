@@ -4,6 +4,7 @@ import numpy as np
 from pandas import DataFrame
 
 from instrupy.base import Instrument
+from nodes.states import SimulationAgentState
 from nodes.science.reqs import MeasurementRequest
 from nodes.engineering.engineering import EngineeringModule
 from nodes.engineering.actions import SubsystemAction, ComponentAction
@@ -15,145 +16,6 @@ from dmas.agents import *
 from dmas.network import NetworkConfig
 
 from messages import *
-
-class SimulationAgentTypes(Enum):
-    SATELLITE = 'SATELLITE'
-    UAV = 'UAV'
-    GROUND_STATION = 'GROUND_STATION'
-
-class SimulationAgentState(AbstractAgentState):
-    """
-    Describes the state of a 3D-CHESS agent
-    """
-    
-    IDLING = 'IDLING'
-    MESSAGING = 'MESSAGING'
-    TRAVELING = 'TRAVELING'
-    MANEUVERING = 'MANEUVERING'
-    MEASURING = 'MEASURING'
-    SENSING = 'SENSING'
-    THINKING = 'THINKING'
-    LISTENING = 'LISTENING'
-
-    def __init__(   self, 
-                    state_type : str,
-                    pos : list,
-                    vel : list,
-                    engineering_module : EngineeringModule = None,
-                    status : str = IDLING,
-                    t : Union[float, int]=0,
-                    **_
-                ) -> None:
-        """
-        Creates an instance of an Abstract Agent State
-        """
-        super().__init__()
-        
-        self.state_type = state_type
-        self.pos : list = pos
-        self.vel : list = vel
-        self.engineering_module : EngineeringModule = engineering_module
-        self.status : str = status
-        self.t : float = t
-
-    def update_state(self, 
-                        t : Union[int, float], 
-                        status : str = None, 
-                        state : dict = None) -> None:
-        # update internal components
-        if self.engineering_module is not None:
-            self.engineering_module.update_state(t)
-
-        # update position and velocity
-        if state:
-            self.pos, self.vel = state['pos'], state['vel']
-        else:
-            self.pos, self.vel = self.propagate(t)
-
-        self.t = t 
-        self.status = status if status is not None else self.status
-
-    @abstractmethod
-    def propagate(self, t : Union[int, float]) -> tuple:
-        """
-        Propagator for the agent's dynamics through time.
-
-        ### Arguments 
-            - t (`int` or `float`) : propagation end time
-
-        ### Returns:
-            - pos, vel (`tuple`) : tuple of updated position and velocity vectors
-        """
-        pass
-
-    def perform_action(self, action : AgentAction, t : Union[int, float]) -> tuple:
-        """
-        Performs an action that may affect the agent's state.
-
-        ### Arguments:
-            - action (:obj:`AgentAction`):
-            - t (`int` or `double`):
-        
-        ### Returns:
-            - status (`str`): action completion status
-            - dt (`float`): time to be waited by the agent
-        """
-        if isinstance(action, IdleAction):
-            self.update_state(t, status=self.IDLING)
-            if action.t_end > t:
-                dt = action.t_end - t
-                status = action.PENDING
-            else:
-                dt = 0.0
-                status = action.COMPLETED
-
-        elif isinstance(action, TravelAction):
-            status, dt = self.perform_travel(action, t)
-
-        elif isinstance(action, ManeuverAction):
-            status, dt = self.perform_maneuver(action, t)
-
-        return status, dt
-
-    @abstractmethod
-    def perform_travel(action : AgentAction, t : Union[int, float]) -> tuple:
-        """
-        Performs a travel action
-
-        ### Arguments:
-            - action (:obj:`AgentAction`):
-            - t (`int` or `double`):
-        
-        ### Returns:
-            - status (`str`): action completion status
-            - dt (`float`): time to be waited by the agent
-        """
-        pass
-    
-    @abstractmethod
-    def perform_maneuver(action : AgentAction, t : Union[int, float]) -> tuple:
-        """
-        Performs a meneuver action
-
-        ### Arguments:
-            - action (:obj:`AgentAction`):
-            - t (`int` or `double`):
-        
-        ### Returns:
-            - status (`str`): action completion status
-            - dt (`float`): time to be waited by the agent
-        """
-        pass
-
-    def __repr__(self) -> str:
-        return str(self.to_dict())
-
-    def __str__(self):
-        return str(dict(self.__dict__))
-    
-    def to_dict(self) -> dict:
-        return dict(self.__dict__)
-
 
 class SimulationAgent(Agent):
     """
@@ -498,25 +360,24 @@ class SimulationAgent(Agent):
         # log agent capabilities
         # log state 
         n_decimals = 3
-        headers = ['t', 'pos', 'vel', 'status']
+        headers = ['t', 'x_pos', 'y_pos', 'z_pos', 'x_vel', 'y_vel', 'z_vel', 'status']
         data = []
 
         # out += '\nt, pos, vel, status\n'
         for state_dict in self.state_history:
             line_data = [
                             np.round(state_dict['t'],3),
-                            [
-                                np.round(state_dict['pos'][0],n_decimals),
-                                np.round(state_dict['pos'][1],n_decimals),
-                                np.round(state_dict['pos'][2],n_decimals)
-                            ],
-                            [
-                                np.round(state_dict['vel'][0],n_decimals),
-                                np.round(state_dict['vel'][1],n_decimals),
-                                np.round(state_dict['vel'][2],n_decimals)
-                            ],
+
+                            np.round(state_dict['pos'][0],n_decimals),
+                            np.round(state_dict['pos'][1],n_decimals),
+                            np.round(state_dict['pos'][2],n_decimals),
+
+                            np.round(state_dict['vel'][0],n_decimals),
+                            np.round(state_dict['vel'][1],n_decimals),
+                            np.round(state_dict['vel'][2],n_decimals),
+                            
                             state_dict['status']
-            ]
+                        ]
             data.append(line_data)
         
         state_df = DataFrame(data,columns=headers)
