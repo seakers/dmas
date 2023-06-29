@@ -60,6 +60,10 @@ class FixedPlanner(PlanningModule):
 
 
     async def listener(self) -> None:
+        """
+        Listens for any incoming messages, unpacks them and classifies them into 
+        internal inboxes for future processing
+        """
         try:
             # initiate results tracker
             results = {}
