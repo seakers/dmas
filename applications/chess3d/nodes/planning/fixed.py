@@ -114,23 +114,24 @@ class FixedPlanner(PlanningModule):
             t_curr = 0
             while True:
                 plan_out = []
-                msg : SimulationMessage = await self.states_inbox.get()
+                msg : AgentStateMessage = await self.states_inbox.get()
 
                 # update current time:
-                if isinstance(msg, AgentStateMessage):
-                    if msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
-                        state = SatelliteAgentState(**msg.state)
-                    elif msg.state['state_type'] == SimulationAgentTypes.UAV.value:
-                        state = UAVAgentState(**msg.state)
-                    elif msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
-                        state = GroundStationAgentState(**msg.state)
-                    else:
-                        raise NotImplementedError(f"`state_type` {msg.state['state_type']} not supported.")
+                if msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
+                    state = SatelliteAgentState(**msg.state)
+                elif msg.state['state_type'] == SimulationAgentTypes.UAV.value:
+                    state = UAVAgentState(**msg.state)
+                elif msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
+                    state = GroundStationAgentState(**msg.state)
+                else:
+                    raise NotImplementedError(f"`state_type` {msg.state['state_type']} not supported.")
 
-                    if t_curr < state.t:
-                        t_curr = state.t
+                if t_curr < state.t:
+                    t_curr = state.t
 
-                elif isinstance(msg, AgentActionMessage):
+                while not self.action_status_inbox.empty():
+                    msg : AgentActionMessage = await self.action_status_inbox.get()
+
                     if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
                         # if action wasn't completed, re-try
                         action_dict : dict = msg.action
@@ -150,7 +151,6 @@ class FixedPlanner(PlanningModule):
 
                         if removed is not None:
                             self.plan.remove(removed)
-
                 
                 for action in self.plan:
                     action : AgentAction

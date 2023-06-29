@@ -98,14 +98,16 @@ class SimulationAgentState(AbstractAgentState):
             else:
                 dt = 0.0
                 status = action.COMPLETED
+            return status, dt
 
         elif isinstance(action, TravelAction):
-            status, dt = self.perform_travel(action, t)
+            return self.perform_travel(action, t)
 
         elif isinstance(action, ManeuverAction):
-            status, dt = self.perform_maneuver(action, t)
+            return self.perform_maneuver(action, t)
+        
+        return action.ABORTED, 0.0
 
-        return status, dt
 
     @abstractmethod
     def perform_travel(self, action : TravelAction, t : Union[int, float]) -> tuple:
