@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import asyncio
-import datetime
+import numpy as np
 import json
 import logging
 import time
@@ -9,7 +9,7 @@ import uuid
 import zmq
 from zmq import asyncio as azmq
 
-from dmas.messages import ManagerMessageTypes, SimulationElementRoles, TocMessage
+from dmas.messages import ManagerMessageTypes, SimulationElementRoles
 from dmas.network import NetworkConfig
 from dmas.nodes import Node
 
@@ -80,7 +80,7 @@ class AgentAction(ABC):
     def __init__(   self, 
                     action_type : str,
                     t_start : Union[float, int],
-                    t_end : Union[float, int], 
+                    t_end : Union[float, int] = np.Inf, 
                     status : str = 'PENDING',
                     id : str = None,
                     **_

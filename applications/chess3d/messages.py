@@ -91,14 +91,14 @@ class MeasurementRequestMessage(SimulationMessage):
         - dst (`str`): name of the intended simulation element to receive this message
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
-        - task (`dict`) : task request to be performed
+        - req (`dict`) : dictionary describing measurement request to be performed
     """
-    def __init__(self, src: str, dst: str, task : dict, id: str = None, **_):
+    def __init__(self, src: str, dst: str, req : dict, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT_REQ.value, id)
         
-        if not isinstance(task, dict):
-            raise AttributeError(f'`task` must be of type `dict`; is of type {type(task)}.')
-        self.task = task
+        if not isinstance(req, dict):
+            raise AttributeError(f'`req` must be of type `dict`; is of type {type(req)}.')
+        self.req = req
 
 class MeasurementResultsRequest(SimulationMessage):
     """

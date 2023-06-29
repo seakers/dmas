@@ -25,8 +25,8 @@ class GroundStationPlanner(FixedPlanner):
         for measurement_req in measurement_reqs:
             # broadcast every initialy known measurement requests
             measurement_req : MeasurementRequest
-            msg = MeasurementRequestMessage(self.get_parent_name(), self.get_parent_name(), measurement_req.to_dict())
-            action = BroadcastMessageAction(msg, measurement_req.t_start)
+            msg = MeasurementRequestMessage(parent_name, parent_name, measurement_req.to_dict())
+            action = BroadcastMessageAction(msg.to_dict(), measurement_req.t_start)
             plan.append(action)
 
         super().__init__(   results_path, 

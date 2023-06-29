@@ -8,6 +8,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from nodes.science.reqs import GroundPointMeasurementRequest
 from nodes.actions import TravelAction
 from nodes.satellite import SatelliteAgent
 from nodes.states import SatelliteAgentState
@@ -212,9 +213,9 @@ if __name__ == "__main__":
                 
                 # DEBUG PURPOSES ONLY:
                 final_pos = [
-                            -5648.93720785008,
-                                2766.212880510714,
-                                2766.184076935999
+                            6869.7866357588455,
+                            100.55337377743358,
+                            100.69348801752179
                             ]
                 plan = [ TravelAction(final_pos, 0.0) ]
 
@@ -264,6 +265,26 @@ if __name__ == "__main__":
             port += 6
 
     if gstation_dict is not None:
+        # load initial measurement request
+        measurement_reqs = []
+        df = pd.read_csv(scenario_path + '/gpRequests.csv')
+            
+        for index, row in df.iterrows():
+            pos = [row['lat'], row['lon'], row['alt']]
+            s_max = row['s_max']
+            
+            measurements_str : str = row['measurements']
+            measurements_str = measurements_str.replace('[','')
+            measurements_str = measurements_str.replace(']','')
+            measurements = measurements_str.split(',')
+
+            t_start = row['t_start']
+            t_end = row['t_end']
+            t_corr = row['t_corr']
+
+            req = GroundPointMeasurementRequest(pos, s_max, measurements, t_start, t_end, t_corr)
+            measurement_reqs.append(req)
+
         for d in gstation_dict:
             # Create ground station agents
             d : dict
@@ -281,6 +302,7 @@ if __name__ == "__main__":
                                         manager_network_config,
                                         initial_state,
                                         linear_utility,
+                                        measurement_reqs=measurement_reqs,
                                         logger=logger)
             agents.append(agent)
             port += 6

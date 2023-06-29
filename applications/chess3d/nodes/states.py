@@ -223,7 +223,6 @@ class SatelliteAgentState(SimulationAgentState):
             pos = cartesian_state[0:3]
             vel = cartesian_state[3:]
 
-
             keplerian_state = orbit_state.get_keplerian_earth_centered_inertial_state()
             self.keplerian_state = {"aop" : keplerian_state.aop,
                                     "ecc" : keplerian_state.ecc,
@@ -375,7 +374,7 @@ class SatelliteAgentState(SimulationAgentState):
         dy = init_pos[1] - pos[1]
         dz = init_pos[2] - pos[2]
 
-        return np.sqrt(dx**2 + dy**2 + dz**2) / 2.0
+        return np.sqrt(dx**2 + dy**2 + dz**2)
     
     def comp_pos(self, pos_1 : list, pos_2 : list):
         """

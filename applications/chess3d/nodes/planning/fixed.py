@@ -101,6 +101,9 @@ class FixedPlanner(PlanningModule):
                             # send to bundle builder 
                             await self.states_inbox.put(state_msg) 
 
+                        elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
+                            x = 1
+                            
                         # TODO support down-linked information processing
 
         except asyncio.CancelledError:
@@ -161,7 +164,7 @@ class FixedPlanner(PlanningModule):
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    t_idle = 1e6 # TODO find end of simulation time        
+                    t_idle = t_curr + 1e6 # TODO find end of simulation time        
                     action = WaitForMessages(t_curr, t_idle)
                     plan_out.append(action.to_dict())
                     
