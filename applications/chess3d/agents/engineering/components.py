@@ -119,7 +119,6 @@ class Battery(AbstractComponent):
                     max_energy : float,
                     status : str,
                     min_pwr : float = 0,
-                    t : float = 0.0,
                     id : str = None
                     ) -> None:
         """
@@ -131,7 +130,7 @@ class Battery(AbstractComponent):
             - t (`float` or `int`) : initial updated time  
             - id (`str`) : identifying number for this component in uuid format
         """
-        super().__init__(self, name, min_pwr, status, t, id)
+        super().__init__(self, name, min_pwr, status, 0.0, id)
                 
         self.max_energy = max_energy
         self.current_energy = max_energy
@@ -153,6 +152,6 @@ class Battery(AbstractComponent):
         if isinstance(action, ComponentProvidePower):
             receiver_pwr = action.receiver_pwr
             self.load += receiver_pwr
-            
+
         elif isinstance(action, ):
             pass
