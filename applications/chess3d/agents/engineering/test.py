@@ -1,7 +1,7 @@
 
 
-from subsystems import ExampleSubsystem
+from subsystems import EPSubsystem
 
 
 if __name__ == "__main__":
-    subsystem = ExampleSubsystem()
+    subsystem = EPSubsystem()
