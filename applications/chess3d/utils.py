@@ -79,13 +79,26 @@ def precompute_orbitdata(scenario_name) -> str:
                 if (
                        scenario_dict['epoch'] != mission_dict['epoch']
                     or scenario_dict['duration'] != mission_dict['duration']
-                    or scenario_dict['spacecraft'] != mission_dict['spacecraft']
                     or scenario_dict['groundStation'] != mission_dict['groundStation']
                     or scenario_dict['grid'] != mission_dict['grid']
+                    or scenario_dict['spacecraft'] != mission_dict['spacecraft']
                     # or scenario_dict['scenario'] != mission_dict['scenario']
                     # or scenario_dict['settings'] != mission_dict['settings']
                     ):
                     changes_to_scenario = True
+                
+                # TODO only re-compute when relevant changes are made to json, not just any changes
+                # elif scenario_dict['spacecraft'] != mission_dict['spacecraft']:
+                #     spacecraft_dict = scenario_dict['spacecraft']
+                #     mission_dict = mission_dict['spacecraft']
+                    
+                #     if (    spacecraft_dict['@id'] != mission_dict['@id']
+                #         or spacecraft_dict['name'] != mission_dict['name']
+                #         or spacecraft_dict['spacecraftBus'] != mission_dict['spacecraftBus']
+                #         or spacecraft_dict['instrument'] != mission_dict['instrument']
+                #         or spacecraft_dict['orbitState'] != mission_dict['orbitState']
+                #         ):
+                #         changes_to_scenario = True
         else:
             changes_to_scenario = True
 

@@ -8,6 +8,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from nodes.planning.greedy import GreedyPlanner
 from nodes.science.reqs import GroundPointMeasurementRequest
 from nodes.actions import TravelAction
 from nodes.satellite import SatelliteAgent
@@ -199,12 +200,27 @@ if __name__ == "__main__":
             if planner_dict is not None:
                 planner_type = planner_dict['@type']
                 if planner_type == PlannerTypes.FIXED.value:
+                    #--- DEBUG PURPOSES ONLY ----
+                    final_pos = [
+                                6869.7866357588455,
+                                100.55337377743358,
+                                100.69348801752179
+                                ]
+                    plan = [ TravelAction(final_pos, 0.0) ]
+                    #----------------------------
+
                     planner = FixedPlanner(results_path, 
                                            agent_name,
-                                           [], 
+                                           plan, 
                                            agent_network_config,
                                            linear_utility, 
                                            logger=logger)
+                elif planner_type == PlannerTypes.GREEDY.value:
+                    planner = GreedyPlanner(results_path,
+                                            agent_name,
+                                            agent_network_config,
+                                            linear_utility,
+                                            logger=logger)
                 else:
                     raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
             else:

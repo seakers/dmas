@@ -1,142 +1,66 @@
 import asyncio
 import logging
 from typing import Any, Callable
+from instrupy.base import Instrument
 
 import zmq
-from applications.chess3d.nodes.states import GroundStationAgentState, SatelliteAgentState, SimulationAgentTypes, UAVAgentState
+from dmas.network import NetworkConfig
+from nodes.science.reqs import MeasurementRequest
+from nodes.states import *
 from applications.planning.actions import WaitForMessages
 from dmas.agents import AgentAction
-from dmas.modules import NetworkConfig, logging
 from messages import *
-from dmas.messages import ManagerMessageTypes
 from nodes.planning.planners import PlanningModule
 
 
 class GreedyPlanner(PlanningModule):
-    async def setup(self) -> None:
-        # initialize internal messaging queues
-        self.states_inbox = asyncio.Queue()
-        self.action_status_inbox = asyncio.Queue()
-        self.measurement_req_inbox = asyncio.Queue()
+    """
+    Schedules masurement request tasks on a first-come, first-served basis.
+    """
+    def __init__(self, 
+                results_path: str, 
+                parent_name: str, 
+                parent_network_config: NetworkConfig, 
+                utility_func: Callable[[], Any], 
+                payload : list,
+                level: int = logging.INFO, 
+                logger: logging.Logger = None) -> None:
+        super().__init__(results_path, parent_name, parent_network_config, utility_func, level, logger)
+        self.payload = payload
 
-    async def live(self) -> None:
-        """
-        Performs three concurrent tasks:
-        - Listener: receives messages from the parent agent and checks results
-        - Bundle-builder: plans and bids according to local information
-        - Rebroadcaster: forwards plan to agent
-        """
-        try:
-            listener_task = asyncio.create_task(self.listener(), name='listener()')
-            bundle_builder_task = asyncio.create_task(self.planner(), name='planner()')
-            
-            tasks = [listener_task, bundle_builder_task]
-
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-
-        finally:
-            for task in done:
-                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
-
-            for task in pending:
-                task : asyncio.Task
-                if not task.done():
-                    task.cancel()
-                    await task
-
-
-    async def listener(self) -> None:
-        """
-        Listens for any incoming messages, unpacks them and classifies them into 
-        internal inboxes for future processing
-        """
-        try:
-            # initiate results tracker
-            results = {}
-
-            # listen for broadcasts and place in the appropriate inboxes
-            while True:
-                self.log('listening to manager broadcast!')
-                _, _, content = await self.listen_manager_broadcast()
-
-                # if sim-end message, end agent `live()`
-                if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-                    self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...")
-                    return
-
-                elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
-                    self.log(f"received senses from parent agent!", level=logging.DEBUG)
-
-                    # unpack message 
-                    senses_msg : SensesMessage = SensesMessage(**content)
-
-                    senses = []
-                    senses.append(senses_msg.state)
-                    senses.extend(senses_msg.senses)     
-
-                    for sense in senses:
-                        if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
-                            # unpack message 
-                            action_msg = AgentActionMessage(**sense)
-                            self.log(f"received agent action of status {action_msg.status}!")
-                            
-                            # send to planner
-                            await self.action_status_inbox.put(action_msg)
-
-                        elif sense['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
-                            # unpack message 
-                            state_msg : AgentStateMessage = AgentStateMessage(**sense)
-                            self.log(f"received agent state message!")
-                                                        
-                            # send to planner
-                            await self.states_inbox.put(state_msg) 
-
-                        elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
-                            # unpack message 
-                            req_msg = MeasurementRequestMessage(**sense)
-                            self.log(f"received measurement request message!")
-                            
-                            # send to planner
-                            await self.measurement_req_inbox.put(req_msg)
-
-                        # TODO support down-linked information processing
-
-        except asyncio.CancelledError:
-            return
-        
-        finally:
-            self.listener_results = results
-
-    async def planne(self) -> None:
+    async def planner(self) -> None:
         try:
             t_curr = 0
+            bundle = []
+            reqs_received = []
+
             while True:
                 plan_out = []
-                msg : AgentStateMessage = await self.states_inbox.get()
+                state_msg : AgentStateMessage = await self.states_inbox.get()
 
                 # update current time:
-                if msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
-                    state = SatelliteAgentState(**msg.state)
-                elif msg.state['state_type'] == SimulationAgentTypes.UAV.value:
-                    state = UAVAgentState(**msg.state)
+                if state_msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
+                    state = SatelliteAgentState(**state_msg.state)
+                elif state_msg.state['state_type'] == SimulationAgentTypes.UAV.value:
+                    state = UAVAgentState(**state_msg.state)
                 else:
-                    raise NotImplementedError(f"`state_type` {msg.state['state_type']} not supported.")
+                    raise NotImplementedError(f"`state_type` {state_msg.state['state_type']} not supported.")
 
                 if t_curr < state.t:
                     t_curr = state.t
 
                 while not self.action_status_inbox.empty():
-                    msg : AgentActionMessage = await self.action_status_inbox.get()
+                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
 
-                    if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
+                    if action_msg.status != AgentAction.COMPLETED and action_msg.status != AgentAction.ABORTED:
                         # if action wasn't completed, re-try
-                        action_dict : dict = msg.action
+                        action_dict : dict = action_msg.action
                         self.log(f'action {action_dict} not completed yet! trying again...')
                         plan_out.append(action_dict)
 
-                    elif msg.status == AgentAction.COMPLETED:
+                    elif action_msg.status == AgentAction.COMPLETED:
                         # if action was completed, remove from plan
-                        action_dict : dict = msg.action
+                        action_dict : dict = action_msg.action
                         completed_action = AgentAction(**action_dict)
                         removed = None
                         for action in self.plan:
@@ -146,11 +70,25 @@ class GreedyPlanner(PlanningModule):
                                 break
 
                         if removed is not None:
+                            self.plan : list
                             self.plan.remove(removed)
 
                 while not self.measurement_req_inbox.empty():
-                    # TODO replan measurements
-                    msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
+                    # replan measurement plan
+
+                    # unpack measurement request
+                    req_msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
+                    req = MeasurementRequest.from_dict(req_msg.req)
+
+                    # add to list of known requirements
+                    if req.id not in reqs_received:
+                        reqs_received.append(req.id)
+
+                        # check if can be added to plan
+                        if self.can_do(state, bundle, req):
+                            bundle.append(req)
+
+                        self.plan = self.plan_from_bundle(bundle)
 
                 for action in self.plan:
                     action : AgentAction
@@ -173,3 +111,62 @@ class GreedyPlanner(PlanningModule):
 
         except asyncio.CancelledError:
             return
+
+    def can_do(self, state: SimulationAgentState, bundle : list, req: MeasurementRequest) -> bool:
+        """
+        Check if the parent agent is capable of performing a measurement request
+
+        ### Arguments:
+            - state (:obj:`SimulatrionAgentState`) : latest known state of parent agent
+            - req (:obj:`MeasurementRequest`) : measurement request being considered
+
+        ### Returns:
+            - can_do (`bool`) : `True` if agent has the capability to perform a task of `False` if otherwise
+        """
+        # check if agent has at least one of the required instruments to perform the task
+        payload_names = [instrument.name for instrument in self.payload]
+        payload_check = False
+        for measurement in req.measurements:
+            if measurement in payload_names:
+                payload_check = True
+                break
+        
+        if not payload_check:
+            return False
+
+        # check if task can be fit in current bundle 
+        bundle_check = False
+        
+
+        return bundle_check
+
+    def predict_access_intervals(self, state: SimulationAgentState, req: MeasurementRequest) -> list:
+        """
+        Predicts a list of time intervals in [s] when an agent may be able to perform a given measurement request
+
+        ### Arguments
+            - state (:obj:`SimulatrionAgentState`) : latest known state of parent agent
+            - req (:obj:`MeasurementRequest`) : measurement request being considered
+
+        #### Returns:
+            - access_time (`float`) : time at which an agent may 
+        """
+        # TODO
+        pass
+
+    def plan_from_bundle(self, bundle : list) -> list:
+        """
+        Converts a list of measurement requests into a plan to be performed by the parent agent
+
+        ### Arguments:
+            - bundle (`list`) : list of accepted measurement requests to be performed
+
+        ### Returns:
+            - plan (`list`) : list of agent actions to be performed by parent agent
+        """
+        # TODO
+        pass
+
+    async def teardown(self) -> None:
+        # Nothing to teardown
+        return

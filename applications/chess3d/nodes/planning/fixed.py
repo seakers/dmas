@@ -104,3 +104,9 @@ class FixedPlanner(PlanningModule):
     async def teardown(self) -> None:
         # nothing to tear-down
         return
+
+    def can_do(self, **_) -> bool:
+        return False
+
+    def predict_access_intervals(self, **_) -> list:
+        return []

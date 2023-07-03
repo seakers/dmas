@@ -2,6 +2,7 @@
 from abc import abstractmethod
 import numpy as np
 from typing import Union
+from nodes.science.reqs import MeasurementRequest
 from nodes.actions import *
 from nodes.engineering.engineering import EngineeringModule
 from dmas.agents import AbstractAgentState, AgentAction
@@ -65,6 +66,20 @@ class SimulationAgentState(AbstractAgentState):
 
         self.t = t 
         self.status = status if status is not None else self.status
+
+    def can_do(self, req : MeasurementRequest) -> bool:
+        """
+        Check if the parent agent is capable of performing a measurement request given its current state
+
+        ### Arguments:
+            - req (:obj:`MeasurementRequest`) : measurement request being considered
+
+        ### Returns:
+            - can_do (`bool`) : `True` if agent has the capability to perform a task of `False` if otherwise
+        """
+        # TODO include support for knowledge graph 
+
+        
 
     @abstractmethod
     def propagate(self, tf : Union[int, float], **kwargs) -> tuple:
@@ -386,8 +401,6 @@ class SatelliteAgentState(SimulationAgentState):
         dx = init_pos[0] - pos[0]
         dy = init_pos[1] - pos[1]
         dz = init_pos[2] - pos[2]
-
-        dr = np.sqrt(dx**2 + dy**2 + dz**2) / 2.0
 
         return np.sqrt(dx**2 + dy**2 + dz**2) / 2.0
     

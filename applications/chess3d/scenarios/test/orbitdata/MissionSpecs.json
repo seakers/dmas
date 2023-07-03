@@ -69,7 +69,10 @@
                     "ta": 0
                 }
             },
-            "missionProfile": "3D-CHESS"
+            "missionProfile": "3D-CHESS",
+            "planner": {
+                "@type": "GREEDY"
+            }
         }
     ],
     "uav": [],

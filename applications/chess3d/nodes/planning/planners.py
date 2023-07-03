@@ -1,4 +1,6 @@
 from typing import Any, Callable
+from nodes.science.reqs import MeasurementRequest
+from nodes.states import SimulationAgentState
 from messages import *
 from dmas.modules import *
 
@@ -149,6 +151,26 @@ class PlanningModule(InternalModule):
     async def planner(self) -> None:
         """
         Processes incoming messages from internal inboxes and sends a plan to the parent agent
+        """
+        pass
+
+    @abstractmethod
+    def can_do(self, **kwargs) -> bool:
+        """
+        Check if the parent agent is capable of performing a measurement request
+
+        ### Returns:
+            - can_do (`bool`) : `True` if agent has the capability to perform a task of `False` if otherwise
+        """
+        pass
+
+    @abstractmethod
+    def predict_access_intervals(self, **kwargs) -> list:
+        """
+        Predicts a list of time intervals in [s] when an agent may be able to perform a given measurement request
+        
+        #### Returns:
+            - access_time (`float`) : time at which an agent may 
         """
         pass
 

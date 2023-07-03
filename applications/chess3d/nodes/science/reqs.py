@@ -170,6 +170,12 @@ class MeasurementRequest(object):
         """
         return dict(self.__dict__)
 
+    def from_dict(req : dict):
+        if req['request_type'] == MeasurementRequetTypes.GROUND_POINT.value:
+            return GroundPointMeasurementRequest(**req)
+        else:
+            raise NotImplementedError(f"Requests of type `{req['request_type']}` not yet supported.")
+
 class GroundPointMeasurementRequest(MeasurementRequest):
     """
     Describes a measurement reques of a specific Ground Point to be performed by agents in the simulation
@@ -225,8 +231,7 @@ class GroundPointMeasurementRequest(MeasurementRequest):
                         t_corr, 
                         duration, 
                         urgency, 
-                        id, 
-                        **_)
+                        id)
         
         # check arguments
         if not isinstance(pos, list):
