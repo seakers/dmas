@@ -87,9 +87,11 @@ class GroundStationPlanner(FixedPlanner):
                     # TODO: rebroadcast measurement requests that were not known to this GS
                     msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
 
+                plan_out_id = [action['id'] for action in plan_out]
                 for action in self.plan:
                     action : AgentAction
-                    if action.t_start <= t_curr <= action.t_end:
+                    if (action.t_start <= t_curr <= action.t_end
+                        and action.id not in plan_out_id):
                         plan_out.append(action.to_dict())
 
                 if len(plan_out) == 0:
