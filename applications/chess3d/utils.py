@@ -76,7 +76,15 @@ def precompute_orbitdata(scenario_name) -> str:
                 scenario_dict.pop('settings')
                 mission_dict.pop('settings')
 
-                if scenario_dict != mission_dict:
+                if (
+                       scenario_dict['epoch'] != mission_dict['epoch']
+                    or scenario_dict['duration'] != mission_dict['duration']
+                    or scenario_dict['spacecraft'] != mission_dict['spacecraft']
+                    or scenario_dict['groundStation'] != mission_dict['groundStation']
+                    or scenario_dict['grid'] != mission_dict['grid']
+                    # or scenario_dict['scenario'] != mission_dict['scenario']
+                    # or scenario_dict['settings'] != mission_dict['settings']
+                    ):
                     changes_to_scenario = True
         else:
             changes_to_scenario = True

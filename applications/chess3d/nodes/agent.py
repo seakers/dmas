@@ -137,15 +137,24 @@ class SimulationAgent(Agent):
 
             if isinstance(resp_msg, AgentStateMessage):
                 # update state
-                self.state.update_state(self.get_current_time(), state=resp_msg.state)
-                senses.append(resp_msg)
+                pos, vel = resp_msg.state['pos'], resp_msg.state['vel']
+            
+                if not self.state.comp_vectors(self.state.pos, pos) or not self.state.comp_vectors(self.state.vel, vel):
+                    self.state.update_state(self.get_current_time(), state=resp_msg.state)
+                    self.state_history.append(self.state.to_dict())
+                    senses.append(resp_msg)
+                else:
+                    state_msg = AgentStateMessage(  self.get_element_name(), 
+                                                    self.get_element_name(),
+                                                    self.state.to_dict()
+                                                )
+                    senses.append(state_msg)
 
             elif isinstance(resp_msg, AgentConnectivityUpdate):
                 if resp_msg.connected == 1:
                     self.subscribe_to_broadcasts(resp_msg.target)
                 else:
                     self.unsubscribe_to_broadcasts(resp_msg.target)
-                # senses.append(rep_msg)
 
         # handle environment broadcasts
         while not self.environment_inbox.empty():
@@ -229,15 +238,12 @@ class SimulationAgent(Agent):
 
                 # modify the agent's state
                 status, dt = self.state.perform_action(action, t)
+                self.state_history.append(self.state.to_dict())
 
                 if dt > 0:
                     try:
                         # perfrom time wait if needed
                         await self.sim_wait(dt)
-
-                        # modify the agent's state
-                        t = self.get_current_time()
-                        status, dt = self.state.perform_action(action, t)
 
                     except asyncio.CancelledError:
                         return

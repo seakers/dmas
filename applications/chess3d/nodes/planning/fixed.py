@@ -126,33 +126,33 @@ class FixedPlanner(PlanningModule):
             t_curr = 0
             while True:
                 plan_out = []
-                msg : AgentStateMessage = await self.states_inbox.get()
+                state_msg : AgentStateMessage = await self.states_inbox.get()
 
                 # update current time:
-                if msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
-                    state = SatelliteAgentState(**msg.state)
-                elif msg.state['state_type'] == SimulationAgentTypes.UAV.value:
-                    state = UAVAgentState(**msg.state)
-                elif msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
-                    state = GroundStationAgentState(**msg.state)
+                if state_msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
+                    state = SatelliteAgentState(**state_msg.state)
+                elif state_msg.state['state_type'] == SimulationAgentTypes.UAV.value:
+                    state = UAVAgentState(**state_msg.state)
+                elif state_msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
+                    state = GroundStationAgentState(**state_msg.state)
                 else:
-                    raise NotImplementedError(f"`state_type` {msg.state['state_type']} not supported.")
+                    raise NotImplementedError(f"`state_type` {state_msg.state['state_type']} not supported.")
 
                 if t_curr < state.t:
                     t_curr = state.t
 
                 while not self.action_status_inbox.empty():
-                    msg : AgentActionMessage = await self.action_status_inbox.get()
+                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
 
-                    if msg.status != AgentAction.COMPLETED and msg.status != AgentAction.ABORTED:
+                    if action_msg.status != AgentAction.COMPLETED and action_msg.status != AgentAction.ABORTED:
                         # if action wasn't completed, re-try
-                        action_dict : dict = msg.action
+                        action_dict : dict = action_msg.action
                         self.log(f'action {action_dict} not completed yet! trying again...')
                         plan_out.append(action_dict)
 
-                    elif msg.status == AgentAction.COMPLETED:
+                    elif action_msg.status == AgentAction.COMPLETED:
                         # if action was completed, remove from plan
-                        action_dict : dict = msg.action
+                        action_dict : dict = action_msg.action
                         completed_action = AgentAction(**action_dict)
                         removed = None
                         for action in self.plan:
@@ -166,13 +166,14 @@ class FixedPlanner(PlanningModule):
 
                 while not self.measurement_req_inbox.empty():
                     # ignore measurement requests
-                    msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
+                    req_msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
                 
+                plan_out_id = [action['id'] for action in plan_out]
                 for action in self.plan:
                     action : AgentAction
-                    if action.t_start <= t_curr <= action.t_end:
+                    if (action.t_start <= t_curr <= action.t_end
+                        and action.id not in plan_out_id):
                         plan_out.append(action.to_dict())
-                        # break
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step

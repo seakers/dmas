@@ -60,7 +60,8 @@ class SimulationAgentState(AbstractAgentState):
         if state:
             self.pos, self.vel = state['pos'], state['vel']
         else:
-            self.pos, self.vel = self.propagate(t)
+            pos, vel = self.propagate(t)
+            self.pos, self.vel = pos, vel
 
         self.t = t 
         self.status = status if status is not None else self.status
@@ -108,6 +109,18 @@ class SimulationAgentState(AbstractAgentState):
         
         return action.ABORTED, 0.0
 
+    def comp_vectors(self, v1 : list, v2 : list):
+        """
+        compares two vectors
+        """
+        dx = v1[0] - v2[0]
+        dy = v1[1] - v2[1]
+        dz = v1[2] - v2[2]
+
+        dv = np.sqrt(dx**2 + dy**2 + dz**2)
+        # print('\n\n', v1, v2, dv, dv < 1e-6, '\n')
+        
+        return dv < 1e-6
 
     @abstractmethod
     def perform_travel(self, action : TravelAction, t : Union[int, float]) -> tuple:
@@ -249,7 +262,8 @@ class SatelliteAgentState(SimulationAgentState):
 
     def propagate(self, tf: Union[int, float], update_keplerian : bool = True) -> tuple:
         # propagates orbit
-        if abs(self.t - tf) < 1e-6:
+        dt = tf - self.t
+        if abs(dt) < 1e-6:
             return self.pos, self.vel
 
         # form the propcov.Spacecraft object
@@ -278,13 +292,12 @@ class SatelliteAgentState(SimulationAgentState):
         prop.Propagate(_start_date)
         
         date = _start_date
-        dt = tf - self.t
 
         if self.time_step:
             # TODO compute dt as a multiple of the registered time-step 
             pass
 
-        date.Advance(dt)
+        date.Advance(tf)
         prop.Propagate(date)
         
         cartesian_state = spc.GetCartesianState().GetRealArray()
@@ -313,7 +326,7 @@ class SatelliteAgentState(SimulationAgentState):
         self.update_state(t, status=self.TRAVELING)
 
         # check if position was reached
-        if self.comp_pos(self.pos, action.final_pos):
+        if self.comp_vectors(self.pos, action.final_pos):
             # if reached, return successful completion status
             return action.COMPLETED, 0.0
         else:
@@ -376,17 +389,19 @@ class SatelliteAgentState(SimulationAgentState):
 
         return np.sqrt(dx**2 + dy**2 + dz**2)
     
-    def comp_pos(self, pos_1 : list, pos_2 : list):
+    def comp_vectors(self, v1 : list, v2 : list):
         """
-        compares two position vectors
+        compares two vectors
         """
-        dx = pos_1[0] - pos_2[0]
-        dy = pos_1[1] - pos_2[1]
-        dz = pos_1[2] - pos_2[2]
+        dx = v1[0] - v2[0]
+        dy = v1[1] - v2[1]
+        dz = v1[2] - v2[2]
 
-        dr = np.sqrt(dx**2 + dy**2 + dz**2)
+        dv = np.sqrt(dx**2 + dy**2 + dz**2)
+
+        # print( '\n\n', v1, v2, dv, self.eps, dv < self.eps, '\n')
         
-        return dr < self.eps
+        return dv < self.eps
 
 class UAVAgentState(SimulationAgentState):
     """
