@@ -276,6 +276,7 @@ if __name__ == "__main__":
             measurements_str : str = row['measurements']
             measurements_str = measurements_str.replace('[','')
             measurements_str = measurements_str.replace(']','')
+            measurements_str = measurements_str.replace(' ','')
             measurements = measurements_str.split(',')
 
             t_start = row['t_start']

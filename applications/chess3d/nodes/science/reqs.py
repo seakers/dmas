@@ -2,6 +2,7 @@ import copy
 from typing import Union
 from enum import Enum
 from itertools import combinations, permutations
+import numpy as np
 import uuid
 import numpy
 
@@ -26,8 +27,8 @@ class MeasurementRequest(object):
                 request_type : str,
                 s_max : float,
                 measurements : list,
-                t_start: Union[float, int], 
-                t_end: Union[float, int], 
+                t_start: Union[float, int] = 0.0, 
+                t_end: Union[float, int] = np.Inf, 
                 t_corr: Union[float, int] = 0.0,
                 duration: Union[float, int] = 0.0, 
                 urgency: Union[float, int] = None,  
@@ -209,6 +210,13 @@ class GroundPointMeasurementRequest(MeasurementRequest):
             - t_corr (`float`): maximum decorralation time between measurements of different measurements
             - id (`str`) : identifying number for this task in uuid format
         """
+        if t_start == "inf" or t_start == "Inf" or t_start == "INF":
+            t_start = np.Inf
+        if t_end == "inf" or t_end == "Inf" or t_end == "INF":
+            t_end = np.Inf
+        if t_corr == "inf" or t_corr == "Inf" or t_corr == "INF":
+            t_corr = np.Inf
+        
         super().__init__(MeasurementRequetTypes.GROUND_POINT.value, 
                         s_max, 
                         measurements, 

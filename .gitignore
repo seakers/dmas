@@ -160,6 +160,8 @@ cython_debug/
 # File Backups
 # TEST/
 
+# Modules
+orbitpy
+instrupy
+
 # End of https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks
-orbitpy
-orbitpy

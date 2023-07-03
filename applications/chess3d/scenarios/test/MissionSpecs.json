@@ -29,11 +29,26 @@
 
     ],
     "groundStation" : [
-        
+        {
+            "@id" : "gs1",
+            "name" : "Svalbard",
+            "latitude": 78.23083333333334,
+            "longitude": 15.389444444444443,
+            "altitude": 0,
+            "minimumElevation": 7,
+            "antenna": {
+                "bands" : ["s-band", "x-band"],
+                "frequency": 2120e9,
+                "eirp": 63.5,
+                "gain": 44.6,
+                "diameter" : 10.3,
+                "power": 10
+            }            
+        }
     ],
     "grid": [   
         {"@type": "autogrid", "@id": 1, "latUpper":20, "latLower":0, "lonUpper":180, "lonLower":-180, "gridRes": 1}
         ],
-    "scenario": {"@type": "TEST", "duration": 0.25, "logger":"DEBUG"},
+    "scenario": {"@type": "TEST", "duration": 0.25, "logger":"DEBUG", "connectivity" : "FULL"},
     "settings": {"coverageType": "GRID COVERAGE"}
 }

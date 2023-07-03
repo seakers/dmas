@@ -172,7 +172,7 @@ class FixedPlanner(PlanningModule):
                     action : AgentAction
                     if action.t_start <= t_curr <= action.t_end:
                         plan_out.append(action.to_dict())
-                        break
+                        # break
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
