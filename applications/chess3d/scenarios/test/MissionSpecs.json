@@ -29,7 +29,22 @@
 
     ],
     "groundStation" : [
-        
+        {
+            "@id" : "gs1",
+            "name" : "Svalbard",
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "altitude": 0,
+            "minimumElevation": 7,
+            "antenna": {
+                "bands" : ["s-band", "x-band"],
+                "frequency": 2120e9,
+                "eirp": 63.5,
+                "gain": 44.6,
+                "diameter" : 10.3,
+                "power": 10
+            }            
+        }
     ],
     "grid": [   
         {"@type": "autogrid", "@id": 1, "latUpper":20, "latLower":0, "lonUpper":180, "lonLower":-180, "gridRes": 1}

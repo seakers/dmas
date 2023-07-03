@@ -387,7 +387,9 @@ class SatelliteAgentState(SimulationAgentState):
         dy = init_pos[1] - pos[1]
         dz = init_pos[2] - pos[2]
 
-        return np.sqrt(dx**2 + dy**2 + dz**2)
+        dr = np.sqrt(dx**2 + dy**2 + dz**2) / 2.0
+
+        return np.sqrt(dx**2 + dy**2 + dz**2) / 2.0
     
     def comp_vectors(self, v1 : list, v2 : list):
         """
