@@ -609,7 +609,7 @@ class GreedyPlanner(PlanningModule):
 
     def calc_imaging_time(self, state : SimulationAgentState, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
         """
-        Computes the "ideal" time when a task in the path would be performed
+        Computes the ideal" time when a task in the path would be performed
         ### Returns
             - t_img (`float`): earliest available imaging time
         """
@@ -631,14 +631,16 @@ class GreedyPlanner(PlanningModule):
 
         return self.calc_arrival_time(prev_state, req, t_prev)
 
-    def calc_arrival_time(self, state : SimulationAgentState, req : MeasurementRequest, t_pref : Union[int, float]) -> float:
+    def calc_arrival_time(self, state : SimulationAgentState, req : MeasurementRequest, t_prev : Union[int, float]) -> float:
         """
         Estimates the quickest arrival time from a starting position to a given final position
         """
         if isinstance(req, GroundPointMeasurementRequest):
             # compute earliest time to the task
             if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
-                pass
+                lat,lon,_ = req.pos
+                df = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
+                x = 1
             else:
                 raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
 
