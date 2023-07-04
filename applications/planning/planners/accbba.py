@@ -1213,7 +1213,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
    
     async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list, level : int = logging.DEBUG) -> None:
         """
-        Uses the most updates results information to construct a path
+        Uses the most updated results information to construct a path
         """
         self.log_results('INITIAL BUNDLE RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)

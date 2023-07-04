@@ -42,11 +42,18 @@ class EngineeringModule(object):
 
     def update_state(self, t : Union[int, float]) -> None:
         """
-        Propagates and updates the current state of the engineering module.
+        Updates the current state of the engineering module.
         """
         for subsystem in self.subsystems:
             subsystem : Subsystem
             subsystem.update_state(t)
+
+    def propagate(self, t : Union[int, float]) -> object:
+        """
+        Propagates and the current state of the engineering module.
+        """
+        # TODO
+        pass
 
     def is_critial(self) -> bool:
         """

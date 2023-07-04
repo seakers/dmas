@@ -58,36 +58,41 @@ class SimulationAgentState(AbstractAgentState):
             self.engineering_module.update_state(t)
 
         # update position and velocity
-        if state:
-            self.pos, self.vel = state['pos'], state['vel']
+        if state is None:
+            self.pos, self.vel = self.kinematic_model(t)
         else:
-            pos, vel = self.propagate(t)
-            self.pos, self.vel = pos, vel
+            self.pos, self.vel = state['pos'], state['vel']
 
+        # update time and status
         self.t = t 
         self.status = status if status is not None else self.status
-
-    def can_do(self, req : MeasurementRequest) -> bool:
-        """
-        Check if the parent agent is capable of performing a measurement request given its current state
-
-        ### Arguments:
-            - req (:obj:`MeasurementRequest`) : measurement request being considered
-
-        ### Returns:
-            - can_do (`bool`) : `True` if agent has the capability to perform a task of `False` if otherwise
-        """
-        # TODO include support for knowledge graph 
-
         
-
-    @abstractmethod
-    def propagate(self, tf : Union[int, float], **kwargs) -> tuple:
+    def propagate(self, tf : Union[int, float]) -> tuple:
         """
-        Propagator for the agent's dynamics through time.
+        Propagator for the agent's state through time.
 
         ### Arguments 
             - tf (`int` or `float`) : propagation end time in [s]
+
+        ### Returns:
+            - propagated (:obj:`SimulationAgentState`) : propagated state
+        """
+        propagated : SimulationAgentState = self.copy()
+
+        if propagated.engineering_module is not None:
+            propagated.engineering_module : EngineeringModule = propagated.engineering_module.propagate(tf)
+        
+        propagated.pos, propagated.vel = self.kinematic_model(tf)
+
+        return propagated
+
+    @abstractmethod
+    def kinematic_model(self, tf : Union[int, float], **kwargs) -> tuple:
+        """
+        Propagates an agent's dinamics through time
+
+        ### Arguments:
+            - tf (`float` or `int`) : propagation end time in [s]
 
         ### Returns:
             - pos, vel (`tuple`) : tuple of updated position and velocity vectors
@@ -172,9 +177,23 @@ class SimulationAgentState(AbstractAgentState):
 
     def __str__(self):
         return str(dict(self.__dict__))
-    
+
+    def copy(self) -> object:
+        d : dict = self.to_dict()
+        return SimulationAgentState.from_dict( d )
+
     def to_dict(self) -> dict:
         return dict(self.__dict__)
+
+    def from_dict(d : dict) -> object:
+        if d['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
+            return GroundStationAgentState(**d)
+        elif d['state_type'] == SimulationAgentTypes.SATELLITE.value:
+            return SatelliteAgentState(**d)
+        elif d['state_type'] == SimulationAgentTypes.UAV.value:
+            return UAVAgentState(**d)
+        else:
+            raise NotImplementedError(f"Agent states of type {d['state_type']} not yet supported.")
 
 class GroundStationAgentState(SimulationAgentState):
     """
@@ -208,7 +227,7 @@ class GroundStationAgentState(SimulationAgentState):
                         status, 
                         t)
 
-    def propagate(self, _: Union[int, float]) -> tuple:
+    def kinematic_model(self, tf: Union[int, float]) -> tuple:
         # agent does not move
         return self.pos, self.vel
 
@@ -239,7 +258,7 @@ class SatelliteAgentState(SimulationAgentState):
                     t: Union[float, int] = 0.0, 
                     eclipse : int = 0,
                     engineering_module: EngineeringModule = None, 
-                    status: str = ..., 
+                    status: str = SimulationAgentState.IDLING, 
                     **_
                 ) -> None:
         
@@ -266,7 +285,7 @@ class SatelliteAgentState(SimulationAgentState):
         if eps:
             self.eps = eps
         else:
-            self.eps = self.calc_eps(pos) if self.time_step else 1e-6
+            self.eps = self.__calc_eps(pos) if self.time_step else 1e-6
         
         super().__init__(   SimulationAgentTypes.SATELLITE.value, 
                             pos, 
@@ -275,7 +294,7 @@ class SatelliteAgentState(SimulationAgentState):
                             status, 
                             t)
 
-    def propagate(self, tf: Union[int, float], update_keplerian : bool = True) -> tuple:
+    def kinematic_model(self, tf: Union[int, float], update_keplerian : bool = True) -> tuple:
         # propagates orbit
         dt = tf - self.t
         if abs(dt) < 1e-6:
@@ -361,7 +380,7 @@ class SatelliteAgentState(SimulationAgentState):
             # satellite has no engineering modue and cannot perform attitude maneuver
             return action.ABORTED, 0.0
             
-    def calc_eps(self, init_pos : list):
+    def __calc_eps(self, init_pos : list):
         """
         Calculates tolerance for position vector comparisons
         """

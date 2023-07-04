@@ -10,6 +10,213 @@ class PlannerTypes(Enum):
     GREEDY = 'GREEDY'
     MACCBBA = 'MACCBBA'
 
+class Bid(ABC):
+    """
+    ## Measurement Request Bid for Planners
+
+    Describes a bid placed on a task by a given agent
+
+    ### Attributes:
+        - req (`dict`): measurement request being bid on
+        - req_id (`str`): id of the request being bid on
+        - bidder (`bidder`): name of the agent keeping track of this bid information
+        - own_bid (`float` or `int`): latest bid from bidder
+        - winner (`str`): name of current the winning agent
+        - winning_bid (`float` or `int`): current winning bid
+        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
+        - t_update (`float` or `int`): time when this bid was last updated
+    """
+    NONE = 'None'
+    
+    def __init__(   self, 
+                    req : dict, 
+                    bidder : str,
+                    winning_bid : Union[float, int] = 0.0, 
+                    own_bid : Union[float, int] = 0.0, 
+                    winner : str = NONE,
+                    t_img : Union[float, int] = -1, 
+                    t_update : Union[float, int] = 0.0
+                    ) -> object:
+        """
+        Creates an instance of a task bid
+
+        ### Arguments:
+            - req (`dict`): measurement request being bid on
+            - bidder (`bidder`): name of the agent keeping track of this bid information
+            - own_bid (`float` or `int`): latest bid from bidder
+            - winner (`str`): name of current the winning agent
+            - winning_bid (`float` or `int`): current winning bid
+            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
+            - t_update (`float` or `int`): time when this bid was last updated
+        """
+        self.req = req
+        self.req_id = req['id']
+        self.bidder = bidder
+        self.winning_bid = winning_bid
+        self.own_bid = own_bid
+        self.winner = winner
+        self.t_img = t_img
+        self.t_update = t_update
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of this task bid in the following format:
+        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`
+        """
+        return f'{self.req_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img}'
+
+    @abstractmethod
+    def update(self, other_dict : dict, t : Union[float, int]) -> object:
+        """
+        Compares bid with another and either updates, resets, or leaves the information contained in this bid
+        depending on predifned rules.
+
+        ### Arguments:
+            - other_dict (`dict`): dictionary representing the bid being compared to
+            - t (`float` or `dict`): time when this information is being updated
+
+        ### Returns:
+            - (`Bid` or `NoneType`): returns bid information if any changes were made.
+        """
+        pass
+
+    @abstractmethod
+    def _update_info(self,
+                        other, 
+                        **kwargs
+                    ) -> None:
+        """
+        Updates all of the variable bid information
+
+        ### Arguments:
+            - other (`Bid`): equivalent bid being used to update information
+        """
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.req_id}, given id: {other.task_id}).')
+
+        other : Bid
+        self.winning_bid = other.winning_bid
+        self.winner = other.winner
+        self.t_img = other.t_img
+
+        if self.bidder == other.bidder:
+            self.own_bid = other.own_bid
+
+    @abstractmethod
+    def reset(self, **kwargs) -> None:
+        """
+        Resets the values of this bid while keeping track of lates update time
+        """
+        self.winning_bid = 0
+        self.winner = self.NONE
+        self.t_img = -1
+
+    def _leave(self, **_) -> None:
+        """
+        Leaves bid as is (used for algorithm readibility).
+
+        ### Arguments:
+            - t_update (`float` or `int`): latest time when this bid was updated
+        """
+        return
+
+    def _tie_breaker(self, bid1 : object, bid2 : object) -> object:
+        """
+        Tie-breaking criteria for determining which bid is GREATER in case winning bids are equal
+        """
+        bid1 : Bid
+        bid2 : Bid
+
+        if bid2.winner == self.NONE and bid1.winner != self.NONE:
+            return bid2
+        elif bid2.winner != self.NONE and bid1.winner == self.NONE:
+            return bid1
+        elif bid2.winner == self.NONE and bid1.winner == self.NONE:
+            return bid1
+
+        elif bid1.bidder == bid2.bidder:
+            return bid1
+        elif bid1.bidder < bid2.bidder:
+            return bid1
+        else:
+            return bid2
+
+    def __lt__(self, other : object) -> bool:
+        other : Bid
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+        
+        if other.winning_bid == self.winning_bid:
+            # if there's a tie, use tie-breaker
+            return self != self._tie_breaker(self, other)
+
+        return other.winning_bid > self.winning_bid
+
+    def __gt__(self, other : object) -> bool:
+        other : Bid
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+        
+        if other.winning_bid == self.winning_bid:
+            # if there's a tie, use tie-breaker
+            return self == self._tie_breaker(self, other)
+
+        return other.winning_bid < self.winning_bid
+
+    def __le__(self, other : object) -> bool:
+        other : Bid
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+        
+        if abs(other.winning_bid - self.winning_bid) < 1e-3:
+            return True
+
+        return other.winning_bid >= self.winning_bid
+
+    def __ge__(self, other : object) -> bool:
+        other : Bid
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+        
+        if abs(other.winning_bid - self.winning_bid) < 1e-3:
+            return True
+
+        return other.winning_bid <= self.winning_bid
+
+    def __eq__(self, other : object) -> bool:
+        other : Bid
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+        
+        return abs(other.winning_bid - self.winning_bid) < 1e-3 and other.winner == self.winner
+
+    def __ne__(self, other : object) -> bool:
+        other : Bid
+        if self.req_id != other.task_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+        
+        return abs(other.winning_bid - self.winning_bid) > 1e-3 or other.winner != self.winner
+
+    def to_dict(self) -> dict:
+        """
+        Crates a dictionary containing all information contained in this bid
+        """
+        return dict(self.__dict__)
+
+    @abstractmethod
+    def copy(self) -> object:
+        """
+        Returns a deep copy of this bid
+        """
+        pass
+
 class PlanningModule(InternalModule):
     def __init__(self, 
                 results_path : str, 
@@ -151,230 +358,6 @@ class PlanningModule(InternalModule):
     async def planner(self) -> None:
         """
         Processes incoming messages from internal inboxes and sends a plan to the parent agent
-        """
-        pass
-
-    @abstractmethod
-    def can_do(self, **kwargs) -> bool:
-        """
-        Check if the parent agent is capable of performing a measurement request
-
-        ### Returns:
-            - can_do (`bool`) : `True` if agent has the capability to perform a task of `False` if otherwise
-        """
-        pass
-
-    @abstractmethod
-    def predict_access_intervals(self, **kwargs) -> list:
-        """
-        Predicts a list of time intervals in [s] when an agent may be able to perform a given measurement request
-        
-        #### Returns:
-            - access_time (`float`) : time at which an agent may 
-        """
-        pass
-
-class Bid(ABC):
-    """
-    ## Task Bid for Consensus Algorithm Planners
-
-    Describes a bid placed on a task by a given agent
-
-    ### Attributes:
-        - task (`dict`): task being bid on
-        - task_id (`str`): id of the task being bid on
-        - bidder (`bidder`): name of the agent keeping track of this bid information
-        - own_bid (`float` or `int`): latest bid from bidder
-        - winner (`str`): name of current the winning agent
-        - winning_bid (`float` or `int`): current winning bid
-        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
-    """
-    NONE = 'None'
-    
-    def __init__(self, 
-                    task : dict, 
-                    bidder : str,
-                    winning_bid : Union[float, int] = 0, 
-                    own_bid : Union[float, int] = 0, 
-                    winner : str = NONE,
-                    t_img : Union[float, int] = -1, 
-                    **_
-                    ) -> object:
-        """
-        Creates an instance of a task bid
-
-        ### Arguments:
-            - task (`dict`): task being bid on
-            - bidder (`bidder`): name of the agent keeping track of this bid information
-            - own_bid (`float` or `int`): latest bid from bidder
-            - winner (`str`): name of current the winning agent
-            - winning_bid (`float` or `int`): current winning bid
-            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
-        """
-        self.task = task
-        self.task_id = task['id']
-        self.bidder = bidder
-        self.winning_bid = winning_bid
-        self.own_bid = own_bid
-        self.winner = winner
-        self.t_img = t_img
-
-    def __str__(self) -> str:
-        """
-        Returns a string representation of this task bid in the following format:
-        - `task_id`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`
-        """
-        return f'{self.task_id},{self.bidder},{self.own_bid},{self.winner},{self.winning_bid},{self.t_img}'
-
-    @abstractmethod
-    def update(self, other_dict : dict, t : Union[float, int]) -> object:
-        """
-        Compares bid with another and either updates, resets, or leaves the information contained in this bid
-        depending on predifned rules.
-
-        ### Arguments:
-            - other_dict (`dict`): dictionary representing the bid being compared to
-            - t (`float` or `dict`): time when this information is being updated
-
-        ### Returns:
-            - (`Bid` or `NoneType`): returns bid information if any changes were made.
-        """
-        pass
-
-    @abstractmethod
-    def _update_info(self,
-                        other, 
-                        **kwargs
-                    ) -> None:
-        """
-        Updates all of the variable bid information
-
-        ### Arguments:
-            - other (`Bid`): equivalent bid being used to update information
-        """
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id}).')
-
-        other : Bid
-        self.winning_bid = other.winning_bid
-        self.winner = other.winner
-        self.t_img = other.t_img
-
-        if self.bidder == other.bidder:
-            self.own_bid = other.own_bid
-
-    @abstractmethod
-    def reset(self, **kwargs) -> None:
-        """
-        Resets the values of this bid while keeping track of lates update time
-        """
-        self.winning_bid = 0
-        self.winner = self.NONE
-        self.t_img = -1
-
-    def _leave(self, **_) -> None:
-        """
-        Leaves bid as is (used for algorithm readibility).
-
-        ### Arguments:
-            - t_update (`float` or `int`): latest time when this bid was updated
-        """
-        return
-
-    def _tie_breaker(self, bid1 : object, bid2 : object) -> object:
-        """
-        Tie-breaking criteria for determining which bid is GREATER in case winning bids are equal
-        """
-        bid1 : Bid
-        bid2 : Bid
-
-        if bid2.winner == self.NONE and bid1.winner != self.NONE:
-            return bid2
-        elif bid2.winner != self.NONE and bid1.winner == self.NONE:
-            return bid1
-        elif bid2.winner == self.NONE and bid1.winner == self.NONE:
-            return bid1
-
-        elif bid1.bidder == bid2.bidder:
-            return bid1
-        elif bid1.bidder < bid2.bidder:
-            return bid1
-        else:
-            return bid2
-
-    def __lt__(self, other : object) -> bool:
-        other : Bid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if other.winning_bid == self.winning_bid:
-            # if there's a tie, use tie-breaker
-            return self != self._tie_breaker(self, other)
-
-        return other.winning_bid > self.winning_bid
-
-    def __gt__(self, other : object) -> bool:
-        other : Bid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if other.winning_bid == self.winning_bid:
-            # if there's a tie, use tie-breaker
-            return self == self._tie_breaker(self, other)
-
-        return other.winning_bid < self.winning_bid
-
-    def __le__(self, other : object) -> bool:
-        other : Bid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if abs(other.winning_bid - self.winning_bid) < 1e-3:
-            return True
-
-        return other.winning_bid >= self.winning_bid
-
-    def __ge__(self, other : object) -> bool:
-        other : Bid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        if abs(other.winning_bid - self.winning_bid) < 1e-3:
-            return True
-
-        return other.winning_bid <= self.winning_bid
-
-    def __eq__(self, other : object) -> bool:
-        other : Bid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        return abs(other.winning_bid - self.winning_bid) < 1e-3 and other.winner == self.winner
-
-    def __ne__(self, other : object) -> bool:
-        other : Bid
-        if self.task_id != other.task_id:
-            # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.task_id}, given id: {other.task_id})')
-        
-        return abs(other.winning_bid - self.winning_bid) > 1e-3 or other.winner != self.winner
-
-    def to_dict(self) -> dict:
-        """
-        Crates a dictionary containing all information contained in this bid
-        """
-        return dict(self.__dict__)
-
-    @abstractmethod
-    def copy(self) -> object:
-        """
-        Returns a deep copy of this bid
         """
         pass
 

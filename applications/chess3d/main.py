@@ -196,6 +196,12 @@ if __name__ == "__main__":
                                                             zmq.SUB: [f'tcp://localhost:{port+5}']
                                                 })
 
+            ## load payload
+            if instruments_dict:
+                payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
+            else:
+                payload = []
+
             ## load planner module
             if planner_dict is not None:
                 planner_type = planner_dict['@type']
@@ -220,6 +226,7 @@ if __name__ == "__main__":
                                             agent_name,
                                             agent_network_config,
                                             linear_utility,
+                                            payload,
                                             logger=logger)
                 else:
                     raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
@@ -247,12 +254,6 @@ if __name__ == "__main__":
                 raise NotImplementedError(f"Science module not yet implemented.")
             else:
                 science = None
-
-            ## load payload
-            if instruments_dict:
-                payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
-            else:
-                payload = []
 
             ## load initial state 
             initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
