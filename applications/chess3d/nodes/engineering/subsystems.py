@@ -128,13 +128,11 @@ class ACDS(Subsystem):
     DISABLED = 'DISABLED'
     FAILED = 'FAILED'
     def __init__(self, 
-                 name: str, 
+                 name: str,
+                 mass: float,
+                 altitude: float,
+                 Inertia: list, 
                  components: list,
-                 I_craft = float,
-                 I_spin = float,
-                 I_transverse = float,
-                 Allow_err = float,
-                 T_disturb = float, 
                  status: str = DISABLED, 
                  t: float = 0, 
                  id: str = None
@@ -151,11 +149,9 @@ class ACDS(Subsystem):
         # assign values
         self.name = 'EP'
         self.components = components
-        self.I_craft = I_craft
-        self.I_spin = I_spin
-        self.I_transverse = I_transverse
-        self.Allow_err = Allow_err
-        self.T_disturb = T_disturb
+        self.mass = mass
+        self.altitude = altitude
+        self.Inertia = Inertia
         self.status = status
 
         self.name = name
