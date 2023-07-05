@@ -327,19 +327,19 @@ class SimulationAgent(Agent):
                 
                 try:
                     # send a measurement data request to the environment
-                    measurement = MeasurementResultsRequest(self.get_element_name(),
+                    measurement = MeasurementResultsRequestMessage(self.get_element_name(),
                                                             SimulationElementRoles.ENVIRONMENT.value, 
                                                             self.state.to_dict(), 
                                                             action_dict
                                                             )
 
-                    # dst, src, measurement_dict = await self.send_peer_message(measurement)
+                    dst, src, measurement_dict = await self.send_peer_message(measurement)
 
-                    # # add measurement to environment inbox to be processed during `sensing()`
-                    # await self.environment_inbox.put((dst, src, measurement_dict))
+                    # add measurement to environment inbox to be processed during `sensing()`
+                    await self.environment_inbox.put((dst, src, measurement_dict))
 
-                    # # wait for the designated duration of the measurmeent 
-                    # await self.sim_wait(measurement_req.duration)  # TODO only compensate for the time lost between queries
+                    # wait for the designated duration of the measurmeent 
+                    await self.sim_wait(measurement_req.duration)  # TODO only compensate for the time lost between queries
                     
                 except asyncio.CancelledError:
                     return

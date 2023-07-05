@@ -31,7 +31,7 @@ def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
     elif msg_type == SimulationMessageTypes.SENSES.value:
         return SensesMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.MEASUREMENT.value:
-        return MeasurementResultsRequest(**kwargs)
+        return MeasurementResultsRequestMessage(**kwargs)
     else:
         raise NotImplementedError(f'Action of type {msg_type} not yet implemented.')
 
@@ -100,7 +100,7 @@ class MeasurementRequestMessage(SimulationMessage):
             raise AttributeError(f'`req` must be of type `dict`; is of type {type(req)}.')
         self.req = req
 
-class MeasurementResultsRequest(SimulationMessage):
+class MeasurementResultsRequestMessage(SimulationMessage):
     """
     ## Measurement Results Request Message 
 

@@ -126,7 +126,7 @@ class SimulationEnvironment(EnvironmentNode):
                     
                     if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
                         # unpack message
-                        msg = MeasurementResultsRequest(**content)
+                        msg = MeasurementResultsRequestMessage(**content)
                         self.log(f'received masurement data request from {msg.src}. quering measurement results...')
 
                         # find/generate measurement results
@@ -146,7 +146,7 @@ class SimulationEnvironment(EnvironmentNode):
 
                         await self.respond_peer_message(resp) 
 
-                    if content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
+                    elif content['msg_type'] == SimulationMessageTypes.AGENT_STATE.value:
                         # unpack message
                         msg = AgentStateMessage(**content)
                         self.log(f'state message received from {msg.src}. updating state tracker...')
@@ -333,7 +333,7 @@ class SimulationEnvironment(EnvironmentNode):
         headers = ['task_id','measurer','pos','t_start','t_end','t_corr','t_img','u_max','u_exp','u']
         data = []
         for msg in self.measurement_history:
-            msg : MeasurementResultsRequest
+            msg : MeasurementResultsRequestMessage
             measurement_action = MeasurementAction(**msg.masurement_action)
             task = MeasurementRequest(**measurement_action.measurement_req)
             measurement_data : dict = msg.measurement
