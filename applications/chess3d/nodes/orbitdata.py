@@ -213,7 +213,7 @@ class OrbitData:
         grid_index, gp_index, _, _ = self.find_gp_index(lat, lon)
 
         access_data = self.gp_access_data \
-                            .query('@t < `time index` & `grid index` == @grid_index & `GP index` == @gp_index') \
+                            .query('@t <= `time index` & `grid index` == @grid_index & `GP index` == @gp_index') \
                             .sort_values(by=['time index'])
 
         return access_data
@@ -371,9 +371,10 @@ class OrbitData:
                         i_ins = payload.index(instrument)
                         gp_acces_by_mode = []
 
-                        modes = spacecraft.get('instrument', None)
-                        if not isinstance(modes, list):
-                            modes = [0]
+                        # modes = spacecraft.get('instrument', None)
+                        # if not isinstance(modes, list):
+                        #     modes = [0]
+                        modes = [0]
 
                         gp_acces_by_mode = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]','instrument',
                                                                     'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])

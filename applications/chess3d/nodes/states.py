@@ -84,6 +84,8 @@ class SimulationAgentState(AbstractAgentState):
         
         propagated.pos, propagated.vel = self.kinematic_model(tf)
 
+        propagated.t = tf
+
         return propagated
 
     @abstractmethod
@@ -360,7 +362,7 @@ class SatelliteAgentState(SimulationAgentState):
         self.update_state(t, status=self.TRAVELING)
 
         # check if position was reached
-        if self.comp_vectors(self.pos, action.final_pos):
+        if self.comp_vectors(self.pos, action.final_pos) or t >= action.t_end:
             # if reached, return successful completion status
             return action.COMPLETED, 0.0
         else:
@@ -368,7 +370,7 @@ class SatelliteAgentState(SimulationAgentState):
             if action.t_end == np.Inf:
                 dt = self.time_step if self.time_step else 60.0
             else:
-                dt = action.t_end
+                dt = action.t_end - t
             return action.PENDING, dt
 
     def perform_maneuver(self, action: ManeuverAction, t: Union[int, float]) -> tuple:

@@ -280,7 +280,7 @@ class SimulationAgent(Agent):
                 else:
                     if isinstance(self._clock_config, FixedTimesStepClockConfig) or isinstance(self._clock_config, EventDrivenClockConfig):
                         # give the agent time to finish sending/processing messages before submitting a tic-request
-                        await asyncio.sleep(1e-2)
+                        await asyncio.sleep(5e-2)
 
                     receive_broadcast = asyncio.create_task(self.external_inbox.get())
                     timeout = asyncio.create_task(self.sim_wait(task.t_end - t_curr))

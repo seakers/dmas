@@ -224,9 +224,7 @@ class GreedyPlanner(PlanningModule):
                             self.plan : list
                             self.plan.remove(removed)
 
-                while not self.measurement_req_inbox.empty():
-                    # replan measurement plan
-
+                while not self.measurement_req_inbox.empty(): # replan measurement plan
                     # unpack measurement request
                     req_msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
                     req = MeasurementRequest.from_dict(req_msg.req)
@@ -238,11 +236,23 @@ class GreedyPlanner(PlanningModule):
                     results, bundle, path = self.planning_phase(state, results, bundle, path)
                     self.plan = self.plan_from_path(state, results, path)
 
+
+                plan_out_id = [action['id'] for action in plan_out]
                 for action in self.plan:
                     action : AgentAction
-                    if action.t_start <= t_curr <= action.t_end:
+                    if (action.t_start <= t_curr <= action.t_end
+                        and action.id not in plan_out_id):
                         plan_out.append(action.to_dict())
-                        break
+
+                print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                for action in self.plan:
+                    action : AgentAction
+                    print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
+
+                print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                for action in plan_out:
+                    action : dict
+                    print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
@@ -364,9 +374,10 @@ class GreedyPlanner(PlanningModule):
                     i_ins = payload.index(instrument)
                     gp_acces_by_mode = []
 
-                    modes = spacecraft.get('instrument', None)
-                    if not isinstance(modes, list):
-                        modes = [0]
+                    # modes = spacecraft.get('instrument', None)
+                    # if not isinstance(modes, list):
+                    #     modes = [0]
+                    modes = [0]
 
                     gp_acces_by_mode = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]','instrument',
                                                                 'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
@@ -567,13 +578,6 @@ class GreedyPlanner(PlanningModule):
         winning_bids = None
         winning_path_utility = 0.0
 
-        # check if the subtask is mutually exclusive with something in the bundle
-        for req_i, subtask_j in original_path:
-            req_i : MeasurementRequest; subtask_j : int
-            if req_i.id == req.id:
-                if req.dependency_matrix[subtask_j][subtask_index] < 0:
-                    return winning_path, winning_bids, winning_path_utility
-
         # find best placement in path
         # self.log_task_sequence('original path', original_path, level=logging.WARNING)
         for i in range(len(original_path)+1):
@@ -708,7 +712,8 @@ class GreedyPlanner(PlanningModule):
                     t_move_end = row['time index'] * self.orbitdata.time_step
                     break
 
-                final_pos = self.orbitdata.get_position(t_move_end)
+                future_state : SatelliteAgentState = state.propagate(t_move_end)
+                final_pos = future_state.pos
             else:
                 raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
             
@@ -728,8 +733,9 @@ class GreedyPlanner(PlanningModule):
                     t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
             
             # move to target
-            move_action = TravelAction(final_pos, t_move_start, t_move_end)
-            plan.append(move_action)
+            if abs(t_move_start - t_move_end) >= 1e-3:
+                move_action = TravelAction(final_pos, t_move_start, t_move_end)
+                plan.append(move_action)
             
             # perform measurement
             measurement_action = MeasurementAction( 
