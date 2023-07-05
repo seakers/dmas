@@ -244,15 +244,15 @@ class GreedyPlanner(PlanningModule):
                         and action.id not in plan_out_id):
                         plan_out.append(action.to_dict())
 
-                print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                for action in self.plan:
-                    action : AgentAction
-                    print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
+                # print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                # for action in self.plan:
+                #     action : AgentAction
+                #     print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
 
-                print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                for action in plan_out:
-                    action : dict
-                    print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
+                # print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                # for action in plan_out:
+                #     action : dict
+                #     print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
