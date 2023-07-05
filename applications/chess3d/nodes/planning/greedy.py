@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 import os
 import re
 from typing import Any, Callable
@@ -7,7 +8,7 @@ import pandas as pd
 
 import zmq
 from nodes.orbitdata import OrbitData
-from nodes.science.reqs import GroundPointMeasurementRequest
+from nodes.science.reqs import GroundPointMeasurementRequest, MeasurementRequetTypes
 from nodes.planning.planners import Bid
 from dmas.network import NetworkConfig
 from nodes.science.reqs import MeasurementRequest
@@ -46,7 +47,8 @@ class GreedyBid(Bid):
                     own_bid: Union[float, int] = 0, 
                     winner: str = Bid.NONE, 
                     t_img: Union[float, int] = -1, 
-                    t_update: Union[float, int] = -1
+                    t_update: Union[float, int] = -1,
+                    **_
                 ) -> Bid:
         """
         Creates an instance of a task bid
@@ -113,7 +115,8 @@ class GreedyBid(Bid):
 
             if len(dependend_measurements) == 0:
                 # DO NOT allow for colaboration
-                subtasks.append(GreedyBid( req.to_dict(), 
+                subtasks.append(GreedyBid(  
+                                            req.to_dict(), 
                                             subtask_index,
                                             main_measurement,
                                             bidder
@@ -174,7 +177,7 @@ class GreedyPlanner(PlanningModule):
             t_curr = 0
             bundle = []
             path = []
-            reasults = {}
+            results = {}
             reqs_received = []
 
             while True:
@@ -188,10 +191,9 @@ class GreedyPlanner(PlanningModule):
                         # import orbit data
                         self.orbitdata : OrbitData = self.__load_orbit_data()
                         self.parent_agent_type = SimulationAgentTypes.SATELLITE.value
+                    # TODO Add UAV support
                     # elif isinstance(state, UAVAgentState):
                     #     self.parent_agent_type = SimulationAgentTypes.UAV.value
-                    # elif isinstance(state, GroundStationAgentState):
-                    #     self.parent_agent_type = SimulationAgentTypes.GROUND_STATION.value
                     else:
                         raise NotImplementedError(f"states of type {state_msg.state['state_type']} not supported for greedy planners.")
 
@@ -234,7 +236,7 @@ class GreedyPlanner(PlanningModule):
                         results[req.id] = GreedyBid.subtask_bids_from_task(req, self.get_parent_name())
 
                     results, bundle, path = self.planning_phase(state, results, bundle, path)
-                    self.plan = self.plan_from_path(path)
+                    self.plan = self.plan_from_path(state, results, path)
 
                 for action in self.plan:
                     action : AgentAction
@@ -478,8 +480,8 @@ class GreedyPlanner(PlanningModule):
                 bundle.append((max_task, max_subtask))
                 path = max_path
 
-                # remove bid task from list of available tasks
-                available_tasks.remove((max_task, max_subtask))
+                # # remove bid task from list of available tasks
+                # available_tasks.remove((max_task, max_subtask))
             
             #  update bids
             for measurement_task, subtask_index in path:
@@ -488,6 +490,8 @@ class GreedyPlanner(PlanningModule):
                 new_bid : GreedyBid = max_path_bids[measurement_task.id][subtask_index]
 
                 results[measurement_task.id][subtask_index] = new_bid
+
+            available_tasks : list = self.get_available_tasks(state, bundle, results)
 
         return results, bundle, path
 
@@ -502,10 +506,10 @@ class GreedyPlanner(PlanningModule):
         for req_id in results:
             for subtask_index in range(len(results[req_id])):
                 subtaskbid : GreedyBid = results[req_id][subtask_index]; 
-                req = MeasurementRequest(**subtaskbid.req)
+                req = MeasurementRequest.from_dict(subtaskbid.req)
 
                 is_biddable = self.can_bid(state, req, subtask_index, results[req_id]) 
-                already_in_bundle = (req, subtaskbid.subtask_index) in bundle 
+                already_in_bundle = self.check_if_in_bundle(req, subtask_index, bundle)
                 # already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
                 already_performed = self.task_has_been_performed(results, req, subtask_index, state.t)
                 
@@ -513,6 +517,13 @@ class GreedyPlanner(PlanningModule):
                     available.append((req, subtaskbid.subtask_index))
 
         return available
+    
+    def check_if_in_bundle(self, req : MeasurementRequest, subtask_index : int, bundle : list) -> bool:
+        for req_i, subtask_index_j in bundle:
+            if req_i.id == req.id and subtask_index == subtask_index_j:
+                return True
+    
+        return False
 
     def can_bid(self, state : SimulationAgentState, req : MeasurementRequest, subtask_index : int, subtaskbids : list) -> bool:
         """
@@ -520,7 +531,8 @@ class GreedyPlanner(PlanningModule):
         """
         # check capabilities - TODO: Replace with knowledge graph
         subtaskbid : GreedyBid = subtaskbids[subtask_index]
-        if subtaskbid.main_measurement not in self.payload:
+        payload_names = [instrument.name for instrument in self.payload]
+        if subtaskbid.main_measurement not in [instrument.name for instrument in self.payload]:
             return False 
 
         # check time constraints
@@ -576,10 +588,11 @@ class GreedyPlanner(PlanningModule):
             for req_i, subtask_j in path:
                 # calculate imaging time
                 req_i : MeasurementRequest; subtask_j : int
-                t_img = self.calc_imaging_time(state, original_results, path, bids, req_i, subtask_j)
+                t_img = self.calc_imaging_time(state, path, bids, req_i, subtask_j)
 
                 # calc utility
-                utility = req.s_max if t_img > 0 else 0.0
+                params = {"req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
+                utility = self.utility_func(**params) if t_img >= 0 else 0.0
 
                 # create bid
                 bid : GreedyBid = original_results[req_i.id][subtask_j].copy()
@@ -625,7 +638,7 @@ class GreedyPlanner(PlanningModule):
             t_prev : float = bid_prev.t_img + prev_req.duration
 
             if isinstance(state, SatelliteAgentState):
-                prev_state = state.propagate(t_prev)
+                prev_state : SatelliteAgentState = state.propagate(t_prev)
             else:
                 raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
 
@@ -639,68 +652,97 @@ class GreedyPlanner(PlanningModule):
             # compute earliest time to the task
             if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
                 lat,lon,_ = req.pos
-                df = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
-                x = 1
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
+
+                for _, row in df.iterrows():
+                    return row['time index'] * self.orbitdata.time_step
+
+                return -1
             else:
                 raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
 
         else:
             raise NotImplementedError(f"cannot calculate imaging time for measurement requests of type {type(req)}")       
 
-    # def can_do(self, state: SimulationAgentState, bundle : list, req: MeasurementRequest) -> bool:
-    #     """
-    #     Check if the parent agent is capable of performing a measurement request
+    def plan_from_path( self, 
+                        state : SimulationAgentState, 
+                        results : dict, 
+                        path : list
+                    ) -> list:
+        """
+        Generates a list of AgentActions from the current path.
 
-    #     ### Arguments:
-    #         - state (:obj:`SimulatrionAgentState`) : latest known state of parent agent
-    #         - req (:obj:`MeasurementRequest`) : measurement request being considered
+        Agents look to move to their designated measurement target and perform the measurement.
+        """
 
-    #     ### Returns:
-    #         - can_do (`bool`) : `True` if agent has the capability to perform a task of `False` if otherwise
-    #     """
-    #     # check if agent has at least one of the required instruments to perform the task
-    #     payload_names = [instrument.name for instrument in self.payload]
-    #     payload_check = False
-    #     for measurement in req.measurements:
-    #         if measurement in payload_names:
-    #             payload_check = True
-    #             break
+        plan = []
+        for i in range(len(path)):
+            measurement_req, subtask_index = path[i]
+            measurement_req : MeasurementRequest; subtask_index : int
+            subtask_bid : GreedyBid = results[measurement_req.id][subtask_index]
+
+            if not isinstance(measurement_req, GroundPointMeasurementRequest):
+                raise NotImplementedError(f"Cannot create plan for requests of type {type(measurement_req)}")
+            
+            if i == 0:
+                t_prev = state.t
+                prev_state = state
+            else:
+                prev_req, prev_subtask_index = path[i-1]
+                prev_req : MeasurementRequest; prev_subtask_index : int
+                bid_prev : Bid = results[prev_req.id][prev_subtask_index]
+                t_prev : float = bid_prev.t_img + prev_req.duration
+
+                if isinstance(state, SatelliteAgentState):
+                    prev_state : SatelliteAgentState = state.propagate(t_prev)
+                else:
+                    raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
+                
+            t_move_start = prev_state.t
+            
+            if isinstance(state, SatelliteAgentState):
+                lat, lon, _ = measurement_req.pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
+
+                for _, row in df.iterrows():
+                    t_move_end = row['time index'] * self.orbitdata.time_step
+                    break
+
+                final_pos = self.orbitdata.get_position(t_move_end)
+            else:
+                raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
+            
+            t_img_start = t_move_end
+            t_img_end = t_img_start + measurement_req.duration
+
+            if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                dt = self._clock_config.dt
+                if t_move_start < np.Inf:
+                    t_move_start = dt * math.floor(t_move_start/dt)
+                if t_move_end < np.Inf:
+                    t_move_end = dt * math.ceil(t_move_end/dt)
+
+                if t_img_start < np.Inf:
+                    t_img_start = dt * math.ceil(t_img_start/dt)
+                if t_img_end < np.Inf:
+                    t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
+            
+            # move to target
+            move_action = TravelAction(final_pos, t_move_start, t_move_end)
+            plan.append(move_action)
+            
+            # perform measurement
+            measurement_action = MeasurementAction( 
+                                                    measurement_req.to_dict(),
+                                                    subtask_index, 
+                                                    subtask_bid.main_measurement,
+                                                    subtask_bid.winning_bid,
+                                                    t_img_start, 
+                                                    t_img_end
+                                                    )
+            plan.append(measurement_action)  
         
-    #     if not payload_check:
-    #         return False
-
-    #     # check if task can be fit in current bundle 
-    #     bundle_check = False
-    #     0
-
-    #     return bundle_check
-
-    # def predict_access_intervals(self, state: SimulationAgentState, req: MeasurementRequest) -> list:
-    #     """
-    #     Predicts a list of time intervals in [s] when an agent may be able to perform a given measurement request
-
-    #     ### Arguments
-    #         - state (:obj:`SimulatrionAgentState`) : latest known state of parent agent
-    #         - req (:obj:`MeasurementRequest`) : measurement request being considered
-
-    #     #### Returns:
-    #         - access_time (`float`) : time at which an agent may 
-    #     """
-    #     # TODO
-    #     pass
-
-    # def plan_from_bundle(self, bundle : list) -> list:
-    #     """
-    #     Converts a list of measurement requests into a plan to be performed by the parent agent
-
-    #     ### Arguments:
-    #         - bundle (`list`) : list of accepted measurement requests to be performed
-
-    #     ### Returns:
-    #         - plan (`list`) : list of agent actions to be performed by parent agent
-    #     """
-    #     # TODO
-    #     pass
+        return plan
 
     async def teardown(self) -> None:
         # Nothing to teardown

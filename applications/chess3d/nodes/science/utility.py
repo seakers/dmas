@@ -11,6 +11,9 @@ List of utility functions used to evalute the value of observations
 def no_utility(**_) -> float:
     return 0.0
 
+def fixed_utility(req : MeasurementRequest, **_) -> float:
+    return req.s_max
+
 def random_utility(req : MeasurementRequest, **_) -> float:
     return req.s_max * random.random()
 

@@ -365,7 +365,10 @@ class SatelliteAgentState(SimulationAgentState):
             return action.COMPLETED, 0.0
         else:
             # else, wait until position is reached
-            dt = self.time_step if self.time_step else 60.0
+            if action.t_end == np.Inf:
+                dt = self.time_step if self.time_step else 60.0
+            else:
+                dt = action.t_end
             return action.PENDING, dt
 
     def perform_maneuver(self, action: ManeuverAction, t: Union[int, float]) -> tuple:

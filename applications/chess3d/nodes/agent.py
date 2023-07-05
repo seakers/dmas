@@ -278,7 +278,7 @@ class SimulationAgent(Agent):
                 if not self.external_inbox.empty():
                     action.status = AgentAction.COMPLETED
                 else:
-                    if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                    if isinstance(self._clock_config, FixedTimesStepClockConfig) or isinstance(self._clock_config, EventDrivenClockConfig):
                         # give the agent time to finish sending/processing messages before submitting a tic-request
                         await asyncio.sleep(1e-2)
 
@@ -323,6 +323,8 @@ class SimulationAgent(Agent):
                 
                 self.state.update_state(self.get_current_time(), 
                                         status=SimulationAgentState.MEASURING)
+                self.state_history.append(self.state.to_dict())
+                
                 try:
                     # send a measurement data request to the environment
                     measurement = MeasurementResultsRequest(self.get_element_name(),
@@ -331,16 +333,20 @@ class SimulationAgent(Agent):
                                                             action_dict
                                                             )
 
-                    dst, src, measurement_dict = await self.send_peer_message(measurement)
+                    # dst, src, measurement_dict = await self.send_peer_message(measurement)
 
-                    # add measurement to environment inbox to be processed during `sensing()`
-                    await self.environment_inbox.put((dst, src, measurement_dict))
+                    # # add measurement to environment inbox to be processed during `sensing()`
+                    # await self.environment_inbox.put((dst, src, measurement_dict))
 
-                    # wait for the designated duration of the measurmeent 
-                    await self.sim_wait(measurement_req.duration)  # TODO only compensate for the time lost between queries
+                    # # wait for the designated duration of the measurmeent 
+                    # await self.sim_wait(measurement_req.duration)  # TODO only compensate for the time lost between queries
                     
                 except asyncio.CancelledError:
                     return
+                
+                # update action completion status
+                action.status = AgentAction.COMPLETED
+                
             else:
                 # ignore action
                 self.log(f"action of type {action_dict['action_type']} not yet supported. ignoring...", level=logging.INFO)

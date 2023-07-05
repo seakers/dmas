@@ -78,6 +78,7 @@ class TravelAction(AgentAction):
     def __init__(self,
                 final_pos : list, 
                 t_start : Union[float, int],
+                t_end : Union[float, int] = np.Inf,
                 pos_type : str = CoordinateTypes.CARTESIAN.value,
                 status : str = 'PENDING',
                 id: str = None, 
@@ -93,7 +94,7 @@ class TravelAction(AgentAction):
             - id (`str`) : identifying number for this action in uuid format
         """
             
-        super().__init__(ActionTypes.TRAVEL.value, t_start, np.Inf, status=status, id=id)
+        super().__init__(ActionTypes.TRAVEL.value, t_start, t_end, status=status, id=id)
         
         if not isinstance(final_pos, list):
             raise AttributeError(f'`final_pos` must be of type `list`. is of type {type(final_pos)}.')

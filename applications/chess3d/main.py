@@ -17,7 +17,7 @@ from nodes.planning.fixed import FixedPlanner
 from nodes.planning.planners import PlannerTypes
 from nodes.states import GroundStationAgentState
 from nodes.groundstat import GroundStationAgent
-from nodes.utility import linear_utility
+from applications.chess3d.nodes.science.utility import *
 from nodes.agent import SimulationAgent
 from utils import *
 from dmas.messages import SimulationElementRoles
@@ -150,7 +150,7 @@ if __name__ == "__main__":
                                         results_path, 
                                         env_network_config, 
                                         manager_network_config,
-                                        linear_utility, 
+                                        fixed_utility, 
                                         logger=logger)
     port += 6
     
@@ -212,20 +212,22 @@ if __name__ == "__main__":
                                 100.55337377743358,
                                 100.69348801752179
                                 ]
-                    plan = [ TravelAction(final_pos, 0.0) ]
+                    plan = [ 
+                            # TravelAction(final_pos, 0.0) 
+                            ]
                     #----------------------------
 
                     planner = FixedPlanner(results_path, 
                                            agent_name,
                                            plan, 
                                            agent_network_config,
-                                           linear_utility, 
+                                           fixed_utility, 
                                            logger=logger)
                 elif planner_type == PlannerTypes.GREEDY.value:
                     planner = GreedyPlanner(results_path,
                                             agent_name,
                                             agent_network_config,
-                                            linear_utility,
+                                            fixed_utility,
                                             payload,
                                             logger=logger)
                 else:
@@ -240,13 +242,15 @@ if __name__ == "__main__":
                             100.55337377743358,
                             100.69348801752179
                             ]
-                plan = [ TravelAction(final_pos, 0.0) ]
+                plan = [ 
+                        # TravelAction(final_pos, 0.0) 
+                        ]
 
                 planner = FixedPlanner(results_path, 
                                            agent_name,
                                            plan, 
                                            agent_network_config,
-                                           linear_utility, 
+                                           fixed_utility, 
                                            logger=logger)
 
             ## load science module
@@ -266,7 +270,7 @@ if __name__ == "__main__":
                                     initial_state, 
                                     planner,
                                     payload,
-                                    linear_utility,
+                                    fixed_utility,
                                     science,
                                     logger=logger)
             agents.append(agent)
@@ -319,7 +323,7 @@ if __name__ == "__main__":
                                         port,
                                         manager_network_config,
                                         initial_state,
-                                        linear_utility,
+                                        fixed_utility,
                                         measurement_reqs=measurement_reqs,
                                         logger=logger)
             agents.append(agent)

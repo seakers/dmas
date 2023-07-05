@@ -131,8 +131,8 @@ class SimulationEnvironment(EnvironmentNode):
 
                         # find/generate measurement results
                         measurement_action = MeasurementAction(**msg.masurement_action)
-                        agent_state= SimulationAgentState(**msg.agent_state)
-                        measurement_req = MeasurementRequest(**measurement_action.measurement_req)
+                        agent_state = SimulationAgentState.from_dict(msg.agent_state)
+                        measurement_req = MeasurementRequest.from_dict(measurement_action.measurement_req)
                         measurement_data = self.query_measurement_date(agent_state, measurement_req, measurement_action)
 
                         # repsond to request
@@ -319,8 +319,9 @@ class SimulationEnvironment(EnvironmentNode):
         Queries internal models or data and returns observation information being sensed by the agent
         """
         # TODO look up requested measurement results from database/model
+        params = {"state" : agent_state, "req" : measurement_req, "subtask_index" : measurement_action.subtask_index, "t_img" : self.get_current_time()}
         return  {   't_img' : self.get_current_time(),
-                    'u' : self.utility_func(agent_state, measurement_req, measurement_action.subtask_index, self.get_current_time()),
+                    'u' : self.utility_func(**params),
                     'u_max' : measurement_req.s_max,
                     'u_exp' : measurement_action.u_exp}
 

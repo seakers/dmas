@@ -71,7 +71,8 @@
             },
             "missionProfile": "3D-CHESS",
             "planner": {
-                "@type": "GREEDY"
+                "@type": "GREEDY",
+                "utility": "FIXED"
             }
         }
     ],
