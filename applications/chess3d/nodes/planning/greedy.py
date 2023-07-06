@@ -203,14 +203,16 @@ class GreedyPlanner(PlanningModule):
                 while not self.action_status_inbox.empty():
                     action_msg : AgentActionMessage = await self.action_status_inbox.get()
 
-                    if action_msg.status != AgentAction.COMPLETED and action_msg.status != AgentAction.ABORTED:
+                    if action_msg.status == AgentAction.PENDING:
                         # if action wasn't completed, re-try
+                        plan_ids = [action.id for action in self.plan]
                         action_dict : dict = action_msg.action
-                        self.log(f'action {action_dict} not completed yet! trying again...')
-                        plan_out.append(action_dict)
+                        if action_dict['id'] in plan_ids:
+                            self.log(f'action {action_dict} not completed yet! trying again...')
+                            plan_out.append(action_dict)
 
-                    elif action_msg.status == AgentAction.COMPLETED:
-                        # if action was completed, remove from plan
+                    else:
+                        # if action was completed or aborted, remove from plan
                         action_dict : dict = action_msg.action
                         completed_action = AgentAction(**action_dict)
                         removed = None
@@ -237,12 +239,23 @@ class GreedyPlanner(PlanningModule):
                     self.plan = self.plan_from_path(state, results, path)
 
 
-                plan_out_id = [action['id'] for action in plan_out]
-                for action in self.plan:
-                    action : AgentAction
-                    if (action.t_start <= t_curr <= action.t_end
-                        and action.id not in plan_out_id):
-                        plan_out.append(action.to_dict())
+                if len(plan_out) == 0 and len(self.plan) > 0:
+                    next_action : AgentAction = self.plan[0]
+                    if next_action.t_start <= t_curr:
+                        plan_out.append(next_action.to_dict())
+                    # plan_out_id = [action['id'] for action in plan_out]
+                    # for action in self.plan:
+                    #     action : AgentAction
+                    #     if (action.t_start <= t_curr <= action.t_end
+                    #         and action.id not in plan_out_id):
+                    #         plan_out.append(action.to_dict())
+                    #         break
+
+                print(f'\PATH\tT{t_curr}\nid\tsubtask index\tt_start\tt_end')
+                for req, subtask_index in path:
+                    req : MeasurementRequest; subtask_index : int
+                    bid : Bid = results[req.id][subtask_index]
+                    print(req.id.split('-')[0], subtask_index, bid.t_img)
 
                 print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
                 for action in self.plan:
@@ -257,7 +270,10 @@ class GreedyPlanner(PlanningModule):
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    t_idle = t_curr + 1e6 # TODO find end of simulation time        
+                    if len(self.plan) == 0:
+                        t_idle = t_curr + 1e6 # TODO find end of simulation time        
+                    else:
+                        t_idle = self.plan[0].t_start
                     action = WaitForMessages(t_curr, t_idle)
                     plan_out.append(action.to_dict())
                     
@@ -589,6 +605,7 @@ class GreedyPlanner(PlanningModule):
 
             # calculate bids for each task in the path
             bids = {}
+            t_prev = -1
             for req_i, subtask_j in path:
                 # calculate imaging time
                 req_i : MeasurementRequest; subtask_j : int
@@ -678,7 +695,7 @@ class GreedyPlanner(PlanningModule):
 
                         # estimate arrival time using fixed angular rate TODO change to 
                         if dt >= dth / 1.0: # TODO change maximum angular rate 
-                            return dt
+                            return t_img
                     else:
                         raise NotImplementedError(f"Arrival time calculation for states of type {type(state)} not yet supported.")
                   

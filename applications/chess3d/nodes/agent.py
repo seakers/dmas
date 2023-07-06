@@ -213,13 +213,13 @@ class SimulationAgent(Agent):
             action = AgentAction(**action_dict)
             t_0 = time.perf_counter()
 
-            if self.get_current_time() < action.t_start:
+            if (action.t_start - self.get_current_time()) > 1e-3:
                 self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
                 action.status = AgentAction.PENDING
                 statuses.append((action, action.status))
                 continue
             
-            if action.t_end < self.get_current_time():
+            if (self.get_current_time() - action.t_end) > 1e-3 :
                 self.log(f"action of type {action_dict['action_type']} has already occureed. could not perform task before...", level=logging.INFO)
                 action.status = AgentAction.ABORTED
                 statuses.append((action, action.status))
@@ -372,7 +372,7 @@ class SimulationAgent(Agent):
         # log agent capabilities
         # log state 
         n_decimals = 3
-        headers = ['t', 'x_pos', 'y_pos', 'z_pos', 'x_vel', 'y_vel', 'z_vel', 'status']
+        headers = ['t', 'x_pos', 'y_pos', 'z_pos', 'x_vel', 'y_vel', 'z_vel', 'attitude', 'status']
         data = []
 
         # out += '\nt, pos, vel, status\n'
@@ -388,6 +388,8 @@ class SimulationAgent(Agent):
                             np.round(state_dict['vel'][1],n_decimals),
                             np.round(state_dict['vel'][2],n_decimals),
                             
+                            np.round(state_dict['attitude'][0],n_decimals),
+
                             state_dict['status']
                         ]
             data.append(line_data)

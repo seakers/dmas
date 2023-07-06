@@ -399,10 +399,12 @@ class SatelliteAgentState(SimulationAgentState):
         
         if self.comp_vectors(self.attitude, action.final_attitude, eps = 1e-6):
             # if reached, return successful completion status
+            self.attitude_rates = [0,0,0]
             return action.COMPLETED, 0.0
         
         elif t >= action.t_end:
             # could not complete action before action end time
+            self.attitude_rates = [0,0,0]
             return action.ABORTED, 0.0
 
         else:
