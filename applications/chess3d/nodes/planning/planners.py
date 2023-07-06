@@ -228,8 +228,13 @@ class PlanningModule(InternalModule):
                 ) -> None:
                        
         addresses = parent_network_config.get_internal_addresses()        
+        sub_addesses = []
         sub_address : str = addresses.get(zmq.PUB)[0]
-        sub_address = sub_address.replace('*', 'localhost')
+        sub_addesses.append( sub_address.replace('*', 'localhost') )
+
+        if len(addresses.get(zmq.SUB)) > 1:
+            sub_address : str = addresses.get(zmq.SUB)[1]
+            sub_addesses.append( sub_address.replace('*', 'localhost') )
 
         pub_address : str = addresses.get(zmq.SUB)[0]
         pub_address = pub_address.replace('localhost', '*')
@@ -240,7 +245,7 @@ class PlanningModule(InternalModule):
         planner_network_config =  NetworkConfig(parent_name,
                                         manager_address_map = {
                                         zmq.REQ: [],
-                                        zmq.SUB: [sub_address],
+                                        zmq.SUB: sub_addesses,
                                         zmq.PUB: [pub_address],
                                         zmq.PUSH: [push_address]})
 

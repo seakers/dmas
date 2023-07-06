@@ -193,7 +193,10 @@ if __name__ == "__main__":
                                                     internal_address_map = {
                                                             zmq.REP: [f'tcp://*:{port+3}'],
                                                             zmq.PUB: [f'tcp://*:{port+4}'],
-                                                            zmq.SUB: [f'tcp://localhost:{port+5}']
+                                                            zmq.SUB: [  
+                                                                        f'tcp://localhost:{port+5}',
+                                                                        f'tcp://localhost:{port+6}'
+                                                                    ]
                                                 })
 
             ## load payload
@@ -263,7 +266,8 @@ if __name__ == "__main__":
             initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
 
             ## create agent
-            agent = SatelliteAgent(agent_name,
+            agent = SatelliteAgent(
+                                    agent_name,
                                     scenario_name,
                                     manager_network_config,
                                     agent_network_config,
@@ -272,7 +276,8 @@ if __name__ == "__main__":
                                     payload,
                                     fixed_utility,
                                     science,
-                                    logger=logger)
+                                    logger=logger
+                                )
             agents.append(agent)
             port += 6
             
