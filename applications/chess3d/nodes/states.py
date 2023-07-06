@@ -32,8 +32,8 @@ class SimulationAgentState(AbstractAgentState):
                     state_type : str,
                     pos : list,
                     vel : list,
-                    attitude : float, # TODO make attitude a quaternion list or euler angles
-                    attitude_rate : float, # TODO make attitude a quaternion list or euler angles
+                    attitude : list,
+                    attitude_rates : list,
                     engineering_module : EngineeringModule = None,
                     status : str = IDLING,
                     t : Union[float, int]=0,
@@ -47,8 +47,8 @@ class SimulationAgentState(AbstractAgentState):
         self.state_type = state_type
         self.pos : list = pos
         self.vel : list = vel
-        self.attitude : float = attitude
-        self.attitude_rate : float = attitude_rate
+        self.attitude : list = attitude
+        self.attitude_rates : list = attitude_rates
         self.engineering_module : EngineeringModule = engineering_module
         self.status : str = status
         self.t : float = t
@@ -63,9 +63,12 @@ class SimulationAgentState(AbstractAgentState):
 
         # update position and velocity
         if state is None:
-            self.pos, self.vel, self.attitude, self.attitude_rate = self.kinematic_model(t)
+            self.pos, self.vel, self.attitude, self.attitude_rates = self.kinematic_model(t)
         else:
-            self.pos, self.vel = state['pos'], state['vel']
+            self.pos = state['pos']
+            self.vel = state['vel']
+            self.attitude = state['attitude']
+            self.attitude_rates = state['attitude_rates']
 
         # update time and status
         self.t = t 
@@ -86,7 +89,7 @@ class SimulationAgentState(AbstractAgentState):
         if propagated.engineering_module is not None:
             propagated.engineering_module : EngineeringModule = propagated.engineering_module.propagate(tf)
         
-        propagated.pos, propagated.vel = self.kinematic_model(tf)
+        propagated.pos, propagated.vel, propagated.attitude, propagated.attitude_rates = propagated.kinematic_model(tf)
 
         propagated.t = tf
 
@@ -101,7 +104,7 @@ class SimulationAgentState(AbstractAgentState):
             - tf (`float` or `int`) : propagation end time in [s]
 
         ### Returns:
-            - pos, vel (`tuple`) : tuple of updated position and velocity vectors
+            - pos, vel, attitude, atittude_rate (`tuple`) : tuple of updated angular and cartasian position and velocity vectors
         """
         pass
 
@@ -228,14 +231,16 @@ class GroundStationAgentState(SimulationAgentState):
         
         super().__init__(SimulationAgentTypes.GROUND_STATION.value, 
                         pos, 
-                        vel, 
+                        vel,
+                        [0,0,0],
+                        [0,0,0], 
                         None, 
                         status, 
                         t)
 
     def kinematic_model(self, tf: Union[int, float]) -> tuple:
         # agent does not move
-        return self.pos, self.vel
+        return self.pos, self.vel, self.attitude, self.attitude
 
     def is_failure(self) -> None:
         # agent never fails
@@ -260,6 +265,8 @@ class SatelliteAgentState(SimulationAgentState):
                     eps : float = None,
                     pos : list = None,
                     vel : list = None,
+                    attitude : list = None,
+                    attitude_rates : list = [0,0,0],
                     keplerian_state : dict = None,
                     t: Union[float, int] = 0.0, 
                     eclipse : int = 0,
@@ -293,12 +300,16 @@ class SatelliteAgentState(SimulationAgentState):
         else:
             self.eps = self.__calc_eps(pos) if self.time_step else 1e-6
         
-        super().__init__(   SimulationAgentTypes.SATELLITE.value, 
+        super().__init__(   
+                            SimulationAgentTypes.SATELLITE.value, 
                             pos, 
                             vel, 
+                            attitude,
+                            attitude_rates,
                             engineering_module, 
                             status, 
-                            t)
+                            t
+                        )
 
     def kinematic_model(self, tf: Union[int, float], update_keplerian : bool = True) -> tuple:
         # propagates orbit
@@ -351,9 +362,14 @@ class SatelliteAgentState(SimulationAgentState):
                                     "inc" : keplerian_state[2],
                                     "raan" : keplerian_state[3],
                                     "aop" : keplerian_state[4],
-                                    "ta" : keplerian_state[5]}                                
+                                    "ta" : keplerian_state[5]}                  
+
+        attitude = []
+        for i in range(len(self.attitude)):
+            th = self.attitude[i] + dt * self.attitude_rates[i]
+            attitude.append(th)
        
-        return pos, vel
+        return pos, vel, attitude, self.attitude_rates
 
     def is_failure(self) -> None:
         if self.engineering_module:
@@ -380,14 +396,42 @@ class SatelliteAgentState(SimulationAgentState):
     def perform_maneuver(self, action: ManeuverAction, t: Union[int, float]) -> tuple:
         # update state
         self.update_state(t, status=self.MANEUVERING)
-
-        if self.engineering_module:
-            # instruct engineering module to perform maneuver
-            return self.engineering_module.perform_action(action, t)
         
-        else:
-            # satellite has no engineering modue and cannot perform attitude maneuver
+        if self.comp_vectors(self.attitude, action.final_attitude, eps = 1e-6):
+            # if reached, return successful completion status
+            return action.COMPLETED, 0.0
+        
+        elif t >= action.t_end:
+            # could not complete action before action end time
             return action.ABORTED, 0.0
+
+        else:
+            # TODO include engineering module in attitude maneuvers 
+            # if self.engineering_module:
+            #     # instruct engineering module to perform maneuver
+            #     return self.engineering_module.perform_action(action, t)
+
+            # chose new angular velocity
+            max_rate = 1                    # in degrees
+            attitude_rates = []             # in degrees per second
+            dts = []
+            for i in range(len(self.attitude)):
+                if   action.final_attitude[i] - self.attitude[i] > 0:
+                    dth = max_rate
+                elif action.final_attitude[i] - self.attitude[i] == 0:
+                    dth = 0
+                elif action.final_attitude[i] - self.attitude[i] < 0:
+                    dth = - max_rate
+                attitude_rates.append(dth)
+                
+                dt = (action.final_attitude[i] - self.attitude[i]) / dth
+                dts.append(dt)
+                
+            self.attitude_rates = attitude_rates
+
+            # else, wait until position is reached
+            return action.PENDING, min(dts)
+
             
     def __calc_eps(self, init_pos : list):
         """
@@ -432,7 +476,7 @@ class SatelliteAgentState(SimulationAgentState):
 
         return np.sqrt(dx**2 + dy**2 + dz**2) / 2.0
     
-    def comp_vectors(self, v1 : list, v2 : list):
+    def comp_vectors(self, v1 : list, v2 : list, eps : float = None):
         """
         compares two vectors
         """
@@ -441,10 +485,11 @@ class SatelliteAgentState(SimulationAgentState):
         dz = v1[2] - v2[2]
 
         dv = np.sqrt(dx**2 + dy**2 + dz**2)
+        eps = eps if eps is not None else self.eps
 
         # print( '\n\n', v1, v2, dv, self.eps, dv < self.eps, '\n')
-        
-        return dv < self.eps
+
+        return dv < eps
 
 class UAVAgentState(SimulationAgentState):
     """
