@@ -251,21 +251,22 @@ class GreedyPlanner(PlanningModule):
                     #         plan_out.append(action.to_dict())
                     #         break
 
-                print(f'\PATH\tT{t_curr}\nid\tsubtask index\tt_start\tt_end')
-                for req, subtask_index in path:
-                    req : MeasurementRequest; subtask_index : int
-                    bid : Bid = results[req.id][subtask_index]
-                    print(req.id.split('-')[0], subtask_index, bid.t_img)
+                # FOR DEBUGGING PURPOSES ONLY:
+                # print(f'\PATH\tT{t_curr}\nid\tsubtask index\tt_start\tt_end')
+                # for req, subtask_index in path:
+                #     req : MeasurementRequest; subtask_index : int
+                #     bid : Bid = results[req.id][subtask_index]
+                #     print(req.id.split('-')[0], subtask_index, bid.t_img)
 
-                print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                for action in self.plan:
-                    action : AgentAction
-                    print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
+                # print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                # for action in self.plan:
+                #     action : AgentAction
+                #     print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
 
-                print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                for action in plan_out:
-                    action : dict
-                    print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
+                # print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                # for action in plan_out:
+                #     action : dict
+                #     print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step

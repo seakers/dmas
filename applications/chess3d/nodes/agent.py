@@ -213,13 +213,13 @@ class SimulationAgent(Agent):
             action = AgentAction(**action_dict)
             t_0 = time.perf_counter()
 
-            if (action.t_start - self.get_current_time()) > 1e-3:
+            if (action.t_start - self.get_current_time()) > np.finfo(np.float32).eps:
                 self.log(f"action of type {action_dict['action_type']} has NOT started yet. waiting for start time...", level=logging.INFO)
                 action.status = AgentAction.PENDING
                 statuses.append((action, action.status))
                 continue
             
-            if (self.get_current_time() - action.t_end) > 1e-3 :
+            if (self.get_current_time() - action.t_end) > np.finfo(np.float32).eps:
                 self.log(f"action of type {action_dict['action_type']} has already occureed. could not perform task before...", level=logging.INFO)
                 action.status = AgentAction.ABORTED
                 statuses.append((action, action.status))
