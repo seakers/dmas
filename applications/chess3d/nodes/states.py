@@ -32,6 +32,8 @@ class SimulationAgentState(AbstractAgentState):
                     state_type : str,
                     pos : list,
                     vel : list,
+                    attitude : float, # TODO make attitude a quaternion list or euler angles
+                    attitude_rate : float, # TODO make attitude a quaternion list or euler angles
                     engineering_module : EngineeringModule = None,
                     status : str = IDLING,
                     t : Union[float, int]=0,
@@ -45,6 +47,8 @@ class SimulationAgentState(AbstractAgentState):
         self.state_type = state_type
         self.pos : list = pos
         self.vel : list = vel
+        self.attitude : float = attitude
+        self.attitude_rate : float = attitude_rate
         self.engineering_module : EngineeringModule = engineering_module
         self.status : str = status
         self.t : float = t
@@ -59,7 +63,7 @@ class SimulationAgentState(AbstractAgentState):
 
         # update position and velocity
         if state is None:
-            self.pos, self.vel = self.kinematic_model(t)
+            self.pos, self.vel, self.attitude, self.attitude_rate = self.kinematic_model(t)
         else:
             self.pos, self.vel = state['pos'], state['vel']
 
