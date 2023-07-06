@@ -244,15 +244,15 @@ class GreedyPlanner(PlanningModule):
                         and action.id not in plan_out_id):
                         plan_out.append(action.to_dict())
 
-                # print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                # for action in self.plan:
-                #     action : AgentAction
-                #     print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
+                print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                for action in self.plan:
+                    action : AgentAction
+                    print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
 
-                # print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                # for action in plan_out:
-                #     action : dict
-                #     print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
+                print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                for action in plan_out:
+                    action : dict
+                    print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
@@ -643,6 +643,12 @@ class GreedyPlanner(PlanningModule):
 
             if isinstance(state, SatelliteAgentState):
                 prev_state : SatelliteAgentState = state.propagate(t_prev)
+                
+                prev_state.attitude = [
+                                        prev_state.calc_off_nadir_agle(prev_req),
+                                        0.0,
+                                        0.0
+                                    ]
             else:
                 raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
 
@@ -659,8 +665,23 @@ class GreedyPlanner(PlanningModule):
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
 
                 for _, row in df.iterrows():
-                    return row['time index'] * self.orbitdata.time_step
+                    t_img = row['time index'] * self.orbitdata.time_step
+                    dt = t_img - state.t
+                    
+                    if isinstance(state, SatelliteAgentState):
+                        # propagate state
+                        propagated_state : SatelliteAgentState = state.propagate(t_img)
 
+                        # compute off-nadir angle
+                        thf = propagated_state.calc_off_nadir_agle(req)
+                        dth = thf - propagated_state.attitude[0]
+
+                        # estimate arrival time using fixed angular rate TODO change to 
+                        if dt >= dth / 1.0: # TODO change maximum angular rate 
+                            return dt
+                    else:
+                        raise NotImplementedError(f"Arrival time calculation for states of type {type(state)} not yet supported.")
+                  
                 return -1
             else:
                 raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
@@ -699,11 +720,28 @@ class GreedyPlanner(PlanningModule):
 
                 if isinstance(state, SatelliteAgentState):
                     prev_state : SatelliteAgentState = state.propagate(t_prev)
+                    prev_state.attitude = [
+                                        prev_state.calc_off_nadir_agle(prev_req),
+                                        0.0,
+                                        0.0
+                                    ]
                 else:
                     raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
-                
-            t_move_start = prev_state.t
+
+            # point to target
+            if isinstance(state, SatelliteAgentState):
+                t_maneuver_start = prev_state.t
+                tf = prev_state.calc_off_nadir_agle(measurement_req)
+                t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
+            else:
+                raise NotImplementedError(f"cannot calculate maneuver time end for agent states of type {type(state)}")
             
+            if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
+                maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
+                plan.append(maneuver_action)
+
+            # move to target
+            t_move_start = t_maneuver_end
             if isinstance(state, SatelliteAgentState):
                 lat, lon, _ = measurement_req.pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
@@ -732,7 +770,6 @@ class GreedyPlanner(PlanningModule):
                 if t_img_end < np.Inf:
                     t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
             
-            # move to target
             if abs(t_move_start - t_move_end) >= 1e-3:
                 move_action = TravelAction(final_pos, t_move_start, t_move_end)
                 plan.append(move_action)

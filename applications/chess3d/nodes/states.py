@@ -2,7 +2,7 @@
 from abc import abstractmethod
 import numpy as np
 from typing import Union
-from nodes.science.reqs import MeasurementRequest
+from nodes.science.reqs import MeasurementRequest, GroundPointMeasurementRequest
 from nodes.actions import *
 from nodes.engineering.engineering import EngineeringModule
 from dmas.agents import AbstractAgentState, AgentAction
@@ -265,7 +265,7 @@ class SatelliteAgentState(SimulationAgentState):
                     eps : float = None,
                     pos : list = None,
                     vel : list = None,
-                    attitude : list = None,
+                    attitude : list = [0,0,0],
                     attitude_rates : list = [0,0,0],
                     keplerian_state : dict = None,
                     t: Union[float, int] = 0.0, 
@@ -315,7 +315,7 @@ class SatelliteAgentState(SimulationAgentState):
         # propagates orbit
         dt = tf - self.t
         if abs(dt) < 1e-6:
-            return self.pos, self.vel
+            return self.pos, self.vel, self.attitude, self.attitude_rates
 
         # form the propcov.Spacecraft object
         attitude = propcov.NadirPointingAttitude()
@@ -419,7 +419,9 @@ class SatelliteAgentState(SimulationAgentState):
                 if   action.final_attitude[i] - self.attitude[i] > 0:
                     dth = max_rate
                 elif action.final_attitude[i] - self.attitude[i] == 0:
-                    dth = 0
+                    dts.append(0)
+                    attitude_rates.append(0)
+                    continue
                 elif action.final_attitude[i] - self.attitude[i] < 0:
                     dth = - max_rate
                 attitude_rates.append(dth)
@@ -430,9 +432,8 @@ class SatelliteAgentState(SimulationAgentState):
             self.attitude_rates = attitude_rates
 
             # else, wait until position is reached
-            dt = min(dts) if min(dts) < action.t_end - t else action.t_end - t
+            dt = max(dts) if max(dts) < action.t_end - t else action.t_end - t
             return action.PENDING, dt
-
             
     def __calc_eps(self, init_pos : list):
         """
@@ -491,6 +492,56 @@ class SatelliteAgentState(SimulationAgentState):
         # print( '\n\n', v1, v2, dv, self.eps, dv < self.eps, '\n')
 
         return dv < eps
+
+    def calc_off_nadir_agle(self, req : MeasurementRequest) -> float:
+        """
+        Calculates the off-nadir angle between a satellite and a target
+        """
+        if isinstance(req, GroundPointMeasurementRequest):
+            lat,lon,alt = req.pos
+            R = 6.3781363e+003 + alt
+            target_pos = [
+                    R * np.cos( lat * np.pi / 180.0) * np.cos( lon * np.pi / 180.0),
+                    R * np.cos( lat * np.pi / 180.0) * np.sin( lon * np.pi / 180.0),
+                    R * np.sin( lat * np.pi / 180.0)
+            ]
+
+            # compute body-fixed frame
+            pos_norm = np.sqrt(np.dot(self.pos, self.pos))
+            nadir_dir = np.array([
+                            -self.pos[0]/pos_norm,
+                            -self.pos[1]/pos_norm,
+                            -self.pos[2]/pos_norm
+                        ])
+
+            vel_norm = np.sqrt(np.dot(self.vel, self.vel))
+            vel_dir = np.array([
+                            self.vel[0]/vel_norm,
+                            self.vel[1]/vel_norm,
+                            self.vel[2]/vel_norm
+                        ])
+            perp_dir = np.cross(nadir_dir, vel_dir)
+
+            # calculate projection to nadir x perp plane
+            sat_to_gp = np.array([
+                            target_pos[0]-self.pos[0],
+                            target_pos[1]-self.pos[1],
+                            target_pos[2]-self.pos[2]
+                        ])
+            sat_to_gp_norm = np.sqrt(np.dot(sat_to_gp, sat_to_gp))
+            sat_to_gp = np.array([
+                            sat_to_gp[0]/sat_to_gp_norm,
+                            sat_to_gp[1]/sat_to_gp_norm,
+                            sat_to_gp[2]/sat_to_gp_norm
+                        ])
+            
+            proj = np.dot(sat_to_gp, nadir_dir) * nadir_dir + np.dot(sat_to_gp, perp_dir) * perp_dir
+
+            return np.arccos( np.dot(proj, nadir_dir) ) * 360 / np.pi
+        
+        else:
+            raise NotImplementedError(f"cannot calculate off-nadir angle for measurement requests of type {type(req)}")
+            
 
 class UAVAgentState(SimulationAgentState):
     """

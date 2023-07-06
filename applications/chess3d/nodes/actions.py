@@ -130,10 +130,11 @@ class ManeuverAction(AgentAction):
     def __init__(self,
                 final_attitude : list, 
                 t_start : Union[float, int],
+                t_end : Union[float, int] = np.Inf,
                 status : str = 'PENDING',
                 id: str = None, 
                 **_) -> None:
-        super().__init__(ActionTypes.TRAVEL.value, t_start, status=status, id=id)
+        super().__init__(ActionTypes.MANEUVER.value, t_start, t_end, status=status, id=id)
         
         if not isinstance(final_attitude, list):
             raise AttributeError(f'`final_attitude` must be of type `list`. is of type {type(final_attitude)}.')
