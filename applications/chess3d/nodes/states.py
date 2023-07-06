@@ -430,7 +430,8 @@ class SatelliteAgentState(SimulationAgentState):
             self.attitude_rates = attitude_rates
 
             # else, wait until position is reached
-            return action.PENDING, min(dts)
+            dt = min(dts) if min(dts) < action.t_end - t else action.t_end - t
+            return action.PENDING, dt
 
             
     def __calc_eps(self, init_pos : list):

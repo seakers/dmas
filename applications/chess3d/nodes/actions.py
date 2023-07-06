@@ -137,7 +137,7 @@ class ManeuverAction(AgentAction):
         
         if not isinstance(final_attitude, list):
             raise AttributeError(f'`final_attitude` must be of type `list`. is of type {type(final_attitude)}.')
-        self.pos = final_attitude
+        self.final_attitude = final_attitude
 
 class BroadcastMessageAction(AgentAction):
     """
