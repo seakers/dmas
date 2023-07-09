@@ -1,5 +1,14 @@
+import copy
 import logging
+import time
+import pandas as pd
+import numpy as np
+import zmq
 from typing import Any, Callable, Union
+from dmas.agents import AgentAction
+from nodes.actions import *
+from nodes.states import SimulationAgentState
+from messages import *
 from nodes.science.reqs import MeasurementRequest
 from nodes.planning.planners import Bid
 from dmas.network import NetworkConfig
@@ -158,7 +167,7 @@ class SubtaskBid(Bid):
     def copy(self) -> object:
         return SubtaskBid(  **self.to_dict() )
 
-    def subtask_bids_from_task(task : MeasurementTask, bidder : str) -> list:
+    def subtask_bids_from_task(task : MeasurementRequest, bidder : str) -> list:
         """
         Generates subtask bids from a measurement task request
         """
@@ -184,7 +193,7 @@ class SubtaskBid(Bid):
         """
         Checks if this bid has a winner
         """
-        return self.winner != TaskBid.NONE
+        return self.winner != Bid.NONE
 
     def __set_violation_timer(self, t : Union[int, float]) -> None:
         """
@@ -282,7 +291,7 @@ class SubtaskBid(Bid):
 
         # initiate coalition bid count
         ## find all possible coalitions
-        task = MeasurementTask(**self.task)
+        task = MeasurementRequest.from_dict(self.req)
         possible_coalitions = []
         for i in range(len(task.dependency_matrix)):
             coalition = [i]
@@ -359,6 +368,7 @@ class MACCBBA(PlanningModule):
                     parent_name: str, 
                     parent_network_config: NetworkConfig, 
                     utility_func: Callable[[], Any], 
+                    payload : list,
                     max_bundle_size = 4,
                     planning_horizon = 3600,
                     level: int = logging.INFO, 
@@ -372,5 +382,1205 @@ class MACCBBA(PlanningModule):
                             level, 
                             logger
                         )
-
+        self.stats = {
+                        "consensus" : [],
+                        "planning" : [],
+                        "doing" : [],
+                        "c_comp_check" : [],
+                        "c_t_end_check" : [],
+                        "c_const_check" : []
+                    }
+        self.plan_history = []
+        self.iter_counter = 0
+        self.payload = payload
+        self.max_bundle_size = max_bundle_size
+        self.planning_horizon = planning_horizon
     
+    async def planner(self) -> None:
+        try:
+            results, bundle, path, plan, prev_actions = {}, [], [], [], []
+            t_curr = 0
+            level = logging.DEBUG
+
+            while True:
+                # wait for next agent plan check
+                state_msg : AgentStateMessage = await self.states_inbox.get()
+                state = SimulationAgentState.from_dict(state_msg.state)
+                t_curr = state.t
+                await self.update_current_time(t_curr)                
+
+                # compare bids with incoming messages
+                self.log_results('\nINITIAL RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
+
+                t_0 = time.perf_counter()
+                t_curr = state.t
+                results, comp_bundle, comp_path, _, comp_rebroadcasts = await self.consensus_phase(results, copy.copy(bundle), copy.copy(path), t_curr, level)
+                comp_rebroadcasts : list
+                dt = time.perf_counter() - t_0
+                self.stats['consensus'].append(dt)
+
+                # self.log_results('BIDS RECEIVED', bids_received, level)
+                self.log_results('COMPARED RESULTS', results, level)
+                self.log_task_sequence('bundle', comp_bundle, level)
+                self.log_task_sequence('path', comp_path, level)
+
+                # determine if bundle was affected by incoming bids
+                changes_to_bundle : bool = not self.compare_bundles(bundle, comp_bundle)
+
+                if changes_to_bundle or len(comp_rebroadcasts) > 0:
+                    # replan
+                    state, results, bundle, path = await self.update_bundle(state, 
+                                                                        results, 
+                                                                        copy.copy(comp_bundle), 
+                                                                        copy.copy(comp_path), 
+                                                                        level)
+                    # broadcast plan 
+                    if not self.compare_bundles(bundle, comp_bundle):
+                        for req, subtask_index in bundle:
+                            req : MeasurementRequest; subtask_index : int
+                            bid : SubtaskBid = results[req.id][subtask_index]
+                            bid_change_msg = MeasurementBidMessage(
+                                                            self.get_parent_name(),
+                                                            self.get_parent_name(),
+                                                            bid.to_dict()
+                            )
+                            comp_rebroadcasts.append(bid_change_msg)
+                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
+
+                    state : SimulationAgentState
+                    t_curr = state.t
+                    plan = self.plan_from_path(state, results, path)
+                    self.log_plan(results, plan, t_curr, level)
+
+                    # log plan
+                    measurement_plan = []   
+                    for action in plan:
+                        if isinstance(action, MeasurementAction):
+                            measurement_req = MeasurementRequest.from_dict(action.measurement_req)
+                            subtask_index : int = action.subtask_index
+                            subtask_bid : SubtaskBid = results[measurement_req.id][subtask_index]  
+                            measurement_plan.append((t_curr, measurement_req, subtask_index, subtask_bid.copy()))
+                    self.plan_history.append(measurement_plan)
+
+                # execute plan
+                t_0 = time.perf_counter()
+                comp_bundle, comp_path, plan, next_actions = await self.get_next_actions( copy.copy(bundle), copy.copy(path), plan, prev_actions, t_curr)
+                
+                # determine if bundle was affected by executing a task from the plan
+                changes_to_bundle : bool = not self.compare_bundles(bundle, comp_bundle)
+                
+                if not changes_to_bundle: 
+                    # continue plan execution
+                    await self.action_broadcaster(next_actions)
+                    dt = time.perf_counter() - t_0
+                    self.stats['doing'].append(dt)
+                    prev_actions = next_actions                
+
+                else:                  
+                    # replan
+                    state, results, bundle, path = await self.update_bundle(state, 
+                                                                        results, 
+                                                                        comp_bundle, 
+                                                                        comp_path, 
+                                                                        level)
+                    
+                    plan = self.plan_from_path(state, results, path)
+                    self.log_plan(results, plan, state.t, level)
+
+                    # broadcast plan 
+                    comp_rebroadcasts = []
+                    for req, subtask_index in bundle:
+                        req : MeasurementRequest; subtask_index : int
+                        bid : SubtaskBid = results[req.id][subtask_index]
+                        bid_change_msg = MeasurementBidMessage(
+                                                        self.get_parent_name(),
+                                                        self.get_parent_name(),
+                                                        bid.to_dict()
+                        )
+                        comp_rebroadcasts.append(bid_change_msg)
+                    await self.bid_broadcaster(comp_rebroadcasts, t_curr, level=level)
+
+                    # log plan
+                    measurement_plan = []
+                    for action in plan:
+                        if isinstance(action, MeasurementAction):
+                            measurement_req = MeasurementRequest.from_dict(action.measurement_req)
+                            subtask_index : int = action.subtask_index
+                            subtask_bid : SubtaskBid = results[measurement_req.id][subtask_index]  
+                            measurement_plan.append((t_curr, measurement_req, subtask_index, subtask_bid.copy()))
+                    self.plan_history.append(measurement_plan)
+
+                    # execute plan
+                    t_0 = time.perf_counter()
+                    comp_bundle, comp_path, plan, next_actions = await self.get_next_actions( copy.copy(bundle), copy.copy(path), plan, [], t_curr)
+
+                    await self.action_broadcaster(next_actions)
+                    dt = time.perf_counter() - t_0
+                    self.stats['doing'].append(dt)
+                    prev_actions = next_actions   
+                                
+        except asyncio.CancelledError:
+            return 
+
+    def compare_bundles(self, bundle_1 : list, bundle_2 : list) -> bool:
+        """
+        Compares two bundles. Returns true if they are equal and false if not.
+        """
+        if len(bundle_1) == len(bundle_2):
+            for req, subtask in bundle_1:
+                if (req, subtask) not in bundle_2:            
+                    return False
+            return True
+        return False
+
+    async def update_bundle(    self, 
+                                state : SimulationAgentState, 
+                                results : dict, 
+                                bundle : list, 
+                                path : list, 
+                                level : int = logging.DEBUG
+                            ) -> tuple:
+        """
+        Runs ACCBBA planning-consensus phases and creates a plan to be executed by agents 
+        """
+        converged = False
+        self.iter_counter = -1
+        # level = logging.WARNING
+
+        while True:
+            # Phase 2: Consensus 
+            t_0 = time.perf_counter()
+            t_curr = state.t
+            results, bundle, path, consensus_changes, consensus_rebroadcasts = await self.consensus_phase(results, bundle, path, t_curr, level)
+            dt = time.perf_counter() - t_0
+            self.stats['consensus'].append(dt)
+
+            # Update iteration counter
+            self.iter_counter += 1
+
+            # Phase 1: Create Plan from latest information
+            t_0 = time.perf_counter()
+            results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path, level)
+            dt = time.perf_counter() - t_0
+            self.stats['planning'].append(dt)
+
+            self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
+            self.log_changes("CHANGES MADE FROM CONSENSUS", consensus_changes, level)
+
+            # Check for convergence
+            if converged:
+                break
+            converged = self.path_constraint_sat(path, results, t_curr)
+
+            # Broadcast changes to bundle and any changes from consensus
+            broadcast_bids : list = consensus_rebroadcasts
+            broadcast_bids.extend(planner_changes)
+            self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
+            wait_for_response = self.has_bundle_dependencies(bundle) and not converged
+            await self.bid_broadcaster(broadcast_bids, t_curr, wait_for_response, level)
+            
+            # Update State
+            state_msg : AgentStateMessage = await self.states_inbox.get()
+            state = SimulationAgentState(**state_msg.state)
+            t_curr = state.t
+            await self.update_current_time(t_curr)  
+
+        # level = logging.WARNING
+        self.log_results('PLAN CREATED', results, level)
+        self.log_task_sequence('Bundle', bundle, level)
+        self.log_task_sequence('Path', path, level)
+        
+        # reset planning counters
+        for task_id in results:
+            for subtask_index in range(len(results[task_id])):
+                bid : SubtaskBid = results[task_id][subtask_index]
+                bid.reset_bid_counters()
+                results[task_id][subtask_index] = bid
+
+        return state, results, bundle, path
+    
+    async def consensus_phase(self, results : dict, bundle : list, path : list, t : Union[int, float], level : int = logging.DEBUG) -> None:
+        """
+        Evaluates incoming bids and updates current results and bundle
+        """
+        changes = []
+        rebroadcasts = []
+        self.log_results('\nINITIAL RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+        
+        # compare bids with incoming messages
+        t_0 = time.perf_counter()
+        results, bundle, path, comp_changes, comp_rebroadcasts, bids_received = await self.compare_results(results, bundle, path, t, level)
+        changes.extend(comp_changes)
+        rebroadcasts.extend(comp_rebroadcasts)
+        dt = time.perf_counter() - t_0
+        self.stats['c_comp_check'].append(dt)
+
+        self.log_results('BIDS RECEIVED', bids_received, level)
+        self.log_results('COMPARED RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+        
+        # check for expired tasks
+        t_0 = time.perf_counter()
+        results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t, level)
+        changes.extend(exp_changes)
+        rebroadcasts.extend(exp_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_t_end_check'].append(dt)
+
+        self.log_results('CHECKED EXPIRATION RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
+        # check for already performed tasks
+        t_0 = time.perf_counter()
+        results, bundle, path, done_changes = await self.check_task_completion(results, bundle, path, t, level)
+        changes.extend(done_changes)
+        rebroadcasts.extend(done_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_t_end_check'].append(dt)
+
+        self.log_results('CHECKED EXPIRATION RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
+        # check task constraint satisfaction
+        t_0 = time.perf_counter()
+        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
+        changes.extend(cons_changes)
+        rebroadcasts.extend(cons_changes)
+        dt = time.perf_counter() - t_0
+        self.stats['c_const_check'].append(dt)
+
+        self.log_results('CONSTRAINT CHECKED RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
+        return results, bundle, path, changes, rebroadcasts
+
+    async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+        """
+        Compares the existing results with any incoming task bids and updates the bundle accordingly
+
+        ### Returns
+            - results
+            - bundle
+            - path
+            - changes
+        """
+        changes = []
+        rebroadcasts = []
+        bids_received = {}
+        while not self.measurement_bid_inbox.empty():
+            # get next bid
+            bid_msg : MeasurementBidMessage = await self.measurement_bid_inbox.get()
+            
+            # unpackage bid
+            their_bid = SubtaskBid(**bid_msg.bid)
+            if their_bid.req_id not in bids_received:
+                bids_received[their_bid.req_id] = {}
+            bids_received[their_bid.req_id][their_bid.subtask_index] = their_bid
+            
+            # check if bid exists for this task
+            new_task = their_bid.req_id not in results
+            if new_task:
+                # was not aware of this task; add to results as a blank bid
+                task = MeasurementRequest.from_dict(their_bid.req)
+                results[their_bid.req_id] = SubtaskBid.subtask_bids_from_task(task, self.get_parent_name())
+
+            # compare bids
+            my_bid : SubtaskBid = results[their_bid.req_id][their_bid.subtask_index]
+            self.log(f'comparing bids...\nmine:  {str(my_bid)}\ntheirs: {str(their_bid)}', level=logging.DEBUG)
+
+            broadcast_bid, changed  = my_bid.update(their_bid.to_dict(), t)
+            broadcast_bid : SubtaskBid; changed : bool
+
+            self.log(f'\nupdated: {my_bid}\n', level=logging.DEBUG)
+            results[their_bid.req_id][their_bid.subtask_index] = my_bid
+                
+            # if relevant changes were made, add to changes broadcast
+            if broadcast_bid or new_task:                    
+                broadcast_bid = broadcast_bid if not new_task else my_bid
+                out_msg = MeasurementBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        broadcast_bid.to_dict()
+                                    )
+                rebroadcasts.append(out_msg)
+
+            if changed or new_task:
+                changed_bid = broadcast_bid if not new_task else my_bid
+                out_msg = MeasurementBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        changed_bid.to_dict()
+                                    )
+                changes.append(out_msg)
+
+            # if outbid for a task in the bundle, release subsequent tasks in bundle and path
+            bid_task = MeasurementRequest.from_dict(my_bid.req)
+            if (bid_task, my_bid.subtask_index) in bundle and my_bid.winner != self.get_parent_name():
+                bid_index = bundle.index((bid_task, my_bid.subtask_index))
+
+                for _ in range(bid_index, len(bundle)):
+                    # remove all subsequent tasks from bundle
+                    measurement_task, subtask_index = bundle.pop(bid_index)
+                    path.remove((measurement_task, subtask_index))
+
+                    # if the agent is currently winning this bid, reset results
+                    current_bid : SubtaskBid = results[measurement_task.id][subtask_index]
+                    if current_bid.winner == self.get_parent_name():
+                        current_bid.reset(t)
+                        results[measurement_task.id][subtask_index] = current_bid
+                        
+                        out_msg = MeasurementBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        current_bid.to_dict()
+                                    )
+                        rebroadcasts.append(out_msg)
+                        changes.append(out_msg)
+        
+        return results, bundle, path, changes, rebroadcasts, bids_received
+
+    async def check_task_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+        """
+        Checks if tasks have expired and cannot be performed
+
+        ### Returns
+            - results
+            - bundle
+            - path
+            - changes
+        """
+        changes = []
+        # release tasks from bundle if t_end has passed
+        task_to_remove = None
+        for req, subtask_index in bundle:
+            req : MeasurementRequest
+            if req.t_end - req.duration < t:
+                task_to_remove = (req, subtask_index)
+                break
+
+        if task_to_remove is not None:
+            bundle_index = bundle.index(task_to_remove)
+            for _ in range(bundle_index, len(bundle)):
+                # remove task from bundle and path
+                req, subtask_index = bundle.pop(bundle_index)
+                path.remove((req, subtask_index))
+
+                self.log_results('PRELIMINARY CHECKED EXPIRATION RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
+
+        return results, bundle, path, changes
+
+    async def check_task_completion(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+        """
+        Checks if tasks have already been performed by someone else
+
+        ### Returns
+            - results
+            - bundle
+            - path
+            - changes
+        """
+        changes = []
+        task_to_remove = None
+        for req, subtask_index in bundle:
+            req : MeasurementRequest
+
+            for subtask_bid in results[req.id]:
+                subtask_bid : SubtaskBid
+                bids : list = results[req.id]
+                bid_index = bids.index(subtask_bid)
+
+                if (subtask_bid.t_img >= 0.0
+                    and subtask_bid.t_img < t
+                    and req.dependency_matrix[subtask_index][bid_index] < 0
+                    ):
+                    task_to_remove = (req, subtask_index)
+                    break   
+
+            if task_to_remove is not None:
+                break
+
+        if task_to_remove is not None:
+            bundle_index = bundle.index(task_to_remove)
+            
+            # level=logging.WARNING
+            self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
+            self.log_task_sequence('bundle', bundle, level)
+            self.log_task_sequence('path', path, level)
+
+            for _ in range(bundle_index, len(bundle)):
+                # remove task from bundle and path
+                req, subtask_index = bundle.pop(bundle_index)
+                path.remove((req, subtask_index))
+
+                bid : SubtaskBid = results[req.id][subtask_index]
+                bid.reset(t)
+                results[req.id][subtask_index] = bid
+
+                self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
+
+            x = 1
+
+        return results, bundle, path, changes
+
+    async def check_results_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
+        """
+        Looks for tasks that do not have their constraints satisfied
+        """
+        changes = []          
+        while True:
+            # find tasks with constraint violations
+            task_to_remove = None
+            for req, subtask_index in bundle:
+                req : MeasurementRequest; subtask_index : int
+                bid : SubtaskBid = results[req.id][subtask_index]
+               
+                reset_bid, const_failed = bid.check_constraints(results[req.id], t)
+                const_failed : SubtaskBid
+                
+                if reset_bid is not None:
+                    if bid.is_optimistic():
+                        if const_failed is None:
+                            task_to_remove = (req, subtask_index)
+                            results[req.id][subtask_index] = reset_bid
+                            break
+                        elif bid.t_img <= const_failed.t_img:
+                            task_to_remove = (req, subtask_index)
+                            results[req.id][subtask_index] = reset_bid
+                            break
+                    else:
+                        task_to_remove = (req, subtask_index)
+                        results[req.id][subtask_index] = reset_bid
+                        break
+                                
+            if task_to_remove is None:
+                # all bids satisfy their constraints
+                break 
+
+            bundle_index = bundle.index(task_to_remove)
+            for _ in range(bundle_index, len(bundle)):
+                # remove task from bundle and path
+                req, subtask_index = bundle.pop(bundle_index)
+                path.remove((req, subtask_index))
+
+                # reset bid
+                req : MeasurementRequest
+                current_bid : SubtaskBid = results[req.id][subtask_index]
+                current_bid.reset(t)
+                results[req.id][subtask_index] = current_bid
+
+                # register change in results
+                out_msg = MeasurementBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        current_bid.to_dict()
+                                    )
+                changes.append(out_msg)
+
+                # self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
+                # self.log_task_sequence('bundle', bundle, level)
+                # self.log_task_sequence('path', path, level)
+
+        return results, bundle, path, changes
+
+    def has_bundle_dependencies(self, bundle : list) -> bool:
+        """
+        Checks if a bundle contains task with dependencies
+        """
+        for req, subtask_index in bundle:
+            req : MeasurementRequest; subtask_index : int
+            dependencies = req.dependency_matrix[subtask_index]
+            for dependency in dependencies:
+                if dependency > 0:
+                    return True
+        
+        return False
+
+    async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list, level : int = logging.DEBUG) -> None:
+        """
+        Uses the most updated results information to construct a path
+        """
+        self.log_results('INITIAL BUNDLE RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
+        available_tasks : list = self.get_available_tasks(state, bundle, results)
+        changes = []
+        changes_to_bundle = []
+        
+        current_bids = {task.id : {} for task, _ in bundle}
+        for req, subtask_index in bundle:
+            req : MeasurementRequest
+            current_bid : SubtaskBid = results[req.id][subtask_index]
+            current_bids[req.id][subtask_index] = current_bid.copy()
+
+        max_path = [(req, subtask_index) for req, subtask_index in path]; 
+        max_path_bids = {req.id : {} for req, _ in path}
+        for req, subtask_index in path:
+            req : MeasurementRequest
+            max_path_bids[req.id][subtask_index] = results[req.id][subtask_index]
+
+        max_utility = 0.0
+        max_task = -1
+
+        while len(bundle) < self.max_bundle_size and len(available_tasks) > 0 and max_task is not None:                   
+            # find next best task to put in bundle (greedy)
+            max_task = None 
+            max_subtask = None
+            for measurement_req, subtask_index in available_tasks:
+                # calculate bid for a given available task
+                measurement_req : MeasurementRequest
+                subtask_index : int
+                projected_path, projected_bids, _ = self.calc_path_bid(state, results, path, measurement_req, subtask_index)
+                
+                # check if path was found
+                if projected_path is None:
+                    continue
+                
+                # compare to maximum task
+                bid_utility = projected_bids[measurement_req.id][subtask_index].winning_bid
+                if (max_task is None 
+                    # or projected_path_utility > max_path_utility
+                    or bid_utility > max_utility
+                    ):
+
+                    # check for cualition and mutex satisfaction
+                    proposed_bid : SubtaskBid = projected_bids[measurement_req.id][subtask_index]
+                    passed_coalition_test = self.coalition_test(results, proposed_bid)
+                    passed_mutex_test = self.mutex_test(results, proposed_bid)
+                    if not passed_coalition_test or not passed_mutex_test:
+                        # ignore path if proposed bid for any task cannot out-bid current winners
+                        continue
+                    
+                    max_path = projected_path
+                    max_task = measurement_req
+                    max_subtask = subtask_index
+                    max_path_bids = projected_bids
+                    max_utility = projected_bids[measurement_req.id][subtask_index].winning_bid
+
+            if max_task is not None:
+                # max bid found! place task with the best bid in the bundle and the path
+                bundle.append((max_task, max_subtask))
+                path = max_path
+
+                # remove bid task from list of available tasks
+                available_tasks.remove((max_task, max_subtask))
+            
+            #  update bids
+            for measurement_req, subtask_index in path:
+                measurement_req : MeasurementRequest
+                subtask_index : int
+                new_bid : Bid = max_path_bids[measurement_req.id][subtask_index]
+                old_bid : Bid = results[measurement_req.id][subtask_index]
+
+                if old_bid != new_bid:
+                    changes_to_bundle.append((measurement_req, subtask_index))
+
+                results[measurement_req.id][subtask_index] = new_bid
+
+            # self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level)
+            # self.log_task_sequence('bundle', bundle, level)
+            # self.log_task_sequence('path', path, level)
+
+        # broadcast changes to bundle
+        for measurement_req, subtask_index in changes_to_bundle:
+            measurement_req : MeasurementRequest
+            subtask_index : int
+
+            new_bid = results[measurement_req.id][subtask_index]
+
+            # add to changes broadcast 
+            out_msg = MeasurementBidMessage(   
+                                    self.get_parent_name(), 
+                                    self.get_parent_name(), 
+                                    new_bid.to_dict()
+                                )
+            changes.append(out_msg)
+
+        self.log_results('MODIFIED BUNDLE RESULTS', results, level)
+        self.log_task_sequence('bundle', bundle, level)
+        self.log_task_sequence('path', path, level)
+
+        return results, bundle, path, changes
+
+    def get_available_tasks(self, state : SimulationAgentState, bundle : list, results : dict) -> list:
+        """
+        Checks if there are any tasks available to be performed
+
+        ### Returns:
+            - list containing all available and bidable tasks to be performed by the parent agent
+        """
+        available = []
+        for task_id in results:
+            for subtask_index in range(len(results[task_id])):
+                subtaskbid : SubtaskBid = results[task_id][subtask_index]; 
+                req = MeasurementRequest.from_dict(subtaskbid.req)
+
+                if self.bundle_contains_mutex_subtasks(bundle, req, subtask_index):
+                    continue
+
+                is_biddable = self.can_bid(state, req, subtask_index, results[task_id]) 
+                already_in_bundle = (req, subtaskbid.subtask_index) in bundle 
+                # already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
+                already_performed = self.request_has_been_performed(results, req, subtask_index, state.t)
+                
+                if is_biddable and (not already_in_bundle) and (not already_performed):
+                    available.append((req, subtaskbid.subtask_index))
+
+        return available
+
+    def can_bid(self, state : SimulationAgentState, req : MeasurementRequest, subtask_index : int, subtaskbids : list) -> bool:
+        """
+        Checks if an agent has the ability to bid on a measurement task
+        """
+        # check capabilities - TODO: Replace with knowledge graph
+        subtaskbid : SubtaskBid = subtaskbids[subtask_index]
+        payload_names : list = [instrument.name for instrument in self.payload]
+        if subtaskbid.main_measurement not in payload_names:
+            return False 
+
+        # check time constraints
+        ## Constraint 1: task must be able to be performed during or after the current time
+        if req.t_end < state.t:
+            return False
+        
+        ## Constraint 2: coalition constraints
+        n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
+        if subtaskbid.is_optimistic():
+            return (    
+                        subtaskbid.N_req == n_sat
+                    or  subtaskbid.bid_solo > 0
+                    or  (subtaskbid.bid_any > 0 and n_sat > 0)
+                    )
+        else:
+            return subtaskbid.N_req == n_sat
+
+    def bundle_contains_mutex_subtasks(self, bundle : list, req : MeasurementRequest, subtask_index : int) -> bool:
+        """
+        Returns true if a bundle contains a subtask that is mutually exclusive to a subtask being added
+
+        ### Arguments:
+            - bundle (`list`) : current bundle to be expanded
+            - req (:obj:`MeasurementRequest`) : request to be added to the bundle
+            - subtask_index (`int`) : index of the subtask to be added to the bundle
+        """
+        for req_i, subtask_index_i in bundle:
+            req_i : MeasurementRequest
+            subtask_index_i : int 
+
+            if req_i.id != req.id:
+                # subtasks reffer to different tasks, cannot be mutually exclusive
+                continue
+
+            if (
+                    req_i.dependency_matrix[subtask_index_i][subtask_index] < 0
+                or  req_i.dependency_matrix[subtask_index][subtask_index_i] < 0
+                ):
+                # either the existing subtask in the bundle is mutually exclusive with the subtask to be added or viceversa
+                return True
+            
+        return False
+
+    def request_has_been_performed(self, results : dict, req : MeasurementRequest, subtask_index : int, t : Union[int, float]) -> bool:
+        current_bid : SubtaskBid = results[req.id][subtask_index]
+        subtask_already_performed = t > current_bid.t_img and current_bid.winner != SubtaskBid.NONE
+        if subtask_already_performed:
+            return True
+
+        for subtask_bid in results[req.id]:
+            subtask_bid : SubtaskBid
+            
+            if t > subtask_bid.t_img and subtask_bid.winner != SubtaskBid.NONE:
+                return True
+        
+        return False
+
+    def calc_path_bid(
+                        self, 
+                        state : SimulationAgentState, 
+                        original_results : dict,
+                        original_path : list, 
+                        req : MeasurementRequest, 
+                        subtask_index : int
+                    ) -> tuple:
+        winning_path = None
+        winning_bids = None
+        winning_path_utility = 0.0
+
+        # check if the subtask is mutually exclusive with something in the bundle
+        for req_i, subtask_j in original_path:
+            req_i : MeasurementRequest; subtask_j : int
+            if req_i.id == req.id:
+                if req.dependency_matrix[subtask_j][subtask_index] < 0:
+                    return winning_path, winning_bids, winning_path_utility
+
+        # find best placement in path
+        # self.log_task_sequence('original path', original_path, level=logging.WARNING)
+        for i in range(len(original_path)+1):
+            # generate possible path
+            path = [scheduled_task for scheduled_task in original_path]
+            
+            path.insert(i, (req, subtask_index))
+            # self.log_task_sequence('new proposed path', path, level=logging.WARNING)
+
+            # calculate bids for each task in the path
+            bids = {}
+            for req_i, subtask_j in path:
+                # calculate imaging time
+                req_i : MeasurementRequest
+                subtask_j : int
+                t_img = self.calc_imaging_time(state, original_results, path, bids, req_i, subtask_j)
+
+                # predict state
+                # TODO move state prediction to state class
+                path_index = path.index((req_i, subtask_j))
+                if path_index == 0:
+                    prev_state = state
+                else:
+                    prev_req, prev_subtask = path[path_index-1]
+                    prev_req : MeasurementRequest; prev_subtask : int
+                    prev_bid : SubtaskBid = bids[prev_req.id][prev_subtask]
+                    t_prev = prev_bid.t_img + prev_req.duration
+                    prev_state = SimulationAgentState(prev_req.pos,
+                                                        state.x_bounds,
+                                                        state.y_bounds,
+                                                        [0.0, 0.0],
+                                                        state.v_max,
+                                                        [],
+                                                        state.status,
+                                                        t_prev,
+                                                        state.instruments)
+
+                # calculate bidding score
+                params = {"prev_state" : prev_state, "req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
+                utility = self.utility_func(**params)
+
+                # create bid
+                bid : SubtaskBid = original_results[req_i.id][subtask_j].copy()
+                bid.set_bid(utility, t_img, state.t)
+                
+                if req_i.id not in bids:
+                    bids[req_i.id] = {}    
+                bids[req_i.id][subtask_j] = bid
+
+            # look for path with the best utility
+            path_utility = self.sum_path_utility(path, bids)
+            if path_utility > winning_path_utility:
+                winning_path = path
+                winning_bids = bids
+                winning_path_utility = path_utility
+
+        return winning_path, winning_bids, winning_path_utility
+
+    def calc_imaging_time(self, state : SimulationAgentState, current_results : dict, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
+        """
+        Computes the earliest time when a task in the path would be performed
+
+        ### Arguments:
+            - state (obj:`SimulationAgentState`): state of the agent at the start of the path
+            - path (`list`): sequence of tasks dictionaries to be performed
+            - bids (`dict`): dictionary of task ids to the current task bid dictionaries 
+
+        ### Returns
+            - t_img (`float`): earliest available imaging time
+        """
+        # calculate the previous task's position and 
+        i = path.index((req,subtask_index))
+        if i == 0:
+            t_prev = state.t
+            pos_prev = state.pos
+        else:
+            req_prev, subtask_index_prev = path[i-1]
+            req_prev : MeasurementRequest
+            subtask_index_prev : int
+            bid_prev : Bid = bids[req_prev.id][subtask_index_prev]
+            t_prev : float = bid_prev.t_img + req_prev.duration
+            pos_prev : list = req_prev.pos
+
+        # compute earliest time to the task
+        t_img = state.calc_arrival_time(pos_prev, req.pos, t_prev)
+        t_img = t_img if t_img >= req.t_start else req.t_start
+        
+        # get active time constraints
+        t_consts = []
+        for subtask_index_dep in range(len(current_results[req.id])):
+            dep_bid : SubtaskBid = current_results[req.id][subtask_index_dep]
+            
+            if dep_bid.winner == SubtaskBid.NONE:
+                continue
+
+            if req.dependency_matrix[subtask_index][subtask_index_dep] > 0:
+                t_corr = req.time_dependency_matrix[subtask_index][subtask_index_dep]
+                t_consts.append((dep_bid.t_img, t_corr))
+        
+        if len(t_consts) > 0:
+            # sort time-constraints in ascending order
+            t_consts = sorted(t_consts)
+
+            # check if chosen imaging time satisfies the latest time constraints
+            t_const, t_corr = t_consts.pop()
+            if t_img + t_corr < t_const:
+                # i am performing my measurement before the other agent's earliest time; meet its imaging time
+                t_img = t_const - t_corr
+            # else:
+                # other agent images before my earliest time; expect other bidder to met my schedule
+                # or `t_img` satisfies this time constraint; no action required
+
+        return t_img
+
+    def calc_arrival_time(self, pos_start : list, pos_final : list, t_start : Union[int, float]) -> float:
+        """
+        Estimates the quickest arrival time from a starting position to a given final position
+        """
+        dpos = np.sqrt( (pos_final[0]-pos_start[0])**2 + (pos_final[1]-pos_start[1])**2 )
+        return t_start + dpos / self.v_max
+
+    def sum_path_utility(self, path : list, bids : dict) -> float:
+        utility = 0.0
+        for req, subtask_index in path:
+            req : MeasurementRequest
+            bid : SubtaskBid = bids[req.id][subtask_index]
+            utility += bid.own_bid
+
+        return utility
+
+    def coalition_test(self, current_results : dict, proposed_bid : SubtaskBid) -> float:
+        """
+        This minimality in the size of coalitions is enforced during the two
+        phases of the Modified CCBBA algorithm. In the first phase, it is carried
+        out via the COALITIONTEST subroutine (see Algorithm 1, line 14).
+        This elimination of waste of resources works by facilitating winning
+        a particular subtask j if the bidding agent has previously won all other
+        dependent subtasks. Specifically, the bid placed for each subtask, cj
+        a, is compared to the sum of the bids of the subtasks that share a dependency
+        constraint with j (D(j, q) = 1) rather than the bid placed on the
+        single subtask j. This is implemented through an availability indicator hj
+
+        ### Arguments:
+            - current_results (`dict`): list of current bids
+            - proposed_bid (:obj:`SubtaskBid`): proposed bid to be added to the bundle
+        """
+        # initiate agent bid count
+        agent_bid = proposed_bid.winning_bid
+
+        # initiate coalition bid count
+        current_bid : SubtaskBid = current_results[proposed_bid.task_id][proposed_bid.subtask_index]
+        coalition_bid = 0
+
+        for bid_i in current_results[proposed_bid.task_id]:
+            bid_i : SubtaskBid
+            bid_i_index = current_results[proposed_bid.task_id].index(bid_i)
+
+            if (    bid_i.winner == current_bid.winner
+                and current_bid.dependencies[bid_i_index] >= 0 ):
+                coalition_bid += bid_i.winning_bid
+
+            if (    bid_i.winner == proposed_bid.winner 
+                 and proposed_bid.dependencies[bid_i_index] == 1):
+                agent_bid += bid_i.winning_bid
+
+        return agent_bid > coalition_bid
+    
+    def mutex_test(self, current_results : dict, proposed_bid : SubtaskBid) -> bool:
+        # calculate total agent bid count
+        agent_bid = proposed_bid.winning_bid
+        agent_coalition = [proposed_bid.subtask_index]
+        for bid_i in current_results[proposed_bid.req_id]:
+            bid_i : SubtaskBid
+            bid_i_index = current_results[proposed_bid.req_id].index(bid_i)
+
+            if bid_i_index == proposed_bid.subtask_index:
+                continue
+
+            if proposed_bid.dependencies[bid_i_index] == 1:
+                agent_bid += bid_i.winning_bid
+                agent_coalition.append(bid_i_index)
+
+        # initiate coalition bid count
+        ## find all possible coalitions
+        task = MeasurementRequest.from_dict(proposed_bid.req)
+        possible_coalitions = []
+        for i in range(len(task.dependency_matrix)):
+            coalition = [i]
+            for j in range(len(task.dependency_matrix[i])):
+                if task.dependency_matrix[i][j] == 1:
+                    coalition.append(j)
+            possible_coalitions.append(coalition)
+        
+        # calculate total mutex bid count
+        max_mutex_bid = 0
+        for coalition in possible_coalitions:
+            mutex_bid = 0
+            for coalition_member in coalition:
+                bid_i : SubtaskBid = current_results[proposed_bid.req_id][coalition_member]
+
+                if proposed_bid.subtask_index == coalition_member:
+                    continue
+                
+                is_mutex = True
+                for agent_coalition_member in agent_coalition:
+                  if task.dependency_matrix[coalition_member][agent_coalition_member] >= 0:
+                    is_mutex = False  
+                    break
+
+                if not is_mutex:
+                    break
+                
+                mutex_bid += bid_i.winning_bid
+
+            max_mutex_bid = max(mutex_bid, max_mutex_bid)
+
+        return agent_bid > max_mutex_bid
+
+    def path_constraint_sat(self, path : list, results : dict, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids of every task in the current path have all of their constraints
+        satisfied by other bids.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        for req, subtask_index in path:
+            # check constraints
+            req : MeasurementRequest
+            if not self.check_task_constraints(results, req, subtask_index, t_curr):
+                return False
+            
+            # check local convergence
+            my_bid : SubtaskBid = results[req.id][subtask_index]
+            if t_curr < my_bid.t_update + my_bid.dt_converge:
+                return False
+
+        return True
+
+    def check_task_constraints(self, results : dict, req : MeasurementRequest, subtask_index : int, t_curr : Union[float, int]) -> bool:
+        """
+        Checks if the bids in the current results satisfy the constraints of a given task.
+
+        ### Returns:
+            - True if all constraints are met; False otherwise
+        """
+        bid : SubtaskBid = results[req.id][subtask_index]
+        bid_copy : SubtaskBid = bid.copy()
+        constraint_sat, _ = bid_copy.check_constraints(results[req.id], t_curr)
+        return constraint_sat is None
+
+
+    async def bid_broadcaster(self, bids : list, t_curr : Union[int, float], wait_for_response : bool = False, level : int = logging.DEBUG) -> None:
+        """
+        Sends bids to parent agent for broadcasting. Only sends the most recent bid of a particular task.
+
+        ### Arguments:
+            - bids (`list`): bids to be broadcasted
+        """
+
+        bid_messages = {}
+        for msg in bids:
+            msg : MeasurementBidMessage
+            bundle_bid : SubtaskBid = SubtaskBid(**msg.bid)
+            if bundle_bid.req_id not in bid_messages:
+                bid_messages[bundle_bid.req_id] = {bundle_bid.subtask_index : msg}
+
+            elif bundle_bid.subtask_index not in bid_messages[bundle_bid.req_id]:
+                bid_messages[bundle_bid.req_id][bundle_bid.subtask_index] = msg
+                
+            else:
+                # only keep most recent information for bids
+                listener_bid_msg : MeasurementBidMessage = bid_messages[bundle_bid.req_id][bundle_bid.subtask_index]
+                listener_bid : SubtaskBid = SubtaskBid(**listener_bid_msg.bid)
+                if bundle_bid.t_update >= listener_bid.t_update:
+                    bid_messages[bundle_bid.req_id][bundle_bid.subtask_index] = msg
+
+        # build plan
+        plan = []
+        changes = []
+        for req_id in bid_messages:
+            for subtask_index in bid_messages[req_id]:
+                bid_message : MeasurementBidMessage = bid_messages[req_id][subtask_index]
+                changes.append(bid_message)
+                plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
+        
+        if wait_for_response:
+            plan.append(WaitForMessages(t_curr, t_curr + 1).to_dict())
+        
+        # send to agent
+        self.log(f'bids compared! generating plan with {len(bid_messages)} bid messages')
+        plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), plan)
+        await self._send_manager_msg(plan_msg, zmq.PUB)
+        self.log(f'actions sent!')
+
+        # wait for tasks to be completed
+        plan_ids = [action['id'] for action in plan]
+        misc_action_msgs = []
+        while len(plan_ids) > 0:
+            action_msg : AgentActionMessage = await self.action_status_inbox.get()
+            action_completed = AgentAction(**action_msg.action)
+
+            if action_completed.id in plan_ids:
+                plan_ids.remove(action_completed.id)
+            
+            else:
+                misc_action_msgs.append(action_msg)
+
+        for action_msg in misc_action_msgs:
+            await self.action_status_inbox.put(action_msg)
+
+        self.log_changes("BROADCASTS SENT", changes, level)
+
+    async def action_broadcaster(self, next_actions : list) -> None:
+        """
+        Sends the parent agent a list of actions to be performed
+        """
+        # generate plan dictionaries for transmission
+        actions_dict = [action.to_dict() for action in next_actions]
+
+        # send plan to agent
+        self.log(f'bids compared! generating plan with {len(next_actions)} action(s).')
+        plan_msg = PlanMessage(self.get_element_name(), self.get_parent_name(), actions_dict)
+        await self._send_manager_msg(plan_msg, zmq.PUB)
+        self.log(f'actions sent!')
+
+        self.log(f'plan sent {[action.action_type for action in next_actions]}', level=logging.DEBUG)
+
+
+    # LOGGING TOOLS
+    def log_results(self, dsc : str, results : dict, level=logging.DEBUG) -> None:
+        """
+        Logs current results at a given time for debugging purposes
+
+        ### Argumnents:
+            - dsc (`str`): description of what is to be logged
+            - results (`dict`): results to be logged
+            - level (`int`): logging level to be used
+        """
+        if self._logger.getEffectiveLevel() <= level:
+            headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            data = []
+            for task_id in results:
+                if isinstance(results[task_id], list):
+                    for bid in results[task_id]:
+                        bid : SubtaskBid
+                        task = MeasurementRequest.from_dict(bid.req)
+                        split_id = task.id.split('-')
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        data.append(line)
+                elif isinstance(results[task_id], dict):
+                    for bid_index in results[task_id]:
+                        bid : SubtaskBid = results[task_id][bid_index]
+                        task = MeasurementRequest.from_dict(bid.req)
+                        split_id = task.id.split('-')
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        data.append(line)
+                else:
+                    raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
+
+            df = pd.DataFrame(data, columns=headers)
+            self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
+    
+    def log_task_sequence(self, dsc : str, sequence : list, level=logging.DEBUG) -> None:
+        """
+        Logs a sequence of tasks at a given time for debugging purposes
+
+        ### Argumnents:
+            - dsc (`str`): description of what is to be logged
+            - sequence (`list`): list of tasks to be logged
+            - level (`int`): logging level to be used
+        """
+        if self._logger.getEffectiveLevel() <= level:
+            out = f'\n{dsc} [Iter {self.iter_counter}] = ['
+            for req, subtask_index in sequence:
+                req : MeasurementRequest
+                subtask_index : int
+                split_id = req.id.split('-')
+                
+                if sequence.index((req, subtask_index)) > 0:
+                    out += ', '
+                out += f'({split_id[0]}, {subtask_index})'
+            out += ']\n'
+
+            self.log(out,level)
+
+    def log_changes(self, dsc : str, changes : list, level=logging.DEBUG) -> None:
+        if self._logger.getEffectiveLevel() <= level:
+            headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            data = []
+            for change in changes:
+                change : MeasurementBidMessage
+                bid = SubtaskBid(**change.bid)
+                req = MeasurementRequest.from_dict(bid.req)
+                split_id = req.id.split('-')
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                data.append(line)
+        
+            df = pd.DataFrame(data, columns=headers)
+            self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
+
+    def log_plan(self, results : dict, plan : list, t : Union[int, float], level=logging.DEBUG) -> None:
+        headers = ['t', 'task_id', 'subtask_index', 't_start', 't_end', 't_img', 'u_exp']
+        data = []
+
+        for action in plan:
+            if isinstance(action, MeasurementAction):
+                req : MeasurementRequest = MeasurementRequest.from_dict(action.measurement_req)
+                task_id = req.id.split('-')[0]
+                subtask_index : int = action.subtask_index
+                subtask_bid : SubtaskBid = results[req.id][subtask_index]
+                t_img = subtask_bid.t_img
+                winning_bid = subtask_bid.winning_bid
+            elif isinstance(action, TravelAction) or isinstance(action, ManeuverAction):
+                task_id = action.id.split('-')[0]
+                subtask_index = -1
+                t_img = -1
+                winning_bid = -1
+            else:
+                continue
+            
+            line_data = [   t,
+                            task_id,
+                            subtask_index,
+                            np.round(action.t_start,3 ),
+                            np.round(action.t_end,3 ),
+                            np.round(t_img,3 ),
+                            np.round(winning_bid,3)
+            ]
+            data.append(line_data)
+
+        df = pd.DataFrame(data, columns=headers)
+        self.log(f'\nPLANNER HISTORY\n{str(df)}\n', level)
+
+    async def teardown(self) -> None:
+        # log plan history
+        headers = ['plan_index', 't', 'task_id', 'subtask_index', 't_img', 'u_exp']
+        data = []
+
+        for i in range(len(self.plan_history)):
+            for t, req, subtask_index, subtask_bid in self.plan_history[i]:
+                req : MeasurementRequest
+                subtask_index : int
+                subtask_bid : SubtaskBid
+                
+                line_data = [   i,
+                                t,
+                                req.id.split('-')[0],
+                                subtask_index,
+                                np.round(subtask_bid.t_img,3 ),
+                                np.round(subtask_bid.winning_bid,3)
+                ]
+                data.append(line_data)
+
+        df = pd.DataFrame(data, columns=headers)
+        self.log(f'\nPLANNER HISTORY\n{str(df)}\n', level=logging.WARNING)
+        df.to_csv(f"{self.results_path}/{self.get_parent_name()}/planner_history.csv", index=False)
+
+        await super().teardown()

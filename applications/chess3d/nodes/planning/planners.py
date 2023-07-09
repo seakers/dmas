@@ -1,6 +1,4 @@
 from typing import Any, Callable
-from nodes.science.reqs import MeasurementRequest
-from nodes.states import SimulationAgentState
 from messages import *
 from dmas.modules import *
 
@@ -270,7 +268,7 @@ class PlanningModule(InternalModule):
         self.states_inbox = asyncio.Queue()
         self.action_status_inbox = asyncio.Queue()
         self.measurement_req_inbox = asyncio.Queue()
-        self.relevant_changes_inbox = asyncio.Queue()
+        self.measurement_bid_inbox = asyncio.Queue()
 
     async def live(self) -> None:
         """
@@ -352,13 +350,13 @@ class PlanningModule(InternalModule):
                             # send to planner
                             await self.measurement_req_inbox.put(req_msg)
 
-                        elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
+                        elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_BID.value:
                             # unpack message 
-                            req_msg = MeasurementRequestMessage(**sense)
+                            bid_msg = MeasurementBidMessage(**sense)
                             self.log(f"received measurement request message!")
                             
                             # send to planner
-                            await self.measurement_req_inbox.put(req_msg)
+                            await self.measurement_bid_inbox.put(bid_msg)
 
                         # TODO support down-linked information processing
 

@@ -25,7 +25,7 @@ def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
     elif msg_type == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
         return AgentConnectivityUpdate(**kwargs)
     elif msg_type == SimulationMessageTypes.MEASUREMENT_BID.value:
-        return MeasurementRequestBidMessage(**kwargs)
+        return MeasurementBidMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.PLAN.value:
         return PlanMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.SENSES.value:
@@ -125,9 +125,9 @@ class MeasurementResultsRequestMessage(SimulationMessage):
         self.agent_state = agent_state
         self.measurement = {}
 
-class MeasurementRequestBidMessage(SimulationMessage):
+class MeasurementBidMessage(SimulationMessage):
     """
-    ## Task Bid Message
+    ## Measurment Bid Message
 
     Informs another agents of the bid information held by the sender
 
