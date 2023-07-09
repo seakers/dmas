@@ -101,7 +101,7 @@
                 }
             },
             "planner": {
-                "@type": "GREEDY",
+                "@type": "MACCBBA",
                 "utility": "FIXED"
             },
             "notifier": "True",
@@ -195,7 +195,7 @@
                 }
             },
             "planner": {
-                "@type": "GREEDY",
+                "@type": "MACCBBA",
                 "utility": "FIXED"
             },
             "notifier": "True",

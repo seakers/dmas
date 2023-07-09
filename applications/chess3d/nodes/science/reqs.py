@@ -124,13 +124,13 @@ class MeasurementRequest(object):
 
                 if index_a == index_b:
                     dependencies.append(0)
-                    # continue
 
-                    dependencies.append(-1)
                 elif main_a not in dependents_b or main_b not in dependents_a:
                     dependencies.append(-1)
+
                 elif main_a == main_b:
                     dependencies.append(-1)
+                    
                 else:
                     dependents_a_extended : list = copy.deepcopy(dependents_a)
                     dependents_a_extended.remove(main_b)

@@ -585,6 +585,8 @@ class ScienceModule(InternalModule):
                 self.log(f'Scenario 2 bloom outlier checked!',level=logging.DEBUG)
             else:
                 science_val = 0.0
+        else:
+            science_val = 0.0
         if outlier:
             self.log(f'Computed bonus science value: {science_val}', level=logging.INFO)
             outlier = True

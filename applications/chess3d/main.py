@@ -8,6 +8,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from applications.chess3d.nodes.planning.maccbba import MACCBBA
 from nodes.planning.greedy import GreedyPlanner
 from nodes.science.reqs import GroundPointMeasurementRequest
 from nodes.actions import TravelAction
@@ -234,6 +235,14 @@ if __name__ == "__main__":
                                             fixed_utility,
                                             payload,
                                             logger=logger)
+                elif planner_type == PlannerTypes.MACCBBA.value:
+                    planner = MACCBBA(results_path,
+                                        agent_name, 
+                                        agent_network_config,
+                                        fixed_utility,
+                                        payload,
+                                        logger=logger)
+
                 else:
                     raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
             else:
@@ -247,7 +256,7 @@ if __name__ == "__main__":
                             100.69348801752179
                             ]
                 plan = [ 
-                        # TravelAction(final_pos, 0.0) 
+                            TravelAction(final_pos, 0.0) 
                         ]
 
                 planner = FixedPlanner(results_path, 
@@ -262,6 +271,7 @@ if __name__ == "__main__":
                 raise NotImplementedError(f"Science module not yet implemented.")
             else:
                 science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
+                # science = None
             ## load initial state 
             initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
 

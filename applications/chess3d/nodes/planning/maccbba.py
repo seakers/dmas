@@ -1,5 +1,8 @@
 import copy
 import logging
+import math
+import os
+import re
 import time
 import pandas as pd
 import numpy as np
@@ -112,7 +115,7 @@ class SubtaskBid(Bid):
         self.dt_converge = dt_converge
 
     def update(self, other_dict : dict, t : Union[float, int]) -> tuple:
-        broadcast_out, changed = super().update(other_dict, t)
+        broadcast_out, changed = self.__update_rules(other_dict, t)
         broadcast_out : Bid; changed : bool
 
         if broadcast_out is not None:
@@ -122,6 +125,213 @@ class SubtaskBid(Bid):
             else:
                 return self, changed
         return None, changed
+
+    def __update_rules(self, other_dict : dict, t : Union[float, int]) -> tuple:
+        """
+        Compares bid with another and either updates, resets, or leaves the information contained in this bid
+        depending on the rules specified in:
+            - Whitten, Andrew K., et al. "Decentralized task allocation with coupled constraints in complex missions." Proceedings of the 2011 American Control Conference. IEEE, 2011.
+
+        ### Arguments:
+            - other_dict (`dict`): dictionary representing the bid being compared to
+            - t (`float` or `dict`): time when this information is being updated
+
+        ### Returns:
+            - rebroadcast (`TaskBid` or `NoneType`): bid information to be rebroadcasted to other agents.
+            - changed (`bool`): boolean value indicating if a change was made to this bid
+        """
+        other : SubtaskBid = SubtaskBid(**other_dict)
+        prev : SubtaskBid = self.copy() 
+
+        if self.req_id != other.req_id:
+            # if update is for a different task, ignore update
+            raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id})')
+
+        if other.bidder == self.bidder:
+            if other.t_update > self.t_update:
+                self._update_info(other,t)
+                return self, prev==self
+            else:
+                self._leave(t)
+                return None, False
+        
+        elif other.winner == other.NONE:
+            if self.winner == self.bidder:
+                # leave and rebroadcast
+                self._leave(t)
+                return self, False
+
+            elif self.winner == other.bidder:
+                # update and rebroadcast
+                self._update_info(other, t)
+                return other, prev==self
+
+            elif self.winner not in [self.bidder, other.bidder, self.NONE]:
+                if other.t_update > self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+
+            elif self.winner == self.NONE:
+                # leave and no rebroadcast
+                self._leave(t)
+                return None, False
+
+        elif other.winner == other.bidder:
+            if self.winner == self.bidder:
+                if other.winning_bid > self.winning_bid:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+                    
+                elif other.winning_bid == self.winning_bid:
+                    # if there's a tie, bidder with the smallest id wins
+                    if self._tie_breaker(other, self):
+                        # update and rebroadcast
+                        self._update_info(other, t)
+                        return other, prev==self
+
+                if other.winning_bid < self.winning_bid:
+                    # update time and rebroadcast
+                    self.__update_time(t)
+                    return self, prev==self
+
+            elif self.winner == other.bidder:
+                if other.t_update >= self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+
+                elif abs(other.t_update - self.t_update) < 1e-6:
+                    # leave and no rebroadcast
+                    self._leave(t)
+                    return None, False
+
+                elif other.t_update < self.t_update:
+                    # leave and no rebroadcast
+                    self._leave(t)
+                    return None, False
+
+            elif self.winner not in [self.bidder, other.bidder, self.NONE]:
+                if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+
+                elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
+                    #leave and rebroadcast
+                    self._leave(t)
+                    return self, False
+
+                elif other.winning_bid == self.winning_bid:
+                    # leave and rebroadcast
+                    self._leave(t)
+                    return self, False
+
+                elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+                    
+                elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+
+            elif self.winner == self.NONE:
+                # update and rebroadcast
+                self._update_info(other, t)
+                return other, prev==self
+
+        elif other.winner == self.bidder:
+            if self.winner == self.NONE:
+                # leave and rebroadcast with current update time
+                self.__update_time(t)
+                return self, prev==self
+
+            elif self.winner == self.bidder:
+                if abs(other.t_update - self.t_update) < 1e-6:
+                    # leave and no rebroadcast
+                    self._leave(t)
+                    return None, False
+                
+            elif self.winner == other.bidder and other.bidder != self.bidder:
+                # reset and rebroadcast with current update time
+                self.reset(t)
+                return self, prev==self
+
+            elif self.winner not in [self.bidder, other.bidder, self.NONE]:
+                # leave and rebroadcast
+                self._leave(t)
+                return self, False
+
+        elif other.winner not in [self.bidder, other.bidder]:
+            if self.winner == self.bidder:
+                if other.winning_bid > self.winning_bid:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+
+                elif other.winning_bid == self.winning_bid:
+                    # if there's a tie, bidder with the smallest id wins
+                    if self._tie_breaker(other, self):
+                        # update and rebroadcast
+                        self._update_info(other, t)
+                        return other, prev==self
+
+                elif other.winning_bid < self.winning_bid:
+                    # update time and rebroadcast
+                    self.__update_time(t)
+                    return other, prev==self
+
+            elif self.winner == other.bidder:
+                # update and rebroadcast
+                self._update_info(other, t)
+                return other, prev==self
+
+            elif self.winner == other.winner:
+                if other.t_update > self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+                    
+                elif abs(other.t_update - self.t_update) < 1e-6:
+                    # leave and no rebroadcast
+                    self._leave(t)
+                    return None, False
+
+                elif other.t_update < self.t_update:
+                    # leave and rebroadcast
+                    self._leave(t)
+                    return self, False
+
+            elif self.winner not in [self.bidder, other.bidder, other.winner, self.NONE]:
+                if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+
+                elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
+                    # leave and rebroadcast
+                    self._leave(t)
+                    return self, False
+                    
+                elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev==self
+                    
+                elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
+                    # leave and rebroadcast
+                    self._leave(t)
+                    return self, prev==self
+
+            elif self.winner == self.NONE:
+                # update and rebroadcast
+                self._update_info(other, t)
+                return other, prev==self
+        
+        return None, prev==self
 
     def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
         """
@@ -193,6 +403,33 @@ class SubtaskBid(Bid):
         Checks if this bid has a winner
         """
         return self.winner != Bid.NONE
+
+    def _update_info(self, 
+                    other, 
+                    t : Union[float, int]
+                    ) -> None:
+        """
+        Updates all of the variable bid information
+
+        ### Arguments:
+            - other (`TaskBid`): equivalent bid being used to update information
+            - t (`float` or `dict`): time when this information is being updated
+        """
+        if t < self.t_update:
+            # if update is from an older time than this bid, ignore update
+            raise ValueError(f'attempting to update bid with outdated information.')
+
+        super()._update_info(other)
+        self.__update_time(t)
+
+    def __update_time(self, t_update : Union[float, int]) -> None:
+        """
+        Only updates the time since this bid was last updated
+
+        ### Arguments:
+            - t_update (`float` or `int`): latest time when this bid was updated
+        """
+        self.t_update = t_update
 
     def __set_violation_timer(self, t : Union[int, float]) -> None:
         """
@@ -400,6 +637,7 @@ class MACCBBA(PlanningModule):
         try:
             results, bundle, path, plan, prev_actions = {}, [], [], [], []
             t_curr = 0
+            # level = logging.WARNING
             level = logging.DEBUG
 
             while True:
@@ -727,7 +965,7 @@ class MACCBBA(PlanningModule):
         """
         converged = False
         self.iter_counter = -1
-        # level = logging.WARNING
+        level = logging.WARNING
 
         while True:
             # Phase 2: Consensus 
@@ -763,7 +1001,7 @@ class MACCBBA(PlanningModule):
             
             # Update State
             state_msg : AgentStateMessage = await self.states_inbox.get()
-            state = SimulationAgentState(**state_msg.state)
+            state = SimulationAgentState.from_dict(state_msg.state)
             t_curr = state.t
             await self.update_current_time(t_curr)  
 
@@ -855,6 +1093,29 @@ class MACCBBA(PlanningModule):
         changes = []
         rebroadcasts = []
         bids_received = {}
+
+        # check for incoming measurement requests
+        while not self.measurement_req_inbox.empty():
+            # get next request
+            req_msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
+
+            # unpackage request
+            req = MeasurementRequest.from_dict(req_msg.req)
+            new_req = req.id not in results
+            if new_req:
+                # was not aware of this request; add to results as a blank bid
+                results[req.id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
+
+                # add to changes broadcast
+                my_bid : SubtaskBid = results[req.id][0]
+                out_msg = MeasurementBidMessage(   
+                                        self.get_parent_name(), 
+                                        self.get_parent_name(), 
+                                        my_bid.to_dict()
+                                    )
+                rebroadcasts.append(out_msg)
+            
+        # check for any incoming bid requests
         while not self.measurement_bid_inbox.empty():
             # get next bid
             bid_msg : MeasurementBidMessage = await self.measurement_bid_inbox.get()
@@ -866,11 +1127,11 @@ class MACCBBA(PlanningModule):
             bids_received[their_bid.req_id][their_bid.subtask_index] = their_bid
             
             # check if bid exists for this task
-            new_task = their_bid.req_id not in results
-            if new_task:
+            new_req = their_bid.req_id not in results
+            if new_req:
                 # was not aware of this task; add to results as a blank bid
-                task = MeasurementRequest.from_dict(their_bid.req)
-                results[their_bid.req_id] = SubtaskBid.subtask_bids_from_task(task, self.get_parent_name())
+                req = MeasurementRequest.from_dict(their_bid.req)
+                results[their_bid.req_id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
 
             # compare bids
             my_bid : SubtaskBid = results[their_bid.req_id][their_bid.subtask_index]
@@ -883,8 +1144,8 @@ class MACCBBA(PlanningModule):
             results[their_bid.req_id][their_bid.subtask_index] = my_bid
                 
             # if relevant changes were made, add to changes broadcast
-            if broadcast_bid or new_task:                    
-                broadcast_bid = broadcast_bid if not new_task else my_bid
+            if broadcast_bid or new_req:                    
+                broadcast_bid = broadcast_bid if not new_req else my_bid
                 out_msg = MeasurementBidMessage(   
                                         self.get_parent_name(), 
                                         self.get_parent_name(), 
@@ -892,8 +1153,8 @@ class MACCBBA(PlanningModule):
                                     )
                 rebroadcasts.append(out_msg)
 
-            if changed or new_task:
-                changed_bid = broadcast_bid if not new_task else my_bid
+            if changed or new_req:
+                changed_bid = broadcast_bid if not new_req else my_bid
                 out_msg = MeasurementBidMessage(   
                                         self.get_parent_name(), 
                                         self.get_parent_name(), 
@@ -1248,10 +1509,11 @@ class MACCBBA(PlanningModule):
                 for time in times:
                     time *= self.orbitdata.time_step 
 
-                    if state.t + self.planning_horizon < time:
-                        continue
+                    # if state.t + self.planning_horizon < time:
+                    #     continue
 
-                    elif time < req.t_end:
+                    # elif time < req.t_end:
+                    if time < req.t_end:
                         # there exists an access time before the request's availability ends
                         can_access = True
                         break
@@ -1370,9 +1632,20 @@ class MACCBBA(PlanningModule):
                 subtask_j : int
                 t_img = self.calc_imaging_time(prev_state, original_results, req_i, subtask_j, t_prev)
 
+                if isinstance(prev_state, SatelliteAgentState):
+                    future_state : SatelliteAgentState = prev_state.propagate(t_prev)
+                    future_state.attitude = [
+                                            future_state.calc_off_nadir_agle(req_i),
+                                            0.0,
+                                            0.0
+                                        ]
+                else:
+                    raise NotImplementedError(f"cannot calculate future state for agent states of type {type(state)}")
+
+
                 # calculate bidding score
-                params = {"prev_state" : prev_state, "req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
-                utility = self.utility_func(**params)
+                params = {"prev_state" : future_state, "req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
+                utility = self.utility_func(**params) if req_i.t_start <= t_img < req_i.t_end else 0.0
 
                 # create bid
                 bid : SubtaskBid = original_results[req_i.id][subtask_j].copy()
@@ -1380,8 +1653,7 @@ class MACCBBA(PlanningModule):
                 
                 if req_i.id not in bids:
                     bids[req_i.id] = {}    
-                bids[req_i.id][subtask_j] = bid
-                state = prev_state
+                bids[req_i.id][subtask_j] = bid                
 
             # look for path with the best utility
             path_utility = self.sum_path_utility(path, bids)
@@ -1706,6 +1978,96 @@ class MACCBBA(PlanningModule):
         
         return plan
 
+    
+    async def get_next_actions(self, bundle : list, path : list, plan : list, prev_actions : list, t_curr : Union[int, float]) -> None:
+        """
+        A plan has already been developed and is being performed; check plan complation status
+        """
+        actions = []
+
+        if len(prev_actions) == 0:
+            if len(plan) > 0:
+                next_task : AgentAction = plan[0]
+                if t_curr >= next_task.t_start:
+                    actions.append(next_task)
+                else:
+                    actions.append( WaitForMessages(t_curr, next_task.t_start) )
+        
+        else:
+            if self.action_status_inbox.empty():
+                # wait for task completion statuses to arrive from parent agent
+                await self.action_status_inbox.put(await self.action_status_inbox.get())
+
+            while not self.action_status_inbox.empty():
+                action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                performed_action = AgentAction(**action_msg.action)
+                self.log(f'Reveived action status for action of type {performed_action.action_type}!', level=logging.DEBUG)
+
+                if len(plan) < 1:
+                    continue
+
+                latest_plan_action : AgentAction = plan[0]
+                if performed_action.id != latest_plan_action.id:
+                    # some other task was performed; ignoring 
+                    self.log(f'Action of type {performed_action.action_type} was not part of original plan. Ignoring completion status.', level=logging.DEBUG)
+                    continue
+
+                elif performed_action.status == AgentAction.PENDING:
+                    # latest action from plan was attepted but not completed; performing again
+                    
+                    if t_curr < performed_action.t_start:
+                        # if action was not ready to be performed, wait for a bit
+                        self.log(f'Action of type {performed_action.action_type} was attempted before its start time. Waiting for a bit...', level=logging.DEBUG)
+                        actions.append( WaitForMessages(t_curr, performed_action.t_start) )
+                    else:
+                        # try to perform action again
+                        self.log(f'Action of type {performed_action.action_type} was attempted but not completed. Trying again...', level=logging.DEBUG)
+                        actions.append(plan[0])
+
+                elif performed_action.status == AgentAction.COMPLETED or performed_action.status == AgentAction.ABORTED:
+                    # latest action from plan was completed! performing next action in plan
+                    done_action : AgentAction = plan.pop(0)
+                    self.log(f'Completed action of type {done_action.action_type}!', level=logging.DEBUG)
+
+                    if done_action.action_type == ActionTypes.MEASURE.value:
+                        done_action : MeasurementAction
+                        done_task = MeasurementRequest.from_dict(done_action.measurement_req)
+                        
+                        # if a measurement action was completed, remove from bundle and path
+                        if (done_task, done_action.subtask_index) in path:
+                            path.remove((done_task, done_action.subtask_index))
+                            bundle.remove((done_task, done_action.subtask_index))
+
+                    if len(plan) > 0:
+                        next_task : AgentAction = plan[0]
+                        if t_curr >= next_task.t_start:
+                            actions.append(next_task)
+                        else:
+                            actions.append( WaitForMessages(t_curr, next_task.t_start) )
+        
+        if len(actions) == 0:
+            if len(plan) > 0:
+                next_task : AgentAction = plan[0]
+                if t_curr >= next_task.t_start:
+                    actions.append(next_task)
+                else:
+                    actions.append( WaitForMessages(t_curr, next_task.t_start) )
+        
+            else:
+                if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                    if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
+                        actions.append( WaitForMessages(t_curr, t_curr + self.orbitdata.time_step) )
+                    else:
+                        actions.append( WaitForMessages(t_curr, t_curr + self._clock_config.get_time_step()) )
+
+                elif isinstance(self._clock_config, EventDrivenClockConfig):
+                    t_next = np.Inf 
+                    actions.append( WaitForMessages(t_curr, t_next) )
+                else:
+                    actions.append( WaitForMessages(t_curr, t_curr + 1) )
+
+        return bundle, path, plan, actions
+
     async def bid_broadcaster(self, bids : list, t_curr : Union[int, float], wait_for_response : bool = False, level : int = logging.DEBUG) -> None:
         """
         Sends bids to parent agent for broadcasting. Only sends the most recent bid of a particular task.
@@ -1738,7 +2100,7 @@ class MACCBBA(PlanningModule):
             for subtask_index in bid_messages[req_id]:
                 bid_message : MeasurementBidMessage = bid_messages[req_id][subtask_index]
                 changes.append(bid_message)
-                plan.append(BroadcastMessageAction(bid_message.to_dict()).to_dict())
+                plan.append(BroadcastMessageAction(bid_message.to_dict(), t_curr).to_dict())
         
         if wait_for_response:
             plan.append(WaitForMessages(t_curr, t_curr + 1).to_dict())

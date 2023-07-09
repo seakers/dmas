@@ -110,7 +110,7 @@ class Bid(ABC):
         self.winner = self.NONE
         self.t_img = -1
 
-    def _leave(self, **_) -> None:
+    def _leave(self, _, **__) -> None:
         """
         Leaves bid as is (used for algorithm readibility).
 
