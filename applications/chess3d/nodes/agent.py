@@ -280,7 +280,7 @@ class SimulationAgent(Agent):
                 else:
                     if isinstance(self._clock_config, FixedTimesStepClockConfig) or isinstance(self._clock_config, EventDrivenClockConfig):
                         # give the agent time to finish sending/processing messages before submitting a tic-request
-                        if t_curr < 1e-3:
+                        if t_curr < 1e-3 or task.t_end == np.Inf:
                             await asyncio.sleep(1e-1)
                         else:
                             await asyncio.sleep(5e-2)
@@ -312,7 +312,7 @@ class SimulationAgent(Agent):
                         except asyncio.CancelledError:
                             # update action completion status
                             if self.external_inbox.empty():
-                                action.status = AgentAction.PENDING
+                                action.status = AgentAction.ABORTED
                             else:
                                 action.status = AgentAction.COMPLETED
             

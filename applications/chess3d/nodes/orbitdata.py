@@ -88,6 +88,7 @@ class OrbitData:
         return TimeInterval(-np.Infinity, np.Infinity)
 
     def get_next_gs_access_interval(self, t):
+        # TODO
         return [-np.Infinity, np.Infinity]
 
     def get_next_gp_access_interval(self, lat: float, lon: float, t: float):
@@ -98,6 +99,7 @@ class OrbitData:
         grid_index, gp_index, _, _ = self.find_gp_index(lat, lon)
 
         # find next access
+        # TODO
         interval = TimeInterval(-np.Infinity, np.Infinity)
         instruments = []
         modes = dict()

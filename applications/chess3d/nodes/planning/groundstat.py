@@ -69,8 +69,8 @@ class GroundStationPlanner(FixedPlanner):
                         self.log(f'action {action_dict} not completed yet! trying again...')
                         plan_out.append(action_dict)
 
-                    elif msg.status == AgentAction.COMPLETED:
-                        # if action was completed, remove from plan
+                    else:
+                        # if action was completed or aborted, remove from plan
                         action_dict : dict = msg.action
                         completed_action = AgentAction(**action_dict)
                         removed = None
@@ -97,7 +97,11 @@ class GroundStationPlanner(FixedPlanner):
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    t_idle = t_curr + 1e8 # TODO find end of simulation time        
+                    if len(self.plan) > 0:
+                        next_action : AgentAction = self.plan[0]
+                        t_idle = next_action.t_start
+                    else:
+                        t_idle = t_curr + 1e8 # TODO find end of simulation time        
                     action = WaitForMessages(t_curr, t_idle)
                     plan_out.append(action.to_dict())
                     

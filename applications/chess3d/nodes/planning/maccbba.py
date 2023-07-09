@@ -2061,7 +2061,11 @@ class MACCBBA(PlanningModule):
                         actions.append( WaitForMessages(t_curr, t_curr + self._clock_config.get_time_step()) )
 
                 elif isinstance(self._clock_config, EventDrivenClockConfig):
-                    t_next = np.Inf 
+                    if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
+                        # t_next_gp = self.orbitdata.get_next_gp_access_interval()
+                        t_next = np.Inf 
+                    else:
+                        t_next = np.Inf 
                     actions.append( WaitForMessages(t_curr, t_next) )
                 else:
                     actions.append( WaitForMessages(t_curr, t_curr + 1) )
@@ -2075,6 +2079,8 @@ class MACCBBA(PlanningModule):
         ### Arguments:
             - bids (`list`): bids to be broadcasted
         """
+        if len(bids) == 0 :
+            x = 1
 
         bid_messages = {}
         for msg in bids:
