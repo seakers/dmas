@@ -5,15 +5,14 @@ import pandas as pd
 import numpy as np
 import zmq
 from typing import Any, Callable, Union
-from dmas.agents import AgentAction
+from nodes.science.reqs import MeasurementRequest, GroundPointMeasurementRequest
+from nodes.planning.planners import Bid, PlanningModule
+from nodes.orbitdata import OrbitData
+from nodes.states import SatelliteAgentState, SimulationAgentTypes, SimulationAgentState, UAVAgentState
 from nodes.actions import *
-from nodes.states import SimulationAgentState
 from messages import *
-from nodes.science.reqs import MeasurementRequest
-from nodes.planning.planners import Bid
+from dmas.agents import AgentAction
 from dmas.network import NetworkConfig
-from nodes.planning.planners import PlanningModule
-
 
 class SubtaskBid(Bid):
     """
@@ -395,6 +394,7 @@ class MACCBBA(PlanningModule):
         self.payload = payload
         self.max_bundle_size = max_bundle_size
         self.planning_horizon = planning_horizon
+        self.parent_agent_type = None
     
     async def planner(self) -> None:
         try:
@@ -406,6 +406,21 @@ class MACCBBA(PlanningModule):
                 # wait for next agent plan check
                 state_msg : AgentStateMessage = await self.states_inbox.get()
                 state = SimulationAgentState.from_dict(state_msg.state)
+
+                if self.parent_agent_type is None:
+                    if isinstance(state, SatelliteAgentState):
+                        # import orbit data
+                        self.orbitdata : OrbitData = self.__load_orbit_data()
+                        self.parent_agent_type = SimulationAgentTypes.SATELLITE.value
+                    
+                    elif isinstance(state, UAVAgentState):
+                        # TODO Add UAV support
+                        raise NotImplementedError(f"states of type {state_msg.state['state_type']} not supported for greedy planners.")
+                    
+                    else:
+                        raise NotImplementedError(f"states of type {state_msg.state['state_type']} not supported for greedy planners.")
+
+
                 t_curr = state.t
                 await self.update_current_time(t_curr)                
 
@@ -523,6 +538,171 @@ class MACCBBA(PlanningModule):
                                 
         except asyncio.CancelledError:
             return 
+
+    def __load_orbit_data(self) -> OrbitData:
+        if self.parent_agent_type != None:
+            raise RuntimeError(f"orbit data already loaded. It can only be assigned once.")            
+
+        scenario_name = self.results_path.split('/')[-1]
+        scenario_dir = f'./scenarios/{scenario_name}/'
+        data_dir = scenario_dir + '/orbitdata/'
+
+        with open(scenario_dir + '/MissionSpecs.json', 'r') as scenario_specs:
+            # load json file as dictionary
+            mission_dict : dict = json.load(scenario_specs)
+            spacecraft_list : list = mission_dict.get('spacecraft', None)
+            ground_station_list = mission_dict.get('groundStation', None)
+            
+            for spacecraft in spacecraft_list:
+                spacecraft : dict
+                name = spacecraft.get('name')
+                index = spacecraft_list.index(spacecraft)
+                agent_folder = "sat" + str(index) + '/'
+
+                if name != self.get_parent_name():
+                    continue
+
+                # load eclipse data
+                eclipse_file = data_dir + agent_folder + "eclipses.csv"
+                eclipse_data = pd.read_csv(eclipse_file, skiprows=range(3))
+                
+                # load position data
+                position_file = data_dir + agent_folder + "state_cartesian.csv"
+                position_data = pd.read_csv(position_file, skiprows=range(4))
+
+                # load propagation time data
+                time_data =  pd.read_csv(position_file, nrows=3)
+                _, epoc_type, _, epoc = time_data.at[0,time_data.axes[1][0]].split(' ')
+                epoc_type = epoc_type[1 : -1]
+                epoc = float(epoc)
+                _, _, _, _, time_step = time_data.at[1,time_data.axes[1][0]].split(' ')
+                time_step = float(time_step)
+
+                time_data = { "epoc": epoc, 
+                            "epoc type": epoc_type, 
+                            "time step": time_step }
+
+                # load inter-satellite link data
+                isl_data = dict()
+                for file in os.listdir(data_dir + '/comm/'):                
+                    isl = re.sub(".csv", "", file)
+                    sender, _, receiver = isl.split('_')
+
+                    if 'sat' + str(index) in sender or 'sat' + str(index) in receiver:
+                        isl_file = data_dir + 'comm/' + file
+                        if 'sat' + str(index) in sender:
+                            receiver_index = int(re.sub("[^0-9]", "", receiver))
+                            receiver_name = spacecraft_list[receiver_index].get('name')
+                            isl_data[receiver_name] = pd.read_csv(isl_file, skiprows=range(3))
+                        else:
+                            sender_index = int(re.sub("[^0-9]", "", sender))
+                            sender_name = spacecraft_list[sender_index].get('name')
+                            isl_data[sender_name] = pd.read_csv(isl_file, skiprows=range(3))
+
+                # load ground station access data
+                gs_access_data = pd.DataFrame(columns=['start index', 'end index', 'gndStn id', 'gndStn name','lat [deg]','lon [deg]'])
+                for file in os.listdir(data_dir + agent_folder):
+                    if 'gndStn' in file:
+                        gndStn_access_file = data_dir + agent_folder + file
+                        gndStn_access_data = pd.read_csv(gndStn_access_file, skiprows=range(3))
+                        nrows, _ = gndStn_access_data.shape
+
+                        if nrows > 0:
+                            gndStn, _ = file.split('_')
+                            gndStn_index = int(re.sub("[^0-9]", "", gndStn))
+                            
+                            gndStn_name = ground_station_list[gndStn_index].get('name')
+                            gndStn_id = ground_station_list[gndStn_index].get('@id')
+                            gndStn_lat = ground_station_list[gndStn_index].get('latitude')
+                            gndStn_lon = ground_station_list[gndStn_index].get('longitude')
+
+                            gndStn_name_column = [gndStn_name] * nrows
+                            gndStn_id_column = [gndStn_id] * nrows
+                            gndStn_lat_column = [gndStn_lat] * nrows
+                            gndStn_lon_column = [gndStn_lon] * nrows
+
+                            gndStn_access_data['gndStn name'] = gndStn_name_column
+                            gndStn_access_data['gndStn id'] = gndStn_id_column
+                            gndStn_access_data['lat [deg]'] = gndStn_lat_column
+                            gndStn_access_data['lon [deg]'] = gndStn_lon_column
+
+                            if len(gs_access_data) == 0:
+                                gs_access_data = gndStn_access_data
+                            else:
+                                gs_access_data = pd.concat([gs_access_data, gndStn_access_data])
+
+                # land coverage data metrics data
+                payload = spacecraft.get('instrument', None)
+                if not isinstance(payload, list):
+                    payload = [payload]
+
+                gp_access_data = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]', 'agent','instrument',
+                                                                'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
+
+                for instrument in payload:
+                    i_ins = payload.index(instrument)
+                    gp_acces_by_mode = []
+
+                    # modes = spacecraft.get('instrument', None)
+                    # if not isinstance(modes, list):
+                    #     modes = [0]
+                    modes = [0]
+
+                    gp_acces_by_mode = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]','instrument',
+                                                                'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
+                    for mode in modes:
+                        i_mode = modes.index(mode)
+                        gp_access_by_grid = pd.DataFrame(columns=['time index','GP index','pnt-opt index','lat [deg]','lon [deg]',
+                                                                'observation range [km]','look angle [deg]','incidence angle [deg]','solar zenith [deg]'])
+
+                        for grid in mission_dict.get('grid'):
+                            i_grid = mission_dict.get('grid').index(grid)
+                            metrics_file = data_dir + agent_folder + f'datametrics_instru{i_ins}_mode{i_mode}_grid{i_grid}.csv'
+                            metrics_data = pd.read_csv(metrics_file, skiprows=range(4))
+                            
+                            nrows, _ = metrics_data.shape
+                            grid_id_column = [i_grid] * nrows
+                            metrics_data['grid index'] = grid_id_column
+
+                            if len(gp_access_by_grid) == 0:
+                                gp_access_by_grid = metrics_data
+                            else:
+                                gp_access_by_grid = pd.concat([gp_access_by_grid, metrics_data])
+
+                        nrows, _ = gp_access_by_grid.shape
+                        gp_access_by_grid['pnt-opt index'] = [mode] * nrows
+
+                        if len(gp_acces_by_mode) == 0:
+                            gp_acces_by_mode = gp_access_by_grid
+                        else:
+                            gp_acces_by_mode = pd.concat([gp_acces_by_mode, gp_access_by_grid])
+                        # gp_acces_by_mode.append(gp_access_by_grid)
+
+                    nrows, _ = gp_acces_by_mode.shape
+                    gp_access_by_grid['instrument'] = [instrument] * nrows
+                    # gp_access_data[ins_name] = gp_acces_by_mode
+
+                    if len(gp_access_data) == 0:
+                        gp_access_data = gp_acces_by_mode
+                    else:
+                        gp_access_data = pd.concat([gp_access_data, gp_acces_by_mode])
+                
+                nrows, _ = gp_access_data.shape
+                gp_access_data['agent name'] = [spacecraft['name']] * nrows
+
+                grid_data_compiled = []
+                for grid in mission_dict.get('grid'):
+                    i_grid = mission_dict.get('grid').index(grid)
+                    grid_file = data_dir + f'grid{i_grid}.csv'
+
+                    grid_data = pd.read_csv(grid_file)
+                    nrows, _ = grid_data.shape
+                    grid_data['GP index'] = [i for i in range(nrows)]
+                    grid_data['grid index'] = [i_grid] * nrows
+                    grid_data_compiled.append(grid_data)
+
+                return OrbitData(name, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data, grid_data_compiled)
+
 
     def compare_bundles(self, bundle_1 : list, bundle_2 : list) -> bool:
         """
@@ -1032,7 +1212,6 @@ class MACCBBA(PlanningModule):
 
                 is_biddable = self.can_bid(state, req, subtask_index, results[task_id]) 
                 already_in_bundle = (req, subtaskbid.subtask_index) in bundle 
-                # already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
                 already_performed = self.request_has_been_performed(results, req, subtask_index, state.t)
                 
                 if is_biddable and (not already_in_bundle) and (not already_performed):
@@ -1054,6 +1233,21 @@ class MACCBBA(PlanningModule):
         ## Constraint 1: task must be able to be performed during or after the current time
         if req.t_end < state.t:
             return False
+        elif isinstance(req, GroundPointMeasurementRequest):
+            # check if agent can see the request location
+            lat,lon,_ = req.pos
+            df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, state.t)
+            can_access = False
+            if not df.empty:                
+                times = df.get('time index')
+                for time in times:
+                    if time * self.orbitdata.time_step < req.t_end:
+                        # there exists an access time before the request's availability ends
+                        can_access = True
+                        break
+                
+            if not can_access:
+                return False
         
         ## Constraint 2: coalition constraints
         n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
@@ -1065,6 +1259,7 @@ class MACCBBA(PlanningModule):
                     )
         else:
             return subtaskbid.N_req == n_sat
+            
 
     def bundle_contains_mutex_subtasks(self, bundle : list, req : MeasurementRequest, subtask_index : int) -> bool:
         """
@@ -1196,21 +1391,29 @@ class MACCBBA(PlanningModule):
             - t_img (`float`): earliest available imaging time
         """
         # calculate the previous task's position and 
-        i = path.index((req,subtask_index))
+        i = path.index((req, subtask_index))
         if i == 0:
             t_prev = state.t
-            pos_prev = state.pos
+            prev_state = state
         else:
-            req_prev, subtask_index_prev = path[i-1]
-            req_prev : MeasurementRequest
-            subtask_index_prev : int
-            bid_prev : Bid = bids[req_prev.id][subtask_index_prev]
-            t_prev : float = bid_prev.t_img + req_prev.duration
-            pos_prev : list = req_prev.pos
+            prev_req, prev_subtask_index = path[i-1]
+            prev_req : MeasurementRequest; prev_subtask_index : int
+            bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
+            t_prev : float = bid_prev.t_img + prev_req.duration
+
+            if isinstance(state, SatelliteAgentState):
+                prev_state : SatelliteAgentState = state.propagate(t_prev)
+                
+                prev_state.attitude = [
+                                        prev_state.calc_off_nadir_agle(prev_req),
+                                        0.0,
+                                        0.0
+                                    ]
+            else:
+                raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
 
         # compute earliest time to the task
-        t_img = state.calc_arrival_time(pos_prev, req.pos, t_prev)
-        t_img = t_img if t_img >= req.t_start else req.t_start
+        t_imgs : list = self.calc_arrival_times(prev_state, req, t_prev)
         
         # get active time constraints
         t_consts = []
@@ -1239,12 +1442,37 @@ class MACCBBA(PlanningModule):
 
         return t_img
 
-    def calc_arrival_time(self, pos_start : list, pos_final : list, t_start : Union[int, float]) -> float:
+    def calc_arrival_times(self, state : SimulationAgentState, req : MeasurementRequest, t_prev : Union[int, float]) -> float:
         """
         Estimates the quickest arrival time from a starting position to a given final position
         """
-        dpos = np.sqrt( (pos_final[0]-pos_start[0])**2 + (pos_final[1]-pos_start[1])**2 )
-        return t_start + dpos / self.v_max
+        if isinstance(req, GroundPointMeasurementRequest):
+            # compute earliest time to the task
+            if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
+                lat,lon,_ = req.pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
+
+                for _, row in df.iterrows():
+                    t_img = row['time index'] * self.orbitdata.time_step
+                    dt = t_img - state.t
+                                        
+                    # propagate state
+                    propagated_state : SatelliteAgentState = state.propagate(t_img)
+
+                    # compute off-nadir angle
+                    thf = propagated_state.calc_off_nadir_agle(req)
+                    dth = thf - propagated_state.attitude[0]
+
+                    # estimate arrival time using fixed angular rate TODO change to 
+                    if dt >= dth / 1.0: # TODO change maximum angular rate 
+                        return t_img
+                        
+                return -1
+            else:
+                raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
+
+        else:
+            raise NotImplementedError(f"cannot calculate imaging time for measurement requests of type {type(req)}")   
 
     def sum_path_utility(self, path : list, bids : dict) -> float:
         utility = 0.0
@@ -1376,6 +1604,105 @@ class MACCBBA(PlanningModule):
         constraint_sat, _ = bid_copy.check_constraints(results[req.id], t_curr)
         return constraint_sat is None
 
+    def plan_from_path( self, 
+                        state : SimulationAgentState, 
+                        results : dict, 
+                        path : list
+                    ) -> list:
+        """
+        Generates a list of AgentActions from the current path.
+
+        Agents look to move to their designated measurement target and perform the measurement.
+        """
+
+        plan = []
+        for i in range(len(path)):
+            measurement_req, subtask_index = path[i]
+            measurement_req : MeasurementRequest; subtask_index : int
+            subtask_bid : SubtaskBid = results[measurement_req.id][subtask_index]
+
+            if not isinstance(measurement_req, GroundPointMeasurementRequest):
+                raise NotImplementedError(f"Cannot create plan for requests of type {type(measurement_req)}")
+            
+            if i == 0:
+                t_prev = state.t
+                prev_state = state
+            else:
+                prev_req, prev_subtask_index = path[i-1]
+                prev_req : MeasurementRequest; prev_subtask_index : int
+                bid_prev : Bid = results[prev_req.id][prev_subtask_index]
+                t_prev : float = bid_prev.t_img + prev_req.duration
+
+                if isinstance(state, SatelliteAgentState):
+                    prev_state : SatelliteAgentState = state.propagate(t_prev)
+                    prev_state.attitude = [
+                                        prev_state.calc_off_nadir_agle(prev_req),
+                                        0.0,
+                                        0.0
+                                    ]
+                else:
+                    raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
+
+            # point to target
+            if isinstance(state, SatelliteAgentState):
+                t_maneuver_start = prev_state.t
+                tf = prev_state.calc_off_nadir_agle(measurement_req)
+                t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
+            else:
+                raise NotImplementedError(f"cannot calculate maneuver time end for agent states of type {type(state)}")
+            if t_maneuver_start == -1.0:
+                continue
+            if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
+                maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
+                plan.append(maneuver_action)
+
+            # move to target
+            t_move_start = t_maneuver_end
+            if isinstance(state, SatelliteAgentState):
+                lat, lon, _ = measurement_req.pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
+                if df.empty:
+                    continue
+                for _, row in df.iterrows():
+                    t_move_end = row['time index'] * self.orbitdata.time_step
+                    break
+
+                future_state : SatelliteAgentState = state.propagate(t_move_end)
+                final_pos = future_state.pos
+            else:
+                raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
+            
+            t_img_start = t_move_end
+            t_img_end = t_img_start + measurement_req.duration
+
+            if isinstance(self._clock_config, FixedTimesStepClockConfig):
+                dt = self._clock_config.dt
+                if t_move_start < np.Inf:
+                    t_move_start = dt * math.floor(t_move_start/dt)
+                if t_move_end < np.Inf:
+                    t_move_end = dt * math.ceil(t_move_end/dt)
+
+                if t_img_start < np.Inf:
+                    t_img_start = dt * math.ceil(t_img_start/dt)
+                if t_img_end < np.Inf:
+                    t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
+            
+            if abs(t_move_start - t_move_end) >= 1e-3:
+                move_action = TravelAction(final_pos, t_move_start, t_move_end)
+                plan.append(move_action)
+            
+            # perform measurement
+            measurement_action = MeasurementAction( 
+                                                    measurement_req.to_dict(),
+                                                    subtask_index, 
+                                                    subtask_bid.main_measurement,
+                                                    subtask_bid.winning_bid,
+                                                    t_img_start, 
+                                                    t_img_end
+                                                    )
+            plan.append(measurement_action)  
+        
+        return plan
 
     async def bid_broadcaster(self, bids : list, t_curr : Union[int, float], wait_for_response : bool = False, level : int = logging.DEBUG) -> None:
         """
