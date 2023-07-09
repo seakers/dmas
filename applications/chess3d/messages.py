@@ -6,7 +6,7 @@ class SimulationMessageTypes(Enum):
     AGENT_ACTION = 'AGENT_ACTION'
     AGENT_STATE = 'AGENT_STATE'
     CONNECTIVITY_UPDATE = 'CONNECTIVITY_UPDATE'
-    TASK_BID = 'TASK_BID'
+    MEASUREMENT_BID = 'MEASUREMENT_BID'
     PLAN = 'PLAN'
     SENSES = 'SENSES'
     MEASUREMENT = 'MEASUREMENT'
@@ -24,8 +24,8 @@ def message_from_dict(msg_type : str, **kwargs) -> SimulationMessage:
         return AgentStateMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.CONNECTIVITY_UPDATE.value:
         return AgentConnectivityUpdate(**kwargs)
-    elif msg_type == SimulationMessageTypes.TASK_BID.value:
-        return TaskBidMessage(**kwargs)
+    elif msg_type == SimulationMessageTypes.MEASUREMENT_BID.value:
+        return MeasurementRequestBidMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.PLAN.value:
         return PlanMessage(**kwargs)
     elif msg_type == SimulationMessageTypes.SENSES.value:
@@ -125,7 +125,7 @@ class MeasurementResultsRequestMessage(SimulationMessage):
         self.agent_state = agent_state
         self.measurement = {}
 
-class TaskBidMessage(SimulationMessage):
+class MeasurementRequestBidMessage(SimulationMessage):
     """
     ## Task Bid Message
 
@@ -152,7 +152,7 @@ class TaskBidMessage(SimulationMessage):
             - bid (`dict`): bid information being shared
             - id (`str`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, dst, SimulationMessageTypes.TASK_BID.value, id)
+        super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT_BID.value, id)
         self.bid = bid
 
 class PlanMessage(SimulationMessage):

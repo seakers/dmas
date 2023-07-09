@@ -270,6 +270,7 @@ class PlanningModule(InternalModule):
         self.states_inbox = asyncio.Queue()
         self.action_status_inbox = asyncio.Queue()
         self.measurement_req_inbox = asyncio.Queue()
+        self.relevant_changes_inbox = asyncio.Queue()
 
     async def live(self) -> None:
         """
@@ -342,6 +343,14 @@ class PlanningModule(InternalModule):
                                                         
                             # send to planner
                             await self.states_inbox.put(state_msg) 
+
+                        elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
+                            # unpack message 
+                            req_msg = MeasurementRequestMessage(**sense)
+                            self.log(f"received measurement request message!")
+                            
+                            # send to planner
+                            await self.measurement_req_inbox.put(req_msg)
 
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
                             # unpack message 

@@ -398,8 +398,8 @@ class ScienceModule(InternalModule):
         # Properly save as CSV
         data = np.random.rand(100,100)
         #value = np.random.rand(100,100)
-        #prefix = self.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
-        #filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
+        prefix = self.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
+        filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
         #np.savetxt(filename, value, delimiter='\t', fmt='%4d')
         return data, filename
 
@@ -426,7 +426,7 @@ class ScienceModule(InternalModule):
         """
         return np.random.rand(100,100)
 
-    def add_data_product(self,sd,lat,lon,time,product_type,filename,data):
+    def add_data_product(self,sd : list, lat : float, lon : float, time : float, product_type : str, filename :str, data : list):
         """
         This function adds a data product to the science database (sd) and generates a .txt header file to represent the data product.
         """
