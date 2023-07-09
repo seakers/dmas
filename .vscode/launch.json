@@ -60,6 +60,20 @@
         },
 
         {
+            "name": "3D CHESS - MACCBBA TESTER",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args" : "maccbba_test"
+        },
+
+        {
             "name": "3D CHESS - SCENARIO 2",
             "type": "python",
             "request": "launch",

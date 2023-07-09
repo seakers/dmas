@@ -1223,6 +1223,10 @@ class MACCBBA(PlanningModule):
         """
         Checks if an agent has the ability to bid on a measurement task
         """
+        # check planning horizon
+        if state.t + self.planning_horizon < req.t_start:
+            return False
+
         # check capabilities - TODO: Replace with knowledge graph
         subtaskbid : SubtaskBid = subtaskbids[subtask_index]
         payload_names : list = [instrument.name for instrument in self.payload]
@@ -1233,6 +1237,7 @@ class MACCBBA(PlanningModule):
         ## Constraint 1: task must be able to be performed during or after the current time
         if req.t_end < state.t:
             return False
+
         elif isinstance(req, GroundPointMeasurementRequest):
             # check if agent can see the request location
             lat,lon,_ = req.pos
@@ -1241,7 +1246,12 @@ class MACCBBA(PlanningModule):
             if not df.empty:                
                 times = df.get('time index')
                 for time in times:
-                    if time * self.orbitdata.time_step < req.t_end:
+                    time *= self.orbitdata.time_step 
+
+                    if state.t + self.planning_horizon < time:
+                        continue
+
+                    elif time < req.t_end:
                         # there exists an access time before the request's availability ends
                         can_access = True
                         break
@@ -1249,6 +1259,7 @@ class MACCBBA(PlanningModule):
             if not can_access:
                 return False
         
+
         ## Constraint 2: coalition constraints
         n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
         if subtaskbid.is_optimistic():
@@ -1309,6 +1320,7 @@ class MACCBBA(PlanningModule):
                         req : MeasurementRequest, 
                         subtask_index : int
                     ) -> tuple:
+        state : SimulationAgentState = state.copy()
         winning_path = None
         winning_bids = None
         winning_path_utility = 0.0
@@ -1332,30 +1344,31 @@ class MACCBBA(PlanningModule):
             # calculate bids for each task in the path
             bids = {}
             for req_i, subtask_j in path:
+                # predict state
+                if i == 0:
+                    t_prev = state.t
+                    prev_state = state
+                else:
+                    prev_req, prev_subtask_index = path[i-1]
+                    prev_req : MeasurementRequest; prev_subtask_index : int
+                    bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
+                    t_prev : float = bid_prev.t_img + prev_req.duration
+
+                    if isinstance(state, SatelliteAgentState):
+                        prev_state : SatelliteAgentState = state.propagate(t_prev)
+                        
+                        prev_state.attitude = [
+                                                prev_state.calc_off_nadir_agle(prev_req),
+                                                0.0,
+                                                0.0
+                                            ]
+                    else:
+                        raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
+
                 # calculate imaging time
                 req_i : MeasurementRequest
                 subtask_j : int
-                t_img = self.calc_imaging_time(state, original_results, path, bids, req_i, subtask_j)
-
-                # predict state
-                # TODO move state prediction to state class
-                path_index = path.index((req_i, subtask_j))
-                if path_index == 0:
-                    prev_state = state
-                else:
-                    prev_req, prev_subtask = path[path_index-1]
-                    prev_req : MeasurementRequest; prev_subtask : int
-                    prev_bid : SubtaskBid = bids[prev_req.id][prev_subtask]
-                    t_prev = prev_bid.t_img + prev_req.duration
-                    prev_state = SimulationAgentState(prev_req.pos,
-                                                        state.x_bounds,
-                                                        state.y_bounds,
-                                                        [0.0, 0.0],
-                                                        state.v_max,
-                                                        [],
-                                                        state.status,
-                                                        t_prev,
-                                                        state.instruments)
+                t_img = self.calc_imaging_time(prev_state, original_results, req_i, subtask_j, t_prev)
 
                 # calculate bidding score
                 params = {"prev_state" : prev_state, "req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
@@ -1368,6 +1381,7 @@ class MACCBBA(PlanningModule):
                 if req_i.id not in bids:
                     bids[req_i.id] = {}    
                 bids[req_i.id][subtask_j] = bid
+                state = prev_state
 
             # look for path with the best utility
             path_utility = self.sum_path_utility(path, bids)
@@ -1378,42 +1392,18 @@ class MACCBBA(PlanningModule):
 
         return winning_path, winning_bids, winning_path_utility
 
-    def calc_imaging_time(self, state : SimulationAgentState, current_results : dict, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
+    def calc_imaging_time(self, prev_state : SimulationAgentState, current_results : dict, req : MeasurementRequest, subtask_index : int, t_prev : float) -> float:
         """
         Computes the earliest time when a task in the path would be performed
 
         ### Arguments:
-            - state (obj:`SimulationAgentState`): state of the agent at the start of the path
-            - path (`list`): sequence of tasks dictionaries to be performed
-            - bids (`dict`): dictionary of task ids to the current task bid dictionaries 
 
         ### Returns
-            - t_img (`float`): earliest available imaging time
+            - t_imgs (`list`): list of available imaging times
         """
-        # calculate the previous task's position and 
-        i = path.index((req, subtask_index))
-        if i == 0:
-            t_prev = state.t
-            prev_state = state
-        else:
-            prev_req, prev_subtask_index = path[i-1]
-            prev_req : MeasurementRequest; prev_subtask_index : int
-            bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
-            t_prev : float = bid_prev.t_img + prev_req.duration
-
-            if isinstance(state, SatelliteAgentState):
-                prev_state : SatelliteAgentState = state.propagate(t_prev)
-                
-                prev_state.attitude = [
-                                        prev_state.calc_off_nadir_agle(prev_req),
-                                        0.0,
-                                        0.0
-                                    ]
-            else:
-                raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
-
         # compute earliest time to the task
         t_imgs : list = self.calc_arrival_times(prev_state, req, t_prev)
+        t_imgs = sorted(t_imgs)
         
         # get active time constraints
         t_consts = []
@@ -1430,22 +1420,30 @@ class MACCBBA(PlanningModule):
         if len(t_consts) > 0:
             # sort time-constraints in ascending order
             t_consts = sorted(t_consts)
-
-            # check if chosen imaging time satisfies the latest time constraints
+            
+            # choose an imaging time satisfies the latest time constraints
             t_const, t_corr = t_consts.pop()
-            if t_img + t_corr < t_const:
-                # i am performing my measurement before the other agent's earliest time; meet its imaging time
-                t_img = t_const - t_corr
-            # else:
-                # other agent images before my earliest time; expect other bidder to met my schedule
-                # or `t_img` satisfies this time constraint; no action required
+            
+            for t_img in t_imgs:
+                if t_img + t_corr < t_const:
+                    # i am performing my measurement before the other agent's earliest time; meet its imaging time
+                    # t_img = t_const - t_corr
+                    continue
+                else:
+                    # other agent images before my earliest time; expect other bidder to met my schedule
+                    # or `t_img` satisfies this time constraint; no action required
+                    return t_img
+        
+        elif len(t_imgs) > 0:
+            return t_imgs[0]
 
-        return t_img
+        return np.Inf
 
     def calc_arrival_times(self, state : SimulationAgentState, req : MeasurementRequest, t_prev : Union[int, float]) -> float:
         """
         Estimates the quickest arrival time from a starting position to a given final position
         """
+        t_imgs = []
         if isinstance(req, GroundPointMeasurementRequest):
             # compute earliest time to the task
             if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
@@ -1455,6 +1453,10 @@ class MACCBBA(PlanningModule):
                 for _, row in df.iterrows():
                     t_img = row['time index'] * self.orbitdata.time_step
                     dt = t_img - state.t
+
+                    # check for planning horizon
+                    if dt > self.planning_horizon:
+                        continue
                                         
                     # propagate state
                     propagated_state : SatelliteAgentState = state.propagate(t_img)
@@ -1464,10 +1466,10 @@ class MACCBBA(PlanningModule):
                     dth = thf - propagated_state.attitude[0]
 
                     # estimate arrival time using fixed angular rate TODO change to 
-                    if dt >= dth / 1.0: # TODO change maximum angular rate 
-                        return t_img
-                        
-                return -1
+                    if dt >= abs(dth / 1.0): # TODO change maximum angular rate 
+                        t_imgs.append(t_img)
+
+                return t_imgs
             else:
                 raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
 
