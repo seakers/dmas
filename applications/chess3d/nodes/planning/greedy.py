@@ -272,7 +272,7 @@ class GreedyPlanner(PlanningModule):
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
                     if len(self.plan) == 0:
-                        t_idle = t_curr + 1e6 # TODO find end of simulation time        
+                        t_idle = t_curr + 1e8 # TODO find end of simulation time        
                     else:
                         t_idle = self.plan[0].t_start
                     action = WaitForMessages(t_curr, t_idle)
@@ -480,8 +480,12 @@ class GreedyPlanner(PlanningModule):
                 # calculate bid for a given available task
                 measurement_task : MeasurementRequest
                 subtask_index : int
-                projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, results, path, measurement_task, subtask_index)
-                
+                lat,lon,_ = measurement_task.pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, 0.0)
+                if not df.empty:
+                    projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, results, path, measurement_task, subtask_index)
+                else:
+                    continue
                 # check if path was found
                 if projected_path is None:
                     continue
@@ -753,7 +757,8 @@ class GreedyPlanner(PlanningModule):
                 t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
             else:
                 raise NotImplementedError(f"cannot calculate maneuver time end for agent states of type {type(state)}")
-            
+            if t_maneuver_start == -1.0:
+                continue
             if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
                 maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
                 plan.append(maneuver_action)
@@ -763,7 +768,8 @@ class GreedyPlanner(PlanningModule):
             if isinstance(state, SatelliteAgentState):
                 lat, lon, _ = measurement_req.pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
-
+                if df.empty:
+                    continue
                 for _, row in df.iterrows():
                     t_move_end = row['time index'] * self.orbitdata.time_step
                     break

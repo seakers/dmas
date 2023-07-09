@@ -1,6 +1,7 @@
 import csv
 import numpy as np
 import pandas as pd
+import datetime as dt
 from nodes.actions import MeasurementAction
 from nodes.states import SimulationAgentState
 from messages import *
@@ -13,13 +14,13 @@ class ScienceModuleTypes(Enum):
     SCENARIO1 = 'SCENARIO1' 
     SCENARIO2 = 'SCENARIO2'
 
+
 class ScienceModule(InternalModule):
     def __init__(   self, 
-                    results_path : str, 
-                    scenario_dir : str,
+                    results_path : str,
+                    scenario_path : str,
                     parent_name : str,
                     parent_network_config: NetworkConfig, 
-                    level: int = logging.INFO, 
                     logger: logging.Logger = None
                 ) -> None:
 
@@ -46,36 +47,16 @@ class ScienceModule(InternalModule):
         super().__init__(   f"{parent_name}-SCIENCE_MODULE", 
                             science_network_config, 
                             parent_network_config, 
-                            level, 
+                            logging.INFO, 
                             logger)
-
-        self.results_path = results_path
-        self.scenario_dir = scenario_dir
-        self.parent_name = parent_name
         
+        self.results_path = results_path
+        self.scenario_dir = scenario_path
+        self.parent_name = parent_name
+    
     async def sim_wait(self, delay: float) -> None:
         return
 
-    async def empty_manager_inbox(self) -> list:
-        msgs = []
-        while True:
-            # wait for manager messages
-            self.log('waiting for parent agent message...')
-            _, _, content = await self.manager_inbox.get()
-            msgs.append(content)
-
-            # wait for any current transmissions to finish being received
-            self.log('waiting for any possible transmissions to finish...')
-            await asyncio.sleep(0.01)
-
-            if self.manager_inbox.empty():
-                self.log('manager queue empty.')
-                break
-            self.log('manager queue still contains elements.')
-        
-        return msgs
-
-class ScenarioScienceModule(ScienceModule):        
     async def setup(self) -> None:
         # setup internal inboxes
         self.science_value_inbox = asyncio.Queue()
@@ -83,16 +64,73 @@ class ScenarioScienceModule(ScienceModule):
         self.onboard_processing_inbox = asyncio.Queue()
         self.processed_items = []
         self.sd = []
-        self.points = np.zeros(shape=(1000, 4))
-        with open(f'{self.scenario_dir}/riverATLAS.csv') as csvfile:
+        if "scenario1a" in self.scenario_dir:
+            self.points = self.load_points_scenario1a()
+            self.log(f'Scenario 1a points loaded!',level=logging.INFO)
+        elif "scenario1b" in self.scenario_dir:
+            self.points = self.load_points_scenario1b()
+            self.log(f'Scenario 1b points loaded!',level=logging.INFO)
+        elif "scenario2" in self.scenario_dir:
+            self.points = self.load_events_scenario2()
+            self.log(f'Scenario 2 points loaded!',level=logging.INFO)
+    
+    def load_points_scenario1a(self):
+        points = np.zeros(shape=(1000,4))
+        with open(self.scenario_dir+'resources/riverATLAS.csv') as csvfile:
             reader = csv.reader(csvfile)
             count = 0
             for row in reader:
                 if count == 0:
                     count = 1
                     continue
-                self.points[count-1,:] = [row[0], row[1], row[2], row[3]]
+                points[count-1,:] = [row[0], row[1], row[2], row[3]]
                 count = count + 1
+        return points
+
+    def load_points_scenario1b(self):
+        points = []
+        with open(self.scenario_dir+'resources/one_year_floods_multiday.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                if len(points) > 0:
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60,1))
+                else:
+                    points.append((line["lat"],line["lon"],line["severity"],line["time"],float(line["time"])+60*60,1))
+        with open(self.scenario_dir+'resources/flow_events_75_multiday.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                if len(points) > 0:
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400,0))
+                else:
+                    points.append((line["lat"],line["lon"],float(line["water_level"])/float(line["flood_level"]),line["time"],float(line["time"])+86400,0))
+        points = np.asfarray(points)
+        self.log(f'Loaded scenario 1b points',level=logging.INFO)
+        return points
+
+    def load_events_scenario2(self):
+        points = []
+        # 0 is height, 1 is temperature
+        with open(self.scenario_dir+'resources/grealm.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                points.append((line["lat"],line["lon"],line["avg"],line["std"],line["date"],line["value"],0))
+        with open(self.scenario_dir+'resources/laketemps.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                points.append((line["lat"],line["lon"],line["avg"],line["std"],line["date"],line["value"],1))
+        with open(self.scenario_dir+'resources/blooms.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                points.append((line["lat"],line["lon"],line["avg"],line["std"],line["date"],line["value"],2))
+        with open(self.scenario_dir+'resources/extralakes.csv', 'r') as f:
+            d_reader = csv.DictReader(f)
+            for line in d_reader:
+                points.append((line["lat"],line["lon"],0.0,1000000.0,"20220601",0.0,0))
+                points.append((line["lat"],line["lon"],0.0,1000000.0,"20220601",0.0,1))
+                points.append((line["lat"],line["lon"],0.0,1000000.0,"20220601",0.0,2))
+        points = np.asfarray(points)
+        self.log(f'Loaded scenario 2 points',level=logging.INFO)
+        return points
         
     async def live(self) -> None:
         """
@@ -105,17 +143,16 @@ class ScenarioScienceModule(ScienceModule):
         listener_task = asyncio.create_task(self.listener(), name='listener()')
         science_value_task = asyncio.create_task(self.science_value(), name='science_value()')
         #science_reasoning_task = asyncio.create_task(self.science_reasoning(), name='science_reasoning()')
-        #onboard_processing_task = asyncio.create_task(self.onboard_processing(), name='onboard_processing()')
+        onboard_processing_task = asyncio.create_task(self.onboard_processing(), name='onboard_processing()')
         
         # , science_value_task, science_reasoning_task, onboard_processing_task
-        tasks = [listener_task,science_value_task]
+        tasks = [listener_task,science_value_task,onboard_processing_task]
         
         _, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
         for task in pending:
             task : asyncio.Task
             task.cancel()
-            print("cancelling tasks")
             await task
 
     async def listener(self):
@@ -138,21 +175,38 @@ class ScenarioScienceModule(ScienceModule):
 
             # listen for broadcasts and place in the appropriate inboxes
             while True:
-                sockets = dict(await poller.poll())
+                self.log('listening to manager broadcast!')
+                _, _, content = await self.listen_manager_broadcast()
+                if content['msg_type'] == SimulationMessageTypes.SENSES.value:
+                    self.log(f"received senses from parent agent!", level=logging.DEBUG)
 
-                if manager_socket in sockets:
-                    self.log('listening to manager broadcast!')
-                    _, _, content = await self.listen_manager_broadcast()
+                    # unpack message 
+                    senses_msg : SensesMessage = SensesMessage(**content)
 
-                    # if sim-end message, end agent `live()`
-                    if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! terminating `live()`...",level=logging.WARN)
-                        return
+                    senses = []
+                    senses.append(senses_msg.state)
+                    senses.extend(senses_msg.senses)     
 
-                    if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
-                        # unpack message
-                        msg = MeasurementResultsRequestMessage(**content)
-                        await self.science_value_inbox.put(msg)
+                    for sense in senses:
+                        if sense['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
+                            # unpack message
+                            if('agent_state' not in sense):
+                                continue
+                            self.log(f"received manager broadcast of type {sense['msg_type']}!",level=logging.DEBUG)
+                            msg = MeasurementResultsRequestMessage(**sense)
+                            await self.science_value_inbox.put(msg)
+                            await self.onboard_processing_inbox.put(msg)
+
+                # if sim-end message, end agent `live()`
+                if content['msg_type'] == ManagerMessageTypes.SIM_END.value:
+                    self.log(f"received manager broadcast of type {content['msg_type']}! terminating `live()`...",level=logging.INFO)
+                    return
+
+                if content['msg_type'] == SimulationMessageTypes.MEASUREMENT.value:
+                    # unpack message
+                    self.log(f"received manager broadcast of type {content['msg_type']}!",level=logging.WARN)
+                    msg = MeasurementResultsRequestMessage(**content)
+                    await self.science_value_inbox.put(msg)
 
                     # elif content['msg_type'] == SimulationMessageTypes.SENSES.value:
                     #     # unpack message
@@ -170,8 +224,6 @@ class ScenarioScienceModule(ScienceModule):
                     #     await self.science_value_inbox.put(msg)
 
                     # else, ignore it
-                    else:
-                        self.log(f"received manager broadcast or type {content['msg_type']}! ignoring...",level=logging.WARN)
         
         except asyncio.CancelledError:
             print("Asyncio cancelled error in science module listener")
@@ -187,10 +239,19 @@ class ScenarioScienceModule(ScienceModule):
                 measurement_action = MeasurementAction(**msg.masurement_action)
                 agent_state = SimulationAgentState.from_dict(msg.agent_state)
                 measurement_req = MeasurementRequest.from_dict(measurement_action.measurement_req)
+                obs = {}
+                if(measurement_action.instrument_name == "POSEIDON-3BAltimeter"):
+                    obs["product_type"] = "altimetry"
+                elif(measurement_action.instrument_name == "OLI"):
+                    obs["product_type"] = "visible"
+                else:
+                    obs["product_type"] = "thermal"
+                obs["lat"] = measurement_req.pos[0]
+                obs["lon"] = measurement_req.pos[1]
 
                 if isinstance(measurement_req, GroundPointMeasurementRequest):
                     lat, lon, _ = measurement_req.pos
-                    obs = msg.measurement
+                    
                     science_value, outlier = self.compute_science_value(lat, lon, obs)
                     self.log('Computed the science value!',level=logging.INFO)
                     metadata = {
@@ -228,7 +289,6 @@ class ScenarioScienceModule(ScienceModule):
     async def science_reasoning(self):
         try:
             while True:
-                print("in science reasoning")
                 msg = await self.science_reasoning_inbox.get()
                 outliers = []
                 for item in self.sd:
@@ -253,8 +313,8 @@ class ScenarioScienceModule(ScienceModule):
 
                     elif(item["product_type"] == "thermal"):
                         if item["checked"] is False:
-                            if "scenario2" in self.parent_module.scenario_dir:
-                                outlier, outlier_data = self.parent_module.check_laketemp_outliers(item)
+                            if "scenario2" in self.scenario_dir:
+                                outlier, outlier_data = self.check_laketemp_outliers(item)
                             if outlier is True:
                                 self.log(f'Thermal outlier in check_sd',level=logging.INFO)
                                 outliers.append(outlier_data)
@@ -262,43 +322,47 @@ class ScenarioScienceModule(ScienceModule):
 
                     else:
                         self.log(f'Item in science database unsupported by science processing module.',level=logging.DEBUG)
-                        
-                for outlier in outliers:
-                    self.log(f'Outliers: {outlier}',level=logging.INFO)
-                    msg = InternalMessage(self.name, ScienceSubmoduleTypes.SCIENCE_VALUE.value, outlier)
-                    await self.send_internal_message(msg)
         except asyncio.CancelledError:
             return
         
     async def onboard_processing(self):
         try:
             while True:
-                print("in onboard processing")
-                raw_data = await self.onboard_processing_inbox.get()
-                obs_str = raw_data.get_data()
-                lat, lon = raw_data.get_target()
-                obs_datatype = raw_data.get_datatype()
-                obs_process_time = self.get_current_time()
-                data,raw_data_filename = self.store_raw_measurement(obs_str,lat,lon,obs_process_time)
-                if obs_datatype == "tss":
-                    processed_data = self.compute_tss_obs_value(data)
-                elif obs_datatype == "altimetry":
-                    processed_data = self.generate_altimetry()
-                elif obs_datatype == "thermal":
-                    processed_data = self.compute_thermal_obs(data)
+                msg : MeasurementResultsRequestMessage = await self.onboard_processing_inbox.get()
+                measurement_action = MeasurementAction(**msg.masurement_action)
+                agent_state = SimulationAgentState.from_dict(msg.agent_state)
+                measurement_req = MeasurementRequest.from_dict(measurement_action.measurement_req)
+                obs = {}
+                if(measurement_action.instrument_name == "POSEIDON-3BAltimeter"):
+                    obs["product_type"] = "altimetry"
+                elif(measurement_action.instrument_name == "OLI"):
+                    obs["product_type"] = "visible"
                 else:
-                    self.log('Unsupported data type for onboard processing.')
-                    continue
-                self.sd, new_data_product = self.add_data_product(self.sd,lat,lon,obs_process_time,obs_datatype,raw_data_filename,processed_data)
-                self.log(f'{obs_datatype} measurement data successfully saved in on-board data-base.', level=logging.DEBUG)
+                    obs["product_type"] = "thermal"
+                obs["lat"] = measurement_req.pos[0]
+                obs["lon"] = measurement_req.pos[1]
+                obs_str = ""
+                obs_datatype = obs["product_type"]
+                obs_process_time = measurement_action.t_start
+                #data,raw_data_filename = self.store_raw_measurement(obs_str,obs["lat"],obs["lon"],obs_process_time)
+                # if obs_datatype == "tss":
+                #     processed_data = self.compute_tss_obs_value(data)
+                # elif obs_datatype == "altimetry":
+                #     processed_data = self.generate_altimetry()
+                # elif obs_datatype == "thermal":
+                #     processed_data = self.compute_thermal_obs(data)
+                # else:
+                #     self.log('Unsupported data type for onboard processing.')
+                #     continue
+                self.sd, new_data_product = self.add_data_product(self.sd,obs["lat"],obs["lon"],obs_process_time,obs_datatype,"",None)
+                self.log(f'{obs_datatype} measurement data successfully saved in on-board data-base.', level=logging.INFO)
                 updated_msg = "SD has been updated."
-                print(updated_msg)
-                await self.science_reasoning_inbox.put(updated_msg)
-                await self.science_value_inbox.put(new_data_product)
+                #await self.science_reasoning_inbox.put(updated_msg)
+                #await self.science_value_inbox.put(new_data_product)
                 processed_item = {
-                        "lat": lat,
-                        "lon": lon,
-                        "time": raw_data.get_metadata()["time"],
+                        "lat": obs["lat"],
+                        "lon": obs["lon"],
+                        "time": obs_process_time,
                         #"product_type": metadata["measuring_instrument"] TODO add back for ground station
                 }
                 self.processed_items.append(processed_item)
@@ -333,10 +397,10 @@ class ScenarioScienceModule(ScienceModule):
 
         # Properly save as CSV
         data = np.random.rand(100,100)
-        value = np.random.rand(100,100)
-        prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
-        filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
-        np.savetxt(filename, value, delimiter='\t', fmt='%4d')
+        #value = np.random.rand(100,100)
+        #prefix = self.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
+        #filename = prefix+str(lat)+"_"+str(lon)+"_"+str(obs_process_time)+"_raw.csv"
+        #np.savetxt(filename, value, delimiter='\t', fmt='%4d')
         return data, filename
 
     def compute_chlorophyll_obs_value(self,b4,b5):
@@ -376,10 +440,10 @@ class ScenarioScienceModule(ScienceModule):
         if(data is not None):
             pd.DataFrame(data).to_csv(data_product_dict["filepath"],index=False,header=False)
         sd.append(data_product_dict)
-        prefix = self.parent_module.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
-        filename = prefix+"dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt"
-        with open(filename, mode="wt") as datafile:
-            datafile.write(json.dumps(data_product_dict))
+        # prefix = self.scenario_dir+"results/"+str(self.parent_module.parent_module.name)+"/sd/"
+        # filename = prefix+"dataprod"+"_"+str(lat)+"_"+str(lon)+"_"+str(time)+"_"+product_type+".txt"
+        # with open(filename, mode="wt") as datafile:
+        #     datafile.write(json.dumps(data_product_dict))
         return sd, data_product_dict
 
     async def save_observations(self,obs_type):
@@ -394,27 +458,27 @@ class ScenarioScienceModule(ScienceModule):
         hotlake_coords = []
         bloom_coords = []
         all_coords = []
-        parent_agent = self.get_top_module()
-        sat_name = parent_agent.name
+        #parent_agent = self.get_top_module()
+        sat_name = self.parent_name
         for potential_outlier in self.processed_items:
-            if "scenario1a" in self.parent_module.scenario_dir:
-                outlier, outlier_data = self.parent_module.check_altimetry_outlier(potential_outlier)
-            elif "scenario1b" in self.parent_module.scenario_dir: 
-                outlier, outlier_data = self.parent_module.check_flood_outliers(potential_outlier)
+            if "scenario1a" in self.scenario_dir:
+                outlier, outlier_data = self.check_altimetry_outlier(potential_outlier)
+            elif "scenario1b" in self.scenario_dir: 
+                outlier, outlier_data = self.check_flood_outliers(potential_outlier)
                 if outlier_data["event_type"] == "flood":
                     floods_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
                 elif outlier_data["event_type"] == "hf":
                     hfs_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
-            elif "scenario2" in self.parent_module.scenario_dir:
+            elif "scenario2" in self.scenario_dir:
                 all_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
                 if obs_type == "altimetry":
-                    outlier, outlier_data = self.parent_module.check_lakelevel_outliers(potential_outlier)
+                    outlier, outlier_data = self.check_lakelevel_outliers(potential_outlier)
                     if outlier_data["event_type"] == "lake flood":
                         lakeflood_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
                     elif outlier_data["event_type"] == "lake drought":
                         lakedrought_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
                 if obs_type == "thermal":
-                    outlier, outlier_data = self.parent_module.check_laketemp_outliers(potential_outlier)
+                    outlier, outlier_data = self.check_laketemp_outliers(potential_outlier)
                     if outlier_data["event_type"] == "hot lake":
                         hotlake_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
                     elif outlier_data["event_type"] == "cold lake":
@@ -422,65 +486,67 @@ class ScenarioScienceModule(ScienceModule):
                 if obs_type == "visible":
                     bloom_coords.append((potential_outlier["lat"],potential_outlier["lon"],potential_outlier["time"]))
             
-        if "scenario1b" in self.parent_module.scenario_dir:
-            with open(self.parent_module.scenario_dir+sat_name+'_floods.csv','w') as out:
+        if "scenario1b" in self.scenario_dir:
+            with open(self.scenario_dir+sat_name+'_floods.csv','w') as out:
                 csv_out=csv.writer(out)
                 csv_out.writerow(['lat','lon','time'])
                 for row in floods_coords:
                     csv_out.writerow(row)
-            with open(self.parent_module.scenario_dir+sat_name+'_hfs.csv','w') as out:
+            with open(self.scenario_dir+sat_name+'_hfs.csv','w') as out:
                 csv_out=csv.writer(out)
                 csv_out.writerow(['lat','lon','time'])
                 for row in hfs_coords:
                     csv_out.writerow(row)
-        parent_agent = self.get_top_module()
-        payload = parent_agent.payload[parent_agent.name]
+        #parent_agent = self.get_top_module()
+        #payload = parent_agent.payload[parent_agent.name]
+
         instruments = []
-        if isinstance(payload, list):
-            for i in range(len(payload)):
-                instruments.append(payload[i]["name"])
-        else:
-            instruments.append(payload["name"])
-        if "scenario2" in self.parent_module.scenario_dir:
+        if "alt_sat" in self.parent_name:
+            instruments.append("POSEIDON-3B Altimeter")
+        if "vnir" in self.parent_name:
+            instruments.append("OLI")
+        if "tir" in self.parent_name:
+            instruments.append("ThermalCamera")
+        if "scenario2" in self.scenario_dir:
             if "OLI" in instruments:
-                with open(self.parent_module.scenario_dir+sat_name+'_blooms.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_blooms.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in lakeflood_coords:
                         csv_out.writerow(row)
-                with open(self.parent_module.scenario_dir+sat_name+'_all.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_all.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in all_coords:
                         csv_out.writerow(row)
             if "POSEIDON-3B Altimeter" in instruments:
-                with open(self.parent_module.scenario_dir+sat_name+'_lakefloods.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_lakefloods.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in lakeflood_coords:
                         csv_out.writerow(row)
-                with open(self.parent_module.scenario_dir+sat_name+'_lakedroughts.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_lakedroughts.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in lakedrought_coords:
                         csv_out.writerow(row)
-                with open(self.parent_module.scenario_dir+sat_name+'_all.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_all.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in all_coords:
                         csv_out.writerow(row)
             if "ThermalCamera" in instruments:
-                with open(self.parent_module.scenario_dir+sat_name+'_hotlakes.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_hotlakes.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in hotlake_coords:
                         csv_out.writerow(row)
-                with open(self.parent_module.scenario_dir+sat_name+'_coldlakes.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_coldlakes.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in coldlake_coords:
                         csv_out.writerow(row)
-                with open(self.parent_module.scenario_dir+sat_name+'_all.csv','w') as out:
+                with open(self.scenario_dir+sat_name+'_all.csv','w') as out:
                     csv_out=csv.writer(out)
                     csv_out.writerow(['lat','lon','time'])
                     for row in all_coords:
@@ -494,37 +560,36 @@ class ScenarioScienceModule(ScienceModule):
         """
         self.log(f'Computing science value...', level=logging.DEBUG)
         outlier = False
-        science_val = 1.0
-        outlier, outlier_data = self.check_altimetry_outlier(obs)
+        if "scenario1a" in self.scenario_dir:
+            science_val = 1.0
+            outlier, outlier_data = self.check_altimetry_outlier(obs)
+            if outlier:
+                science_val = 10.0
+            self.log(f'Scenario 1a outlier checked!',level=logging.INFO)
+        elif "scenario1b" in self.scenario_dir:
+            outlier, outlier_data = self.parent_module.check_flood_outliers(obs)
+            science_val = outlier_data["severity"]
+            self.log(f'Scenario 1b outlier checked!',level=logging.INFO)
+        elif "scenario2" in self.scenario_dir:
+            if obs["product_type"] == "altimetry":
+                outlier, outlier_data = self.check_lakelevel_outliers(obs)
+                science_val = outlier_data["severity"]
+                self.log(f'Scenario 2 lake level outlier checked!',level=logging.DEBUG)
+            elif obs["product_type"] == "thermal":
+                outlier, outlier_data = self.check_laketemp_outliers(obs)
+                science_val = outlier_data["severity"]
+                self.log(f'Scenario 2 lake temp outlier checked!',level=logging.DEBUG)
+            elif obs["product_type"] == "visible":
+                outlier, outlier_data = self.check_bloom_outliers(obs)
+                science_val = outlier_data["severity"]
+                self.log(f'Scenario 2 bloom outlier checked!',level=logging.DEBUG)
+            else:
+                science_val = 0.0
         if outlier:
-            science_val = 10.0
-        self.log(f'Scenario 1a outlier checked!',level=logging.INFO)
-        # if "scenario1a" in self.parent_module.scenario_dir:
-        #     science_val = 1.0
-        #     outlier, outlier_data = self.check_altimetry_outlier(obs)
-        #     if outlier:
-        #         science_val = 10.0
-        #     self.log(f'Scenario 1a outlier checked!',level=logging.INFO)
-        # elif "scenario1b" in self.parent_module.scenario_dir:
-        #     outlier, outlier_data = self.parent_module.check_flood_outliers(obs)
-        #     science_val = outlier_data["severity"]
-        #     self.log(f'Scenario 1b outlier checked!',level=logging.INFO)
-        # elif "scenario2" in self.parent_module.scenario_dir:
-        #     if obs["product_type"] == "altimetry":
-        #         outlier, outlier_data = self.parent_module.check_lakelevel_outliers(obs)
-        #         science_val = outlier_data["severity"]
-        #         self.log(f'Scenario 2 lake level outlier checked!',level=logging.INFO)
-        #     elif obs["product_type"] == "thermal":
-        #         outlier, outlier_data = self.parent_module.check_laketemp_outliers(obs)
-        #         science_val = outlier_data["severity"]
-        #         self.log(f'Scenario 2 lake temp outlier checked!',level=logging.INFO)
-        #     else:
-        #         science_val = 1.0
-        if outlier:
-            self.log(f'Computed bonus science value: {science_val}', level=logging.DEBUG)
+            self.log(f'Computed bonus science value: {science_val}', level=logging.INFO)
             outlier = True
         else:
-            self.log(f'Computed normal science value: {science_val}', level=logging.DEBUG)
+            self.log(f'Computed normal science value: {science_val}', level=logging.INFO)
         resulting_value = science_val*self.meas_perf()
         return resulting_value, outlier
 
@@ -615,6 +680,156 @@ class ScenarioScienceModule(ScienceModule):
             else:
                 self.log(f'No flood detected at {lat}, {lon}',level=logging.INFO)
             item["checked"] = True
+        return outlier, outlier_data
+    
+    def check_bloom_outliers(self,item):
+        """
+        Checks G-REALM data for outliers. To be used for Scenario 2.
+        """
+        outlier = False
+        outlier_data = None
+        severity = 0.0
+        event_type = ""
+        lake_obs = []
+        for i in range(len(self.points[:, 0])):
+            if (abs(float(item["lat"])-self.points[i, 0]) < 0.001) and (abs(float(item["lon"]) - self.points[i, 1]) < 0.001):
+                if self.points[i,6] == 2:
+                    lake_obs.append(self.points[i,:])
+        if len(lake_obs) == 0:
+            item["severity"] = 0.0
+            item["event_type"] = ""
+            return outlier, item
+        start_date = dt.datetime(2022,6,1,0,0,0)
+        latest_obs = None
+        for obs in lake_obs:
+            date = str(obs[4])
+            obs_date = dt.datetime(2022,int(date[4:6]),int(date[6:8]),0,0,0)
+            obs_time = (obs_date-start_date).total_seconds()
+            if(self.get_current_time() > obs_time):
+                latest_obs = obs
+        if latest_obs is None:
+            latest_obs = lake_obs[0]
+        
+        if latest_obs[5] > (latest_obs[2]+latest_obs[3]):
+            if latest_obs[3] == 0.0:
+                item["severity"] = np.abs(latest_obs[5]/latest_obs[3])
+            else:
+                item["severity"] = latest_obs[5]
+            outlier = True
+            outlier_data = item
+            outlier_data["event_type"] = "bloom"
+            self.log(f'Algal bloom detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        else:
+            outlier_data = item
+            outlier_data["severity"] = 0.0
+            outlier_data["event_type"] = ""
+            self.log(f'No algal bloom detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        return outlier, outlier_data
+
+    def check_lakelevel_outliers(self,item):
+        """
+        Checks G-REALM data for outliers. To be used for Scenario 2.
+        """
+        outlier = False
+        outlier_data = None
+        severity = 0.0
+        event_type = ""
+        lake_obs = []
+        for i in range(len(self.points[:, 0])):
+            if (abs(float(item["lat"])-self.points[i, 0]) < 0.01) and (abs(float(item["lon"]) - self.points[i, 1]) < 0.01):
+                if self.points[i,6] == 0:
+                    lake_obs.append(self.points[i,:])
+        if len(lake_obs) == 0:
+            item["severity"] = 0.0
+            item["event_type"] = ""
+            return outlier, item
+        start_date = dt.datetime(2010,6,1,0,0,0)
+        latest_obs = None
+        for obs in lake_obs:
+            date = str(obs[4])
+            obs_date = dt.datetime(2010,int(date[4:6]),int(date[6:8]),0,0,0)
+            obs_time = (obs_date-start_date).total_seconds()
+            if(self.get_current_time() > obs_time):
+                latest_obs = obs
+        if latest_obs is None:
+            latest_obs = lake_obs[0]
+        
+        if latest_obs[5] > (latest_obs[2]+latest_obs[3]):
+            if latest_obs[3] == 0.0:
+                item["severity"] = np.abs(latest_obs[5]/latest_obs[3])
+            else:
+                item["severity"] = latest_obs[5]
+            outlier = True
+            outlier_data = item
+            outlier_data["event_type"] = "lake flood"
+            self.log(f'Lake flood detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        elif latest_obs[5] < (latest_obs[2]-latest_obs[3]):
+            if latest_obs[3] == 0.0:
+                item["severity"] = np.abs(latest_obs[5]/latest_obs[3])
+            else:
+                item["severity"] = latest_obs[5]
+            outlier = True
+            outlier_data = item
+            outlier_data["event_type"] = "lake drought"
+            self.log(f'Lake drought detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        else:
+            outlier_data = item
+            outlier_data["severity"] = 0.0
+            outlier_data["event_type"] = ""
+            self.log(f'No lake height outlier detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        return outlier, outlier_data
+
+    def check_laketemp_outliers(self,item):
+        """
+        Checks G-REALM data for outliers. To be used for Scenario 2.
+        """
+        outlier = False
+        outlier_data = None
+        severity = 0.0
+        event_type = ""
+        lake_obs = []
+        for i in range(len(self.points[:, 0])):
+            if (abs(float(item["lat"])-self.points[i, 0]) < 0.01) and (abs(float(item["lon"]) - self.points[i, 1]) < 0.01):
+                if self.points[i,6] == 1:
+                    lake_obs.append(self.points[i,:])
+        start_date = dt.datetime(2010,6,1,0,0,0)
+        if len(lake_obs) == 0:
+            item["severity"] = 0.0
+            item["event_type"] = ""
+            return outlier, item
+        latest_obs = None
+        for obs in lake_obs:
+            date = str(obs[4])
+            obs_date = dt.datetime(2010,int(date[4:6]),int(date[6:8]),0,0,0)
+            obs_time = (obs_date-start_date).total_seconds()
+            if(self.get_current_time() > obs_time):
+                latest_obs = obs
+        if latest_obs is None:
+            latest_obs = lake_obs[0]
+        
+        if latest_obs[5] > (latest_obs[2]+latest_obs[3]):
+            if latest_obs[3] == 0.0:
+                item["severity"] = np.abs(latest_obs[5]/latest_obs[3])
+            else:
+                item["severity"] = latest_obs[5]
+            outlier = True
+            outlier_data = item
+            outlier_data["event_type"] = "hot lake"
+            self.log(f'Hot lake detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        elif latest_obs[5] < (latest_obs[2]-latest_obs[3]):
+            if latest_obs[3] == 0.0:
+                item["severity"] = np.abs(latest_obs[5]/latest_obs[3])
+            else:
+                item["severity"] = latest_obs[5]
+            outlier = True
+            outlier_data = item
+            outlier_data["event_type"] = "cold lake"
+            self.log(f'Cold lake detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
+        else:
+            outlier_data = item
+            outlier_data["severity"] = 0.0
+            outlier_data["event_type"] = ""
+            self.log(f'No lake temperature outlier detected at {latest_obs[0]}, {latest_obs[1]}',level=logging.DEBUG)
         return outlier, outlier_data
 
     def meas_perf(self):

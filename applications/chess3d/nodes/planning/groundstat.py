@@ -97,7 +97,7 @@ class GroundStationPlanner(FixedPlanner):
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    t_idle = t_curr + 1e6 # TODO find end of simulation time        
+                    t_idle = t_curr + 1e8 # TODO find end of simulation time        
                     action = WaitForMessages(t_curr, t_idle)
                     plan_out.append(action.to_dict())
                     

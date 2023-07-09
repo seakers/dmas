@@ -26,6 +26,7 @@ from dmas.clocks import FixedTimesStepClockConfig, EventDrivenClockConfig
 from manager import SimulationManager
 from monitor import ResultsMonitor
 from nodes.environment import SimulationEnvironment
+from nodes.science.science import ScienceModule
 
 """
 ======================================================
@@ -260,8 +261,7 @@ if __name__ == "__main__":
             if science_dict is not None:
                 raise NotImplementedError(f"Science module not yet implemented.")
             else:
-                science = None
-
+                science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
             ## load initial state 
             initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
 

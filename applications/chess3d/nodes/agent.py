@@ -333,7 +333,10 @@ class SimulationAgent(Agent):
                                                             action_dict
                                                             )
 
-                    dst, src, measurement_dict = await self.send_peer_message(measurement)
+                    dst,src,measurement_dict = await self.send_peer_message(measurement)
+                    result : dict = measurement_dict
+                    msg_sci = MeasurementResultsRequestMessage(**result)
+                    await self._send_manager_msg(msg_sci, zmq.PUB)
 
                     # add measurement to environment inbox to be processed during `sensing()`
                     await self.environment_inbox.put((dst, src, measurement_dict))

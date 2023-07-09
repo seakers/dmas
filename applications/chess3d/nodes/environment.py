@@ -141,7 +141,6 @@ class SimulationEnvironment(EnvironmentNode):
                         resp.dst = resp.src
                         resp.src = self.get_element_name()
                         resp.measurement = measurement_data
-                        
                         self.measurement_history.append(resp)
 
                         await self.respond_peer_message(resp) 
@@ -337,12 +336,12 @@ class SimulationEnvironment(EnvironmentNode):
             measurement_action = MeasurementAction(**msg.masurement_action)
             task = MeasurementRequest(**measurement_action.measurement_req)
             measurement_data : dict = msg.measurement
-            measurer = msg.measurement['agent']
+            measurer = msg.dst
             t_img = msg.measurement['t_img']
 
             line_data = [task.id.split('-')[0],
                             measurer,
-                            task.pos,
+                            msg.masurement_action["measurement_req"]["pos"],
                             task.t_start,
                             task.t_end,
                             task.t_corr,
