@@ -1357,6 +1357,10 @@ class MACCBBA(PlanningModule):
         self.log_task_sequence('path', path, level)
 
         available_tasks : list = self.get_available_tasks(state, bundle, results)
+
+        if len(available_tasks) > 0:
+            x = 1
+
         changes = []
         changes_to_bundle = []
         
@@ -1520,7 +1524,8 @@ class MACCBBA(PlanningModule):
                 
             if not can_access:
                 return False
-        
+            else:
+                x = 1
 
         ## Constraint 2: coalition constraints
         n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)

@@ -142,7 +142,7 @@
                 }
             },
             "instrument": {
-                "name": "OLI",
+                "name": "POSEIDON-3BAltimeter",
                 "mass": 10,
                 "volume": 12.45,
                 "dataRate": 40,

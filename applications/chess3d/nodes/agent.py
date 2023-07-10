@@ -401,6 +401,7 @@ class SimulationAgent(Agent):
             data.append(line_data)
         
         state_df = DataFrame(data,columns=headers)
+        # state_df = state_df.drop_duplicates()
         self.log(f'\nPayload: {self.payload}\nSTATE HISTORY\n{str(state_df)}\n', level=logging.WARNING)
         state_df.to_csv(f"{self.results_path}/states.csv", index=False)
 
