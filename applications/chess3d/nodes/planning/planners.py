@@ -89,7 +89,7 @@ class Bid(ABC):
         ### Arguments:
             - other (`Bid`): equivalent bid being used to update information
         """
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.req_id}, given id: {other.task_id}).')
 
@@ -142,7 +142,7 @@ class Bid(ABC):
 
     def __lt__(self, other : object) -> bool:
         other : Bid
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         
@@ -154,7 +154,7 @@ class Bid(ABC):
 
     def __gt__(self, other : object) -> bool:
         other : Bid
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         
@@ -166,7 +166,7 @@ class Bid(ABC):
 
     def __le__(self, other : object) -> bool:
         other : Bid
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         
@@ -177,7 +177,7 @@ class Bid(ABC):
 
     def __ge__(self, other : object) -> bool:
         other : Bid
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         
@@ -188,7 +188,7 @@ class Bid(ABC):
 
     def __eq__(self, other : object) -> bool:
         other : Bid
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         
@@ -196,7 +196,7 @@ class Bid(ABC):
 
     def __ne__(self, other : object) -> bool:
         other : Bid
-        if self.req_id != other.task_id:
+        if self.req_id != other.req_id:
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         

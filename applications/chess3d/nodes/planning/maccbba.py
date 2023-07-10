@@ -776,6 +776,9 @@ class MACCBBA(PlanningModule):
                                 
         except asyncio.CancelledError:
             return 
+        
+        except Exception as e:
+            raise e
 
     def __load_orbit_data(self) -> OrbitData:
         if self.parent_agent_type != None:
@@ -983,6 +986,9 @@ class MACCBBA(PlanningModule):
             results, bundle, path, planner_changes = await self.planning_phase(state, results, bundle, path, level)
             dt = time.perf_counter() - t_0
             self.stats['planning'].append(dt)
+
+            if len(bundle) > 0:
+                x = 1
 
             self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
             self.log_changes("CHANGES MADE FROM CONSENSUS", consensus_changes, level)
@@ -1732,8 +1738,8 @@ class MACCBBA(PlanningModule):
                     dt = t_img - state.t
 
                     # check for planning horizon
-                    if dt > self.planning_horizon:
-                        continue
+                    # if dt > self.planning_horizon:
+                    #     continue
                                         
                     # propagate state
                     propagated_state : SatelliteAgentState = state.propagate(t_img)
@@ -1782,12 +1788,12 @@ class MACCBBA(PlanningModule):
         agent_bid = proposed_bid.winning_bid
 
         # initiate coalition bid count
-        current_bid : SubtaskBid = current_results[proposed_bid.task_id][proposed_bid.subtask_index]
+        current_bid : SubtaskBid = current_results[proposed_bid.req_id][proposed_bid.subtask_index]
         coalition_bid = 0
 
-        for bid_i in current_results[proposed_bid.task_id]:
+        for bid_i in current_results[proposed_bid.req_id]:
             bid_i : SubtaskBid
-            bid_i_index = current_results[proposed_bid.task_id].index(bid_i)
+            bid_i_index = current_results[proposed_bid.req_id].index(bid_i)
 
             if (    bid_i.winner == current_bid.winner
                 and current_bid.dependencies[bid_i_index] >= 0 ):
