@@ -191,9 +191,8 @@ class GreedyPlanner(PlanningModule):
                         # import orbit data
                         self.orbitdata : OrbitData = self.__load_orbit_data()
                         self.parent_agent_type = SimulationAgentTypes.SATELLITE.value
-                    # TODO Add UAV support
-                    # elif isinstance(state, UAVAgentState):
-                    #     self.parent_agent_type = SimulationAgentTypes.UAV.value
+                    elif isinstance(state, UAVAgentState):
+                        self.parent_agent_type = SimulationAgentTypes.UAV.value
                     else:
                         raise NotImplementedError(f"states of type {state_msg.state['state_type']} not supported for greedy planners.")
 
@@ -476,32 +475,39 @@ class GreedyPlanner(PlanningModule):
             # find next best task to put in bundle (greedy)
             max_task = None 
             max_subtask = None
-            for measurement_task, subtask_index in available_tasks:
+            for measurement_req, subtask_index in available_tasks:
                 # calculate bid for a given available task
-                measurement_task : MeasurementRequest
+                measurement_req : MeasurementRequest
                 subtask_index : int
-                lat,lon,_ = measurement_task.pos
-                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, 0.0)
-                if not df.empty:
-                    projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, results, path, measurement_task, subtask_index)
-                else:
-                    continue
+
+                if (    
+                        isinstance(measurement_req, GroundPointMeasurementRequest) 
+                    and isinstance(state, SatelliteAgentState)
+                    ):
+                    # check if the satellite can observe the GP
+                    lat,lon,_ = measurement_req.pos
+                    df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, 0.0)
+                    if df.empty:
+                        continue
+
+                projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, results, path, measurement_req, subtask_index)
+
                 # check if path was found
                 if projected_path is None:
                     continue
                 
                 # compare to maximum task
-                bid_utility = projected_bids[measurement_task.id][subtask_index].winning_bid
+                bid_utility = projected_bids[measurement_req.id][subtask_index].winning_bid
                 if (max_task is None 
                     # or projected_path_utility > max_path_utility
                     or bid_utility > max_utility
                     ):
 
                     # check for cualition and mutex satisfaction
-                    proposed_bid : GreedyBid = projected_bids[measurement_task.id][subtask_index]
+                    proposed_bid : GreedyBid = projected_bids[measurement_req.id][subtask_index]
                     
                     max_path = projected_path
-                    max_task = measurement_task
+                    max_task = measurement_req
                     max_subtask = subtask_index
                     max_path_bids = projected_bids
                     max_path_utility = projected_path_utility
@@ -516,12 +522,12 @@ class GreedyPlanner(PlanningModule):
                 # available_tasks.remove((max_task, max_subtask))
             
             #  update bids
-            for measurement_task, subtask_index in path:
-                measurement_task : MeasurementRequest
+            for measurement_req, subtask_index in path:
+                measurement_req : MeasurementRequest
                 subtask_index : int
-                new_bid : GreedyBid = max_path_bids[measurement_task.id][subtask_index]
+                new_bid : GreedyBid = max_path_bids[measurement_req.id][subtask_index]
 
-                results[measurement_task.id][subtask_index] = new_bid
+                results[measurement_req.id][subtask_index] = new_bid
 
             available_tasks : list = self.get_available_tasks(state, bundle, results)
 
@@ -610,7 +616,6 @@ class GreedyPlanner(PlanningModule):
 
             # calculate bids for each task in the path
             bids = {}
-            t_prev = -1
             for req_i, subtask_j in path:
                 # calculate imaging time
                 req_i : MeasurementRequest; subtask_j : int
@@ -671,6 +676,13 @@ class GreedyPlanner(PlanningModule):
                                         0.0,
                                         0.0
                                     ]
+            elif isinstance(state, UAVAgentState):
+                prev_state = state.copy()
+                
+                if isinstance(prev_req, GroundPointMeasurementRequest):
+                    prev_state.pos = prev_req.pos
+                else:
+                    raise NotImplementedError
             else:
                 raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
 
@@ -682,29 +694,31 @@ class GreedyPlanner(PlanningModule):
         """
         if isinstance(req, GroundPointMeasurementRequest):
             # compute earliest time to the task
-            if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
+            if isinstance(state, SatelliteAgentState):
                 lat,lon,_ = req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
 
                 for _, row in df.iterrows():
                     t_img = row['time index'] * self.orbitdata.time_step
                     dt = t_img - state.t
-                    
-                    if isinstance(state, SatelliteAgentState):
-                        # propagate state
-                        propagated_state : SatelliteAgentState = state.propagate(t_img)
+                
+                    # propagate state
+                    propagated_state : SatelliteAgentState = state.propagate(t_img)
 
-                        # compute off-nadir angle
-                        thf = propagated_state.calc_off_nadir_agle(req)
-                        dth = thf - propagated_state.attitude[0]
+                    # compute off-nadir angle
+                    thf = propagated_state.calc_off_nadir_agle(req)
+                    dth = thf - propagated_state.attitude[0]
 
-                        # estimate arrival time using fixed angular rate TODO change to 
-                        if dt >= dth / 1.0: # TODO change maximum angular rate 
-                            return t_img
-                    else:
-                        raise NotImplementedError(f"Arrival time calculation for states of type {type(state)} not yet supported.")
-                  
+                    # estimate arrival time using fixed angular rate TODO change to 
+                    if dt >= dth / 1.0: # TODO change maximum angular rate 
+                        return t_img
                 return -1
+
+            elif isinstance(state, UAVAgentState):
+                dr = np.array(req.pos) - np.array(state.pos)
+                norm = np.sqrt( dr.dot(dr) )
+                return norm / state.max_speed
+
             else:
                 raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
 
@@ -747,6 +761,14 @@ class GreedyPlanner(PlanningModule):
                                         0.0,
                                         0.0
                                     ]
+
+                elif isinstance(state, UAVAgentState):
+                    prev_state : UAVAgentState = state.copy()
+                    if isinstance(prev_req, GroundPointMeasurementRequest):
+                        prev_state.pos = prev_req.pos
+                    else:
+                        raise NotImplementedError(f"cannot calculate travel time start for requests of type {type(prev_req)} for uav agents")
+
                 else:
                     raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
 
@@ -755,13 +777,12 @@ class GreedyPlanner(PlanningModule):
                 t_maneuver_start = prev_state.t
                 tf = prev_state.calc_off_nadir_agle(measurement_req)
                 t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
-            else:
-                raise NotImplementedError(f"cannot calculate maneuver time end for agent states of type {type(state)}")
-            if t_maneuver_start == -1.0:
-                continue
-            if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
-                maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
-                plan.append(maneuver_action)
+
+                if t_maneuver_start == -1.0:
+                    continue
+                if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
+                    maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
+                    plan.append(maneuver_action)            
 
             # move to target
             t_move_start = t_maneuver_end
@@ -776,6 +797,14 @@ class GreedyPlanner(PlanningModule):
 
                 future_state : SatelliteAgentState = state.propagate(t_move_end)
                 final_pos = future_state.pos
+
+            elif isinstance(state, UAVAgentState):
+                final_pos = measurement_req.pos
+                dr = np.array(final_pos) - np.array(prev_state.pos)
+                norm = np.sqrt( dr.dot(dr) )
+                
+                t_move_end = t_move_start + norm / state.max_speed
+
             else:
                 raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
             
