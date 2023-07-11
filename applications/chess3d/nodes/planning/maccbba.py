@@ -2179,16 +2179,16 @@ class MACCBBA(PlanningModule):
                 if isinstance(results[task_id], list):
                     for bid in results[task_id]:
                         bid : SubtaskBid
-                        task = MeasurementRequest.from_dict(bid.req)
-                        split_id = task.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        req = MeasurementRequest.from_dict(bid.req)
+                        split_id = req.id.split('-')
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
                 elif isinstance(results[task_id], dict):
                     for bid_index in results[task_id]:
                         bid : SubtaskBid = results[task_id][bid_index]
-                        task = MeasurementRequest.from_dict(bid.req)
-                        split_id = task.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, task.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        req = MeasurementRequest.from_dict(bid.req)
+                        split_id = req.id.split('-')
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
                 else:
                     raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')

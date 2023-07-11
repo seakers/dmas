@@ -82,7 +82,7 @@ if __name__ == "__main__":
             agent_names.append(gstation['name'])
 
     # precompute orbit data
-    orbitdata_dir = precompute_orbitdata(scenario_name)
+    orbitdata_dir = precompute_orbitdata(scenario_name) if spacecraft_dict is not None else None
 
     # read clock configuration
     epoch_dict : dict = scenario_dict.get("epoch")
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     delta = timedelta(days=duration)
     end_date = start_date + delta
 
+    ## define simulation time-step
     if spacecraft_dict:
         for spacecraft in spacecraft_dict:
             spacecraft_dict : list
@@ -112,8 +113,8 @@ if __name__ == "__main__":
     else:
         dt = delta.total_seconds()/100
 
-    # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
-    clock_config = EventDrivenClockConfig(start_date, end_date)
+    clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    # clock_config = EventDrivenClockConfig(start_date, end_date)
 
     # initialize manager
     manager_network_config = NetworkConfig( scenario_name,

@@ -200,6 +200,7 @@ class GroundPointMeasurementRequest(MeasurementRequest):
                 t_corr: Union[float, int] = 0.0,
                 duration: Union[float, int] = 0.0, 
                 urgency: Union[float, int] = None,  
+                pos_type : str = 'LATLON',
                 id: str = None, 
                 **_
                 ) -> None:

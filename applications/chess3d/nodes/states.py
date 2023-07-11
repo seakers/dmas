@@ -138,7 +138,7 @@ class SimulationAgentState(AbstractAgentState):
         
         return action.ABORTED, 0.0
 
-    def comp_vectors(self, v1 : list, v2 : list):
+    def comp_vectors(self, v1 : list, v2 : list, eps : float = 1e-6):
         """
         compares two vectors
         """
@@ -147,9 +147,8 @@ class SimulationAgentState(AbstractAgentState):
         dz = v1[2] - v2[2]
 
         dv = np.sqrt(dx**2 + dy**2 + dz**2)
-        # print('\n\n', v1, v2, dv, dv < 1e-6, '\n')
         
-        return dv < 1e-6
+        return dv < eps
 
     @abstractmethod
     def perform_travel(self, action : TravelAction, t : Union[int, float]) -> tuple:
@@ -549,12 +548,74 @@ class UAVAgentState(SimulationAgentState):
     """
     Describes the state of a UAV Agent
     """
-    def __init__(self, 
+    def __init__(   self, 
                     pos: list, 
                     vel: list, 
+                    max_speed: float,
+                    attitude: list, 
+                    attitude_rates: list, 
                     engineering_module: EngineeringModule = None, 
-                    status: str = ..., 
+                    status: str = SimulationAgentState.IDLING, 
                     t: Union[float, int] = 0, 
                     **_
                 ) -> None:
-        super().__init__(pos, vel, engineering_module, status, t, **_)
+        super().__init__(
+                            SimulationAgentTypes.UAV.value, 
+                            pos, 
+                            vel, 
+                            attitude, 
+                            attitude_rates, 
+                            engineering_module, 
+                            status, 
+                            t)
+        self.max_speed = max_speed
+
+    def kinematic_model(self, tf: Union[int, float]) -> tuple:
+        dt = tf - self.t
+
+        if dt < 0:
+            raise RuntimeError(f"cannot propagate UAV state with non-negative time-step of {dt} [s].")
+
+        pos = np.array(self.pos) + np.array(self.vel) * dt
+        return pos, self.vel.copy(), self.attitude, self.attitude_rates
+
+
+    def perform_travel(self, action: TravelAction, t: Union[int, float]) -> tuple:
+        # update state
+        self.update_state(t, status=self.TRAVELING)
+
+        # check completion
+        if self.comp_vectors(self.attitude, action.final_pos):
+            # if reached, return successful completion status
+            self.vel = [0,0,0]
+            return action.COMPLETED, 0.0
+        
+        elif t > action.t_end:
+            # could not complete action before action end time
+            self.vel = [0,0,0]
+            return action.ABORTED, 0.0
+
+        # else, wait until position is reached
+        else:
+            # find new direction towards target
+            dr = np.array(action.final_pos) - np.array(self.pos)
+            norm = np.sqrt( dr.dot(dr) )
+            dr = np.array([
+                            dr[0] / norm,
+                            dr[1] / norm,
+                            dr[2] / norm
+                            ]
+                        )
+
+            # chose new velocity 
+            self.vel = self.max_speed * dr
+
+            dt = action.t_end - t
+            return action.PENDING, dt
+
+    def perform_maneuver(self, action: ManeuverAction, t: Union[int, float]) -> tuple:
+        # update state
+        self.update_state(t, status=self.MANEUVERING)
+
+        # Cannot perform maneuvers
+        return action.ABORTED, 0.0
