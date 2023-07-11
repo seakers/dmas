@@ -126,6 +126,7 @@ class ClockConfig(ABC):
             dmm, dss = int(dmm), int(dss)
         else:
             hh, mm, ss = time.split(':')
+            hh, mm, ss = float(hh), float(mm), float(ss)
             hh, mm, ss = int(hh), int(mm), int(ss)
 
         return datetime(year, month, day, hh, mm, ss, tzinfo=timezone.utc)

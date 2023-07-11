@@ -499,7 +499,7 @@ class SatelliteAgentState(SimulationAgentState):
         Calculates the off-nadir angle between a satellite and a target
         """
         if isinstance(req, GroundPointMeasurementRequest):
-            lat,lon,alt = req.pos
+            lat,lon,alt = req.lat_lon_pos
             R = 6.3781363e+003 + alt
             target_pos = [
                     R * np.cos( lat * np.pi / 180.0) * np.cos( lon * np.pi / 180.0),
@@ -550,10 +550,8 @@ class UAVAgentState(SimulationAgentState):
     """
     def __init__(   self, 
                     pos: list, 
-                    vel: list, 
                     max_speed: float,
-                    attitude: list, 
-                    attitude_rates: list, 
+                    vel: list = [0.0,0.0,0.0], 
                     engineering_module: EngineeringModule = None, 
                     status: str = SimulationAgentState.IDLING, 
                     t: Union[float, int] = 0, 
@@ -563,8 +561,8 @@ class UAVAgentState(SimulationAgentState):
                             SimulationAgentTypes.UAV.value, 
                             pos, 
                             vel, 
-                            attitude, 
-                            attitude_rates, 
+                            [0.0,0.0,0.0], 
+                            [0.0,0.0,0.0], 
                             engineering_module, 
                             status, 
                             t)
@@ -577,8 +575,13 @@ class UAVAgentState(SimulationAgentState):
             raise RuntimeError(f"cannot propagate UAV state with non-negative time-step of {dt} [s].")
 
         pos = np.array(self.pos) + np.array(self.vel) * dt
-        return pos, self.vel.copy(), self.attitude, self.attitude_rates
+        pos = [
+                pos[0],
+                pos[1],
+                pos[2]
+            ]
 
+        return pos, self.vel.copy(), self.attitude, self.attitude_rates
 
     def perform_travel(self, action: TravelAction, t: Union[int, float]) -> tuple:
         # update state
@@ -587,12 +590,12 @@ class UAVAgentState(SimulationAgentState):
         # check completion
         if self.comp_vectors(self.attitude, action.final_pos):
             # if reached, return successful completion status
-            self.vel = [0,0,0]
+            self.vel = [0.0,0.0,0.0]
             return action.COMPLETED, 0.0
         
         elif t > action.t_end:
             # could not complete action before action end time
-            self.vel = [0,0,0]
+            self.vel = [0.0,0.0,0.0]
             return action.ABORTED, 0.0
 
         # else, wait until position is reached
@@ -608,7 +611,12 @@ class UAVAgentState(SimulationAgentState):
                         )
 
             # chose new velocity 
-            self.vel = self.max_speed * dr
+            vel = self.max_speed * dr
+            self.vel = [
+                        vel[0],
+                        vel[1],
+                        vel[2]
+                        ]
 
             dt = action.t_end - t
             return action.PENDING, dt
@@ -619,3 +627,9 @@ class UAVAgentState(SimulationAgentState):
 
         # Cannot perform maneuvers
         return action.ABORTED, 0.0
+
+    def is_failure(self) -> None:
+        if self.engineering_module:
+            # agent only fails if internal components fail
+            return self.engineering_module.is_failure()
+        return False

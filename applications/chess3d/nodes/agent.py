@@ -495,3 +495,4 @@ class SimulationAgent(Agent):
                 # forward all ignored messages as manager messages
                 for dst, src, content in ignored:
                     await self.manager_inbox.put((dst,src,content))
+

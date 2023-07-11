@@ -1,12 +1,10 @@
 import logging
 from typing import Any, Callable
-from nodes.planning.planners import PlannerTypes
 from nodes.science.science import ScienceModule
 from nodes.planning.planners import PlanningModule
 from nodes.agent import SimulationAgentState
 from dmas.network import NetworkConfig
 from nodes.agent import SimulationAgent
-import zmq 
 
 
 class SatelliteAgent(SimulationAgent):

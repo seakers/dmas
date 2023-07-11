@@ -356,7 +356,7 @@ class SubtaskBid(Bid):
         """
         req : MeasurementRequest = MeasurementRequest.from_dict(self.req)
         split_id = req.id.split('-')
-        line_data = [split_id[0], self.subtask_index, self.main_measurement, self.dependencies, req.pos, self.bidder, round(self.own_bid, 3), self.winner, round(self.winning_bid, 3), round(self.t_img, 3), round(self.t_violation, 3), self.bid_solo, self.bid_any]
+        line_data = [split_id[0], self.subtask_index, self.main_measurement, self.dependencies, req.lat_lon_pos, self.bidder, round(self.own_bid, 3), self.winner, round(self.winning_bid, 3), round(self.t_img, 3), round(self.t_violation, 3), self.bid_solo, self.bid_any]
         out = ""
         for i in range(len(line_data)):
             line_datum = line_data[i]
@@ -1511,7 +1511,7 @@ class MACCBBA(PlanningModule):
 
         elif isinstance(req, GroundPointMeasurementRequest):
             # check if agent can see the request location
-            lat,lon,_ = req.pos
+            lat,lon,_ = req.lat_lon_pos
             df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, state.t)
             can_access = False
             if not df.empty:                
@@ -1730,7 +1730,7 @@ class MACCBBA(PlanningModule):
         if isinstance(req, GroundPointMeasurementRequest):
             # compute earliest time to the task
             if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
-                lat,lon,_ = req.pos
+                lat,lon,_ = req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
 
                 for _, row in df.iterrows():
@@ -1944,7 +1944,7 @@ class MACCBBA(PlanningModule):
             # move to target
             t_move_start = t_maneuver_end
             if isinstance(state, SatelliteAgentState):
-                lat, lon, _ = measurement_req.pos
+                lat, lon, _ = measurement_req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
                 if df.empty:
                     continue
@@ -2181,14 +2181,14 @@ class MACCBBA(PlanningModule):
                         bid : SubtaskBid
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
                 elif isinstance(results[task_id], dict):
                     for bid_index in results[task_id]:
                         bid : SubtaskBid = results[task_id][bid_index]
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
                 else:
                     raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
@@ -2228,7 +2228,7 @@ class MACCBBA(PlanningModule):
                 bid = SubtaskBid(**change.bid)
                 req = MeasurementRequest.from_dict(bid.req)
                 split_id = req.id.split('-')
-                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                 data.append(line)
         
             df = pd.DataFrame(data, columns=headers)

@@ -192,7 +192,7 @@ class GroundPointMeasurementRequest(MeasurementRequest):
         - id (`str`) : identifying number for this task in uuid format
     """        
     def __init__(self, 
-                pos : list,
+                lat_lon_pos : list,
                 s_max : float,
                 measurements : list,
                 t_start: Union[float, int], 
@@ -200,7 +200,7 @@ class GroundPointMeasurementRequest(MeasurementRequest):
                 t_corr: Union[float, int] = 0.0,
                 duration: Union[float, int] = 0.0, 
                 urgency: Union[float, int] = None,  
-                pos_type : str = 'LATLON',
+                pos : list = None,
                 id: str = None, 
                 **_
                 ) -> None:
@@ -208,13 +208,14 @@ class GroundPointMeasurementRequest(MeasurementRequest):
         Creates an instance of a ground point measurement request 
 
         ### Arguments:
-            - pos (`list`): lat-lon-alt coordinates of the location of this task
+            - lat_lon_pos (`list`): lat-lon-alt coordinates of the location of this task [deg]
             - s_max (`float`): maximum score attained from performing this task
             - measurements (`list`): measurement types required to perform this task
             - duration (`float`): duration of the measurement being performed
             - t_start (`float`): start time of the availability of this task in [s] from the beginning of the simulation
             - t_end (`float`): end time of the availability of this task in [s] from the beginning of the simulation
             - t_corr (`float`): maximum decorralation time between measurements of different measurements
+            - pos (`list`): cartesian coordinates of the location of this task [km]
             - id (`str`) : identifying number for this task in uuid format
         """
         if t_start == "inf" or t_start == "Inf" or t_start == "INF":
@@ -234,10 +235,23 @@ class GroundPointMeasurementRequest(MeasurementRequest):
                         urgency, 
                         id)
         
-        # check arguments
+        if not isinstance(lat_lon_pos, list):
+            raise AttributeError(f'`lat_lon_pos` must be of type `list`. is of type {type(lat_lon_pos)}.')
+        elif len(lat_lon_pos) != 3:
+            raise ValueError(f'`lat_lon_pos` must be a list of 3 values (lat, lon, alt). is of length {len(lat_lon_pos)}.')
+
+        self.lat_lon_pos = lat_lon_pos
+        lat, lon, alt = lat_lon_pos
+
+        if pos is None:
+            R = 6.3781363e+003 + alt
+            pos = [
+                    R * np.cos( lat * np.pi / 180.0) * np.cos( lon * np.pi / 180.0),
+                    R * np.cos( lat * np.pi / 180.0) * np.sin( lon * np.pi / 180.0),
+                    R * np.sin( lat * np.pi / 180.0)
+            ]    
         if not isinstance(pos, list):
             raise AttributeError(f'`pos` must be of type `list`. is of type {type(pos)}.')
         elif len(pos) != 3:
-            raise ValueError(f'`pos` must be a list of 3 values (lat, lon, alt). is of length {len(pos)}.')
-    
+            raise ValueError(f'`pos` must be a list of 3 values (x_pos, y_pos, z_pos). is of length {len(pos)}.')
         self.pos = pos

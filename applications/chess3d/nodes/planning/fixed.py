@@ -35,14 +35,7 @@ class FixedPlanner(PlanningModule):
                 state_msg : AgentStateMessage = await self.states_inbox.get()
 
                 # update current time:
-                if state_msg.state['state_type'] == SimulationAgentTypes.SATELLITE.value:
-                    state = SatelliteAgentState(**state_msg.state)
-                elif state_msg.state['state_type'] == SimulationAgentTypes.UAV.value:
-                    state = UAVAgentState(**state_msg.state)
-                elif state_msg.state['state_type'] == SimulationAgentTypes.GROUND_STATION.value:
-                    state = GroundStationAgentState(**state_msg.state)
-                else:
-                    raise NotImplementedError(f"`state_type` {state_msg.state['state_type']} not supported.")
+                state : SimulationAgentState = SimulationAgentState.from_dict(state_msg.state)
 
                 if t_curr < state.t:
                     t_curr = state.t
@@ -84,7 +77,11 @@ class FixedPlanner(PlanningModule):
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
                     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    t_idle = t_curr + 1e6 # TODO find end of simulation time        
+                    if len(self.plan) > 0:
+                        next_action : AgentAction = self.plan[0]
+                        t_idle = next_action.t_start
+                    else:
+                        t_idle = t_curr + 1e8 # TODO find end of simulation time        
                     action = WaitForMessages(t_curr, t_idle)
                     plan_out.append(action.to_dict())
                     

@@ -1,6 +1,6 @@
 {   
     "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
-    "duration": 0.0416,
+    "duration": 0.000115740740741,
     "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR"},
     "uav" : [
         {
@@ -33,6 +33,9 @@
                 },
                 "@id": "bs1",
                 "@type": "Basic Sensor"
+            },
+            "planner" : {
+                "@type" : "FIXED"
             }
         }
     ],

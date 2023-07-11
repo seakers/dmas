@@ -246,11 +246,11 @@ class ScienceModule(InternalModule):
                     obs["product_type"] = "visible"
                 else:
                     obs["product_type"] = "thermal"
-                obs["lat"] = measurement_req.pos[0]
-                obs["lon"] = measurement_req.pos[1]
+                obs["lat"] = measurement_req.lat_lon_pos[0]
+                obs["lon"] = measurement_req.lat_lon_pos[1]
 
                 if isinstance(measurement_req, GroundPointMeasurementRequest):
-                    lat, lon, _ = measurement_req.pos
+                    lat, lon, _ = measurement_req.lat_lon_pos
                     
                     science_value, outlier = self.compute_science_value(lat, lon, obs)
                     self.log('Computed the science value!',level=logging.INFO)
@@ -339,8 +339,8 @@ class ScienceModule(InternalModule):
                     obs["product_type"] = "visible"
                 else:
                     obs["product_type"] = "thermal"
-                obs["lat"] = measurement_req.pos[0]
-                obs["lon"] = measurement_req.pos[1]
+                obs["lat"] = measurement_req.lat_lon_pos[0]
+                obs["lon"] = measurement_req.lat_lon_pos[1]
                 obs_str = ""
                 obs_datatype = obs["product_type"]
                 obs_process_time = measurement_action.t_start

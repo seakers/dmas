@@ -683,7 +683,7 @@ class GreedyPlanner(PlanningModule):
         if isinstance(req, GroundPointMeasurementRequest):
             # compute earliest time to the task
             if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
-                lat,lon,_ = req.pos
+                lat,lon,_ = req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
 
                 for _, row in df.iterrows():
@@ -766,7 +766,7 @@ class GreedyPlanner(PlanningModule):
             # move to target
             t_move_start = t_maneuver_end
             if isinstance(state, SatelliteAgentState):
-                lat, lon, _ = measurement_req.pos
+                lat, lon, _ = measurement_req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
                 if df.empty:
                     continue
