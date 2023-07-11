@@ -552,11 +552,13 @@ class UAVAgentState(SimulationAgentState):
                     pos: list, 
                     max_speed: float,
                     vel: list = [0.0,0.0,0.0], 
+                    eps : float = 1e-6,
                     engineering_module: EngineeringModule = None, 
                     status: str = SimulationAgentState.IDLING, 
                     t: Union[float, int] = 0, 
                     **_
                 ) -> None:
+                
         super().__init__(
                             SimulationAgentTypes.UAV.value, 
                             pos, 
@@ -567,6 +569,7 @@ class UAVAgentState(SimulationAgentState):
                             status, 
                             t)
         self.max_speed = max_speed
+        self.eps = eps
 
     def kinematic_model(self, tf: Union[int, float]) -> tuple:
         dt = tf - self.t
@@ -588,7 +591,7 @@ class UAVAgentState(SimulationAgentState):
         self.update_state(t, status=self.TRAVELING)
 
         # check completion
-        if self.comp_vectors(self.attitude, action.final_pos):
+        if self.comp_vectors(self.pos, action.final_pos, self.eps):
             # if reached, return successful completion status
             self.vel = [0.0,0.0,0.0]
             return action.COMPLETED, 0.0
@@ -603,12 +606,13 @@ class UAVAgentState(SimulationAgentState):
             # find new direction towards target
             dr = np.array(action.final_pos) - np.array(self.pos)
             norm = np.sqrt( dr.dot(dr) )
-            dr = np.array([
-                            dr[0] / norm,
-                            dr[1] / norm,
-                            dr[2] / norm
-                            ]
-                        )
+            if norm > 0:
+                dr = np.array([
+                                dr[0] / norm,
+                                dr[1] / norm,
+                                dr[2] / norm
+                                ]
+                            )
 
             # chose new velocity 
             vel = self.max_speed * dr
@@ -618,7 +622,7 @@ class UAVAgentState(SimulationAgentState):
                         vel[2]
                         ]
 
-            dt = action.t_end - t
+            dt = min(action.t_end - t, norm / self.max_speed)
             return action.PENDING, dt
 
     def perform_maneuver(self, action: ManeuverAction, t: Union[int, float]) -> tuple:

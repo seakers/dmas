@@ -394,7 +394,12 @@ if __name__ == "__main__":
             ## load initial state 
             pos = d['pos']
             max_speed = d['max_speed']
-            initial_state = UAVAgentState( pos, max_speed )
+            if isinstance(clock_config, FixedTimesStepClockConfig):
+                eps = max_speed * clock_config.dt / 2.0
+            else:
+                eps = 1e-6
+
+            initial_state = UAVAgentState( pos, max_speed, eps=eps )
 
             ## create agent
             agent = UAVAgent(agent_name, 
