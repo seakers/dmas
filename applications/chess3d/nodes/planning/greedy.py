@@ -773,6 +773,7 @@ class GreedyPlanner(PlanningModule):
                     raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
 
             # point to target
+            t_maneuver_end = None
             if isinstance(state, SatelliteAgentState):
                 t_maneuver_start = prev_state.t
                 tf = prev_state.calc_off_nadir_agle(measurement_req)
@@ -785,7 +786,7 @@ class GreedyPlanner(PlanningModule):
                     plan.append(maneuver_action)            
 
             # move to target
-            t_move_start = t_maneuver_end
+            t_move_start = prev_state.t if t_maneuver_end is None else t_maneuver_end
             if isinstance(state, SatelliteAgentState):
                 lat, lon, _ = measurement_req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)

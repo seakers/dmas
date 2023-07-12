@@ -35,7 +35,7 @@
                 "@type": "Basic Sensor"
             },
             "planner" : {
-                "@type" : "FIXED"
+                "@type" : "GREEDY"
             }
         }
     ],

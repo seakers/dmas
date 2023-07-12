@@ -434,7 +434,7 @@ class SimulationAgent(Agent):
                 isinstance(self._clock_config, FixedTimesStepClockConfig) 
                 or isinstance(self._clock_config, EventDrivenClockConfig)
                 ):
-                if delay < 1e-6: 
+                if delay == 0.0: 
                     ignored = None
                     return
 
