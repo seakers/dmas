@@ -420,7 +420,7 @@ if __name__ == "__main__":
         measurement_reqs = []
         df = pd.read_csv(scenario_path + '/gpRequests.csv')
             
-        for index, row in df.iterrows():
+        for _, row in df.iterrows():
             s_max = row['s_max']
             
             measurements_str : str = row['measurements']
@@ -481,4 +481,3 @@ if __name__ == "__main__":
             pool.submit(agent.run, *[])    
     
     print('\nSIMULATION DONE')
-    x = 1

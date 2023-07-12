@@ -112,6 +112,20 @@
                 "PYTHONPATH": "${workspaceRoot}"
             },
             "args" : "igarss_2023"
+        },
+
+        {
+            "name": "VISUALIZER TESTER",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/visualizer.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args" : "igarss_2023"
         }
     ],
 
