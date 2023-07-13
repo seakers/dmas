@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 import uuid
 from nodes.engineering.components import Component
-from nodes.engineering.actions import SubsystemAction, ADCSAttitude,IdleAction
+from nodes.engineering.actions import SubsystemAction, ADCSAttitude,DisabledAction
 
 
 class Subsystem(ABC):
@@ -114,6 +114,7 @@ class Subsystem(ABC):
         Crates a dictionary containing all information contained in this agent state object
         """
         return dict(self.__dict__)
+
 class ACDS(Subsystem):
     """
     Attitude Control and Determination Subsystem of Agent's Engineeering Module
@@ -176,9 +177,9 @@ class ACDS(Subsystem):
         th = th_o + dth/dt
         self.th = th
     
-    def perform_action(self, action : SubsystemAction, t : Union[int, float]) -> bool:
+    def perform_action(self, action : SubsystemAction, t : float) -> bool:
         """
-        Performs Attitude change of ADCS Subsystem
+        Performs an action of subsystem
 
         ### Arguments:
             - action (:obj:`SubsystemAction`) : action to be performed
@@ -189,9 +190,22 @@ class ACDS(Subsystem):
         """
         self.t = t
 
-        if isinstance(action,IdleAction):
+        if isinstance(action,DisabledAction):
             self.update_state(t,status=self.DISABLED)
         elif isinstance(action,ADCSAttitude):
-            self.perform_
+            self.update_state(t,status=self.ENABLED)
+            return self.perform_ADCSAttitude(action,t)
 
+    def perform_ADCSAttitude(self, action : ADCSAttitude, t : float) -> bool:
+        """
+        Performs ADCS Attitude change
+
+        ### Arguments:
+            - action (:obj:`SubsystemAction`) : action to be performed
+            - t (`float` or `int`) : current simulation time in [s]
+
+        ### Returns:
+            - boolean value indicating if performing the action was successful or not
+        """
+        self.t = t
     pass
