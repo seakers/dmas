@@ -193,10 +193,9 @@ class ACDS(Subsystem):
         if isinstance(action,DisabledAction):
             self.update_state(t,status=self.DISABLED)
         elif isinstance(action,ADCSAttitude):
-            self.update_state(t,status=self.ENABLED)
             return self.perform_ADCSAttitude(action,t)
 
-    def perform_ADCSAttitude(self, action : ADCSAttitude, t : float) -> bool:
+    def perform_ADCSAttitude(self, action : ADCSAttitude, t : float, **kwargs) -> bool:
         """
         Performs ADCS Attitude change
 
@@ -208,4 +207,10 @@ class ACDS(Subsystem):
             - boolean value indicating if performing the action was successful or not
         """
         self.t = t
+        # Update State
+        self.update_state(t,status=self.ENABLED)
+
+        # Check for completion
+        if self.mom_before == self.mom_after:
+            return True
     pass
