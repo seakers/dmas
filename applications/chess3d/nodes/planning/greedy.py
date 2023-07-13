@@ -220,10 +220,15 @@ class GreedyPlanner(PlanningModule):
                             if action.id == completed_action.id:
                                 removed = action
                                 break
-
+                        
+                        print(f'\nACTIONS COMPLETED\tT{t_curr}\nid\taction type\tt_start\tt_end')
                         if removed is not None:
                             self.plan : list
                             self.plan.remove(removed)
+                            removed = removed.to_dict()
+                            print(removed['id'].split('-')[0], removed['action_type'], removed['t_start'], removed['t_end'])
+                        else:
+                            print('\n')
 
                 while not self.measurement_req_inbox.empty(): # replan measurement plan
                     # unpack measurement request
@@ -237,35 +242,27 @@ class GreedyPlanner(PlanningModule):
                     results, bundle, path = self.planning_phase(state, results, bundle, path)
                     self.plan = self.plan_from_path(state, results, path)
 
-
                 if len(plan_out) == 0 and len(self.plan) > 0:
                     next_action : AgentAction = self.plan[0]
                     if next_action.t_start <= t_curr:
                         plan_out.append(next_action.to_dict())
-                    # plan_out_id = [action['id'] for action in plan_out]
-                    # for action in self.plan:
-                    #     action : AgentAction
-                    #     if (action.t_start <= t_curr <= action.t_end
-                    #         and action.id not in plan_out_id):
-                    #         plan_out.append(action.to_dict())
-                    #         break
 
                 # FOR DEBUGGING PURPOSES ONLY:
-                # print(f'\PATH\tT{t_curr}\nid\tsubtask index\tt_start\tt_end')
-                # for req, subtask_index in path:
-                #     req : MeasurementRequest; subtask_index : int
-                #     bid : Bid = results[req.id][subtask_index]
-                #     print(req.id.split('-')[0], subtask_index, bid.t_img)
+                print(f'\nPATH\tT{t_curr}\nid\tsubtask index\tmain mmnt\tpos\tt_img')
+                for req, subtask_index in path:
+                    req : MeasurementRequest; subtask_index : int
+                    bid : GreedyBid = results[req.id][subtask_index]
+                    print(req.id.split('-')[0], subtask_index, bid.main_measurement, req.pos, bid.t_img)
 
-                # print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                # for action in self.plan:
-                #     action : AgentAction
-                #     print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
+                print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                for action in self.plan:
+                    action : AgentAction
+                    print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
 
-                # print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                # for action in plan_out:
-                #     action : dict
-                #     print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
+                print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                for action in plan_out:
+                    action : dict
+                    print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
@@ -661,7 +658,7 @@ class GreedyPlanner(PlanningModule):
         i = path.index((req, subtask_index))
         if i == 0:
             t_prev = state.t
-            prev_state = state
+            prev_state = state.copy()
         else:
             prev_req, prev_subtask_index = path[i-1]
             prev_req : MeasurementRequest; prev_subtask_index : int
@@ -678,6 +675,7 @@ class GreedyPlanner(PlanningModule):
                                     ]
             elif isinstance(state, UAVAgentState):
                 prev_state = state.copy()
+                prev_state.t = t_prev
                 
                 if isinstance(prev_req, GroundPointMeasurementRequest):
                     prev_state.pos = prev_req.pos
@@ -717,7 +715,7 @@ class GreedyPlanner(PlanningModule):
             elif isinstance(state, UAVAgentState):
                 dr = np.array(req.pos) - np.array(state.pos)
                 norm = np.sqrt( dr.dot(dr) )
-                return norm / state.max_speed
+                return norm / state.max_speed + t_prev
 
             else:
                 raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
@@ -764,6 +762,8 @@ class GreedyPlanner(PlanningModule):
 
                 elif isinstance(state, UAVAgentState):
                     prev_state : UAVAgentState = state.copy()
+                    prev_state.t = t_prev
+
                     if isinstance(prev_req, GroundPointMeasurementRequest):
                         prev_state.pos = prev_req.pos
                     else:

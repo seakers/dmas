@@ -115,8 +115,8 @@ if __name__ == "__main__":
     else:
         dt = delta.total_seconds()/100
 
-    clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
-    # clock_config = EventDrivenClockConfig(start_date, end_date)
+    # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    clock_config = EventDrivenClockConfig(start_date, end_date)
 
     # initialize manager
     manager_network_config = NetworkConfig( scenario_name,
