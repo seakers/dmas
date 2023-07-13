@@ -11,6 +11,7 @@ import zmq
 class GroundStationAgent(SimulationAgent):
     def __init__(self, 
                     agent_name: str, 
+                    results_path: str,
                     scenario_name: str, 
                     port : int,
                     manager_network_config: NetworkConfig, 
@@ -51,7 +52,6 @@ class GroundStationAgent(SimulationAgent):
 														zmq.SUB: [f'tcp://localhost:{port+5}']
 											})
 
-        results_path = f'./results' + scenario_name + '/' + agent_name
         planning_module = GroundStationPlanner( results_path, 
                                                 agent_name, 
                                                 measurement_reqs, 
@@ -61,7 +61,7 @@ class GroundStationAgent(SimulationAgent):
                                                 logger)
 
         super().__init__(   agent_name, 
-                            scenario_name,
+                            results_path,
                             manager_network_config, 
                             agent_network_config, 
                             initial_state, 

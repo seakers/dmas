@@ -281,7 +281,7 @@ if __name__ == "__main__":
             ## create agent
             agent = SatelliteAgent(
                                     agent_name,
-                                    scenario_name,
+                                    results_path,
                                     manager_network_config,
                                     agent_network_config,
                                     initial_state, 
@@ -403,7 +403,7 @@ if __name__ == "__main__":
 
             ## create agent
             agent = UAVAgent(agent_name, 
-                            scenario_name,
+                            results_path,
                             manager_network_config,
                             agent_network_config,
                             initial_state,
@@ -459,7 +459,8 @@ if __name__ == "__main__":
                                                     lon,
                                                     alt)
 
-            agent = GroundStationAgent(agent_name, 
+            agent = GroundStationAgent( agent_name, 
+                                        results_path,
                                         scenario_name,
                                         port,
                                         manager_network_config,

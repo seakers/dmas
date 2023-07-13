@@ -10,7 +10,7 @@ from nodes.agent import SimulationAgent
 class SatelliteAgent(SimulationAgent):
     def __init__(   self, 
                     agent_name: str, 
-                    scenario_name: str, 
+                    results_path: str, 
                     manager_network_config: NetworkConfig, 
                     agent_network_config: NetworkConfig,
                     initial_state: SimulationAgentState, 
@@ -24,7 +24,7 @@ class SatelliteAgent(SimulationAgent):
 
         
         super().__init__(agent_name, 
-                        scenario_name, 
+                        results_path, 
                         manager_network_config, 
                         agent_network_config, 
                         initial_state, 

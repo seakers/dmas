@@ -36,7 +36,7 @@ class SimulationAgent(Agent):
     """
     def __init__(   self, 
                     agent_name: str, 
-                    scenario_name: str,
+                    results_path : str,
                     manager_network_config: NetworkConfig, 
                     agent_network_config: NetworkConfig,
                     initial_state : SimulationAgentState,
@@ -94,7 +94,7 @@ class SimulationAgent(Agent):
         self.state_history : list = []
         
         # setup results folder:
-        self.results_path = setup_results_directory(f'./results/' + scenario_name + '/' + self.get_element_name())
+        self.results_path = setup_results_directory(results_path + '/' + self.get_element_name())
           
 
     async def sense(self, statuses: list) -> list:
