@@ -28,7 +28,6 @@ class SimulationAgent(Agent):
         - agent_network_config (:obj:`NetworkConfig`): network configuration for this agent
         - initial_state (:obj:`SimulationAgentState`): initial state for this agent
         - payload (`list): list of instruments on-board the spacecraft
-        - utility_func (`function`): utility function used to evaluate the value of observations
         - planning_module (`PlanningModule`): planning module assigned to this agent
         - science_module (`ScienceModule): science module assigned to this agent
         - level (int): logging level
@@ -41,7 +40,6 @@ class SimulationAgent(Agent):
                     agent_network_config: NetworkConfig,
                     initial_state : SimulationAgentState,
                     payload : list,
-                    utility_func : Callable[[], Any],
                     planning_module : PlanningModule = None,
                     science_module : ScienceModule = None,
                     level: int = logging.INFO, 
@@ -57,7 +55,6 @@ class SimulationAgent(Agent):
             - agent_network_config (:obj:`NetworkConfig`): network configuration for this agent
             - initial_state (:obj:`SimulationAgentState`): initial state for this agent
             - payload (`list): list of instruments on-board the spacecraft
-            - utility_func (`function`): utility function used to evaluate the value of observations
             - planning_module (`PlanningModule`): planning module assigned to this agent
             - science_module (`ScienceModule): science module assigned to this agent
             - level (int): logging level
@@ -90,7 +87,6 @@ class SimulationAgent(Agent):
                 raise AttributeError(f'`payload` must be a `list` containing elements of type `Instrument`; contains elements of type {type(instrument)}')
         
         self.payload : list = payload
-        self.utility_func : function = utility_func
         self.state_history : list = []
         
         # setup results folder:

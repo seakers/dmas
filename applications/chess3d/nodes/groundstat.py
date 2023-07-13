@@ -66,7 +66,6 @@ class GroundStationAgent(SimulationAgent):
                             agent_network_config, 
                             initial_state, 
                             [], 
-                            utility_func, 
                             planning_module, 
                             science_module, 
                             level, 

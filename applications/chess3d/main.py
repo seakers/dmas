@@ -20,7 +20,7 @@ from nodes.planning.fixed import FixedPlanner
 from nodes.planning.planners import PlannerTypes
 from nodes.states import GroundStationAgentState
 from nodes.groundstat import GroundStationAgent
-from applications.chess3d.nodes.science.utility import *
+from nodes.science.utility import utility_function
 from nodes.agent import SimulationAgent
 from utils import *
 from dmas.messages import SimulationElementRoles
@@ -141,6 +141,8 @@ if __name__ == "__main__":
     monitor = ResultsMonitor(clock_config, monitor_network_config, logger=logger)
 
     # create environment
+    scenario_config_dict : dict = scenario_dict['scenario']
+    env_utility_function = scenario_config_dict.get('utility', 'LINEAR')
     env_network_config = NetworkConfig( manager.get_network_config().network_name,
 											manager_address_map = {
 													zmq.REQ: [f'tcp://localhost:{port}'],
@@ -151,11 +153,12 @@ if __name__ == "__main__":
 													zmq.REP: [f'tcp://*:{port+4}'],
 													zmq.PUB: [f'tcp://*:{port+5}']
 											})
+    
     environment = SimulationEnvironment(scenario_path, 
                                         results_path, 
                                         env_network_config, 
                                         manager_network_config,
-                                        fixed_utility, 
+                                        utility_function[env_utility_function], 
                                         logger=logger)
     port += 6
     
@@ -213,6 +216,7 @@ if __name__ == "__main__":
             ## load planner module
             if planner_dict is not None:
                 planner_type = planner_dict['@type']
+                planner_util = planner_dict['utility']
                 if planner_type == PlannerTypes.FIXED.value:
                     #--- DEBUG PURPOSES ONLY ----
                     final_pos = [
@@ -229,20 +233,20 @@ if __name__ == "__main__":
                                            agent_name,
                                            plan, 
                                            agent_network_config,
-                                           fixed_utility, 
+                                           utility_function[planner_util], 
                                            logger=logger)
                 elif planner_type == PlannerTypes.GREEDY.value:
                     planner = GreedyPlanner(results_path,
                                             agent_name,
                                             agent_network_config,
-                                            fixed_utility,
+                                            utility_function[planner_util],
                                             payload,
                                             logger=logger)
                 elif planner_type == PlannerTypes.MACCBBA.value:
                     planner = MACCBBA(results_path,
                                         agent_name, 
                                         agent_network_config,
-                                        fixed_utility,
+                                        utility_function[planner_util],
                                         payload,
                                         logger=logger)
 
@@ -266,7 +270,7 @@ if __name__ == "__main__":
                                            agent_name,
                                            plan, 
                                            agent_network_config,
-                                           fixed_utility, 
+                                           utility_function['FIXED'], 
                                            logger=logger)
 
             ## load science module
@@ -275,6 +279,7 @@ if __name__ == "__main__":
             else:
                 science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
                 # science = None
+                
             ## load initial state 
             initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
 
@@ -287,7 +292,6 @@ if __name__ == "__main__":
                                     initial_state, 
                                     planner,
                                     payload,
-                                    fixed_utility,
                                     science,
                                     logger=logger
                                 )
@@ -297,11 +301,131 @@ if __name__ == "__main__":
     if uav_dict is not None:
         # Create uav agents
         for d in uav_dict:
+
+            # ## unpack mission specs
+            # agent_name = d['name']
+            # planner_dict = d.get('planner', None)
+            # science_dict = d.get('science', None)
+            # instruments_dict = d.get('instrument', None)
+
+            # ## create agent network config
+            # manager_addresses : dict = manager_network_config.get_manager_addresses()
+            # req_address : str = manager_addresses.get(zmq.REP)[0]
+            # req_address = req_address.replace('*', 'localhost')
+
+            # sub_address : str = manager_addresses.get(zmq.PUB)[0]
+            # sub_address = sub_address.replace('*', 'localhost')
+
+            # pub_address : str = manager_addresses.get(zmq.SUB)[0]
+            # pub_address = pub_address.replace('*', 'localhost')
+
+            # push_address : str = manager_addresses.get(zmq.PUSH)[0]
+
+            # agent_network_config = NetworkConfig( 	scenario_name,
+            #                                         manager_address_map = {
+            #                                                 zmq.REQ: [req_address],
+            #                                                 zmq.SUB: [sub_address],
+            #                                                 zmq.PUB: [pub_address],
+            #                                                 zmq.PUSH: [push_address]},
+            #                                         external_address_map = {
+            #                                                 zmq.REQ: [],
+            #                                                 zmq.SUB: [f'tcp://localhost:{port+1}'],
+            #                                                 zmq.PUB: [f'tcp://*:{port+2}']},
+            #                                         internal_address_map = {
+            #                                                 zmq.REP: [f'tcp://*:{port+3}'],
+            #                                                 zmq.PUB: [f'tcp://*:{port+4}'],
+            #                                                 zmq.SUB: [  
+            #                                                             f'tcp://localhost:{port+5}',
+            #                                                             f'tcp://localhost:{port+6}'
+            #                                                         ]
+            #                                     })
+
+            # ## load payload
+            # if instruments_dict:
+            #     payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
+            # else:
+            #     payload = []
+
+            # ## load planner module
+            # if planner_dict is not None:
+            #     planner_type = planner_dict['@type']
+            #     if planner_type == PlannerTypes.FIXED.value:
+            #         #--- DEBUG PURPOSES ONLY ----
+                    # final_pos = [
+                    #             3.0,
+                    #             3.0,
+                    #             0.0
+                    #             ]
+            #         plan = [ 
+            #                 TravelAction(final_pos, 0.0) 
+            #                 ]
+            #         #----------------------------
+
+            #         planner = FixedPlanner(results_path, 
+            #                                agent_name,
+            #                                plan, 
+            #                                agent_network_config,
+            #                                fixed_utility, 
+            #                                logger=logger)
+            #     elif planner_type == PlannerTypes.GREEDY.value:
+            #         planner = GreedyPlanner(results_path,
+            #                                 agent_name,
+            #                                 agent_network_config,
+            #                                 fixed_utility,
+            #                                 payload,
+            #                                 logger=logger)
+            #     elif planner_type == PlannerTypes.MACCBBA.value:
+            #         planner = MACCBBA(results_path,
+            #                             agent_name, 
+            #                             agent_network_config,
+            #                             fixed_utility,
+            #                             payload,
+            #                             logger=logger)
+
+            #     else:
+            #         raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
+            # else:
+            #     # add default planner if no planner was specified
+            #     # TODO create a dummy default planner that  only listens for plans from the ground and executes them
+            #     raise NotImplementedError(f"Planner not specified.")
+
+            # ## load science module
+            # if science_dict is not None:
+            #     raise NotImplementedError(f"Science module not yet implemented.")
+            # else:
+            #     science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
+            #     # science = None
+
+            # ## load initial state 
+            # pos = d['pos']
+            # max_speed = d['max_speed']
+            # if isinstance(clock_config, FixedTimesStepClockConfig):
+            #     eps = max_speed * clock_config.dt / 2.0
+            # else:
+            #     eps = 1e-6
+
+            # initial_state = UAVAgentState( pos, max_speed, eps=eps )
+
+            # ## create agent
+            # agent = UAVAgent(agent_name, 
+            #                 results_path,
+            #                 manager_network_config,
+            #                 agent_network_config,
+            #                 initial_state,
+            #                 payload,
+            #                 fixed_utility,
+            #                 planner,
+            #                 science,
+            #                 logger=logger)
+            # agents.append(agent)
+            # port += 6
+
             ## unpack mission specs
             agent_name = d['name']
             planner_dict = d.get('planner', None)
             science_dict = d.get('science', None)
             instruments_dict = d.get('instrument', None)
+            orbit_state_dict = d.get('orbitState', None)
 
             ## create agent network config
             manager_addresses : dict = manager_network_config.get_manager_addresses()
@@ -344,6 +468,7 @@ if __name__ == "__main__":
             ## load planner module
             if planner_dict is not None:
                 planner_type = planner_dict['@type']
+                planner_util = planner_dict['utility']
                 if planner_type == PlannerTypes.FIXED.value:
                     #--- DEBUG PURPOSES ONLY ----
                     final_pos = [
@@ -360,20 +485,20 @@ if __name__ == "__main__":
                                            agent_name,
                                            plan, 
                                            agent_network_config,
-                                           fixed_utility, 
+                                           utility_function[planner_util], 
                                            logger=logger)
                 elif planner_type == PlannerTypes.GREEDY.value:
                     planner = GreedyPlanner(results_path,
                                             agent_name,
                                             agent_network_config,
-                                            fixed_utility,
+                                            utility_function[planner_util],
                                             payload,
                                             logger=logger)
                 elif planner_type == PlannerTypes.MACCBBA.value:
                     planner = MACCBBA(results_path,
                                         agent_name, 
                                         agent_network_config,
-                                        fixed_utility,
+                                        utility_function[planner_util],
                                         payload,
                                         logger=logger)
 
@@ -382,7 +507,23 @@ if __name__ == "__main__":
             else:
                 # add default planner if no planner was specified
                 # TODO create a dummy default planner that  only listens for plans from the ground and executes them
-                raise NotImplementedError(f"Planner not specified.")
+                
+                # DEBUG PURPOSES ONLY:
+                final_pos = [
+                                3.0,
+                                3.0,
+                                0.0
+                                ]
+                plan = [ 
+                            TravelAction(final_pos, 0.0) 
+                        ]
+
+                planner = FixedPlanner(results_path, 
+                                           agent_name,
+                                           plan, 
+                                           agent_network_config,
+                                           utility_function['FIXED'], 
+                                           logger=logger)
 
             ## load science module
             if science_dict is not None:
@@ -390,7 +531,7 @@ if __name__ == "__main__":
             else:
                 science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
                 # science = None
-
+                
             ## load initial state 
             pos = d['pos']
             max_speed = d['max_speed']
@@ -402,16 +543,16 @@ if __name__ == "__main__":
             initial_state = UAVAgentState( pos, max_speed, eps=eps )
 
             ## create agent
-            agent = UAVAgent(agent_name, 
-                            results_path,
-                            manager_network_config,
-                            agent_network_config,
-                            initial_state,
-                            payload,
-                            fixed_utility,
-                            planner,
-                            science,
-                            logger=logger)
+            agent = UAVAgent(   agent_name, 
+                                results_path,
+                                manager_network_config,
+                                agent_network_config,
+                                initial_state,
+                                payload,
+                                planner,
+                                science,
+                                logger=logger
+                            )
             agents.append(agent)
             port += 6
 
@@ -465,7 +606,7 @@ if __name__ == "__main__":
                                         port,
                                         manager_network_config,
                                         initial_state,
-                                        fixed_utility,
+                                        utility_function[env_utility_function],
                                         measurement_reqs=measurement_reqs,
                                         logger=logger)
             agents.append(agent)

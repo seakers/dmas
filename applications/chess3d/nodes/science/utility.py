@@ -43,6 +43,34 @@ def linear_utility(
     # calculate urgency factor from task
     utility = req.s_max * (t_img - req.t_end) / (req.t_start - req.t_end)
 
+    return utility 
+
+def linear_utility_synergy(   
+                    req : MeasurementRequest, 
+                    subtask_index : int, 
+                    t_img : float,
+                    **_
+                ) -> float:
+    """
+    Calculates the expected utility of performing a measurement task.
+    Its value decays lineraly with the time of observation
+
+    ### Arguments:
+        - state (:obj:`SimulationAgentState`): agent state before performing the task
+        - task (:obj:`MeasurementRequest`): task request to be performed 
+        - subtask_index (`int`): index of subtask to be performed
+        - t_img (`float`): time at which the task will be performed
+
+    ### Retrurns:
+        - utility (`float`): estimated normalized utility 
+    """
+    # check time constraints
+    if t_img < req.t_start or req.t_end < t_img:
+        return 0.0
+    
+    # calculate urgency factor from task
+    utility = req.s_max * (t_img - req.t_end) / (req.t_start - req.t_end)
+
     _, dependent_measurements = req.measurement_groups[subtask_index]
     k = len(dependent_measurements) + 1
 
@@ -51,7 +79,7 @@ def linear_utility(
     else:
         alpha = 1.0/3.0
 
-    return utility * alpha / k
+    return utility
 
 def exp_utility(   
                     req : MeasurementRequest, 
@@ -88,3 +116,12 @@ def exp_utility(
         alpha = 1.0/3.0
 
     return utility * alpha / k
+
+utility_function = {
+    "NONE" : no_utility,
+    "FIXED" : fixed_utility,
+    "RANDOM" : random_utility,
+    "LINEAR" : linear_utility,
+    "LINEAR_SYNERGY" : linear_utility_synergy,
+    "EXPONENTIAL" : exp_utility
+}

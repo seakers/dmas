@@ -16,7 +16,6 @@ class SatelliteAgent(SimulationAgent):
                     initial_state: SimulationAgentState, 
                     planning_module : PlanningModule,
                     payload: list, 
-                    utility_func: Callable[[], Any], 
                     science_module: ScienceModule = None, 
                     level: int = logging.INFO, 
                     logger: logging.Logger = None
@@ -29,7 +28,6 @@ class SatelliteAgent(SimulationAgent):
                         agent_network_config, 
                         initial_state, 
                         payload, 
-                        utility_func, 
                         planning_module, 
                         science_module, 
                         level, 

@@ -35,7 +35,8 @@
                 "@type": "Basic Sensor"
             },
             "planner" : {
-                "@type" : "GREEDY"
+                "@type" : "GREEDY",
+                "utility" : "LINEAR"
             }
         }
     ],
@@ -58,6 +59,6 @@
         }
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
-    "scenario": {"@type": "TEST", "duration": 30.0, "connectivity" : "FULL"},
+    "scenario": {"@type": "TEST", "duration": 30.0, "connectivity" : "FULL", "utility" : "LINEAR"},
     "settings": {"coverageType": "GRID COVERAGE"}
 }
