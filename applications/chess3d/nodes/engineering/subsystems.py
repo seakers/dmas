@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 import uuid
 from nodes.engineering.components import Component
-from nodes.engineering.actions import SubsystemAction
+from nodes.engineering.actions import SubsystemAction, ADCSAttitude,IdleAction
 
 
 class Subsystem(ABC):
@@ -131,7 +131,9 @@ class ACDS(Subsystem):
                  name: str,
                  mass: float,
                  altitude: float,
-                 Inertia: list, 
+                 Inertia_sat: float,
+                 Sat_rot: float,
+                 #Inertia: list, 
                  components: list,
                  status: str = DISABLED, 
                  t: float = 0, 
@@ -147,15 +149,49 @@ class ACDS(Subsystem):
                 raise ValueError(f'elements of list `components` must be of type `Component`. contains element of type {type(component)}.')
         
         # assign values
-        self.name = 'EP'
+        self.name = 'ADCS'
         self.components = components
         self.mass = mass
         self.altitude = altitude
-        self.Inertia = Inertia
+        self.Inertia_sat = Inertia_sat
+        self.Sat_rot = Sat_rot
+        #self.Inertia = Inertia
         self.status = status
 
         self.name = name
         self.status = status
         self.components = components
         self.t = t
+
+    def update_state(self,
+                     t_f: float,
+                     th_o: float,
+                     dth: float,
+                     status: str=None, 
+                     **kwargs) -> None:
+        """
+        Propagates and updates the current state of the subsystem.
+        """
+        dt = t_f - self.t
+        th = th_o + dth/dt
+        self.th = th
+    
+    def perform_action(self, action : SubsystemAction, t : Union[int, float]) -> bool:
+        """
+        Performs Attitude change of ADCS Subsystem
+
+        ### Arguments:
+            - action (:obj:`SubsystemAction`) : action to be performed
+            - t (`float` or `int`) : current simulation time in [s]
+
+        ### Returns:
+            - boolean value indicating if performing the action was successful or not
+        """
+        self.t = t
+
+        if isinstance(action,IdleAction):
+            self.update_state(t,status=self.DISABLED)
+        elif isinstance(action,ADCSAttitude):
+            self.perform_
+
     pass
