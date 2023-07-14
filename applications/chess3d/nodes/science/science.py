@@ -236,7 +236,7 @@ class ScienceModule(InternalModule):
                 self.log(f'Got message in science_value!',level=logging.INFO)
                 
                 # print(msg)
-                measurement_action = MeasurementAction(**msg.masurement_action)
+                measurement_action = MeasurementAction(**msg.measurement_action)
                 agent_state = SimulationAgentState.from_dict(msg.agent_state)
                 measurement_req = MeasurementRequest.from_dict(measurement_action.measurement_req)
                 obs = {}
@@ -329,7 +329,7 @@ class ScienceModule(InternalModule):
         try:
             while True:
                 msg : MeasurementResultsRequestMessage = await self.onboard_processing_inbox.get()
-                measurement_action = MeasurementAction(**msg.masurement_action)
+                measurement_action = MeasurementAction(**msg.measurement_action)
                 agent_state = SimulationAgentState.from_dict(msg.agent_state)
                 measurement_req = MeasurementRequest.from_dict(measurement_action.measurement_req)
                 obs = {}

@@ -245,12 +245,11 @@ if __name__ == "__main__":
     hh = epoch_dict.get('hour', None)
     mm = epoch_dict.get('minute', None)
     ss = epoch_dict.get('second', None)
-    duration = scenario_dict.get("duration")
     start_date = datetime(year, month, day, hh, mm, ss)
-    delta = timedelta(days=duration)
+    delta = timedelta(days=scenario_dict.get("duration"))
     end_date = start_date + delta
 
-    ## define simulation time-step
+    ## define simulation clock
     if spacecraft_dict:
         for spacecraft in spacecraft_dict:
             spacecraft_dict : list

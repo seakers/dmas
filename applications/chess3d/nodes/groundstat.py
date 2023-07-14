@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Callable, Union
 from dmas.agents import AgentAction
@@ -74,3 +75,8 @@ class GroundStationAgent(SimulationAgent):
     async def setup(self) -> None:
         # nothing to setup
         return
+    
+    async def live(self):
+        await asyncio.sleep(5e-2) # wait for others to connect 
+        
+        await super().live()

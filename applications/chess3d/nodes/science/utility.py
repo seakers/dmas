@@ -43,7 +43,7 @@ def linear_utility(
     # calculate urgency factor from task
     utility = req.s_max * (t_img - req.t_end) / (req.t_start - req.t_end)
 
-    return utility 
+    return utility / len(req.measurements)
 
 def linear_utility_synergy(   
                     req : MeasurementRequest, 
@@ -79,7 +79,7 @@ def linear_utility_synergy(
     else:
         alpha = 1.0/3.0
 
-    return utility
+    return utility * alpha / (k - 1)
 
 def exp_utility(   
                     req : MeasurementRequest, 

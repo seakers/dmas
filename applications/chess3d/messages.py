@@ -113,15 +113,15 @@ class MeasurementResultsRequestMessage(SimulationMessage):
         - id (`str`) : Universally Unique IDentifier for this message
         - measurement (`dict`) : measurement data being communicated
     """
-    def __init__(self, src: str, dst: str, agent_state : dict, masurement_action : dict, id: str = None, **_):
+    def __init__(self, src: str, dst: str, agent_state : dict, measurement_action : dict, id: str = None, **_):
         super().__init__(src, dst, SimulationMessageTypes.MEASUREMENT.value, id)
         
-        if not isinstance(masurement_action, dict):
-            raise AttributeError(f'`measurement_req` must be of type `dict`; is of type {type(masurement_action)}.')
+        if not isinstance(measurement_action, dict):
+            raise AttributeError(f'`measurement_req` must be of type `dict`; is of type {type(measurement_action)}.')
         if not isinstance(agent_state, dict):
             raise AttributeError(f'`agent_state` must be of type `dict`; is of type {type(agent_state)}.')
 
-        self.masurement_action = masurement_action
+        self.measurement_action = measurement_action
         self.agent_state = agent_state
         self.measurement = {}
 

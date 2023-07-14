@@ -101,6 +101,8 @@ class SimulationEnvironment(EnvironmentNode):
                 
                 self.agent_connectivity[src][target] = -1
 
+        self.measurement_reqs = {}
+
     async def setup(self) -> None:
         # nothing to set up
         return
@@ -130,7 +132,7 @@ class SimulationEnvironment(EnvironmentNode):
                         self.log(f'received masurement data request from {msg.src}. quering measurement results...')
 
                         # find/generate measurement results
-                        measurement_action = MeasurementAction(**msg.masurement_action)
+                        measurement_action = MeasurementAction(**msg.measurement_action)
                         agent_state = SimulationAgentState.from_dict(msg.agent_state)
                         measurement_req = MeasurementRequest.from_dict(measurement_action.measurement_req)
                         measurement_data = self.query_measurement_date(agent_state, measurement_req, measurement_action)
@@ -317,6 +319,9 @@ class SimulationEnvironment(EnvironmentNode):
         """
         Queries internal models or data and returns observation information being sensed by the agent
         """
+        if measurement_req.id not in self.measurement_reqs:
+            self.measurement_reqs[measurement_req.id] = measurement_req
+
         # TODO look up requested measurement results from database/model
         params = {"state" : agent_state, "req" : measurement_req, "subtask_index" : measurement_action.subtask_index, "t_img" : self.get_current_time()}
         return  {   't_img' : self.get_current_time(),
@@ -328,23 +333,24 @@ class SimulationEnvironment(EnvironmentNode):
         # print final time
         self.log(f'Environment shutdown with internal clock of {self.get_current_time()}[s]', level=logging.WARNING)
         
-        # print measurements
-        headers = ['task_id','measurer','pos','t_start','t_end','t_corr','t_img','u_max','u_exp','u']
+        # print received measurements
+        headers = ['req_id','measurer','measurement','pos','t_start','t_end','t_corr','t_img','u_max','u_exp','u']
         data = []
         for msg in self.measurement_history:
             msg : MeasurementResultsRequestMessage
-            measurement_action = MeasurementAction(**msg.masurement_action)
-            task = MeasurementRequest(**measurement_action.measurement_req)
+            measurement_action = MeasurementAction(**msg.measurement_action)
+            req : MeasurementRequest = MeasurementRequest.from_dict(measurement_action.measurement_req)
             measurement_data : dict = msg.measurement
             measurer = msg.dst
-            t_img = msg.measurement['t_img']
+            t_img = msg.measurement['t_img']           
 
-            line_data = [task.id.split('-')[0],
+            line_data = [req.id.split('-')[0],
                             measurer,
-                            msg.masurement_action["measurement_req"]["pos"],
-                            task.t_start,
-                            task.t_end,
-                            task.t_corr,
+                            req.measurements[ msg.measurement_action['subtask_index'] ],
+                            msg.measurement_action["measurement_req"]["pos"],
+                            req.t_start,
+                            req.t_end,
+                            req.t_corr,
                             t_img,
                             measurement_data['u_max'],
                             measurement_data['u_exp'],
@@ -354,6 +360,90 @@ class SimulationEnvironment(EnvironmentNode):
         measurements_df = DataFrame(data, columns=headers)
         self.log(f"MEASUREMENTS RECEIVED:\n{str(measurements_df)}\n", level=logging.WARNING)
         measurements_df.to_csv(f"{self.results_path}/measurements.csv", index=False)
+
+        # calculate utility achieved by measurements
+        utility_total = 0.0
+        max_utility = 0.0
+        n_coobservations = 0
+        n_obervations_max = 0
+
+        co_observations = []
+
+        for req_id in self.measurement_reqs:
+            req_id_short = req_id.split('-')[0]
+            req_measurements = measurements_df \
+                                .query('@req_id_short == `req_id`')
+            
+            req = self.measurement_reqs[req_id]
+            req_utility = 0
+            for _, row_i in req_measurements.iterrows():
+                t_img_i = row_i['t_img']
+                measurement_i = row_i['measurement']
+                correlated_measurements = []
+
+                for _, row_j in req_measurements.iterrows():
+                    measurement_j = row_j['measurement']
+                    t_img_j = row_j['t_img']
+
+                    if measurement_i == measurement_j:
+                        continue
+
+                    if abs(t_img_i - t_img_j) <= req.t_corr:
+                        correlated_measurements.append( measurement_j )
+
+                subtask_index = None
+                while subtask_index == None:
+                    for main_measurement, dependent_measurements in req.measurement_groups:
+                        if (main_measurement == measurement_i 
+                            and len(np.setdiff1d(correlated_measurements, dependent_measurements)) == 0):
+                            subtask_index = req.measurement_groups.index((main_measurement, dependent_measurements))
+                            break
+                    
+                    if subtask_index == None:
+                        correlated_measurements == []
+
+                if len(correlated_measurements) > 0:
+                    co_observation : list = copy.copy(dependent_measurements)
+                    co_observation.append(main_measurement)
+                    co_observation.append(req_id)
+                    co_observation = set(co_observation) 
+
+                    if co_observation not in co_observations:
+                        co_observations.append(co_observation)
+                                
+                k = len(dependent_measurements) + 1
+                if k / len(req.measurements) == 1.0:
+                    alpha = 1.0
+                else:
+                    alpha = 1.0/3.0
+
+                params = {
+                            "req" : req, 
+                            "subtask_index" : subtask_index,
+                            "t_img" : t_img_i
+                        }
+                req_utility += self.utility_func(**params) * alpha 
+            
+            utility_total += req_utility
+            max_utility += req.s_max
+            n_obervations_max += len(req.measurements)
+
+
+        headers = ['stat_name', 'val']
+        data = [
+                    ['t_start', self._clock_config.start_date], 
+                    ['t_end', self._clock_config.end_date], 
+                    ['n_reqs', len(self.measurement_reqs)],
+                    ['n_obs_max', n_obervations_max],
+                    ['n_obs', len(self.measurement_history)],
+                    ['n_obs_co', len(co_observations)],
+                    ['u_max', max_utility], 
+                    ['u', utility_total],
+                    ['u_norm', utility_total/max_utility]
+                ]
+        measurements_df = DataFrame(data, columns=headers)
+        self.log(f"\nSIMULATION RESULTS SUMMARY:\n{str(measurements_df)}\n", level=logging.WARNING)
+        measurements_df.to_csv(f"{self.results_path}/../summary.csv", index=False)
 
     async def sim_wait(self, delay: float) -> None:
         try:

@@ -221,14 +221,14 @@ class GreedyPlanner(PlanningModule):
                                 removed = action
                                 break
                         
-                        print(f'\nACTIONS COMPLETED\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                        # print(f'\nACTIONS COMPLETED\tT{t_curr}\nid\taction type\tt_start\tt_end')
                         if removed is not None:
                             self.plan : list
                             self.plan.remove(removed)
                             removed = removed.to_dict()
-                            print(removed['id'].split('-')[0], removed['action_type'], removed['t_start'], removed['t_end'])
-                        else:
-                            print('\n')
+                            # print(removed['id'].split('-')[0], removed['action_type'], removed['t_start'], removed['t_end'])
+                        # else:
+                        #     print('\n')
 
                 while not self.measurement_req_inbox.empty(): # replan measurement plan
                     # unpack measurement request
@@ -247,22 +247,29 @@ class GreedyPlanner(PlanningModule):
                     if next_action.t_start <= t_curr:
                         plan_out.append(next_action.to_dict())
 
-                # FOR DEBUGGING PURPOSES ONLY:
-                print(f'\nPATH\tT{t_curr}\nid\tsubtask index\tmain mmnt\tpos\tt_img')
+                # --- FOR DEBUGGING PURPOSES ONLY: ---
+                self.log(f'\nPATH\tT{t_curr}\nid\tsubtask index\tmain mmnt\tpos\tt_img', level=logging.DEBUG)
+                out = ''
                 for req, subtask_index in path:
                     req : MeasurementRequest; subtask_index : int
                     bid : GreedyBid = results[req.id][subtask_index]
-                    print(req.id.split('-')[0], subtask_index, bid.main_measurement, req.pos, bid.t_img)
+                    out += f"{req.id.split('-')[0]}, {subtask_index}, {bid.main_measurement}, {req.pos}, {bid.t_img}\n"
+                self.log(out, level=logging.DEBUG)
 
-                print(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                self.log(f'\nPLAN\tT{t_curr}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
+                out = ''
                 for action in self.plan:
                     action : AgentAction
-                    print(action.id.split('-')[0], action.action_type, action.t_start, action.t_end)
+                    out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end},\n"
+                self.log(out, level=logging.DEBUG)
 
-                print(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                self.log(f'\nPLAN OUT\tT{t_curr}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
+                out = ''
                 for action in plan_out:
                     action : dict
-                    print(action['id'].split('-')[0], action['action_type'], action['t_start'], action['t_end'])
+                    out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
+                self.log(out, level=logging.DEBUG)
+                # -------------------------------------
 
                 if len(plan_out) == 0:
                     # if no plan left, just idle for a time-step
