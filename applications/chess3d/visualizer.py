@@ -9,7 +9,7 @@ import numpy as np
 from nodes.science.reqs import *
 
 
-def plot_2d(scenario_path : str, results_path : str, show_plot : bool = True) -> None:
+def plot_2d(scenario_path : str, results_path : str, show_plot : bool = False) -> None:
 
     # load scenario json file
     scenario_file = open(scenario_path + '/MissionSpecs.json', 'r')

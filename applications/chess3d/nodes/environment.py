@@ -5,6 +5,7 @@ import numpy as np
 from zmq import asyncio as azmq
 
 from pandas import DataFrame
+from nodes.science.utility import synergy_factor
 from nodes.science.reqs import MeasurementRequest
 from nodes.orbitdata import OrbitData
 from nodes.states import GroundStationAgentState, UAVAgentState, SatelliteAgentState
@@ -411,18 +412,12 @@ class SimulationEnvironment(EnvironmentNode):
                     if co_observation not in co_observations:
                         co_observations.append(co_observation)
                                 
-                k = len(dependent_measurements) + 1
-                if k / len(req.measurements) == 1.0:
-                    alpha = 1.0
-                else:
-                    alpha = 1.0/3.0
-
                 params = {
                             "req" : req, 
                             "subtask_index" : subtask_index,
                             "t_img" : t_img_i
                         }
-                req_utility += self.utility_func(**params) * alpha 
+                req_utility += self.utility_func(**params) * synergy_factor(**params)
             
             utility_total += req_utility
             max_utility += req.s_max
