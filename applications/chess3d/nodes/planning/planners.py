@@ -7,6 +7,7 @@ class PlannerTypes(Enum):
     FIXED = 'FIXED'
     GREEDY = 'GREEDY'
     MACCBBA = 'MACCBBA'
+    MCCBBA = 'MCCBBA'
 
 class Bid(ABC):
     """

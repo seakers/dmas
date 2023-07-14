@@ -598,7 +598,7 @@ class SubtaskBid(Bid):
         
         return True, None
 
-class MACCBBA(PlanningModule):
+class MCCBBA(PlanningModule):
     def __init__(   self, 
                     results_path: str, 
                     parent_name: str, 

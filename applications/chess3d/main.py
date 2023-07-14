@@ -8,20 +8,19 @@ import random
 import sys
 import zmq
 import concurrent.futures
-from applications.chess3d.nodes.planning.maccbba import MACCBBA
+from applications.chess3d.nodes.planning.mccbba import MCCBBA
 from applications.chess3d.nodes.states import UAVAgentState
 from applications.chess3d.nodes.uav import UAVAgent
 from nodes.planning.greedy import GreedyPlanner
 from nodes.science.reqs import GroundPointMeasurementRequest
-from nodes.actions import TravelAction
+from nodes.groundstat import GroundStationAgent
 from nodes.satellite import SatelliteAgent
-from nodes.states import SatelliteAgentState
+from nodes.states import *
 from nodes.planning.fixed import FixedPlanner
 from nodes.planning.planners import PlannerTypes
-from nodes.states import GroundStationAgentState
-from nodes.groundstat import GroundStationAgent
 from nodes.science.utility import utility_function
 from nodes.agent import SimulationAgent
+from nodes.states import SimulationAgentTypes
 from utils import *
 from dmas.messages import SimulationElementRoles
 from dmas.network import NetworkConfig
@@ -44,6 +43,158 @@ from nodes.science.science import ScienceModule
 
 Preliminary wrapper used for debugging purposes
 """
+def agent_factory(  scenario_name : str, 
+                    scenario_path : str,
+                    results_path : str,
+                    orbitdata_dir : str,
+                    agent_dict : dict, 
+                    manager_network_config : NetworkConfig, 
+                    port : int, 
+                    agent_type : SimulationAgentTypes,
+                    clock_config : float,
+                    logger : logging.Logger
+                ) -> SimulationAgent:
+    ## unpack mission specs
+    agent_name = agent_dict['name']
+    planner_dict = agent_dict.get('planner', None)
+    science_dict = agent_dict.get('science', None)
+    instruments_dict = agent_dict.get('instrument', None)
+    orbit_state_dict = agent_dict.get('orbitState', None)
+
+    ## create agent network config
+    manager_addresses : dict = manager_network_config.get_manager_addresses()
+    req_address : str = manager_addresses.get(zmq.REP)[0]
+    req_address = req_address.replace('*', 'localhost')
+
+    sub_address : str = manager_addresses.get(zmq.PUB)[0]
+    sub_address = sub_address.replace('*', 'localhost')
+
+    pub_address : str = manager_addresses.get(zmq.SUB)[0]
+    pub_address = pub_address.replace('*', 'localhost')
+
+    push_address : str = manager_addresses.get(zmq.PUSH)[0]
+
+    agent_network_config = NetworkConfig( 	scenario_name,
+                                            manager_address_map = {
+                                                    zmq.REQ: [req_address],
+                                                    zmq.SUB: [sub_address],
+                                                    zmq.PUB: [pub_address],
+                                                    zmq.PUSH: [push_address]},
+                                            external_address_map = {
+                                                    zmq.REQ: [],
+                                                    zmq.SUB: [f'tcp://localhost:{port+1}'],
+                                                    zmq.PUB: [f'tcp://*:{port+2}']},
+                                            internal_address_map = {
+                                                    zmq.REP: [f'tcp://*:{port+3}'],
+                                                    zmq.PUB: [f'tcp://*:{port+4}'],
+                                                    zmq.SUB: [  
+                                                                f'tcp://localhost:{port+5}',
+                                                                f'tcp://localhost:{port+6}'
+                                                            ]
+                                        })
+
+    ## load payload
+    if instruments_dict:
+        payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
+    else:
+        payload = []
+
+    ## load planner module
+    if planner_dict is not None:
+        planner_type = planner_dict['@type']
+        planner_util = planner_dict['utility']
+        if planner_type == PlannerTypes.FIXED.value:
+            plan = [ ]
+
+            planner = FixedPlanner(results_path, 
+                                    agent_name,
+                                    plan, 
+                                    agent_network_config,
+                                    utility_function[planner_util], 
+                                    logger=logger)
+        elif planner_type == PlannerTypes.GREEDY.value:
+            planner = GreedyPlanner(results_path,
+                                    agent_name,
+                                    agent_network_config,
+                                    utility_function[planner_util],
+                                    payload,
+                                    logger=logger)
+        elif planner_type == PlannerTypes.MCCBBA.value:
+            planner = MCCBBA(results_path,
+                                agent_name, 
+                                agent_network_config,
+                                utility_function[planner_util],
+                                payload,
+                                logger=logger)
+
+        else:
+            raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
+    else:
+        # add default planner if no planner was specified
+        # TODO create a dummy default planner that  only listens for plans from the ground and executes them
+        planner = FixedPlanner(results_path, 
+                                    agent_name,
+                                    [], 
+                                    agent_network_config,
+                                    utility_function['FIXED'], 
+                                    logger=logger)
+
+    ## load science module
+    if science_dict is not None:
+        science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
+    else:
+        science = None
+        # raise NotImplementedError(f"Science module not yet implemented.")
+        
+    ## create agent
+    if agent_type == SimulationAgentTypes.UAV:
+        ## load initial state 
+            pos = agent_dict['pos']
+            max_speed = agent_dict['max_speed']
+            if isinstance(clock_config, FixedTimesStepClockConfig):
+                eps = max_speed * clock_config.dt / 2.0
+            else:
+                eps = 1e-6
+
+            initial_state = UAVAgentState( pos, max_speed, eps=eps )
+
+            ## create agent
+            return UAVAgent(   agent_name, 
+                                results_path,
+                                manager_network_config,
+                                agent_network_config,
+                                initial_state,
+                                payload,
+                                planner,
+                                science,
+                                logger=logger
+                            )
+
+    elif agent_type == SimulationAgentTypes.SATELLITE:
+        agent_folder = "sat" + str(0) + '/'
+
+        position_file = orbitdata_dir + agent_folder + 'state_cartesian.csv'
+        time_data =  pd.read_csv(position_file, nrows=3)
+        l : str = time_data.at[1,time_data.axes[1][0]]
+        _, _, _, _, dt = l.split(' ')
+        dt = float(dt)
+
+        initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
+        return SatelliteAgent(
+                                agent_name,
+                                results_path,
+                                manager_network_config,
+                                agent_network_config,
+                                initial_state, 
+                                planner,
+                                payload,
+                                science,
+                                logger=logger
+                            )
+    else:
+        raise NotImplementedError(f"agents of type `{agent_type}` not yet supported by agent factory.")
+
+
 if __name__ == "__main__":
     
     # read system arguments
@@ -167,392 +318,35 @@ if __name__ == "__main__":
     if spacecraft_dict is not None:
         for d in spacecraft_dict:
             # Create spacecraft agents
-            
-            ## unpack mission specs
-            agent_name = d['name']
-            planner_dict = d.get('planner', None)
-            science_dict = d.get('science', None)
-            instruments_dict = d.get('instrument', None)
-            orbit_state_dict = d.get('orbitState', None)
-
-            ## create agent network config
-            manager_addresses : dict = manager_network_config.get_manager_addresses()
-            req_address : str = manager_addresses.get(zmq.REP)[0]
-            req_address = req_address.replace('*', 'localhost')
-
-            sub_address : str = manager_addresses.get(zmq.PUB)[0]
-            sub_address = sub_address.replace('*', 'localhost')
-
-            pub_address : str = manager_addresses.get(zmq.SUB)[0]
-            pub_address = pub_address.replace('*', 'localhost')
-
-            push_address : str = manager_addresses.get(zmq.PUSH)[0]
-
-            agent_network_config = NetworkConfig( 	scenario_name,
-                                                    manager_address_map = {
-                                                            zmq.REQ: [req_address],
-                                                            zmq.SUB: [sub_address],
-                                                            zmq.PUB: [pub_address],
-                                                            zmq.PUSH: [push_address]},
-                                                    external_address_map = {
-                                                            zmq.REQ: [],
-                                                            zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                            zmq.PUB: [f'tcp://*:{port+2}']},
-                                                    internal_address_map = {
-                                                            zmq.REP: [f'tcp://*:{port+3}'],
-                                                            zmq.PUB: [f'tcp://*:{port+4}'],
-                                                            zmq.SUB: [  
-                                                                        f'tcp://localhost:{port+5}',
-                                                                        f'tcp://localhost:{port+6}'
-                                                                    ]
-                                                })
-
-            ## load payload
-            if instruments_dict:
-                payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
-            else:
-                payload = []
-
-            ## load planner module
-            if planner_dict is not None:
-                planner_type = planner_dict['@type']
-                planner_util = planner_dict['utility']
-                if planner_type == PlannerTypes.FIXED.value:
-                    #--- DEBUG PURPOSES ONLY ----
-                    final_pos = [
-                                6869.7866357588455,
-                                100.55337377743358,
-                                100.69348801752179
-                                ]
-                    plan = [ 
-                            # TravelAction(final_pos, 0.0) 
-                            ]
-                    #----------------------------
-
-                    planner = FixedPlanner(results_path, 
-                                           agent_name,
-                                           plan, 
-                                           agent_network_config,
-                                           utility_function[planner_util], 
-                                           logger=logger)
-                elif planner_type == PlannerTypes.GREEDY.value:
-                    planner = GreedyPlanner(results_path,
-                                            agent_name,
-                                            agent_network_config,
-                                            utility_function[planner_util],
-                                            payload,
-                                            logger=logger)
-                elif planner_type == PlannerTypes.MACCBBA.value:
-                    planner = MACCBBA(results_path,
-                                        agent_name, 
-                                        agent_network_config,
-                                        utility_function[planner_util],
-                                        payload,
-                                        logger=logger)
-
-                else:
-                    raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
-            else:
-                # add default planner if no planner was specified
-                # TODO create a dummy default planner that  only listens for plans from the ground and executes them
-                
-                # DEBUG PURPOSES ONLY:
-                final_pos = [
-                            6869.7866357588455,
-                            100.55337377743358,
-                            100.69348801752179
-                            ]
-                plan = [ 
-                            TravelAction(final_pos, 0.0) 
-                        ]
-
-                planner = FixedPlanner(results_path, 
-                                           agent_name,
-                                           plan, 
-                                           agent_network_config,
-                                           utility_function['FIXED'], 
-                                           logger=logger)
-
-            ## load science module
-            if science_dict is not None:
-                raise NotImplementedError(f"Science module not yet implemented.")
-            else:
-                science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
-                # science = None
-                
-            ## load initial state 
-            initial_state = SatelliteAgentState(orbit_state_dict, time_step=dt) 
-
-            ## create agent
-            agent = SatelliteAgent(
-                                    agent_name,
-                                    results_path,
-                                    manager_network_config,
-                                    agent_network_config,
-                                    initial_state, 
-                                    planner,
-                                    payload,
-                                    science,
-                                    logger=logger
+            agent = agent_factory(  scenario_name, 
+                                    scenario_path, 
+                                    results_path, 
+                                    orbitdata_dir, 
+                                    d, 
+                                    manager_network_config, 
+                                    port, 
+                                    SimulationAgentTypes.SATELLITE, 
+                                    clock_config, 
+                                    logger
                                 )
             agents.append(agent)
             port += 6
-            
+
+    agents = []
     if uav_dict is not None:
         # Create uav agents
         for d in uav_dict:
-
-            # ## unpack mission specs
-            # agent_name = d['name']
-            # planner_dict = d.get('planner', None)
-            # science_dict = d.get('science', None)
-            # instruments_dict = d.get('instrument', None)
-
-            # ## create agent network config
-            # manager_addresses : dict = manager_network_config.get_manager_addresses()
-            # req_address : str = manager_addresses.get(zmq.REP)[0]
-            # req_address = req_address.replace('*', 'localhost')
-
-            # sub_address : str = manager_addresses.get(zmq.PUB)[0]
-            # sub_address = sub_address.replace('*', 'localhost')
-
-            # pub_address : str = manager_addresses.get(zmq.SUB)[0]
-            # pub_address = pub_address.replace('*', 'localhost')
-
-            # push_address : str = manager_addresses.get(zmq.PUSH)[0]
-
-            # agent_network_config = NetworkConfig( 	scenario_name,
-            #                                         manager_address_map = {
-            #                                                 zmq.REQ: [req_address],
-            #                                                 zmq.SUB: [sub_address],
-            #                                                 zmq.PUB: [pub_address],
-            #                                                 zmq.PUSH: [push_address]},
-            #                                         external_address_map = {
-            #                                                 zmq.REQ: [],
-            #                                                 zmq.SUB: [f'tcp://localhost:{port+1}'],
-            #                                                 zmq.PUB: [f'tcp://*:{port+2}']},
-            #                                         internal_address_map = {
-            #                                                 zmq.REP: [f'tcp://*:{port+3}'],
-            #                                                 zmq.PUB: [f'tcp://*:{port+4}'],
-            #                                                 zmq.SUB: [  
-            #                                                             f'tcp://localhost:{port+5}',
-            #                                                             f'tcp://localhost:{port+6}'
-            #                                                         ]
-            #                                     })
-
-            # ## load payload
-            # if instruments_dict:
-            #     payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
-            # else:
-            #     payload = []
-
-            # ## load planner module
-            # if planner_dict is not None:
-            #     planner_type = planner_dict['@type']
-            #     if planner_type == PlannerTypes.FIXED.value:
-            #         #--- DEBUG PURPOSES ONLY ----
-                    # final_pos = [
-                    #             3.0,
-                    #             3.0,
-                    #             0.0
-                    #             ]
-            #         plan = [ 
-            #                 TravelAction(final_pos, 0.0) 
-            #                 ]
-            #         #----------------------------
-
-            #         planner = FixedPlanner(results_path, 
-            #                                agent_name,
-            #                                plan, 
-            #                                agent_network_config,
-            #                                fixed_utility, 
-            #                                logger=logger)
-            #     elif planner_type == PlannerTypes.GREEDY.value:
-            #         planner = GreedyPlanner(results_path,
-            #                                 agent_name,
-            #                                 agent_network_config,
-            #                                 fixed_utility,
-            #                                 payload,
-            #                                 logger=logger)
-            #     elif planner_type == PlannerTypes.MACCBBA.value:
-            #         planner = MACCBBA(results_path,
-            #                             agent_name, 
-            #                             agent_network_config,
-            #                             fixed_utility,
-            #                             payload,
-            #                             logger=logger)
-
-            #     else:
-            #         raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
-            # else:
-            #     # add default planner if no planner was specified
-            #     # TODO create a dummy default planner that  only listens for plans from the ground and executes them
-            #     raise NotImplementedError(f"Planner not specified.")
-
-            # ## load science module
-            # if science_dict is not None:
-            #     raise NotImplementedError(f"Science module not yet implemented.")
-            # else:
-            #     science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
-            #     # science = None
-
-            # ## load initial state 
-            # pos = d['pos']
-            # max_speed = d['max_speed']
-            # if isinstance(clock_config, FixedTimesStepClockConfig):
-            #     eps = max_speed * clock_config.dt / 2.0
-            # else:
-            #     eps = 1e-6
-
-            # initial_state = UAVAgentState( pos, max_speed, eps=eps )
-
-            # ## create agent
-            # agent = UAVAgent(agent_name, 
-            #                 results_path,
-            #                 manager_network_config,
-            #                 agent_network_config,
-            #                 initial_state,
-            #                 payload,
-            #                 fixed_utility,
-            #                 planner,
-            #                 science,
-            #                 logger=logger)
-            # agents.append(agent)
-            # port += 6
-
-            ## unpack mission specs
-            agent_name = d['name']
-            planner_dict = d.get('planner', None)
-            science_dict = d.get('science', None)
-            instruments_dict = d.get('instrument', None)
-            orbit_state_dict = d.get('orbitState', None)
-
-            ## create agent network config
-            manager_addresses : dict = manager_network_config.get_manager_addresses()
-            req_address : str = manager_addresses.get(zmq.REP)[0]
-            req_address = req_address.replace('*', 'localhost')
-
-            sub_address : str = manager_addresses.get(zmq.PUB)[0]
-            sub_address = sub_address.replace('*', 'localhost')
-
-            pub_address : str = manager_addresses.get(zmq.SUB)[0]
-            pub_address = pub_address.replace('*', 'localhost')
-
-            push_address : str = manager_addresses.get(zmq.PUSH)[0]
-
-            agent_network_config = NetworkConfig( 	scenario_name,
-                                                    manager_address_map = {
-                                                            zmq.REQ: [req_address],
-                                                            zmq.SUB: [sub_address],
-                                                            zmq.PUB: [pub_address],
-                                                            zmq.PUSH: [push_address]},
-                                                    external_address_map = {
-                                                            zmq.REQ: [],
-                                                            zmq.SUB: [f'tcp://localhost:{port+1}'],
-                                                            zmq.PUB: [f'tcp://*:{port+2}']},
-                                                    internal_address_map = {
-                                                            zmq.REP: [f'tcp://*:{port+3}'],
-                                                            zmq.PUB: [f'tcp://*:{port+4}'],
-                                                            zmq.SUB: [  
-                                                                        f'tcp://localhost:{port+5}',
-                                                                        f'tcp://localhost:{port+6}'
-                                                                    ]
-                                                })
-
-            ## load payload
-            if instruments_dict:
-                payload = orbitpy.util.dictionary_list_to_object_list(instruments_dict, Instrument) # list of instruments
-            else:
-                payload = []
-
-            ## load planner module
-            if planner_dict is not None:
-                planner_type = planner_dict['@type']
-                planner_util = planner_dict['utility']
-                if planner_type == PlannerTypes.FIXED.value:
-                    #--- DEBUG PURPOSES ONLY ----
-                    final_pos = [
-                                3.0,
-                                3.0,
-                                0.0
-                                ]
-                    plan = [ 
-                            TravelAction(final_pos, 0.0) 
-                            ]
-                    #----------------------------
-
-                    planner = FixedPlanner(results_path, 
-                                           agent_name,
-                                           plan, 
-                                           agent_network_config,
-                                           utility_function[planner_util], 
-                                           logger=logger)
-                elif planner_type == PlannerTypes.GREEDY.value:
-                    planner = GreedyPlanner(results_path,
-                                            agent_name,
-                                            agent_network_config,
-                                            utility_function[planner_util],
-                                            payload,
-                                            logger=logger)
-                elif planner_type == PlannerTypes.MACCBBA.value:
-                    planner = MACCBBA(results_path,
-                                        agent_name, 
-                                        agent_network_config,
-                                        utility_function[planner_util],
-                                        payload,
-                                        logger=logger)
-
-                else:
-                    raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
-            else:
-                # add default planner if no planner was specified
-                # TODO create a dummy default planner that  only listens for plans from the ground and executes them
-                
-                # DEBUG PURPOSES ONLY:
-                final_pos = [
-                                3.0,
-                                3.0,
-                                0.0
-                                ]
-                plan = [ 
-                            TravelAction(final_pos, 0.0) 
-                        ]
-
-                planner = FixedPlanner(results_path, 
-                                           agent_name,
-                                           plan, 
-                                           agent_network_config,
-                                           utility_function['FIXED'], 
-                                           logger=logger)
-
-            ## load science module
-            if science_dict is not None:
-                raise NotImplementedError(f"Science module not yet implemented.")
-            else:
-                science = ScienceModule(results_path,scenario_path,agent_name,agent_network_config,logger=logger)
-                # science = None
-                
-            ## load initial state 
-            pos = d['pos']
-            max_speed = d['max_speed']
-            if isinstance(clock_config, FixedTimesStepClockConfig):
-                eps = max_speed * clock_config.dt / 2.0
-            else:
-                eps = 1e-6
-
-            initial_state = UAVAgentState( pos, max_speed, eps=eps )
-
-            ## create agent
-            agent = UAVAgent(   agent_name, 
-                                results_path,
-                                manager_network_config,
-                                agent_network_config,
-                                initial_state,
-                                payload,
-                                planner,
-                                science,
-                                logger=logger
-                            )
+            agent = agent_factory(  scenario_name, 
+                                    scenario_path, 
+                                    results_path, 
+                                    orbitdata_dir, 
+                                    d, 
+                                    manager_network_config, 
+                                    port, 
+                                    SimulationAgentTypes.UAV, 
+                                    clock_config, 
+                                    logger
+                                )
             agents.append(agent)
             port += 6
 
@@ -589,8 +383,8 @@ if __name__ == "__main__":
             req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
             measurement_reqs.append(req)
 
+        # Create ground station agents
         for d in gstation_dict:
-            # Create ground station agents
             d : dict
             agent_name = d['name']
             lat = d['latitude']
@@ -612,7 +406,6 @@ if __name__ == "__main__":
             agents.append(agent)
             port += 6
             
-
     # run simulation
     with concurrent.futures.ThreadPoolExecutor(len(agents) + 3) as pool:
         pool.submit(monitor.run, *[])

@@ -6,8 +6,6 @@ from pandas import DataFrame
 from instrupy.base import Instrument
 from nodes.states import SimulationAgentState
 from nodes.science.reqs import MeasurementRequest
-from nodes.engineering.engineering import EngineeringModule
-from nodes.engineering.actions import SubsystemAction, ComponentAction
 from nodes.planning.planners import PlanningModule
 from nodes.science.science import ScienceModule
 from utils import setup_results_directory

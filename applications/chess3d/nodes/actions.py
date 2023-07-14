@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Union
 
 import numpy as np
-from applications.chess3d.utils import CoordinateTypes
+from utils import CoordinateTypes
 from dmas.agents import AgentAction
    
 class ActionTypes(Enum):
