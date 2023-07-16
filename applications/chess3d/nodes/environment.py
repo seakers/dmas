@@ -365,9 +365,7 @@ class SimulationEnvironment(EnvironmentNode):
         # calculate utility achieved by measurements
         utility_total = 0.0
         max_utility = 0.0
-        n_coobservations = 0
         n_obervations_max = 0
-
         co_observations = []
 
         for req_id in self.measurement_reqs:
@@ -417,6 +415,7 @@ class SimulationEnvironment(EnvironmentNode):
                             "subtask_index" : subtask_index,
                             "t_img" : t_img_i
                         }
+
                 req_utility += self.utility_func(**params) * synergy_factor(**params)
             
             utility_total += req_utility

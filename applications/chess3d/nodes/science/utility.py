@@ -8,7 +8,7 @@ from nodes.agent import SimulationAgentState
 List of utility functions used to evalute the value of observations
 """
 
-def synergy_factor(req : MeasurementRequest, subtask_index : int) -> float:
+def synergy_factor(req : MeasurementRequest, subtask_index : int, **_) -> float:
     _, dependent_measurements = req.measurement_groups[subtask_index]
     k = len(dependent_measurements) + 1
 

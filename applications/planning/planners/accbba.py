@@ -17,6 +17,7 @@ import time
 from typing import Union
 import numpy as np
 from pandas import DataFrame
+from applications.chess3d.nodes.science.reqs import MeasurementRequest
 from applications.planning.messages import Union
 from applications.planning.planners.planners import Union
 from applications.planning.actions import Union
@@ -1039,13 +1040,14 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 changes.append(out_msg)
 
             # if outbid for a task in the bundle, release subsequent tasks in bundle and path
-            bid_task = MeasurementTask(**my_bid.task)
+            bid_task = MeasurementRequest.from_dict(my_bid.task)
             if (bid_task, my_bid.subtask_index) in bundle and my_bid.winner != self.get_parent_name():
                 bid_index = bundle.index((bid_task, my_bid.subtask_index))
 
                 for _ in range(bid_index, len(bundle)):
                     # remove all subsequent tasks from bundle
                     measurement_task, subtask_index = bundle.pop(bid_index)
+                    measurement_task : MeasurementRequest
                     path.remove((measurement_task, subtask_index))
 
                     # if the agent is currently winning this bid, reset results
@@ -1054,13 +1056,8 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                         current_bid.reset(t)
                         results[measurement_task.id][subtask_index] = current_bid
                         
-                        out_msg = TaskBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        current_bid.to_dict()
-                                    )
-                        rebroadcasts.append(out_msg)
-                        changes.append(out_msg)
+                        rebroadcasts.append(current_bid)
+                        changes.append(current_bid)
         
         return results, bundle, path, changes, rebroadcasts, bids_received
 
@@ -1198,12 +1195,7 @@ class ACCBBAPlannerModule(ACBBAPlannerModule):
                 results[task.id][subtask_index] = current_bid
 
                 # register change in results
-                out_msg = TaskBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        current_bid.to_dict()
-                                    )
-                changes.append(out_msg)
+                changes.append(current_bid)
 
                 # self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
                 # self.log_task_sequence('bundle', bundle, level)
