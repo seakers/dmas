@@ -916,7 +916,7 @@ class MACCBBA(PlanningModule):
                 incoming_bids = await self.listener_to_broadcaster_buffer.wait_for_updates()
                 self.log_results('BIDS RECEIVED', incoming_bids, level)
 
-                # # Consensus Phase 
+                # Consensus Phase 
                 t_0 = time.perf_counter()
                 results, bundle, path, consensus_changes, \
                 consensus_rebroadcasts = await self.consensus_phase(    results, 
@@ -924,8 +924,8 @@ class MACCBBA(PlanningModule):
                                                                         path, 
                                                                         self.get_current_time(),
                                                                         incoming_bids,
-                                                                        logging.DEBUG
-                                                                    )                                                                                                level)
+                                                                        level
+                                                                    )
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
 
