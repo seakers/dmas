@@ -59,6 +59,7 @@ class SubtaskBid(TaskBid):
         - bid_solo (`int`): maximum number of solo bid attempts with no constraint satisfaction attempts
         - bid_any (`int`): maximum number of bid attempts with partial constraint satisfaction attempts
         - N_req (`int`): number of required constraints
+        - performed (`bool`): indicates if the winner of this bid has performed the measurement request at hand
     """
     def __init__(
                     self, 
@@ -78,6 +79,7 @@ class SubtaskBid(TaskBid):
                     dt_violoation: Union[float, int] = 0.0,
                     bid_solo : int = 1,
                     bid_any : int = 1, 
+                    performed : bool = False
                     **_
                 ) -> object:
         """
@@ -100,6 +102,7 @@ class SubtaskBid(TaskBid):
             - dt_violoation (`float` or `int`): maximum time in which this bid is allowed to be in violation of its constraints
             - bid_solo (`int`): maximum number of solo bid attempts with no constraint satisfaction attempts
             - bid_any (`int`): maximum number of bid attempts with partial constraint satisfaction attempts
+            - performed (`bool`): indicates if the winner of this bid has performed the measurement request at hand
         """
         super().__init__(task, bidder, winning_bid, own_bid, winner, t_img, t_update, dt_converge, **_)
 
@@ -129,6 +132,7 @@ class SubtaskBid(TaskBid):
             raise ValueError(f'`bid_solo` must be a positive `int`. Was given value of {bid_any}.')
         self.bid_any = bid_any
         self.bid_any_max = bid_any
+        self.performed = performed
 
     def update(self, other_dict : dict, t : Union[float, int]) -> tuple:
         broadcast_out, changed = super().update(other_dict, t)

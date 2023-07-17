@@ -55,7 +55,7 @@ class BidBuffer(object):
 
         current_bid : SubtaskBid = self.bid_buffer[new_bid.req_id][new_bid.subtask_index]
 
-        if current_bid is None or new_bid.t_update > current_bid.t_update:
+        if current_bid is None or new_bid.t_update >= current_bid.t_update:
             self.bid_buffer[new_bid.req_id][new_bid.subtask_index] = new_bid.copy()
 
         self.bid_access_lock.release()
@@ -78,7 +78,7 @@ class BidBuffer(object):
 
             current_bid : SubtaskBid = self.bid_buffer[new_bid.req_id][new_bid.subtask_index]
 
-            if current_bid is None or new_bid.t_update > current_bid.t_update:
+            if current_bid is None or new_bid.t_update >= current_bid.t_update:
                 self.bid_buffer[new_bid.req_id][new_bid.subtask_index] = new_bid.copy()
 
         self.bid_access_lock.release()
@@ -107,11 +107,15 @@ class MACCBBA(MCCBBA):
         self.listener_to_builder_buffer = BidBuffer()
         self.listener_to_broadcaster_buffer = BidBuffer()
         self.builder_to_broadcaster_buffer = BidBuffer()
+        self.broadcasted_bids_buffer = BidBuffer()
 
         self.t_curr = 0
-        self.current_agent_state : SimulationAgentState = None
+        self.agent_state : SimulationAgentState = None
+        self.agent_state_lock = asyncio.Lock()
+        self.agent_state_updated = asyncio.Event()
         self.parent_agent_type = None
         self.orbitdata = None
+        self.plan_inbox = asyncio.Queue()
 
     async def live(self) -> None:
         """
@@ -166,7 +170,9 @@ class MACCBBA(MCCBBA):
 
                     senses = []
                     senses.append(senses_msg.state)
-                    senses.extend(senses_msg.senses)     
+                    senses.extend(senses_msg.senses)  
+
+                    incoming_bids = []   
 
                     for sense in senses:
                         if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
@@ -183,10 +189,11 @@ class MACCBBA(MCCBBA):
                             self.log(f"received agent state message!")
                                                         
                             # update current state
+                            await self.agent_state_lock.acquire()
                             state : SimulationAgentState = SimulationAgentState.from_dict(state_msg.state)
 
                             self.update_current_time(state.t)
-                            self.current_agent_state = state
+                            self.agent_state = state
 
                             if self.parent_agent_type is None:
                                 if isinstance(state, SatelliteAgentState):
@@ -197,8 +204,12 @@ class MACCBBA(MCCBBA):
                                     self.parent_agent_type = SimulationAgentTypes.UAV.value
                                 else:
                                     raise NotImplementedError(f"states of type {state_msg.state['state_type']} not supported for greedy planners.")
-
-                            await self.states_inbox.put(state_msg) 
+                            
+                            self.agent_state_lock.release()
+                            self.agent_state_updated.set()
+                            self.agent_state_updated.clear()
+                            
+                            await self.states_inbox.put(state) 
 
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
                             # unpack message 
@@ -227,30 +238,25 @@ class MACCBBA(MCCBBA):
                             bid : SubtaskBid = SubtaskBid(**bid_msg.bid)
                             self.log(f"received measurement request message!")
                             
-                            # check if bid exists for this task
-                            new_req = bid.req_id not in results
-                            if new_req:
-                                # was not aware of this task; add to results as a blank bid
-                                req = MeasurementRequest.from_dict(**req_msg.req)
-                                results[bid.req_id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
+                            incoming_bids.append(bid)
 
-                            # compare bids
-                            my_bid : SubtaskBid = results[bid.req_id][bid.subtask_index]
-                            self.log(f'comparing bids...\nmine:  {str(my_bid)}\ntheirs: {str(bid)}', level=logging.DEBUG)
+                    if len(self.broadcasted_bids_buffer) > 0:
+                        broadcasted_bids : list = await self.broadcasted_bids_buffer.flush_bids()
+                        incoming_bids.extend(broadcasted_bids)                    
+                    
+                    results, bundle, path, \
+                    _, rebroadcast_bids = await self.consensus_phase(   results, 
+                                                                        bundle, 
+                                                                        path, 
+                                                                        self.get_current_time(),
+                                                                        incoming_bids,
+                                                                        logging.DEBUG
+                                                                    )
 
-                            broadcast_bid, _  = my_bid.update(bid.to_dict(), self.get_current_time())
-                            broadcast_bid : SubtaskBid
+                    # send to bundle-builder and broadcaster
+                    await self.listener_to_builder_buffer.add_bids(rebroadcast_bids)
+                    await self.listener_to_broadcaster_buffer.add_bids(rebroadcast_bids)
 
-                            self.log(f'\nupdated: {my_bid}\n', level=logging.DEBUG)
-                            results[bid.req_id][bid.subtask_index] = my_bid
-
-                            if broadcast_bid or new_req:                    
-                                # relevant changes were made
-                                broadcast_bid = broadcast_bid if not new_req else my_bid
-
-                                # send to bundle-builder and broadcaster
-                                await self.listener_to_builder_buffer.add_bid(broadcast_bid)
-                                await self.listener_to_broadcaster_buffer.add_bid(broadcast_bid)
 
         except asyncio.CancelledError:
             return
@@ -267,18 +273,19 @@ class MACCBBA(MCCBBA):
 
             while True:
                 # wait for incoming bids
-                relevant_changes = await self.listener_to_broadcaster_buffer.wait_for_updates()
-                self.log_results('BIDS RECEIVED', relevant_changes, level)
+                incoming_bids = await self.listener_to_broadcaster_buffer.wait_for_updates()
+                self.log_results('BIDS RECEIVED', incoming_bids, level)
 
-                # Consensus Phase 
+                # # Consensus Phase 
                 t_0 = time.perf_counter()
-                results, bundle, path, consensus_changes, consensus_rebroadcasts = await self.consensus_phase(
-                                                                                                                results, 
-                                                                                                                bundle, 
-                                                                                                                path, 
-                                                                                                                self.get_current_time,
-                                                                                                                relevant_changes ,
-                                                                                                                level)
+                results, bundle, path, consensus_changes, \
+                consensus_rebroadcasts = await self.consensus_phase(    results, 
+                                                                        bundle, 
+                                                                        path, 
+                                                                        self.get_current_time(),
+                                                                        incoming_bids,
+                                                                        logging.DEBUG
+                                                                    )                                                                                                level)
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
 
@@ -287,190 +294,50 @@ class MACCBBA(MCCBBA):
 
                 # Planning Phase
                 t_0 = time.perf_counter()
-                results, bundle, path, planner_changes = await self.planning_phase(self.current_agent_state, results, bundle, path, level)
+                results, bundle, path, planner_changes = await self.planning_phase(self.agent_state, results, bundle, path, level)
                 dt = time.perf_counter() - t_0
                 self.stats['planning'].append(dt)
 
                 self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
                 self.log_changes("CHANGES MADE FROM CONSENSUS", consensus_changes, level)
-
-                # Broadcast changes to bundle and any changes from consensus
-                broadcast_bids : list = consensus_rebroadcasts
-                broadcast_bids.extend(planner_changes)
-                self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
-                # wait_for_response = self.has_bundle_dependencies(bundle) and not converged
-                # await self.bid_broadcaster(broadcast_bids, self.get_current_time(), wait_for_response, level)
                 
                 # Check for convergence
                 converged = self.path_constraint_sat(path, results, self.get_current_time())
                 if converged:
                     # generate plan from path
+                    await self.agent_state_lock.acquire()
+                    plan = self.plan_from_path(self.states_inbox, results, path)
+                    self.agent_state_lock.release()
 
-                    # send plan to broadcaster
-                    pass
-                
+                else:
+                    # wait for messages or for next bid time-out
+                    t_next = np.NINF
+                    for req, subtask_index in path:
+                        req : MeasurementRequest
+                        bid : SubtaskBid = results[req.id][subtask_index]
 
+                        t_timeout = bid.t_violation + bid.dt_violation
+                        if t_timeout < t_next:
+                            t_next == t_timeout
+
+                    wait_action = WaitForMessages(self.get_current_time(), t_next)
+                    plan = [wait_action]
+                    
+                # Send plan to broadcaster
+                await self.plan_inbox.put(plan)
+
+                # Broadcast changes to bundle and any changes from consensus
+                broadcast_bids : list = consensus_rebroadcasts
+                broadcast_bids.extend(planner_changes)
                 
+                self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
+                await self.builder_to_broadcaster_buffer.add_bids(broadcast_bids)
+                                
 
         except asyncio.CancelledError:
             return
         finally:
             self.bundle_builder_results = results 
-
-
-    async def consensus_phase(  
-                                self, 
-                                results : dict, 
-                                bundle : list, 
-                                path : list, 
-                                t : Union[int, float], 
-                                new_bids : list,
-                                level : int = logging.DEBUG
-                            ) -> None:
-        """
-        Evaluates incoming bids and updates current results and bundle
-        """
-        changes = []
-        rebroadcasts = []
-        self.log_results('\nINITIAL RESULTS', results, level)
-        self.log_task_sequence('bundle', bundle, level)
-        self.log_task_sequence('path', path, level)
-        
-        # compare bids with incoming messages
-        t_0 = time.perf_counter()
-        results, bundle, path, comp_changes, comp_rebroadcasts = await self.compare_results(results, bundle, path, t, new_bids, level)
-        changes.extend(comp_changes)
-        rebroadcasts.extend(comp_rebroadcasts)
-        dt = time.perf_counter() - t_0
-        self.stats['c_comp_check'].append(dt)
-
-        self.log_results('BIDS RECEIVED', new_bids, level)
-        self.log_results('COMPARED RESULTS', results, level)
-        self.log_task_sequence('bundle', bundle, level)
-        self.log_task_sequence('path', path, level)
-        
-        # check for expired tasks
-        t_0 = time.perf_counter()
-        results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t, level)
-        changes.extend(exp_changes)
-        rebroadcasts.extend(exp_changes)
-        dt = time.perf_counter() - t_0
-        self.stats['c_t_end_check'].append(dt)
-
-        self.log_results('CHECKED EXPIRATION RESULTS', results, level)
-        self.log_task_sequence('bundle', bundle, level)
-        self.log_task_sequence('path', path, level)
-
-        # check for already performed tasks
-        t_0 = time.perf_counter()
-        results, bundle, path, done_changes = await self.check_task_completion(results, bundle, path, t, level)
-        changes.extend(done_changes)
-        rebroadcasts.extend(done_changes)
-        dt = time.perf_counter() - t_0
-        self.stats['c_t_end_check'].append(dt)
-
-        self.log_results('CHECKED EXPIRATION RESULTS', results, level)
-        self.log_task_sequence('bundle', bundle, level)
-        self.log_task_sequence('path', path, level)
-
-        # check task constraint satisfaction
-        t_0 = time.perf_counter()
-        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
-        changes.extend(cons_changes)
-        rebroadcasts.extend(cons_changes)
-        dt = time.perf_counter() - t_0
-        self.stats['c_const_check'].append(dt)
-
-        self.log_results('CONSTRAINT CHECKED RESULTS', results, level)
-        self.log_task_sequence('bundle', bundle, level)
-        self.log_task_sequence('path', path, level)
-
-        return results, bundle, path, changes, rebroadcasts
-    
-
-    def compare_results(
-                        self, 
-                        results : dict, 
-                        bundle : list, 
-                        path : list, 
-                        t : Union[int, float], 
-                        new_bids : list,
-                        level=logging.DEBUG
-                    ) -> tuple:
-        """
-        Compares the existing results with any incoming task bids and updates the bundle accordingly
-
-        ### Returns
-            - results
-            - bundle
-            - path
-            - changes
-        """
-        changes = []
-        rebroadcasts = []
-
-        for their_bid in new_bids:
-            their_bid : SubtaskBid            
-
-            # check bids are for new requests
-            req = MeasurementRequest.from_dict(their_bid.req)
-            new_req = req.id not in results
-
-            if new_req:
-                # was not aware of this request; add to results as a blank bid
-                results[req.id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
-
-                # add to changes broadcast
-                my_bid : SubtaskBid = results[req.id][0]
-                rebroadcasts.append(my_bid)
-                                    
-            # compare bids
-            my_bid : SubtaskBid = results[their_bid.req_id][their_bid.subtask_index]
-            self.log(f'comparing bids...\nmine:  {str(my_bid)}\ntheirs: {str(their_bid)}', level=logging.DEBUG)
-
-            broadcast_bid, changed  = my_bid.update(their_bid.to_dict(), t)
-            broadcast_bid : SubtaskBid; changed : bool
-
-            self.log(f'\nupdated: {my_bid}\n', level=logging.DEBUG)
-            results[their_bid.req_id][their_bid.subtask_index] = my_bid
-                
-            # if relevant changes were made, add to changes and rebroadcast
-            if changed or new_req:
-                changed_bid : SubtaskBid = broadcast_bid if not new_req else my_bid
-                changes.append(changed_bid)
-
-            if broadcast_bid or new_req:                    
-                broadcast_bid : SubtaskBid = broadcast_bid if not new_req else my_bid
-                rebroadcasts.append(broadcast_bid)
-
-            # if outbid for a task in the bundle, release subsequent tasks in bundle and path
-            if (
-                (req, my_bid.subtask_index) in bundle 
-                and my_bid.winner != self.get_parent_name()
-                ):
-                bid_index = bundle.index((req, my_bid.subtask_index))
-
-                for _ in range(bid_index, len(bundle)):
-                    # remove all subsequent tasks from bundle
-                    measurement_req, subtask_index = bundle.pop(bid_index)
-                    measurement_req : MeasurementRequest
-                    path.remove((measurement_req, subtask_index))
-
-                    # if the agent is currently winning this bid, reset results
-                    current_bid : SubtaskBid = results[measurement_req.id][subtask_index]
-                    if current_bid.winner == self.get_parent_name():
-                        current_bid.reset(t)
-                        results[measurement_req.id][subtask_index] = current_bid
-                        
-                        out_msg = MeasurementBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        current_bid.to_dict()
-                                    )
-                        rebroadcasts.append(out_msg)
-                        changes.append(out_msg)
-        
-        return results, bundle, path, changes, rebroadcasts
 
     async def planner(self) -> None:
         try:
@@ -479,86 +346,87 @@ class MACCBBA(MCCBBA):
             reqs_received = []
 
             while True:
-                plan_out = []
-                state_msg : AgentStateMessage = await self.states_inbox.get()
+                pass
+                # plan_out = []
+                # state_msg : AgentStateMessage = await self.states_inbox.get()
 
-                # check time 
-                while not self.action_status_inbox.empty():
-                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                # # check time 
+                # while not self.action_status_inbox.empty():
+                #     action_msg : AgentActionMessage = await self.action_status_inbox.get()
 
-                    if action_msg.status == AgentAction.PENDING:
-                        # if action wasn't completed, re-try
-                        plan_ids = [action.id for action in self.plan]
-                        action_dict : dict = action_msg.action
-                        if action_dict['id'] in plan_ids:
-                            self.log(f'action {action_dict} not completed yet! trying again...')
-                            plan_out.append(action_dict)
+                #     if action_msg.status == AgentAction.PENDING:
+                #         # if action wasn't completed, re-try
+                #         plan_ids = [action.id for action in self.plan]
+                #         action_dict : dict = action_msg.action
+                #         if action_dict['id'] in plan_ids:
+                #             self.log(f'action {action_dict} not completed yet! trying again...')
+                #             plan_out.append(action_dict)
 
-                    else:
-                        # if action was completed or aborted, remove from plan
-                        action_dict : dict = action_msg.action
-                        completed_action = AgentAction(**action_dict)
-                        removed = None
-                        for action in self.plan:
-                            action : AgentAction
-                            if action.id == completed_action.id:
-                                removed = action
-                                break
+                #     else:
+                #         # if action was completed or aborted, remove from plan
+                #         action_dict : dict = action_msg.action
+                #         completed_action = AgentAction(**action_dict)
+                #         removed = None
+                #         for action in self.plan:
+                #             action : AgentAction
+                #             if action.id == completed_action.id:
+                #                 removed = action
+                #                 break
                         
-                        # print(f'\nACTIONS COMPLETED\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                        if removed is not None:
-                            removed : AgentAction
-                            self.plan : list
-                            self.plan.remove(removed)
-                            removed = removed.to_dict()
-                            # print(removed['id'].split('-')[0], removed['action_type'], removed['t_start'], removed['t_end'])
-                        # else:
-                        #     print('\n')
+                #         # print(f'\nACTIONS COMPLETED\tT{t_curr}\nid\taction type\tt_start\tt_end')
+                #         if removed is not None:
+                #             removed : AgentAction
+                #             self.plan : list
+                #             self.plan.remove(removed)
+                #             removed = removed.to_dict()
+                #             # print(removed['id'].split('-')[0], removed['action_type'], removed['t_start'], removed['t_end'])
+                #         # else:
+                #         #     print('\n')
 
-                if len(plan_out) == 0 and len(self.plan) > 0:
-                    next_action : AgentAction = self.plan[0]
-                    if next_action.t_start <= self.get_current_time():
-                        plan_out.append(next_action.to_dict())
+                # if len(plan_out) == 0 and len(self.plan) > 0:
+                #     next_action : AgentAction = self.plan[0]
+                #     if next_action.t_start <= self.get_current_time():
+                #         plan_out.append(next_action.to_dict())
 
-                # --- FOR DEBUGGING PURPOSES ONLY: ---
-                self.log(f'\nPATH\tT{self.get_current_time()}\nid\tsubtask index\tmain mmnt\tpos\tt_img', level=logging.DEBUG)
-                out = ''
-                for req, subtask_index in path:
-                    req : MeasurementRequest; subtask_index : int
-                    bid : SubtaskBid = results[req.id][subtask_index]
-                    out += f"{req.id.split('-')[0]}, {subtask_index}, {bid.main_measurement}, {req.pos}, {bid.t_img}\n"
-                self.log(out, level=logging.DEBUG)
+                # # --- FOR DEBUGGING PURPOSES ONLY: ---
+                # self.log(f'\nPATH\tT{self.get_current_time()}\nid\tsubtask index\tmain mmnt\tpos\tt_img', level=logging.DEBUG)
+                # out = ''
+                # for req, subtask_index in path:
+                #     req : MeasurementRequest; subtask_index : int
+                #     bid : SubtaskBid = results[req.id][subtask_index]
+                #     out += f"{req.id.split('-')[0]}, {subtask_index}, {bid.main_measurement}, {req.pos}, {bid.t_img}\n"
+                # self.log(out, level=logging.DEBUG)
 
-                self.log(f'\nPLAN\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
-                out = ''
-                for action in self.plan:
-                    action : AgentAction
-                    out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end},\n"
-                self.log(out, level=logging.DEBUG)
+                # self.log(f'\nPLAN\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
+                # out = ''
+                # for action in self.plan:
+                #     action : AgentAction
+                #     out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end},\n"
+                # self.log(out, level=logging.DEBUG)
 
-                self.log(f'\nPLAN OUT\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
-                out = ''
-                for action in plan_out:
-                    action : dict
-                    out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
-                self.log(out, level=logging.DEBUG)
-                # -------------------------------------
+                # self.log(f'\nPLAN OUT\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
+                # out = ''
+                # for action in plan_out:
+                #     action : dict
+                #     out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
+                # self.log(out, level=logging.DEBUG)
+                # # -------------------------------------
 
-                if len(plan_out) == 0:
-                    # if no plan left, just idle for a time-step
-                    self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                    if len(self.plan) == 0:
-                        t_idle = self.get_current_time() + 1e8 # TODO find end of simulation time        
-                    else:
-                        t_idle = self.plan[0].t_start
-                    action = WaitForMessages(self.get_current_time(), t_idle)
-                    plan_out.append(action.to_dict())
+                # if len(plan_out) == 0:
+                #     # if no plan left, just idle for a time-step
+                #     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
+                #     if len(self.plan) == 0:
+                #         t_idle = self.get_current_time() + 1e8 # TODO find end of simulation time        
+                #     else:
+                #         t_idle = self.plan[0].t_start
+                #     action = WaitForMessages(self.get_current_time(), t_idle)
+                #     plan_out.append(action.to_dict())
                     
-                self.log(f'sending {len(plan_out)} actions to agent...')
-                plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
-                await self._send_manager_msg(plan_msg, zmq.PUB)
+                # self.log(f'sending {len(plan_out)} actions to agent...')
+                # plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
+                # await self._send_manager_msg(plan_msg, zmq.PUB)
 
-                self.log(f'actions sent!')
+                # self.log(f'actions sent!')
 
         except asyncio.CancelledError:
             return

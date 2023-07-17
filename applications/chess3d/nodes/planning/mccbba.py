@@ -41,7 +41,7 @@ class SubtaskBid(Bid):
         - dt_violoation (`float` or `int`): maximum time in which this bid is allowed to be in violation of its constraints
         - bid_solo (`int`): maximum number of solo bid attempts with no constraint satisfaction attempts
         - bid_any (`int`): maximum number of bid attempts with partial constraint satisfaction attempts
-        - N_req (`int`): number of required constraints
+        - performed (`bool`): indicates if the winner of this bid has performed the measurement request at hand
     """      
     def __init__(
                     self, 
@@ -61,6 +61,7 @@ class SubtaskBid(Bid):
                     dt_violoation: Union[float, int] = 0.0,
                     bid_solo : int = 1,
                     bid_any : int = 1, 
+                    performed : bool = False,
                     **_
                 ) -> object:
         """
@@ -83,6 +84,7 @@ class SubtaskBid(Bid):
             - dt_violoation (`float` or `int`): maximum time in which this bid is allowed to be in violation of its constraints
             - bid_solo (`int`): maximum number of solo bid attempts with no constraint satisfaction attempts
             - bid_any (`int`): maximum number of bid attempts with partial constraint satisfaction attempts
+            - performed (`bool`): indicates if the winner of this bid has performed the measurement request at hand
         """
         super().__init__(req, bidder, winning_bid, own_bid, winner, t_img, t_update)
 
@@ -113,6 +115,7 @@ class SubtaskBid(Bid):
         self.bid_any = bid_any
         self.bid_any_max = bid_any
         self.dt_converge = dt_converge
+        self.performed = performed
 
     def update(self, other_dict : dict, t : Union[float, int]) -> tuple:
         broadcast_out, changed = self.__update_rules(other_dict, t)
@@ -421,6 +424,7 @@ class SubtaskBid(Bid):
 
         super()._update_info(other)
         self.__update_time(t)
+        self.performed = other.performed
 
     def __update_time(self, t_update : Union[float, int]) -> None:
         """
@@ -1025,7 +1029,15 @@ class MCCBBA(PlanningModule):
 
         return state, results, bundle, path
     
-    async def consensus_phase(self, results : dict, bundle : list, path : list, t : Union[int, float], level : int = logging.DEBUG) -> None:
+    async def consensus_phase(  
+                                self, 
+                                results : dict, 
+                                bundle : list, 
+                                path : list, 
+                                t : Union[int, float], 
+                                new_bids : list,
+                                level : int = logging.DEBUG
+                            ) -> None:
         """
         Evaluates incoming bids and updates current results and bundle
         """
@@ -1037,22 +1049,22 @@ class MCCBBA(PlanningModule):
         
         # compare bids with incoming messages
         t_0 = time.perf_counter()
-        results, bundle, path, comp_changes, comp_rebroadcasts, bids_received = await self.compare_results(results, bundle, path, t, level)
+        results, bundle, path, comp_changes, comp_rebroadcasts = await self.compare_results(results, bundle, path, t, new_bids, level)
         changes.extend(comp_changes)
         rebroadcasts.extend(comp_rebroadcasts)
         dt = time.perf_counter() - t_0
         self.stats['c_comp_check'].append(dt)
 
-        self.log_results('BIDS RECEIVED', bids_received, level)
+        self.log_results('BIDS RECEIVED', new_bids, level)
         self.log_results('COMPARED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
         
         # check for expired tasks
         t_0 = time.perf_counter()
-        results, bundle, path, exp_changes = await self.check_task_end_time(results, bundle, path, t, level)
+        results, bundle, path, exp_changes, exp_rebroadcasts = await self.check_request_end_time(results, bundle, path, t, level)
         changes.extend(exp_changes)
-        rebroadcasts.extend(exp_changes)
+        rebroadcasts.extend(exp_rebroadcasts)
         dt = time.perf_counter() - t_0
         self.stats['c_t_end_check'].append(dt)
 
@@ -1062,9 +1074,9 @@ class MCCBBA(PlanningModule):
 
         # check for already performed tasks
         t_0 = time.perf_counter()
-        results, bundle, path, done_changes = await self.check_task_completion(results, bundle, path, t, level)
+        results, bundle, path, done_changes, done_rebroadcasts = await self.check_request_completion(results, bundle, path, t, level)
         changes.extend(done_changes)
-        rebroadcasts.extend(done_changes)
+        rebroadcasts.extend(done_rebroadcasts)
         dt = time.perf_counter() - t_0
         self.stats['c_t_end_check'].append(dt)
 
@@ -1074,9 +1086,9 @@ class MCCBBA(PlanningModule):
 
         # check task constraint satisfaction
         t_0 = time.perf_counter()
-        results, bundle, path, cons_changes = await self.check_results_constraints(results, bundle, path, t, level)
+        results, bundle, path, cons_changes, cons_rebroadcasts = await self.check_bid_constraints(results, bundle, path, t, level)
         changes.extend(cons_changes)
-        rebroadcasts.extend(cons_changes)
+        rebroadcasts.extend(cons_rebroadcasts)
         dt = time.perf_counter() - t_0
         self.stats['c_const_check'].append(dt)
 
@@ -1085,8 +1097,16 @@ class MCCBBA(PlanningModule):
         self.log_task_sequence('path', path, level)
 
         return results, bundle, path, changes, rebroadcasts
-
-    async def compare_results(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+    
+    def compare_results(
+                        self, 
+                        results : dict, 
+                        bundle : list, 
+                        path : list, 
+                        t : Union[int, float], 
+                        new_bids : list,
+                        level=logging.DEBUG
+                    ) -> tuple:
         """
         Compares the existing results with any incoming task bids and updates the bundle accordingly
 
@@ -1098,47 +1118,22 @@ class MCCBBA(PlanningModule):
         """
         changes = []
         rebroadcasts = []
-        bids_received = {}
 
-        # check for incoming measurement requests
-        while not self.measurement_req_inbox.empty():
-            # get next request
-            req_msg : MeasurementRequestMessage = await self.measurement_req_inbox.get()
+        for their_bid in new_bids:
+            their_bid : SubtaskBid            
 
-            # unpackage request
-            req = MeasurementRequest.from_dict(req_msg.req)
-            new_req = req.id not in results
+            # check bids are for new requests
+            new_req = their_bid.req_id not in results
+
             if new_req:
                 # was not aware of this request; add to results as a blank bid
+                req = MeasurementRequest.from_dict(their_bid.req)
                 results[req.id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
 
                 # add to changes broadcast
                 my_bid : SubtaskBid = results[req.id][0]
-                out_msg = MeasurementBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        my_bid.to_dict()
-                                    )
-                rebroadcasts.append(out_msg)
-            
-        # check for any incoming bid requests
-        while not self.measurement_bid_inbox.empty():
-            # get next bid
-            bid_msg : MeasurementBidMessage = await self.measurement_bid_inbox.get()
-            
-            # unpackage bid
-            their_bid = SubtaskBid(**bid_msg.bid)
-            if their_bid.req_id not in bids_received:
-                bids_received[their_bid.req_id] = {}
-            bids_received[their_bid.req_id][their_bid.subtask_index] = their_bid
-            
-            # check if bid exists for this task
-            new_req = their_bid.req_id not in results
-            if new_req:
-                # was not aware of this task; add to results as a blank bid
-                req = MeasurementRequest.from_dict(their_bid.req)
-                results[their_bid.req_id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
-
+                rebroadcasts.append(my_bid)
+                                    
             # compare bids
             my_bid : SubtaskBid = results[their_bid.req_id][their_bid.subtask_index]
             self.log(f'comparing bids...\nmine:  {str(my_bid)}\ntheirs: {str(their_bid)}', level=logging.DEBUG)
@@ -1149,54 +1144,42 @@ class MCCBBA(PlanningModule):
             self.log(f'\nupdated: {my_bid}\n', level=logging.DEBUG)
             results[their_bid.req_id][their_bid.subtask_index] = my_bid
                 
-            # if relevant changes were made, add to changes broadcast
-            if broadcast_bid or new_req:                    
-                broadcast_bid = broadcast_bid if not new_req else my_bid
-                out_msg = MeasurementBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        broadcast_bid.to_dict()
-                                    )
-                rebroadcasts.append(out_msg)
-
+            # if relevant changes were made, add to changes and rebroadcast
             if changed or new_req:
-                changed_bid = broadcast_bid if not new_req else my_bid
-                out_msg = MeasurementBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        changed_bid.to_dict()
-                                    )
-                changes.append(out_msg)
+                changed_bid : SubtaskBid = broadcast_bid if not new_req else my_bid
+                changes.append(changed_bid)
+
+            if broadcast_bid or new_req:                    
+                broadcast_bid : SubtaskBid = broadcast_bid if not new_req else my_bid
+                rebroadcasts.append(broadcast_bid)
 
             # if outbid for a task in the bundle, release subsequent tasks in bundle and path
-            bid_task = MeasurementRequest.from_dict(my_bid.req)
-            if (bid_task, my_bid.subtask_index) in bundle and my_bid.winner != self.get_parent_name():
-                bid_index = bundle.index((bid_task, my_bid.subtask_index))
+            if (
+                (req, my_bid.subtask_index) in bundle 
+                and my_bid.winner != self.get_parent_name()
+                ):
+                bid_index = bundle.index((req, my_bid.subtask_index))
 
                 for _ in range(bid_index, len(bundle)):
                     # remove all subsequent tasks from bundle
-                    measurement_task, subtask_index = bundle.pop(bid_index)
-                    path.remove((measurement_task, subtask_index))
+                    measurement_req, subtask_index = bundle.pop(bid_index)
+                    measurement_req : MeasurementRequest
+                    path.remove((measurement_req, subtask_index))
 
                     # if the agent is currently winning this bid, reset results
-                    current_bid : SubtaskBid = results[measurement_task.id][subtask_index]
+                    current_bid : SubtaskBid = results[measurement_req.id][subtask_index]
                     if current_bid.winner == self.get_parent_name():
                         current_bid.reset(t)
-                        results[measurement_task.id][subtask_index] = current_bid
-                        
-                        out_msg = MeasurementBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        current_bid.to_dict()
-                                    )
-                        rebroadcasts.append(out_msg)
-                        changes.append(out_msg)
-        
-        return results, bundle, path, changes, rebroadcasts, bids_received
+                        results[measurement_req.id][subtask_index] = current_bid
 
-    async def check_task_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+                        rebroadcasts.append(current_bid)
+                        changes.append(current_bid)
+        
+        return results, bundle, path, changes, rebroadcasts
+
+    async def check_request_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
-        Checks if tasks have expired and cannot be performed
+        Checks if measurement requests have expired and can no longer be performed
 
         ### Returns
             - results
@@ -1205,6 +1188,7 @@ class MCCBBA(PlanningModule):
             - changes
         """
         changes = []
+        rebroadcasts = []
         # release tasks from bundle if t_end has passed
         task_to_remove = None
         for req, subtask_index in bundle:
@@ -1216,19 +1200,27 @@ class MCCBBA(PlanningModule):
         if task_to_remove is not None:
             bundle_index = bundle.index(task_to_remove)
             for _ in range(bundle_index, len(bundle)):
-                # remove task from bundle and path
-                req, subtask_index = bundle.pop(bundle_index)
-                path.remove((req, subtask_index))
+                # remove all subsequent bids from bundle
+                measurement_req, subtask_index = bundle.pop(bundle_index)
 
-                self.log_results('PRELIMINARY CHECKED EXPIRATION RESULTS', results, level)
-                self.log_task_sequence('bundle', bundle, level)
-                self.log_task_sequence('path', path, level)
+                # remove bids from path
+                path.remove((measurement_req, subtask_index))
 
-        return results, bundle, path, changes
+                # if the agent is currently winning this bid, reset results
+                measurement_req : SubtaskBid
+                current_bid : SubtaskBid = results[measurement_req.id][subtask_index]
+                if current_bid.winner == self.get_parent_name():
+                    current_bid.reset(t)
+                    results[measurement_req.id][subtask_index] = current_bid
+                    
+                    rebroadcasts.append(current_bid)
+                    changes.append(current_bid)
 
-    async def check_task_completion(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+        return results, bundle, path, changes, rebroadcasts
+
+    async def check_request_completion(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
-        Checks if tasks have already been performed by someone else
+        Checks if a subtask or a mutually exclusive subtask has already been performed 
 
         ### Returns
             - results
@@ -1236,20 +1228,28 @@ class MCCBBA(PlanningModule):
             - path
             - changes
         """
+
         changes = []
+        rebroadcasts = []
         task_to_remove = None
         for req, subtask_index in bundle:
             req : MeasurementRequest
 
+            # check if bid has been performed 
+            subtask_bid : SubtaskBid = results[req.id][subtask_index]
+            if self.bid_completed(req, subtask_bid, t):
+                task_to_remove = (req, subtask_index)
+                break
+
+            # check if a mutually exclusive bid has been performed
             for subtask_bid in results[req.id]:
                 subtask_bid : SubtaskBid
+
                 bids : list = results[req.id]
                 bid_index = bids.index(subtask_bid)
+                bid : SubtaskBid = bids[bid_index]
 
-                if (subtask_bid.t_img >= 0.0
-                    and subtask_bid.t_img < t
-                    and req.dependency_matrix[subtask_index][bid_index] < 0
-                    ):
+                if self.bid_completed(req, bid, t) and req.dependency_matrix[subtask_index][bid_index] < 0:
                     task_to_remove = (req, subtask_index)
                     break   
 
@@ -1273,19 +1273,27 @@ class MCCBBA(PlanningModule):
                 bid.reset(t)
                 results[req.id][subtask_index] = bid
 
+                rebroadcasts.append(bid)
+                changes.append(bid)
+
                 self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
 
-            x = 1
+        return results, bundle, path, changes, rebroadcasts
 
-        return results, bundle, path, changes
+    def bid_completed(self, req : MeasurementRequest, bid : SubtaskBid, t : float) -> bool:
+        """
+        Checks if a bid has been completed or not
+        """
+        return (bid.t_img >= 0.0 and bid.t_img + req.duration < t) or bid.performed
 
-    async def check_results_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
+    async def check_bid_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
         """
-        Looks for tasks that do not have their constraints satisfied
+        Looks for bids that do not have their constraints satisfied
         """
-        changes = []          
+        changes = []       
+        rebroadcasts = []   
         while True:
             # find tasks with constraint violations
             task_to_remove = None
@@ -1323,23 +1331,19 @@ class MCCBBA(PlanningModule):
 
                 # reset bid
                 req : MeasurementRequest
-                current_bid : SubtaskBid = results[req.id][subtask_index]
-                current_bid.reset(t)
-                results[req.id][subtask_index] = current_bid
+                bid : SubtaskBid = results[req.id][subtask_index]
+                bid.reset(t)
+                results[req.id][subtask_index] = bid
 
                 # register change in results
-                out_msg = MeasurementBidMessage(   
-                                        self.get_parent_name(), 
-                                        self.get_parent_name(), 
-                                        current_bid.to_dict()
-                                    )
-                changes.append(out_msg)
+                changes.append(bid)
+                rebroadcasts.append(bid)
 
-                # self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
-                # self.log_task_sequence('bundle', bundle, level)
-                # self.log_task_sequence('path', path, level)
+                self.log_results('PRELIMINARY CONSTRAINT CHECKED RESULTS', results, level)
+                self.log_task_sequence('bundle', bundle, level)
+                self.log_task_sequence('path', path, level)
 
-        return results, bundle, path, changes
+        return results, bundle, path, changes, rebroadcasts
 
     def has_bundle_dependencies(self, bundle : list) -> bool:
         """
