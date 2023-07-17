@@ -21,7 +21,7 @@ class BidBuffer(object):
                 l += 1 if bid is not None else 0
         return 1
 
-    async def flush_bids(self) -> list:
+    async def pop_all(self) -> list:
         """
         Returns latest bids for all requests and empties buffer
         """
@@ -43,7 +43,7 @@ class BidBuffer(object):
 
         return out
 
-    async def add_bid(self, new_bid : SubtaskBid) -> None:
+    async def put_bid(self, new_bid : SubtaskBid) -> None:
         """
         Adds bid to the appropriate buffer if it's a more updated bid information than the one at hand
         """
@@ -63,7 +63,7 @@ class BidBuffer(object):
         self.updated.set()
         self.updated.clear()
 
-    async def add_bids(self, new_bids : list) -> None:
+    async def put_bids(self, new_bids : list) -> None:
         """
         Adds bid to the appropriate buffer if it's a more updated bid information than the one at hand
         """
@@ -96,7 +96,7 @@ class BidBuffer(object):
             if len(self) >= min_len:
                 break
 
-        return self.flush_bids()
+        return self.pop_all()
 
 
 class MACCBBA(MCCBBA):
@@ -173,6 +173,7 @@ class MACCBBA(MCCBBA):
                     senses.extend(senses_msg.senses)  
 
                     incoming_bids = []   
+                    state : SimulationAgentState = None
 
                     for sense in senses:
                         if sense['msg_type'] == SimulationMessageTypes.AGENT_ACTION.value:
@@ -206,10 +207,6 @@ class MACCBBA(MCCBBA):
                                     raise NotImplementedError(f"states of type {state_msg.state['state_type']} not supported for greedy planners.")
                             
                             self.agent_state_lock.release()
-                            self.agent_state_updated.set()
-                            self.agent_state_updated.clear()
-                            
-                            await self.states_inbox.put(state) 
 
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
                             # unpack message 
@@ -226,8 +223,8 @@ class MACCBBA(MCCBBA):
                                 results[req.id] = bids
 
                                 # send to bundle-builder and rebroadcaster
-                                await self.listener_to_builder_buffer.add_bids(bids)
-                                await self.listener_to_broadcaster_buffer.add_bids(bids)
+                                await self.listener_to_builder_buffer.put_bids(bids)
+                                await self.listener_to_broadcaster_buffer.put_bids(bids)
 
                                 # inform bundle-builder of new tasks
                                 await self.measurement_req_inbox.put(req_msg)
@@ -241,7 +238,7 @@ class MACCBBA(MCCBBA):
                             incoming_bids.append(bid)
 
                     if len(self.broadcasted_bids_buffer) > 0:
-                        broadcasted_bids : list = await self.broadcasted_bids_buffer.flush_bids()
+                        broadcasted_bids : list = await self.broadcasted_bids_buffer.pop_all()
                         incoming_bids.extend(broadcasted_bids)                    
                     
                     results, bundle, path, \
@@ -254,9 +251,14 @@ class MACCBBA(MCCBBA):
                                                                     )
 
                     # send to bundle-builder and broadcaster
-                    await self.listener_to_builder_buffer.add_bids(rebroadcast_bids)
-                    await self.listener_to_broadcaster_buffer.add_bids(rebroadcast_bids)
+                    await self.listener_to_builder_buffer.put_bids(rebroadcast_bids)
+                    await self.listener_to_broadcaster_buffer.put_bids(rebroadcast_bids)
 
+                    # inform planner of state update
+                    self.agent_state_updated.set()
+                    self.agent_state_updated.clear()
+                    
+                    await self.states_inbox.put(state) 
 
         except asyncio.CancelledError:
             return
@@ -318,7 +320,7 @@ class MACCBBA(MCCBBA):
 
                         t_timeout = bid.t_violation + bid.dt_violation
                         if t_timeout < t_next:
-                            t_next == t_timeout
+                            t_next = t_timeout
 
                     wait_action = WaitForMessages(self.get_current_time(), t_next)
                     plan = [wait_action]
@@ -331,8 +333,7 @@ class MACCBBA(MCCBBA):
                 broadcast_bids.extend(planner_changes)
                 
                 self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
-                await self.builder_to_broadcaster_buffer.add_bids(broadcast_bids)
-                                
+                await self.builder_to_broadcaster_buffer.put_bids(broadcast_bids)                                
 
         except asyncio.CancelledError:
             return
@@ -341,52 +342,88 @@ class MACCBBA(MCCBBA):
 
     async def planner(self) -> None:
         try:
-            path = []
-            results = {}
-            reqs_received = []
+            plan = []
 
             while True:
-                pass
-                # plan_out = []
-                # state_msg : AgentStateMessage = await self.states_inbox.get()
+                # wait for agent to update state
+                _ : AgentStateMessage = await self.states_inbox.get()
 
-                # # check time 
-                # while not self.action_status_inbox.empty():
-                #     action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                # --- Look for Plan Updates ---
 
-                #     if action_msg.status == AgentAction.PENDING:
-                #         # if action wasn't completed, re-try
-                #         plan_ids = [action.id for action in self.plan]
-                #         action_dict : dict = action_msg.action
-                #         if action_dict['id'] in plan_ids:
-                #             self.log(f'action {action_dict} not completed yet! trying again...')
-                #             plan_out.append(action_dict)
+                # Check if relevant changes to the bundle were performed
+                if len(self.listener_to_broadcaster_buffer) > 0:
+                    # wait for plan to be updated
+                    plan : list = await self.plan_inbox.get()
 
-                #     else:
-                #         # if action was completed or aborted, remove from plan
-                #         action_dict : dict = action_msg.action
-                #         completed_action = AgentAction(**action_dict)
-                #         removed = None
-                #         for action in self.plan:
-                #             action : AgentAction
-                #             if action.id == completed_action.id:
-                #                 removed = action
-                #                 break
+                    # compule updated bids from the listener and bundle buiilder
+                    rebroadcast_bids = {}
+                    bids = []
+
+                    # received bids to rebroadcast from bundle-builder
+                    bids.extend(self.builder_to_broadcaster_buffer.pop_all())
+
+                    # communicate updates to listener
+                    self.broadcasted_bids_buffer.put_bids(bids)
+                    
+                    # received bids to rebroadcast from listener    
+                    bids.extend(self.listener_to_broadcaster_buffer.pop_all())
+
+                    # add bid broadcasts to plan
+                    rebroadcast_bids = self.compile_bids(bids)
+                    for req_id in rebroadcast_bids:
+                        for bid in rebroadcast_bids[req_id]:
+                            bid : SubtaskBid
+                            if bid is not None:
+                                bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), bid.to_dict())
+                                plan.insert(0, BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()).to_dict())
+                                 
+                # --- Execute plan ---
+
+                # check plan completion 
+                plan_out = []
+                while not self.action_status_inbox.empty():
+                    action_msg : AgentActionMessage = await self.action_status_inbox.get()
+
+                    if action_msg.status == AgentAction.PENDING:
+                        # if action wasn't completed, try again
+                        plan_ids = [action.id for action in self.plan]
+                        action_dict : dict = action_msg.action
+                        if action_dict['id'] in plan_ids:
+                            self.log(f'action {action_dict} not completed yet! trying again...')
+                            plan_out.append(action_dict)
+
+                    else:
+                        # if action was completed or aborted, remove from plan
+                        action_dict : dict = action_msg.action
+                        completed_action = AgentAction(**action_dict)
+                        removed = None
+                        for action in self.plan:
+                            action : AgentAction
+                            if action.id == completed_action.id:
+                                removed = action
+                                break
                         
-                #         # print(f'\nACTIONS COMPLETED\tT{t_curr}\nid\taction type\tt_start\tt_end')
-                #         if removed is not None:
-                #             removed : AgentAction
-                #             self.plan : list
-                #             self.plan.remove(removed)
-                #             removed = removed.to_dict()
-                #             # print(removed['id'].split('-')[0], removed['action_type'], removed['t_start'], removed['t_end'])
-                #         # else:
-                #         #     print('\n')
+                        if removed is not None:
+                            removed : AgentAction
+                            self.plan : list
+                            self.plan.remove(removed)
+                            removed = removed.to_dict()
 
-                # if len(plan_out) == 0 and len(self.plan) > 0:
-                #     next_action : AgentAction = self.plan[0]
-                #     if next_action.t_start <= self.get_current_time():
-                #         plan_out.append(next_action.to_dict())
+                if len(plan_out) == 0:
+                    if len(self.plan) > 0:
+                        next_action : AgentAction = self.plan[0]
+                        if next_action.t_start <= self.get_current_time():
+                            plan_out.append(next_action.to_dict())
+                        else:
+                            t_idle = next_action.t_start
+                            action = WaitForMessages(self.get_current_time(), t_idle)
+                            plan_out.append(action.to_dict())
+                    else:
+                        # no more actions to perform, idle until the end of the simulation
+                        self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
+                        t_idle = self.get_current_time() + 1e9
+                        action = WaitForMessages(self.get_current_time(), t_idle)
+                        plan_out.append(action.to_dict())
 
                 # # --- FOR DEBUGGING PURPOSES ONLY: ---
                 # self.log(f'\nPATH\tT{self.get_current_time()}\nid\tsubtask index\tmain mmnt\tpos\tt_img', level=logging.DEBUG)
@@ -412,24 +449,27 @@ class MACCBBA(MCCBBA):
                 # self.log(out, level=logging.DEBUG)
                 # # -------------------------------------
 
-                # if len(plan_out) == 0:
-                #     # if no plan left, just idle for a time-step
-                #     self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                #     if len(self.plan) == 0:
-                #         t_idle = self.get_current_time() + 1e8 # TODO find end of simulation time        
-                #     else:
-                #         t_idle = self.plan[0].t_start
-                #     action = WaitForMessages(self.get_current_time(), t_idle)
-                #     plan_out.append(action.to_dict())
-                    
-                # self.log(f'sending {len(plan_out)} actions to agent...')
-                # plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
-                # await self._send_manager_msg(plan_msg, zmq.PUB)
+                self.log(f'sending {len(plan_out)} actions to agent...')
+                plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
+                await self._send_manager_msg(plan_msg, zmq.PUB)
 
-                # self.log(f'actions sent!')
+                self.log(f'actions sent!')
 
         except asyncio.CancelledError:
             return
 
-    async def broadcaster(self) -> None:
-        pass
+    def compile_bids(self, bids : list) -> dict:
+        rebroadcast_bids = {}
+
+        for bid in bids:
+            bid : SubtaskBid
+            
+            if bid.req not in rebroadcast_bids:
+                req = MeasurementRequest.from_dict(bid.req)
+                rebroadcast_bids[bid.req_id] = [None for _ in req.dependency_matrix]
+            
+            current_bid : SubtaskBid = rebroadcast_bids[bid.req_id][bid.subtask_index]
+            if (current_bid is None or current_bid.t_update <= bid.t_update):
+                rebroadcast_bids[bid.req_id][bid.subtask_index] = bid
+
+        return rebroadcast_bids

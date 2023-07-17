@@ -1368,9 +1368,6 @@ class MCCBBA(PlanningModule):
 
         available_tasks : list = self.get_available_tasks(state, bundle, results)
 
-        if len(available_tasks) > 0:
-            x = 1
-
         changes = []
         changes_to_bundle = []
         
