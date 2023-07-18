@@ -204,7 +204,7 @@ class SimulationAgent(Agent):
         
         for action_dict in actions:
             action_dict : dict
-            action = AgentAction(**action_dict)
+            action = action_from_dict(**action_dict)
             t_0 = time.perf_counter()
 
             if (action.t_start - self.get_current_time()) > np.finfo(np.float32).eps:

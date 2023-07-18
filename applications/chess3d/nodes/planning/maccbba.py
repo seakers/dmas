@@ -981,9 +981,6 @@ class MACCBBA(PlanningModule):
                         if t_timeout < t_next:
                             t_next = t_timeout
 
-                    if t_next < self.get_current_time():
-                        x = 1
-
                     wait_action = WaitForMessages(self.get_current_time(), t_next)
                     plan = [wait_action]
                 
@@ -1008,7 +1005,7 @@ class MACCBBA(PlanningModule):
     async def planner(self) -> None:
         try:
             self.plan = []
-            level = logging.WARNING
+            # level = logging.WARNING
             level = logging.DEBUG
 
             while True:
@@ -1083,7 +1080,7 @@ class MACCBBA(PlanningModule):
                     plan_out_ids = [action['id'] for action in plan_out]
                     for action in self.plan:
                         action : AgentAction
-                        if (action.t_start <= self.get_current_time() <= action.t_end
+                        if (action.t_start <= self.get_current_time()
                             and action.id not in plan_out_ids):
                             plan_out.append(action.to_dict())
 
@@ -1091,7 +1088,7 @@ class MACCBBA(PlanningModule):
                         if len(self.plan) > 0:
                             # next action is yet to start, wait until then
                             next_action : AgentAction = self.plan[0]
-                            t_idle = next_action.t_start if next_action.t_start < self.get_current_time() else self.get_current_time()
+                            t_idle = next_action.t_start if next_action.t_start > self.get_current_time() else self.get_current_time()
                         else:
                             # no more actions to perform, idle until the end of the simulation
                             t_idle = np.Inf
@@ -2091,7 +2088,7 @@ class MACCBBA(PlanningModule):
                     plan.append(maneuver_action)            
 
             # move to target
-            t_move_start = prev_state.t if t_maneuver_end is None else t_maneuver_end
+            t_move_start = t_prev if t_maneuver_end is None else t_maneuver_end
             if isinstance(state, SatelliteAgentState):
                 lat, lon, _ = measurement_req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
@@ -2125,7 +2122,7 @@ class MACCBBA(PlanningModule):
                     t_move_end = dt * math.ceil(t_move_end/dt)
 
                 if t_img_start < np.Inf:
-                    t_img_start = dt * math.ceil(t_img_start/dt)
+                    t_img_start = dt * math.floor(t_img_start/dt)
                 if t_img_end < np.Inf:
                     t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
             
