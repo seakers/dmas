@@ -157,7 +157,7 @@ class SubtaskBid(Bid):
         if other.bidder == self.bidder:
             if other.t_update > self.t_update:
                 self._update_info(other,t)
-                return self, prev==self
+                return self, prev!=self
             else:
                 self._leave(t)
                 return None, False
@@ -171,13 +171,13 @@ class SubtaskBid(Bid):
             elif self.winner == other.bidder:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other, prev==self
+                return other, prev!=self
 
             elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
 
             elif self.winner == self.NONE:
                 # leave and no rebroadcast
@@ -189,30 +189,30 @@ class SubtaskBid(Bid):
                 if other.winning_bid > self.winning_bid:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
                     
                 elif other.winning_bid == self.winning_bid:
                     # if there's a tie, bidder with the smallest id wins
                     if self._tie_breaker(other, self):
                         # update and rebroadcast
                         self._update_info(other, t)
-                        return other, prev==self
+                        return other, prev!=self
 
                 if other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
                     self.__update_time(t)
-                    return self, prev==self
+                    return self, prev!=self
 
             elif self.winner == other.bidder:
-                if other.t_update >= self.t_update:
-                    # update and rebroadcast
-                    self._update_info(other, t)
-                    return other, prev==self
-
-                elif abs(other.t_update - self.t_update) < 1e-6:
+                if abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
                     self._leave(t)
                     return None, False
+
+                elif other.t_update > self.t_update:
+                    # update and rebroadcast
+                    self._update_info(other, t)
+                    return other, prev!=self
 
                 elif other.t_update < self.t_update:
                     # leave and no rebroadcast
@@ -223,7 +223,7 @@ class SubtaskBid(Bid):
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
 
                 elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
                     #leave and rebroadcast
@@ -238,23 +238,23 @@ class SubtaskBid(Bid):
                 elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
                     
                 elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
 
             elif self.winner == self.NONE:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other, prev==self
+                return other, prev!=self
 
         elif other.winner == self.bidder:
             if self.winner == self.NONE:
                 # leave and rebroadcast with current update time
                 self.__update_time(t)
-                return self, prev==self
+                return self, prev!=self
 
             elif self.winner == self.bidder:
                 if abs(other.t_update - self.t_update) < 1e-6:
@@ -265,7 +265,7 @@ class SubtaskBid(Bid):
             elif self.winner == other.bidder and other.bidder != self.bidder:
                 # reset and rebroadcast with current update time
                 self.reset(t)
-                return self, prev==self
+                return self, prev!=self
 
             elif self.winner not in [self.bidder, other.bidder, self.NONE]:
                 # leave and rebroadcast
@@ -277,30 +277,30 @@ class SubtaskBid(Bid):
                 if other.winning_bid > self.winning_bid:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
 
                 elif other.winning_bid == self.winning_bid:
                     # if there's a tie, bidder with the smallest id wins
                     if self._tie_breaker(other, self):
                         # update and rebroadcast
                         self._update_info(other, t)
-                        return other, prev==self
+                        return other, prev!=self
 
                 elif other.winning_bid < self.winning_bid:
                     # update time and rebroadcast
                     self.__update_time(t)
-                    return other, prev==self
+                    return other, prev!=self
 
             elif self.winner == other.bidder:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other, prev==self
+                return other, prev!=self
 
             elif self.winner == other.winner:
                 if other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
                     
                 elif abs(other.t_update - self.t_update) < 1e-6:
                     # leave and no rebroadcast
@@ -316,7 +316,7 @@ class SubtaskBid(Bid):
                 if other.winning_bid > self.winning_bid and other.t_update >= self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
 
                 elif other.winning_bid < self.winning_bid and other.t_update <= self.t_update:
                     # leave and rebroadcast
@@ -326,19 +326,19 @@ class SubtaskBid(Bid):
                 elif other.winning_bid < self.winning_bid and other.t_update > self.t_update:
                     # update and rebroadcast
                     self._update_info(other, t)
-                    return other, prev==self
+                    return other, prev!=self
                     
                 elif other.winning_bid > self.winning_bid and other.t_update < self.t_update:
                     # leave and rebroadcast
                     self._leave(t)
-                    return self, prev==self
+                    return self, prev!=self
 
             elif self.winner == self.NONE:
                 # update and rebroadcast
                 self._update_info(other, t)
-                return other, prev==self
+                return other, prev!=self
         
-        return None, prev==self
+        return None, prev!=self
 
     def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
         """
@@ -950,6 +950,9 @@ class MACCBBA(PlanningModule):
                 dt = time.perf_counter() - t_0
                 self.stats['planning'].append(dt)
 
+                broadcast_buffer = BidBuffer()
+                await broadcast_buffer.put_bids(planner_changes)
+                planner_changes = await broadcast_buffer.pop_all()
                 self.log_changes("builder - CHANGES MADE FROM PLANNING", planner_changes, level)
                 
                 # Check for convergence
@@ -1032,7 +1035,9 @@ class MACCBBA(PlanningModule):
                                     bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), bid.to_dict())
                                     plan_out.append( BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()).to_dict() )
                     else:
+                        # flush redundant broadcasts from listener
                         _ = await self.listener_to_broadcaster_buffer.pop_all()
+
                 # --- Execute plan ---
 
                 # check plan completion 
@@ -1081,7 +1086,7 @@ class MACCBBA(PlanningModule):
                             t_idle = next_action.t_start
                         else:
                             # no more actions to perform, idle until the end of the simulation
-                            t_idle = self.get_current_time() + 1e9
+                            t_idle = np.Inf
 
                         action = WaitForMessages(self.get_current_time(), t_idle)
                         plan_out.append(action.to_dict())
@@ -2196,13 +2201,13 @@ class MACCBBA(PlanningModule):
 
     def log_changes(self, dsc : str, changes : list, level=logging.DEBUG) -> None:
         if self._logger.getEffectiveLevel() <= level:
-            headers = ['req_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            headers = ['req_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_update', 't_img', 't_v', 'w_solo', 'w_any']
             data = []
             for bid in changes:
                 bid : SubtaskBid
                 req = MeasurementRequest.from_dict(bid.req)
                 split_id = req.id.split('-')
-                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_update, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                 data.append(line)
         
             df = pd.DataFrame(data, columns=headers)
