@@ -197,7 +197,8 @@ class Bid(ABC):
         other : Bid
         if self.req_id != other.req_id:
             # if update is for a different task, ignore update
-            raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
+            return False
+            # raise AttributeError(f'cannot compare bids intended for different tasks (expected task id: {self.req_id}, given id: {other.task_id})')
         
         return abs(other.winning_bid - self.winning_bid) < 1e-3 and other.winner == self.winner
 

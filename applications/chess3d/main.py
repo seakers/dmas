@@ -273,8 +273,40 @@ if __name__ == "__main__":
     else:
         dt = delta.total_seconds()/100
 
-    clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
-    # clock_config = EventDrivenClockConfig(start_date, end_date)
+    ## load initial measurement request
+    measurement_reqs = []
+    df = pd.read_csv(scenario_path + '/gpRequests.csv')
+        
+    for _, row in df.iterrows():
+        s_max = row['s_max']
+        
+        measurements_str : str = row['measurements']
+        measurements_str = measurements_str.replace('[','')
+        measurements_str = measurements_str.replace(']','')
+        measurements_str = measurements_str.replace(' ','')
+        measurements = measurements_str.split(',')
+
+        t_start = row['t_start']
+        t_end = row['t_end']
+        t_corr = row['t_corr']
+
+        lat, lon, alt = row.get('lat', None), row.get('lon', None), row.get('alt', None)
+        if lat is None and lon is None and alt is None: 
+            x_pos, y_pos, z_pos = row.get('x_pos', None), row.get('y_pos', None), row.get('z_pos', None)
+            if x_pos is not None and y_pos is not None and z_pos is not None:
+                pos = [x_pos, y_pos, z_pos]
+                lat, lon, alt = 0.0, 0.0, 0.0
+            else:
+                raise ValueError('GP Measurement Requests in `gpRequest.csv` must specify a ground position as lat-lon-alt or cartesian coordinates.')
+        else:
+            pos = None
+
+        lan_lon_pos = [lat, lon, alt]
+        req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
+        measurement_reqs.append(req)
+
+    # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    clock_config = EventDrivenClockConfig(start_date, end_date)
 
     # initialize manager
     manager_network_config = NetworkConfig( scenario_name,
@@ -316,7 +348,8 @@ if __name__ == "__main__":
                                         results_path, 
                                         env_network_config, 
                                         manager_network_config,
-                                        utility_function[env_utility_function], 
+                                        utility_function[env_utility_function],
+                                        measurement_reqs, 
                                         logger=logger)
     port += 6
     
@@ -358,38 +391,6 @@ if __name__ == "__main__":
             port += 6
 
     if gstation_dict is not None:
-        # load initial measurement request
-        measurement_reqs = []
-        df = pd.read_csv(scenario_path + '/gpRequests.csv')
-            
-        for _, row in df.iterrows():
-            s_max = row['s_max']
-            
-            measurements_str : str = row['measurements']
-            measurements_str = measurements_str.replace('[','')
-            measurements_str = measurements_str.replace(']','')
-            measurements_str = measurements_str.replace(' ','')
-            measurements = measurements_str.split(',')
-
-            t_start = row['t_start']
-            t_end = row['t_end']
-            t_corr = row['t_corr']
-
-            lat, lon, alt = row.get('lat', None), row.get('lon', None), row.get('alt', None)
-            if lat is None and lon is None and alt is None: 
-                x_pos, y_pos, z_pos = row.get('x_pos', None), row.get('y_pos', None), row.get('z_pos', None)
-                if x_pos is not None and y_pos is not None and z_pos is not None:
-                    pos = [x_pos, y_pos, z_pos]
-                    lat, lon, alt = 0.0, 0.0, 0.0
-                else:
-                    raise ValueError('GP Measurement Requests in `gpRequest.csv` must specify a ground position as lat-lon-alt or cartesian coordinates.')
-            else:
-                pos = None
-
-            lan_lon_pos = [lat, lon, alt]
-            req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
-            measurement_reqs.append(req)
-
         # Create ground station agents
         for d in gstation_dict:
             d : dict

@@ -37,6 +37,7 @@ class SimulationEnvironment(EnvironmentNode):
                 env_network_config: NetworkConfig, 
                 manager_network_config: NetworkConfig, 
                 utility_func : Callable[[], Any], 
+                measurement_reqs : list = [],
                 level: int = logging.INFO, 
                 logger: logging.Logger = None) -> None:
         super().__init__(env_network_config, manager_network_config, [], level, logger)
@@ -102,7 +103,7 @@ class SimulationEnvironment(EnvironmentNode):
                 
                 self.agent_connectivity[src][target] = -1
 
-        self.measurement_reqs = {}
+        self.measurement_reqs = measurement_reqs
 
     async def setup(self) -> None:
         # nothing to set up
@@ -320,8 +321,8 @@ class SimulationEnvironment(EnvironmentNode):
         """
         Queries internal models or data and returns observation information being sensed by the agent
         """
-        if measurement_req.id not in self.measurement_reqs:
-            self.measurement_reqs[measurement_req.id] = measurement_req
+        # if measurement_req.id not in self.measurement_reqs:
+        #     self.measurement_reqs[measurement_req.id] = measurement_req
 
         # TODO look up requested measurement results from database/model
         params = {"state" : agent_state, "req" : measurement_req, "subtask_index" : measurement_action.subtask_index, "t_img" : self.get_current_time()}
@@ -360,8 +361,6 @@ class SimulationEnvironment(EnvironmentNode):
                 data.append(line_data)
 
             measurements_df = DataFrame(data, columns=headers)
-            self.log(f"MEASUREMENTS RECEIVED:\n{str(measurements_df)}\n", level=logging.WARNING)
-            measurements_df.to_csv(f"{self.results_path}/measurements.csv", index=False)
 
             # calculate utility achieved by measurements
             utility_total = 0.0
@@ -369,14 +368,14 @@ class SimulationEnvironment(EnvironmentNode):
             n_obervations_max = 0
             co_observations = []
 
-            for req_id in self.measurement_reqs:
+            for req in self.measurement_reqs:
+                req_id : str = req.id
                 req_id_short = req_id.split('-')[0]
                 req_measurements = measurements_df \
                                     .query('@req_id_short == `req_id`')
                 
-                req = self.measurement_reqs[req_id]
                 req_utility = 0
-                for _, row_i in req_measurements.iterrows():
+                for idx, row_i in req_measurements.iterrows():
                     t_img_i = row_i['t_img']
                     measurement_i = row_i['measurement']
                     correlated_measurements = []
@@ -416,16 +415,17 @@ class SimulationEnvironment(EnvironmentNode):
                                 "subtask_index" : subtask_index,
                                 "t_img" : t_img_i
                             }
+                    utility = self.utility_func(**params) * synergy_factor(**params)
+                    req_utility += utility
 
-                    req_utility += self.utility_func(**params) * synergy_factor(**params)
-                
+                    measurements_df.loc[idx,'u']=utility
+
                 utility_total += req_utility
                 max_utility += req.s_max
                 n_obervations_max += len(req.measurements)
 
-
-            headers = ['stat_name', 'val']
-            data = [
+            summary_headers = ['stat_name', 'val']
+            summary_data = [
                         ['t_start', self._clock_config.start_date], 
                         ['t_end', self._clock_config.end_date], 
                         ['n_reqs', len(self.measurement_reqs)],
@@ -436,9 +436,14 @@ class SimulationEnvironment(EnvironmentNode):
                         ['u', utility_total],
                         ['u_norm', utility_total/max_utility]
                     ]
-            measurements_df = DataFrame(data, columns=headers)
-            self.log(f"\nSIMULATION RESULTS SUMMARY:\n{str(measurements_df)}\n", level=logging.WARNING)
-            measurements_df.to_csv(f"{self.results_path}/../summary.csv", index=False)
+
+            # log and save results
+            self.log(f"MEASUREMENTS RECEIVED:\n{str(measurements_df)}\n\n", level=logging.WARNING)
+            measurements_df.to_csv(f"{self.results_path}/measurements.csv", index=False)
+
+            summary_df = DataFrame(summary_data, columns=summary_headers)
+            self.log(f"\nSIMULATION RESULTS SUMMARY:\n{str(summary_df)}\n\n", level=logging.WARNING)
+            summary_df.to_csv(f"{self.results_path}/../summary.csv", index=False)
         
         except Exception as e :
             print('\n', e, '\n\n')
