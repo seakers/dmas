@@ -8,9 +8,10 @@ import random
 import sys
 import zmq
 import concurrent.futures
-from applications.chess3d.nodes.planning.mccbba import MCCBBA
-from applications.chess3d.nodes.states import UAVAgentState
-from applications.chess3d.nodes.uav import UAVAgent
+from nodes.planning.maccbba import MACCBBA
+# from applications.chess3d.nodes.planning.mccbba import MCCBBA
+from nodes.states import UAVAgentState
+from nodes.uav import UAVAgent
 from nodes.planning.greedy import GreedyPlanner
 from nodes.science.reqs import GroundPointMeasurementRequest
 from nodes.groundstat import GroundStationAgent
@@ -119,14 +120,21 @@ def agent_factory(  scenario_name : str,
                                     utility_function[planner_util],
                                     payload,
                                     logger=logger)
-        elif planner_type == PlannerTypes.MCCBBA.value:
-            planner = MCCBBA(results_path,
+        # elif planner_type == PlannerTypes.MCCBBA.value:
+        #     planner = MCCBBA(results_path,
+        #                         agent_name, 
+        #                         agent_network_config,
+        #                         utility_function[planner_util],
+        #                         payload,
+        #                         logger=logger)
+
+        elif planner_type == PlannerTypes.MACCBBA.value:
+            planner = MACCBBA(results_path,
                                 agent_name, 
                                 agent_network_config,
                                 utility_function[planner_util],
                                 payload,
                                 logger=logger)
-
         else:
             raise NotImplementedError(f"Planner of type {planner_type} not yet implemented.")
     else:

@@ -11,12 +11,12 @@ import pandas as pd
 from nodes.orbitdata import OrbitData
 from nodes.states import *
 from nodes.actions import *
-from messages import *
-from nodes.planning.planners import PlanningModule
 from nodes.states import SimulationAgentState
+from nodes.science.utility import synergy_factor
 from nodes.science.reqs import MeasurementRequest
-from nodes.planning.planners import Bid
+from nodes.planning.planners import Bid, PlanningModule
 from nodes.planning.mccbba import *
+from messages import *
 
 from dmas.messages import *
 from dmas.network import NetworkConfig
@@ -353,7 +353,7 @@ class SubtaskBid(Bid):
         self.winning_bid = new_bid
         self.winner = self.bidder
         self.t_img = t_img
-        self.t_violation = -1
+        self.t_violation = t_update if 1 in self.time_constraints else -1
         self.t_update = t_update
 
     def __str__(self) -> str:
@@ -450,8 +450,10 @@ class SubtaskBid(Bid):
         """
         Resets violation counter
         """
-        if self.winner == self.bidder:
-            self.t_violation = -1
+        # if self.winner == self.bidder:
+        #     self.t_violation = -1
+        self.t_violation = -1
+        return
 
     def is_optimistic(self) -> bool:
         """
@@ -614,8 +616,6 @@ class BidBuffer(object):
     def __init__(self) -> None:
         self.bid_access_lock = asyncio.Lock()
         self.bid_buffer = {}
-        self.req_access_lock = asyncio.Lock()
-        self.req_buffer = []
         self.updated = asyncio.Event()             
 
     def __len__(self) -> int:
@@ -624,7 +624,7 @@ class BidBuffer(object):
             for bid in self.bid_buffer[req_id]:
                 bid : SubtaskBid
                 l += 1 if bid is not None else 0
-        return 1
+        return l
 
     async def pop_all(self) -> list:
         """
@@ -640,9 +640,9 @@ class BidBuffer(object):
                     # place bid in outgoing list
                     out.append(bid.copy())
 
-                    # reset bid in buffer
-                    subtask_index = self.bid_buffer[req_id].index(bid)
-                    self.bid_buffer[req_id][subtask_index] = None
+            # reset bids in buffer
+            self.bid_buffer[req_id] = [None for _ in self.bid_buffer[req_id]]
+            x = 1
 
         self.bid_access_lock.release()
 
@@ -701,7 +701,7 @@ class BidBuffer(object):
             if len(self) >= min_len:
                 break
 
-        return self.pop_all()
+        return await self.pop_all()
 
 
 class MACCBBA(PlanningModule):
@@ -764,7 +764,7 @@ class MACCBBA(PlanningModule):
         """
         try:
             listener_task = asyncio.create_task(self.listener(), name='listener()')
-            bundle_builder_task = asyncio.create_task(self.planner(), name='bundle_builder()')
+            bundle_builder_task = asyncio.create_task(self.bundle_builder(), name='bundle_builder()')
             planner_task = asyncio.create_task(self.planner(), name='planner()')
             
             tasks = [listener_task, bundle_builder_task, planner_task]
@@ -789,6 +789,7 @@ class MACCBBA(PlanningModule):
         try:
             # initiate results tracker
             results = {}
+            level = logging.WARNING
 
             # listen for broadcasts and place in the appropriate inboxes
             while True:
@@ -831,7 +832,7 @@ class MACCBBA(PlanningModule):
                             await self.agent_state_lock.acquire()
                             state : SimulationAgentState = SimulationAgentState.from_dict(state_msg.state)
 
-                            self.update_current_time(state.t)
+                            await self.update_current_time(state.t)
                             self.agent_state = state
 
                             if self.parent_agent_type is None:
@@ -849,7 +850,7 @@ class MACCBBA(PlanningModule):
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_REQ.value:
                             # unpack message 
                             req_msg = MeasurementRequestMessage(**sense)
-                            req = MeasurementRequest.from_dict(**req_msg.req)
+                            req = MeasurementRequest.from_dict(req_msg.req)
                             self.log(f"received measurement request message!")
                             
                             # if not in send to planner
@@ -858,14 +859,15 @@ class MACCBBA(PlanningModule):
                                 self.log(f"received new measurement request! Adding to results ledger...")
 
                                 bids : list = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
-                                results[req.id] = bids
+                                # results[req.id] = bids
+                                incoming_bids.extend(bids)
 
-                                # send to bundle-builder and rebroadcaster
-                                await self.listener_to_builder_buffer.put_bids(bids)
-                                await self.listener_to_broadcaster_buffer.put_bids(bids)
+                                # # send to bundle-builder and rebroadcaster
+                                # await self.listener_to_builder_buffer.put_bids(bids)
+                                # await self.listener_to_broadcaster_buffer.put_bids(bids)
 
-                                # inform bundle-builder of new tasks
-                                await self.measurement_req_inbox.put(req_msg)
+                                # # inform bundle-builder of new tasks
+                                # await self.measurement_req_inbox.put(req_msg)
 
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_BID.value:
                             # unpack message 
@@ -880,13 +882,14 @@ class MACCBBA(PlanningModule):
                         incoming_bids.extend(broadcasted_bids)                    
                     
                     results, bundle, path, \
-                    _, rebroadcast_bids = await self.consensus_phase(   results, 
-                                                                        bundle, 
-                                                                        path, 
-                                                                        self.get_current_time(),
-                                                                        incoming_bids,
-                                                                        logging.DEBUG
-                                                                    )
+                    consensus_changes, rebroadcast_bids = self.consensus_phase( results, 
+                                                                                [], 
+                                                                                [], 
+                                                                                self.get_current_time(),
+                                                                                incoming_bids,
+                                                                                level
+                                                                            )
+                    self.log_changes("listener - CHANGES MADE FROM CONSENSUS", consensus_changes, level)
 
                     # send to bundle-builder and broadcaster
                     await self.listener_to_builder_buffer.put_bids(rebroadcast_bids)
@@ -909,49 +912,56 @@ class MACCBBA(PlanningModule):
             results = {}
             path = []
             bundle = []
-            level = logging.DEBUG
+            level = logging.WARNING
 
             while True:
                 # wait for incoming bids
-                incoming_bids = await self.listener_to_broadcaster_buffer.wait_for_updates()
-                self.log_results('BIDS RECEIVED', incoming_bids, level)
+                incoming_bids = await self.listener_to_builder_buffer.wait_for_updates()
+                self.log_changes('BIDS RECEIVED', incoming_bids, level)
 
                 # Consensus Phase 
                 t_0 = time.perf_counter()
                 results, bundle, path, consensus_changes, \
-                consensus_rebroadcasts = await self.consensus_phase(    results, 
-                                                                        bundle, 
-                                                                        path, 
-                                                                        self.get_current_time(),
-                                                                        incoming_bids,
-                                                                        level
-                                                                    )
+                consensus_rebroadcasts = self.consensus_phase(  results, 
+                                                                bundle, 
+                                                                path, 
+                                                                self.get_current_time(),
+                                                                incoming_bids,
+                                                                level
+                                                            )
                 dt = time.perf_counter() - t_0
                 self.stats['consensus'].append(dt)
+
+                self.log_changes("builder - CHANGES MADE FROM CONSENSUS", consensus_changes, level)
 
                 # Update iteration counter
                 self.iter_counter += 1
 
                 # Planning Phase
                 t_0 = time.perf_counter()
-                results, bundle, path, planner_changes = await self.planning_phase(self.agent_state, results, bundle, path, level)
+                results, bundle, path,\
+                     planner_changes = self.planning_phase( self.agent_state, 
+                                                            results, 
+                                                            bundle, 
+                                                            path, 
+                                                            level
+                                                        )
                 dt = time.perf_counter() - t_0
                 self.stats['planning'].append(dt)
 
-                self.log_changes("CHANGES MADE FROM PLANNING", planner_changes, level)
-                self.log_changes("CHANGES MADE FROM CONSENSUS", consensus_changes, level)
+                self.log_changes("builder - CHANGES MADE FROM PLANNING", planner_changes, level)
                 
                 # Check for convergence
                 converged = self.path_constraint_sat(path, results, self.get_current_time())
                 if converged:
                     # generate plan from path
                     await self.agent_state_lock.acquire()
-                    plan = self.plan_from_path(self.states_inbox, results, path)
+                    plan = self.plan_from_path(self.agent_state, results, path)
                     self.agent_state_lock.release()
 
                 else:
                     # wait for messages or for next bid time-out
-                    t_next = np.NINF
+                    t_next = np.Inf
                     for req, subtask_index in path:
                         req : MeasurementRequest
                         bid : SubtaskBid = results[req.id][subtask_index]
@@ -959,6 +969,9 @@ class MACCBBA(PlanningModule):
                         t_timeout = bid.t_violation + bid.dt_violation
                         if t_timeout < t_next:
                             t_next = t_timeout
+
+                    if t_next < self.get_current_time():
+                        x = 1
 
                     wait_action = WaitForMessages(self.get_current_time(), t_next)
                     plan = [wait_action]
@@ -980,7 +993,8 @@ class MACCBBA(PlanningModule):
 
     async def planner(self) -> None:
         try:
-            plan = []
+            self.plan = []
+            level = logging.WARNING
 
             while True:
                 # wait for agent to update state
@@ -988,23 +1002,24 @@ class MACCBBA(PlanningModule):
 
                 # --- Look for Plan Updates ---
 
+                plan_out = []
                 # Check if relevant changes to the bundle were performed
                 if len(self.listener_to_broadcaster_buffer) > 0:
                     # wait for plan to be updated
-                    plan : list = await self.plan_inbox.get()
+                    self.plan : list = await self.plan_inbox.get()
 
                     # compule updated bids from the listener and bundle buiilder
                     rebroadcast_bids = {}
                     bids = []
 
                     # received bids to rebroadcast from bundle-builder
-                    bids.extend(self.builder_to_broadcaster_buffer.pop_all())
+                    bids.extend(await self.builder_to_broadcaster_buffer.pop_all())
 
                     # communicate updates to listener
-                    self.broadcasted_bids_buffer.put_bids(bids)
+                    await self.broadcasted_bids_buffer.put_bids(bids)
                     
                     # received bids to rebroadcast from listener    
-                    bids.extend(self.listener_to_broadcaster_buffer.pop_all())
+                    bids.extend(await self.listener_to_broadcaster_buffer.pop_all())
 
                     # add bid broadcasts to plan
                     rebroadcast_bids = self.compile_bids(bids)
@@ -1013,14 +1028,14 @@ class MACCBBA(PlanningModule):
                             bid : SubtaskBid
                             if bid is not None:
                                 bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), bid.to_dict())
-                                plan.insert(0, BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()).to_dict())
+                                plan_out.append( BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()) )
                                  
                 # --- Execute plan ---
 
                 # check plan completion 
-                plan_out = []
                 while not self.action_status_inbox.empty():
                     action_msg : AgentActionMessage = await self.action_status_inbox.get()
+                    action : AgentAction = action_from_dict(**action_msg.action)
 
                     if action_msg.status == AgentAction.PENDING:
                         # if action wasn't completed, try again
@@ -1063,29 +1078,19 @@ class MACCBBA(PlanningModule):
                         action = WaitForMessages(self.get_current_time(), t_idle)
                         plan_out.append(action.to_dict())
 
-                # # --- FOR DEBUGGING PURPOSES ONLY: ---
-                # self.log(f'\nPATH\tT{self.get_current_time()}\nid\tsubtask index\tmain mmnt\tpos\tt_img', level=logging.DEBUG)
-                # out = ''
-                # for req, subtask_index in path:
-                #     req : MeasurementRequest; subtask_index : int
-                #     bid : SubtaskBid = results[req.id][subtask_index]
-                #     out += f"{req.id.split('-')[0]}, {subtask_index}, {bid.main_measurement}, {req.pos}, {bid.t_img}\n"
-                # self.log(out, level=logging.DEBUG)
+                # --- FOR DEBUGGING PURPOSES ONLY: ---
+                out = f'\nPLAN\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end\n'
+                for action in self.plan:
+                    action : AgentAction
+                    out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end},\n"
+                self.log(out, level)
 
-                # self.log(f'\nPLAN\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
-                # out = ''
-                # for action in self.plan:
-                #     action : AgentAction
-                #     out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end},\n"
-                # self.log(out, level=logging.DEBUG)
-
-                # self.log(f'\nPLAN OUT\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end', level=logging.DEBUG)
-                # out = ''
-                # for action in plan_out:
-                #     action : dict
-                #     out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
-                # self.log(out, level=logging.DEBUG)
-                # # -------------------------------------
+                out = f'\nPLAN OUT\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end\n'
+                for action in plan_out:
+                    action : dict
+                    out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
+                self.log(out, level)
+                # -------------------------------------
 
                 self.log(f'sending {len(plan_out)} actions to agent...')
                 plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
@@ -1101,7 +1106,7 @@ class MACCBBA(PlanningModule):
         CONSENSUS PHASE
     -----------------------
     """
-    async def consensus_phase(  
+    def consensus_phase(  
                                 self, 
                                 results : dict, 
                                 bundle : list, 
@@ -1121,20 +1126,22 @@ class MACCBBA(PlanningModule):
         
         # compare bids with incoming messages
         t_0 = time.perf_counter()
-        results, bundle, path, comp_changes, comp_rebroadcasts = await self.compare_results(results, bundle, path, t, new_bids, level)
+        results, bundle, path, \
+            comp_changes, comp_rebroadcasts = self.compare_results(results, bundle, path, t, new_bids, level)
         changes.extend(comp_changes)
         rebroadcasts.extend(comp_rebroadcasts)
         dt = time.perf_counter() - t_0
         self.stats['c_comp_check'].append(dt)
 
-        self.log_results('BIDS RECEIVED', new_bids, level)
+        self.log_changes('BIDS RECEIVED', new_bids, level)
         self.log_results('COMPARED RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
         
         # check for expired tasks
         t_0 = time.perf_counter()
-        results, bundle, path, exp_changes, exp_rebroadcasts = await self.check_request_end_time(results, bundle, path, t, level)
+        results, bundle, path, \
+            exp_changes, exp_rebroadcasts = self.check_request_end_time(results, bundle, path, t, level)
         changes.extend(exp_changes)
         rebroadcasts.extend(exp_rebroadcasts)
         dt = time.perf_counter() - t_0
@@ -1146,7 +1153,8 @@ class MACCBBA(PlanningModule):
 
         # check for already performed tasks
         t_0 = time.perf_counter()
-        results, bundle, path, done_changes, done_rebroadcasts = await self.check_request_completion(results, bundle, path, t, level)
+        results, bundle, path, \
+            done_changes, done_rebroadcasts = self.check_request_completion(results, bundle, path, t, level)
         changes.extend(done_changes)
         rebroadcasts.extend(done_rebroadcasts)
         dt = time.perf_counter() - t_0
@@ -1158,7 +1166,8 @@ class MACCBBA(PlanningModule):
 
         # check task constraint satisfaction
         t_0 = time.perf_counter()
-        results, bundle, path, cons_changes, cons_rebroadcasts = await self.check_bid_constraints(results, bundle, path, t, level)
+        results, bundle, path, \
+            cons_changes, cons_rebroadcasts = self.check_bid_constraints(results, bundle, path, t, level)
         changes.extend(cons_changes)
         rebroadcasts.extend(cons_rebroadcasts)
         dt = time.perf_counter() - t_0
@@ -1197,9 +1206,9 @@ class MACCBBA(PlanningModule):
             # check bids are for new requests
             new_req = their_bid.req_id not in results
 
+            req = MeasurementRequest.from_dict(their_bid.req)
             if new_req:
                 # was not aware of this request; add to results as a blank bid
-                req = MeasurementRequest.from_dict(their_bid.req)
                 results[req.id] = SubtaskBid.subtask_bids_from_task(req, self.get_parent_name())
 
                 # add to changes broadcast
@@ -1249,7 +1258,7 @@ class MACCBBA(PlanningModule):
         
         return results, bundle, path, changes, rebroadcasts
 
-    async def check_request_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+    def check_request_end_time(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
         Checks if measurement requests have expired and can no longer be performed
 
@@ -1290,7 +1299,7 @@ class MACCBBA(PlanningModule):
 
         return results, bundle, path, changes, rebroadcasts
 
-    async def check_request_completion(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
+    def check_request_completion(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.DEBUG) -> tuple:
         """
         Checks if a subtask or a mutually exclusive subtask has already been performed 
 
@@ -1360,7 +1369,7 @@ class MACCBBA(PlanningModule):
         """
         return (bid.t_img >= 0.0 and bid.t_img + req.duration < t) or bid.performed
 
-    async def check_bid_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
+    def check_bid_constraints(self, results : dict, bundle : list, path : list, t : Union[int, float], level=logging.WARNING) -> tuple:
         """
         Looks for bids that do not have their constraints satisfied
         """
@@ -1447,7 +1456,7 @@ class MACCBBA(PlanningModule):
         for bid in bids:
             bid : SubtaskBid
             
-            if bid.req not in rebroadcast_bids:
+            if bid.req_id not in rebroadcast_bids:
                 req = MeasurementRequest.from_dict(bid.req)
                 rebroadcast_bids[bid.req_id] = [None for _ in req.dependency_matrix]
             
@@ -1462,15 +1471,13 @@ class MACCBBA(PlanningModule):
         PLANNING PHASE 
     ----------------------
     """
-    async def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list, level : int = logging.DEBUG) -> None:
+    def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list, level : int = logging.DEBUG) -> None:
         """
         Uses the most updated results information to construct a path
         """
         self.log_results('INITIAL BUNDLE RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
-
-        available_tasks : list = self.get_available_tasks(state, bundle, results)
 
         changes = []
         changes_to_bundle = []
@@ -1490,6 +1497,7 @@ class MACCBBA(PlanningModule):
         # max_utility = 0.0
         max_task = -1
         max_path_utility = self.sum_path_utility(max_path, max_path_bids)
+        available_tasks : list = self.get_available_tasks(state, bundle, results)
 
         while len(bundle) < self.max_bundle_size and len(available_tasks) > 0 and max_task is not None:                   
             # find next best task to put in bundle (greedy)
@@ -1499,16 +1507,6 @@ class MACCBBA(PlanningModule):
                 # calculate bid for a given available task
                 measurement_req : MeasurementRequest
                 subtask_index : int
-
-                if (    
-                        isinstance(measurement_req, GroundPointMeasurementRequest) 
-                    and isinstance(state, SatelliteAgentState)
-                    ):
-                    # check if the satellite agent can even observe the GP
-                    lat,lon,_ = measurement_req.pos
-                    df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, 0.0)
-                    if df.empty:
-                        continue
 
                 projected_path, projected_bids, projected_path_utility = self.calc_path_bid(state, results, path, measurement_req, subtask_index)
                 
@@ -1594,7 +1592,6 @@ class MACCBBA(PlanningModule):
 
                 is_biddable = self.can_bid(state, req, subtask_index, results[req_id]) 
                 already_in_bundle = self.check_if_in_bundle(req, subtask_index, bundle)
-                # already_performed = state.t > subtaskbid.t_img and subtaskbid.winner != SubtaskBid.NONE
                 already_performed = self.task_has_been_performed(results, req, subtask_index, state.t)
                 
                 if is_biddable and not already_in_bundle and not already_performed:
@@ -1619,8 +1616,7 @@ class MACCBBA(PlanningModule):
 
         # check capabilities - TODO: Replace with knowledge graph
         subtaskbid : SubtaskBid = subtaskbids[subtask_index]
-        payload_names : list = [instrument.name for instrument in self.payload]
-        if subtaskbid.main_measurement not in payload_names:
+        if subtaskbid.main_measurement not in [instrument.name for instrument in self.payload]:
             return False 
 
         # check time constraints
@@ -1629,24 +1625,25 @@ class MACCBBA(PlanningModule):
             return False
 
         elif isinstance(req, GroundPointMeasurementRequest):
-            # check if agent can see the request location
-            lat,lon,_ = req.lat_lon_pos
-            df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, state.t)
-            can_access = False
-            if not df.empty:                
-                times = df.get('time index')
-                for time in times:
-                    time *= self.orbitdata.time_step 
+            if isinstance(state, SatelliteAgentState):
+                # check if agent can see the request location
+                lat,lon,_ = req.lat_lon_pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, state.t)
+                can_access = False
+                if not df.empty:                
+                    times = df.get('time index')
+                    for time in times:
+                        time *= self.orbitdata.time_step 
 
-                    if time < req.t_end:
-                        # there exists an access time before the request's availability ends
-                        can_access = True
-                        break
+                        if time < req.t_end:
+                            # there exists an access time before the request's availability ends
+                            can_access = True
+                            break
                 
-            if not can_access:
-                return False
-            else:
-                x = 1
+                if not can_access:
+                    return False
+            # elif isinstance(state, SatelliteAgentState): # TODO chech UAV range 
+            #     pass
 
         ## Constraint 2: coalition constraints
         n_sat = subtaskbid.count_coal_conts_satisied(subtaskbids)
@@ -1752,46 +1749,15 @@ class MACCBBA(PlanningModule):
             # calculate bids for each task in the path
             bids = {}
             for req_i, subtask_j in path:
-                # predict state
-                if i == 0:
-                    t_prev = state.t
-                    prev_state = state
-                else:
-                    prev_req, prev_subtask_index = path[i-1]
-                    prev_req : MeasurementRequest; prev_subtask_index : int
-                    bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
-                    t_prev : float = bid_prev.t_img + prev_req.duration
-
-                    if isinstance(state, SatelliteAgentState):
-                        prev_state : SatelliteAgentState = state.propagate(t_prev)
-                        
-                        prev_state.attitude = [
-                                                prev_state.calc_off_nadir_agle(prev_req),
-                                                0.0,
-                                                0.0
-                                            ]
-                    else:
-                        raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
-
                 # calculate imaging time
                 req_i : MeasurementRequest
                 subtask_j : int
-                t_img = self.calc_imaging_time(prev_state, original_results, req_i, subtask_j, t_prev)
+                t_img = self.calc_imaging_time(state, original_results, path, bids, req_i, subtask_j)
 
-                if isinstance(prev_state, SatelliteAgentState):
-                    future_state : SatelliteAgentState = prev_state.propagate(t_prev)
-                    future_state.attitude = [
-                                            future_state.calc_off_nadir_agle(req_i),
-                                            0.0,
-                                            0.0
-                                        ]
-                else:
-                    raise NotImplementedError(f"cannot calculate future state for agent states of type {type(state)}")
-
-
-                # calculate bidding score
-                params = {"prev_state" : future_state, "req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
-                utility = self.utility_func(**params) if req_i.t_start <= t_img < req_i.t_end else 0.0
+                # calc utility
+                params = {"req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
+                utility = self.utility_func(**params) if t_img >= 0 else 0.0
+                utility *= synergy_factor(**params)
 
                 # create bid
                 bid : SubtaskBid = original_results[req_i.id][subtask_j].copy()
@@ -1810,7 +1776,7 @@ class MACCBBA(PlanningModule):
 
         return winning_path, winning_bids, winning_path_utility
 
-    def calc_imaging_time(self, prev_state : SimulationAgentState, current_results : dict, req : MeasurementRequest, subtask_index : int, t_prev : float) -> float:
+    def calc_imaging_time(self, state : SimulationAgentState, original_results : dict, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
         """
         Computes the earliest time when a task in the path would be performed
 
@@ -1819,14 +1785,43 @@ class MACCBBA(PlanningModule):
         ### Returns
             - t_imgs (`list`): list of available imaging times
         """
+        i = path.index((req, subtask_index))
+        if i == 0:
+            t_prev = state.t
+            prev_state = state.copy()
+        else:
+            prev_req, prev_subtask_index = path[i-1]
+            prev_req : MeasurementRequest; prev_subtask_index : int
+            bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
+            t_prev : float = bid_prev.t_img + prev_req.duration
+
+            if isinstance(state, SatelliteAgentState):
+                prev_state : SatelliteAgentState = state.propagate(t_prev)
+                
+                prev_state.attitude = [
+                                        prev_state.calc_off_nadir_agle(prev_req),
+                                        0.0,
+                                        0.0
+                                    ]
+            elif isinstance(state, UAVAgentState):
+                prev_state = state.copy()
+                prev_state.t = t_prev
+                
+                if isinstance(prev_req, GroundPointMeasurementRequest):
+                    prev_state.pos = prev_req.pos
+                else:
+                    raise NotImplementedError
+            else:
+                raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
+
         # compute earliest time to the task
-        t_imgs : list = self.calc_arrival_times(prev_state, req, t_prev)
+        t_imgs : list = self.calc_arrival_times(prev_state, req, t_prev,)
         t_imgs = sorted(t_imgs)
         
         # get active time constraints
         t_consts = []
-        for subtask_index_dep in range(len(current_results[req.id])):
-            dep_bid : SubtaskBid = current_results[req.id][subtask_index_dep]
+        for subtask_index_dep in range(len(original_results[req.id])):
+            dep_bid : SubtaskBid = original_results[req.id][subtask_index_dep]
             
             if dep_bid.winner == SubtaskBid.NONE:
                 continue
@@ -1856,43 +1851,6 @@ class MACCBBA(PlanningModule):
             return t_imgs[0]
 
         return np.Inf
-
-    def calc_arrival_times(self, state : SimulationAgentState, req : MeasurementRequest, t_prev : Union[int, float]) -> float:
-        """
-        Estimates the quickest arrival time from a starting position to a given final position
-        """
-        t_imgs = []
-        if isinstance(req, GroundPointMeasurementRequest):
-            # compute earliest time to the task
-            if self.parent_agent_type == SimulationAgentTypes.SATELLITE.value:
-                lat,lon,_ = req.lat_lon_pos
-                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
-
-                for _, row in df.iterrows():
-                    t_img = row['time index'] * self.orbitdata.time_step
-                    dt = t_img - state.t
-
-                    # check for planning horizon
-                    # if dt > self.planning_horizon:
-                    #     continue
-                                        
-                    # propagate state
-                    propagated_state : SatelliteAgentState = state.propagate(t_img)
-
-                    # compute off-nadir angle
-                    thf = propagated_state.calc_off_nadir_agle(req)
-                    dth = thf - propagated_state.attitude[0]
-
-                    # estimate arrival time using fixed angular rate TODO change to 
-                    if dt >= abs(dth / 1.0): # TODO change maximum angular rate 
-                        t_imgs.append(t_img)
-
-                return t_imgs
-            else:
-                raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
-
-        else:
-            raise NotImplementedError(f"cannot calculate imaging time for measurement requests of type {type(req)}")   
 
     def sum_path_utility(self, path : list, bids : dict) -> float:
         utility = 0.0
@@ -2036,6 +1994,21 @@ class MACCBBA(PlanningModule):
         """
 
         plan = []
+
+        # add convergence timer if needed
+        t_conv_min = np.Inf
+        for measurement_req, subtask_index in path:
+            bid : SubtaskBid = results[measurement_req.id][subtask_index]
+            t_conv = bid.t_update + bid.dt_converge
+            if t_conv < t_conv_min:
+                t_conv_min = t_conv
+
+        if state.t < t_conv_min:
+            plan.append( WaitForMessages(state.t, t_conv_min) )
+        else:
+            t_conv_min = state.t
+
+        # add actions per measurement
         for i in range(len(path)):
             measurement_req, subtask_index = path[i]
             measurement_req : MeasurementRequest; subtask_index : int
@@ -2045,8 +2018,16 @@ class MACCBBA(PlanningModule):
                 raise NotImplementedError(f"Cannot create plan for requests of type {type(measurement_req)}")
             
             if i == 0:
-                t_prev = state.t
-                prev_state = state
+                if isinstance(state, SatelliteAgentState):
+                    t_prev = state.t
+                    prev_state : SatelliteAgentState = state.copy()
+
+                elif isinstance(state, UAVAgentState):
+                    t_prev = t_conv_min
+                    prev_state : UAVAgentState = state.copy()
+
+                else:
+                    raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
             else:
                 prev_req, prev_subtask_index = path[i-1]
                 prev_req : MeasurementRequest; prev_subtask_index : int
@@ -2060,24 +2041,36 @@ class MACCBBA(PlanningModule):
                                         0.0,
                                         0.0
                                     ]
+
+                elif isinstance(state, UAVAgentState):
+                    prev_state : UAVAgentState = state.copy()
+                    prev_state.t = t_prev
+
+                    if isinstance(prev_req, GroundPointMeasurementRequest):
+                        prev_state.pos = prev_req.pos
+                    else:
+                        raise NotImplementedError(f"cannot calculate travel time start for requests of type {type(prev_req)} for uav agents")
+
                 else:
                     raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
 
-            # point to target
+            # maneuver to point to target
+            t_maneuver_end = None
             if isinstance(state, SatelliteAgentState):
+                prev_state : SatelliteAgentState
+
                 t_maneuver_start = prev_state.t
                 tf = prev_state.calc_off_nadir_agle(measurement_req)
                 t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
-            else:
-                raise NotImplementedError(f"cannot calculate maneuver time end for agent states of type {type(state)}")
-            if t_maneuver_start == -1.0:
-                continue
-            if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
-                maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
-                plan.append(maneuver_action)
+
+                if t_maneuver_start == -1.0:
+                    continue
+                if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
+                    maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
+                    plan.append(maneuver_action)            
 
             # move to target
-            t_move_start = t_maneuver_end
+            t_move_start = prev_state.t if t_maneuver_end is None else t_maneuver_end
             if isinstance(state, SatelliteAgentState):
                 lat, lon, _ = measurement_req.lat_lon_pos
                 df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
@@ -2089,6 +2082,14 @@ class MACCBBA(PlanningModule):
 
                 future_state : SatelliteAgentState = state.propagate(t_move_end)
                 final_pos = future_state.pos
+
+            elif isinstance(state, UAVAgentState):
+                final_pos = measurement_req.pos
+                dr = np.array(final_pos) - np.array(prev_state.pos)
+                norm = np.sqrt( dr.dot(dr) )
+                
+                t_move_end = t_move_start + norm / state.max_speed
+
             else:
                 raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
             
@@ -2139,19 +2140,19 @@ class MACCBBA(PlanningModule):
             - level (`int`): logging level to be used
         """
         if self._logger.getEffectiveLevel() <= level:
-            headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            headers = ['req_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
             data = []
-            for task_id in results:
-                if isinstance(results[task_id], list):
-                    for bid in results[task_id]:
+            for req_id in results:
+                if isinstance(results[req_id], list):
+                    for bid in results[req_id]:
                         bid : SubtaskBid
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
                         line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
                         data.append(line)
-                elif isinstance(results[task_id], dict):
-                    for bid_index in results[task_id]:
-                        bid : SubtaskBid = results[task_id][bid_index]
+                elif isinstance(results[req_id], dict):
+                    for bid_index in results[req_id]:
+                        bid : SubtaskBid = results[req_id][bid_index]
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
                         line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
@@ -2187,11 +2188,10 @@ class MACCBBA(PlanningModule):
 
     def log_changes(self, dsc : str, changes : list, level=logging.DEBUG) -> None:
         if self._logger.getEffectiveLevel() <= level:
-            headers = ['task_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
+            headers = ['req_id', 'i', 'mmt', 'deps', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 't_v', 'w_solo', 'w_any']
             data = []
-            for change in changes:
-                change : MeasurementBidMessage
-                bid = SubtaskBid(**change.bid)
+            for bid in changes:
+                bid : SubtaskBid
                 req = MeasurementRequest.from_dict(bid.req)
                 split_id = req.id.split('-')
                 line = [split_id[0], bid.subtask_index, bid.main_measurement, bid.dependencies, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), round(bid.t_violation, 3), bid.bid_solo, bid.bid_any]
@@ -2201,7 +2201,7 @@ class MACCBBA(PlanningModule):
             self.log(f'\n{dsc} [Iter {self.iter_counter}]\n{str(df)}\n', level)
 
     def log_plan(self, results : dict, plan : list, t : Union[int, float], level=logging.DEBUG) -> None:
-        headers = ['t', 'task_id', 'subtask_index', 't_start', 't_end', 't_img', 'u_exp']
+        headers = ['t', 'req_id', 'subtask_index', 't_start', 't_end', 't_img', 'u_exp']
         data = []
 
         for action in plan:
@@ -2235,7 +2235,7 @@ class MACCBBA(PlanningModule):
 
     async def teardown(self) -> None:
         # log plan history
-        headers = ['plan_index', 't', 'task_id', 'subtask_index', 't_img', 'u_exp']
+        headers = ['plan_index', 't', 'req_id', 'subtask_index', 't_img', 'u_exp']
         data = []
 
         for i in range(len(self.plan_history)):

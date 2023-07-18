@@ -1,7 +1,9 @@
 import os
 import re
 from typing import Any, Callable
-from applications.chess3d.nodes.orbitdata import OrbitData
+from nodes.orbitdata import OrbitData
+from nodes.states import *
+from nodes.science.reqs import *
 from messages import *
 from dmas.modules import *
 import pandas as pd
@@ -106,13 +108,14 @@ class Bid(ABC):
             self.own_bid = other.own_bid
 
     @abstractmethod
-    def reset(self, **kwargs) -> None:
+    def reset(self, t_update) -> None:
         """
         Resets the values of this bid while keeping track of lates update time
         """
         self.winning_bid = 0
         self.winner = self.NONE
         self.t_img = -1
+        self.t_update = t_update
 
     def _leave(self, _, **__) -> None:
         """
@@ -261,10 +264,10 @@ class PlanningModule(InternalModule):
         self.parent_name = parent_name
         self.utility_func = utility_func
         self.plan = []
-
         self.stats = {}
 
         self.parent_agent_type = None
+        self.orbitdata : OrbitData = None
 
     async def sim_wait(self, delay: float) -> None:
         return
@@ -538,6 +541,82 @@ class PlanningModule(InternalModule):
                     grid_data_compiled.append(grid_data)
 
                 return OrbitData(name, time_data, eclipse_data, position_data, isl_data, gs_access_data, gp_access_data, grid_data_compiled)
+
+    def calc_imaging_time(self, state : SimulationAgentState, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
+        """
+        Computes the ideal" time when a task in the path would be performed
+        ### Returns
+            - t_img (`float`): earliest available imaging time
+        """
+        # calculate the state of the agent prior to performing the measurement request
+        i = path.index((req, subtask_index))
+        if i == 0:
+            t_prev = state.t
+            prev_state = state.copy()
+        else:
+            prev_req, prev_subtask_index = path[i-1]
+            prev_req : MeasurementRequest; prev_subtask_index : int
+            bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
+            t_prev : float = bid_prev.t_img + prev_req.duration
+
+            if isinstance(state, SatelliteAgentState):
+                prev_state : SatelliteAgentState = state.propagate(t_prev)
+                
+                prev_state.attitude = [
+                                        prev_state.calc_off_nadir_agle(prev_req),
+                                        0.0,
+                                        0.0
+                                    ]
+            elif isinstance(state, UAVAgentState):
+                prev_state = state.copy()
+                prev_state.t = t_prev
+                
+                if isinstance(prev_req, GroundPointMeasurementRequest):
+                    prev_state.pos = prev_req.pos
+                else:
+                    raise NotImplementedError
+            else:
+                raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
+
+        return self.calc_arrival_times(prev_state, req, t_prev)[0]
+
+    def calc_arrival_times(self, state : SimulationAgentState, req : MeasurementRequest, t_prev : Union[int, float]) -> float:
+        """
+        Estimates the quickest arrival time from a starting position to a given final position
+        """
+        if isinstance(req, GroundPointMeasurementRequest):
+            # compute earliest time to the task
+            if isinstance(state, SatelliteAgentState):
+                t_imgs = []
+                lat,lon,_ = req.lat_lon_pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
+
+                for _, row in df.iterrows():
+                    t_img = row['time index'] * self.orbitdata.time_step
+                    dt = t_img - state.t
+                
+                    # propagate state
+                    propagated_state : SatelliteAgentState = state.propagate(t_img)
+
+                    # compute off-nadir angle
+                    thf = propagated_state.calc_off_nadir_agle(req)
+                    dth = thf - propagated_state.attitude[0]
+
+                    # estimate arrival time using fixed angular rate TODO change to 
+                    if dt >= dth / 1.0: # TODO change maximum angular rate 
+                        t_imgs.append(t_img)
+                return t_imgs
+
+            elif isinstance(state, UAVAgentState):
+                dr = np.array(req.pos) - np.array(state.pos)
+                norm = np.sqrt( dr.dot(dr) )
+                return [norm / state.max_speed + t_prev]
+
+            else:
+                raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
+
+        else:
+            raise NotImplementedError(f"cannot calculate imaging time for measurement requests of type {type(req)}")       
 
 # class ConsensusPlanner(PlannerModule):
 #     """
