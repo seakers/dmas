@@ -642,7 +642,6 @@ class BidBuffer(object):
 
             # reset bids in buffer
             self.bid_buffer[req_id] = [None for _ in self.bid_buffer[req_id]]
-            x = 1
 
         self.bid_access_lock.release()
 
@@ -672,6 +671,9 @@ class BidBuffer(object):
         """
         Adds bid to the appropriate buffer if it's a more updated bid information than the one at hand
         """
+        if len(new_bids) == 0:
+            return
+
         await self.bid_access_lock.acquire()
 
         for new_bid in new_bids:
@@ -862,13 +864,6 @@ class MACCBBA(PlanningModule):
                                 # results[req.id] = bids
                                 incoming_bids.extend(bids)
 
-                                # # send to bundle-builder and rebroadcaster
-                                # await self.listener_to_builder_buffer.put_bids(bids)
-                                # await self.listener_to_broadcaster_buffer.put_bids(bids)
-
-                                # # inform bundle-builder of new tasks
-                                # await self.measurement_req_inbox.put(req_msg)
-
                         elif sense['msg_type'] == SimulationMessageTypes.MEASUREMENT_BID.value:
                             # unpack message 
                             bid_msg = MeasurementBidMessage(**sense)
@@ -881,19 +876,25 @@ class MACCBBA(PlanningModule):
                         broadcasted_bids : list = await self.broadcasted_bids_buffer.pop_all()
                         incoming_bids.extend(broadcasted_bids)                    
                     
-                    results, bundle, path, \
-                    consensus_changes, rebroadcast_bids = self.consensus_phase( results, 
-                                                                                [], 
-                                                                                [], 
-                                                                                self.get_current_time(),
-                                                                                incoming_bids,
-                                                                                level
-                                                                            )
-                    self.log_changes("listener - CHANGES MADE FROM CONSENSUS", consensus_changes, level)
+                    if len(incoming_bids) > 0:
+                        results, bundle, path, \
+                        consensus_changes, rebroadcast_bids = self.consensus_phase( results, 
+                                                                                    [], 
+                                                                                    [], 
+                                                                                    self.get_current_time(),
+                                                                                    incoming_bids,
+                                                                                    level
+                                                                                )
+                        sorting_buffer = BidBuffer()
+                        await sorting_buffer.put_bids(rebroadcast_bids)
+                        rebroadcast_bids = await sorting_buffer.pop_all()
 
-                    # send to bundle-builder and broadcaster
-                    await self.listener_to_builder_buffer.put_bids(rebroadcast_bids)
-                    await self.listener_to_broadcaster_buffer.put_bids(rebroadcast_bids)
+                        self.log_changes("listener - CHANGES MADE FROM CONSENSUS", consensus_changes, level)
+                        self.log_changes("listener - REBROADCASTS TO BE DONE", rebroadcast_bids, level)
+
+                        # send to bundle-builder and broadcaster
+                        await self.listener_to_builder_buffer.put_bids(rebroadcast_bids)
+                        await self.listener_to_broadcaster_buffer.put_bids(rebroadcast_bids)
 
                     # inform planner of state update
                     self.agent_state_updated.set()
@@ -980,7 +981,10 @@ class MACCBBA(PlanningModule):
                 broadcast_bids : list = consensus_rebroadcasts
                 broadcast_bids.extend(planner_changes)
                 
-                self.log_changes("REBROADCASTS TO BE DONE", broadcast_bids, level)
+                broadcast_buffer = BidBuffer()
+                await broadcast_buffer.put_bids(broadcast_bids)
+                broadcast_bids = await broadcast_buffer.pop_all()
+                self.log_changes("builder - REBROADCASTS TO BE DONE", broadcast_bids, level)
                 await self.builder_to_broadcaster_buffer.put_bids(broadcast_bids)                                
 
                 # Send plan to broadcaster
@@ -1009,27 +1013,26 @@ class MACCBBA(PlanningModule):
                     self.plan : list = await self.plan_inbox.get()
 
                     # compule updated bids from the listener and bundle buiilder
-                    rebroadcast_bids = {}
-                    bids = []
+                    if len(self.builder_to_broadcaster_buffer) > 0:
+                        # received bids to rebroadcast from bundle-builder
+                        bids : list = await self.builder_to_broadcaster_buffer.pop_all()
+                        
+                        # communicate updates to listener
+                        await self.broadcasted_bids_buffer.put_bids(bids)
+                        
+                        # received bids to rebroadcast from listener    
+                        bids.extend(await self.listener_to_broadcaster_buffer.pop_all())
 
-                    # received bids to rebroadcast from bundle-builder
-                    bids.extend(await self.builder_to_broadcaster_buffer.pop_all())
-
-                    # communicate updates to listener
-                    await self.broadcasted_bids_buffer.put_bids(bids)
-                    
-                    # received bids to rebroadcast from listener    
-                    bids.extend(await self.listener_to_broadcaster_buffer.pop_all())
-
-                    # add bid broadcasts to plan
-                    rebroadcast_bids = self.compile_bids(bids)
-                    for req_id in rebroadcast_bids:
-                        for bid in rebroadcast_bids[req_id]:
-                            bid : SubtaskBid
-                            if bid is not None:
-                                bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), bid.to_dict())
-                                plan_out.append( BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()) )
-                                 
+                        # add bid broadcasts to plan
+                        rebroadcast_bids = self.compile_bids(bids)
+                        for req_id in rebroadcast_bids:
+                            for bid in rebroadcast_bids[req_id]:
+                                bid : SubtaskBid
+                                if bid is not None:
+                                    bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), bid.to_dict())
+                                    plan_out.append( BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()).to_dict() )
+                    else:
+                        _ = await self.listener_to_broadcaster_buffer.pop_all()
                 # --- Execute plan ---
 
                 # check plan completion 
@@ -1062,19 +1065,24 @@ class MACCBBA(PlanningModule):
                             self.plan.remove(removed)
                             removed = removed.to_dict()
 
+                # get next action to perform
                 if len(plan_out) == 0:
-                    if len(self.plan) > 0:
-                        next_action : AgentAction = self.plan[0]
-                        if next_action.t_start <= self.get_current_time():
-                            plan_out.append(next_action.to_dict())
-                        else:
-                            t_idle = next_action.t_start
-                            action = WaitForMessages(self.get_current_time(), t_idle)
+                    plan_out_ids = [action['id'] for action in plan_out]
+                    for action in self.plan:
+                        action : AgentAction
+                        if (action.t_start <= self.get_current_time() <= action.t_end
+                            and action.id not in plan_out_ids):
                             plan_out.append(action.to_dict())
-                    else:
-                        # no more actions to perform, idle until the end of the simulation
-                        self.log('no more actions to perform. instruct agent to idle for the remainder of the simulation.')
-                        t_idle = self.get_current_time() + 1e9
+
+                    if len(plan_out) == 0:
+                        if len(self.plan) > 0:
+                            # next action is yet to start, wait until then
+                            next_action : AgentAction = self.plan[0]
+                            t_idle = next_action.t_start
+                        else:
+                            # no more actions to perform, idle until the end of the simulation
+                            t_idle = self.get_current_time() + 1e9
+
                         action = WaitForMessages(self.get_current_time(), t_idle)
                         plan_out.append(action.to_dict())
 
