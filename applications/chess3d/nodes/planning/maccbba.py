@@ -61,8 +61,8 @@ class SubtaskBid(Bid):
                     t_img: Union[float, int] = -1, 
                     t_update: Union[float, int] = -1, 
                     dt_converge: Union[float, int] = 0.0, 
-                    t_violation: Union[float, int] = -1, 
-                    dt_violoation: Union[float, int] = 0.0,
+                    t_violation: Union[float, int] = np.Inf, 
+                    dt_violoation: Union[float, int] = 1e-6,
                     bid_solo : int = 1,
                     bid_any : int = 1, 
                     performed : bool = False,
@@ -353,7 +353,7 @@ class SubtaskBid(Bid):
         self.winning_bid = new_bid
         self.winner = self.bidder
         self.t_img = t_img
-        self.t_violation = t_update if 1 in self.time_constraints else -1
+        self.t_violation = t_update if 1 in self.time_constraints else np.Inf
         self.t_update = t_update
 
     def __str__(self) -> str:
@@ -452,7 +452,7 @@ class SubtaskBid(Bid):
         """
         # if self.winner == self.bidder:
         #     self.t_violation = -1
-        self.t_violation = -1
+        self.t_violation = np.Inf
         return
 
     def is_optimistic(self) -> bool:
@@ -791,7 +791,8 @@ class MACCBBA(PlanningModule):
         try:
             # initiate results tracker
             results = {}
-            level = logging.WARNING
+            # level = logging.WARNING
+            level = logging.DEBUG
 
             # listen for broadcasts and place in the appropriate inboxes
             while True:
@@ -913,7 +914,8 @@ class MACCBBA(PlanningModule):
             results = {}
             path = []
             bundle = []
-            level = logging.WARNING
+            # level = logging.WARNING
+            level = logging.DEBUG
 
             while True:
                 # wait for incoming bids
@@ -958,6 +960,8 @@ class MACCBBA(PlanningModule):
                 # Check for convergence
                 converged = self.path_constraint_sat(path, results, self.get_current_time())
                 if converged:
+                    converged = self.path_constraint_sat(path, results, self.get_current_time())
+                    
                     # generate plan from path
                     await self.agent_state_lock.acquire()
                     plan = self.plan_from_path(self.agent_state, results, path)
@@ -969,6 +973,9 @@ class MACCBBA(PlanningModule):
                     for req, subtask_index in path:
                         req : MeasurementRequest
                         bid : SubtaskBid = results[req.id][subtask_index]
+
+                        if bid.winner == SubtaskBid.NONE:
+                            continue
 
                         t_timeout = bid.t_violation + bid.dt_violation
                         if t_timeout < t_next:
@@ -1002,6 +1009,7 @@ class MACCBBA(PlanningModule):
         try:
             self.plan = []
             level = logging.WARNING
+            level = logging.DEBUG
 
             while True:
                 # wait for agent to update state
@@ -1083,7 +1091,7 @@ class MACCBBA(PlanningModule):
                         if len(self.plan) > 0:
                             # next action is yet to start, wait until then
                             next_action : AgentAction = self.plan[0]
-                            t_idle = next_action.t_start
+                            t_idle = next_action.t_start if next_action.t_start < self.get_current_time() else self.get_current_time()
                         else:
                             # no more actions to perform, idle until the end of the simulation
                             t_idle = np.Inf
@@ -1095,7 +1103,7 @@ class MACCBBA(PlanningModule):
                 out = f'\nPLAN\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end\n'
                 for action in self.plan:
                     action : AgentAction
-                    out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end},\n"
+                    out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end}\n"
                 self.log(out, level)
 
                 out = f'\nPLAN OUT\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end\n'
