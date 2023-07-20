@@ -213,4 +213,6 @@ class ACDS(Subsystem):
         # Check for completion
         if self.mom_before == self.mom_after:
             return True
+        else:
+            return False
     pass
