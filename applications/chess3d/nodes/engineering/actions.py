@@ -55,8 +55,7 @@ class ADCSAttitude(AgentAction):
     """
     def __init__(self, 
                 action_type: str,
-                des_att: float,
-                cur_spd: float, 
+                des_att: float, 
                 target : str, 
                 t_start: Union[float, int], 
                 status: str = 'PENDING', 
@@ -64,11 +63,5 @@ class ADCSAttitude(AgentAction):
                 **_) -> None:
         super().__init__(action_type, t_start, status=status, id=id)
         self.target = target
-    def Reactionwheel(self,**kwargs) -> None:
-        I_s = self.Inertia_sat
-        I_w = self.Inertia_wheel
-        w_wo = self.rot_spd
-        w_so = self.Sat_rot
-        w_sf = self.cur_spd 
-        wheel_spd = (I_s*(w_so - w_sf))/I_w  + w_wo
-        self.wheel_spd = wheel_spd
+        self.des_att = des_att
+

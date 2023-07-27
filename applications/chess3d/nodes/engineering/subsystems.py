@@ -132,9 +132,10 @@ class ACDS(Subsystem):
                  name: str,
                  mass: float,
                  altitude: float,
-                 Inertia_sat: float,
                  Sat_rot: float,
-                 #Inertia: list, 
+                 rot_spd: float,
+                 cur_spd: float,
+                 Inertia: list, 
                  components: list,
                  status: str = DISABLED, 
                  t: float = 0, 
@@ -150,13 +151,18 @@ class ACDS(Subsystem):
                 raise ValueError(f'elements of list `components` must be of type `Component`. contains element of type {type(component)}.')
         
         # assign values
+        Inertia_sat = Inertia[0]
+        Inertia_wheel = Inertia[1]
         self.name = 'ADCS'
         self.components = components
         self.mass = mass
         self.altitude = altitude
-        self.Inertia_sat = Inertia_sat
         self.Sat_rot = Sat_rot
-        #self.Inertia = Inertia
+        self.cur_spd = cur_spd
+        self.rot_spd = rot_spd
+        self.Inertia = Inertia
+        self.Inertia_wheel = Inertia_wheel
+        self.Inertia_sat = Inertia_sat
         self.status = status
 
         self.name = name
@@ -174,6 +180,9 @@ class ACDS(Subsystem):
         Propagates and updates the current state of the subsystem.
         """
         dt = t_f - self.t
+        self.dt = dt
+        # temp
+        self.th_o = th_o
         th = th_o + dth/dt
         self.th = th
     
@@ -194,6 +203,8 @@ class ACDS(Subsystem):
             self.update_state(t,status=self.DISABLED)
         elif isinstance(action,ADCSAttitude):
             return self.perform_ADCSAttitude(action,t)
+        else:
+            return False
 
     def perform_ADCSAttitude(self, action : ADCSAttitude, t : float, **kwargs) -> bool:
         """
@@ -209,10 +220,27 @@ class ACDS(Subsystem):
         self.t = t
         # Update State
         self.update_state(t,status=self.ENABLED)
+        # Generate componet action
+        I_s = self.Inertia_sat
+        I_w = self.Inertia_wheel
+        w_wo = self.rot_spd
+        w_so = self.Sat_rot
+        w_sf = self.cur_spd 
+        wheel_spd = (I_s*(w_so - w_sf))/I_w  + w_wo
+        self.wheel_spd = wheel_spd
+        # Componet instruction
+        # Import component data/check component state
+        # Check Subsystem state 
+        self.update_state(t,status=self.ENABLED)
+        
+        ang = self.th_o + self.wheel_spd*self.dt
 
-        # Check for completion
-        if self.mom_before == self.mom_after:
+
+        # Check for completion (Check angle not angular rate)
+        if self.th == ang:
             return True
+            self.update_state(t,status=self.DISABLED)
         else:
             return False
+            self.update_state(t,status=self.FAILED)
     pass
