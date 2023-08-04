@@ -8,7 +8,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
-from nodes.planning.maccbba import MACCBBA
+from nodes.planning.consensus.maccbba import MACCBBA
 # from applications.chess3d.nodes.planning.mccbba import MCCBBA
 from nodes.states import UAVAgentState
 from nodes.uav import UAVAgent
