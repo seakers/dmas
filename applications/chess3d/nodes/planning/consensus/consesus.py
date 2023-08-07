@@ -7,6 +7,7 @@ from typing import Any, Callable, Union
 import pandas as pd
 import zmq
 from applications.chess3d.nodes.orbitdata import OrbitData
+from applications.chess3d.nodes.science.utility import synergy_factor
 from nodes.planning.consensus.bids import Bid
 
 from nodes.science.reqs import MeasurementRequest
@@ -432,7 +433,7 @@ class ConsensusPlanner(PlanningModule):
             req = MeasurementRequest.from_dict(their_bid.req)
             if new_req:
                 # was not aware of this request; add to results as a blank bid
-                results[req.id] = Bid.new_bids_from_task(req, self.get_parent_name())
+                results[req.id] = Bid.new_bids_from_request(req, self.get_parent_name())
 
                 # add to changes broadcast
                 my_bid : Bid = results[req.id][0]
@@ -691,15 +692,14 @@ class ConsensusPlanner(PlanningModule):
         return False
 
     def request_has_been_performed(self, results : dict, req : MeasurementRequest, subtask_index : int, t : Union[int, float]) -> bool:
-        
         # check if subtask at hand has been performed
         current_bid : Bid = results[req.id][subtask_index]
-        subtask_already_performed = t > current_bid.t_img + req.duration and current_bid.winner != ConstrainedBid.NONE
+        subtask_already_performed = t > current_bid.t_img >= 0 + req.duration and current_bid.winner != Bid.NONE
         if subtask_already_performed or current_bid.performed:
             return True
 
         # check if a mutually exclusive subtask has already been performed
-        for subtask_bid in results[req.id]:
+        for _, subtask_bid in results:
             subtask_bid : Bid         
 
             if (
@@ -710,20 +710,6 @@ class ConsensusPlanner(PlanningModule):
                 return True
         
         return False
-
-    # def request_has_been_performed(self, results : dict, req : MeasurementRequest, subtask_index : int, t : Union[int, float]) -> bool:
-    #     current_bid : ConstrainedBid = results[req.id][subtask_index]
-    #     subtask_already_performed = t > current_bid.t_img and current_bid.winner != ConstrainedBid.NONE
-    #     if subtask_already_performed:
-    #         return True
-
-    #     for subtask_bid in results[req.id]:
-    #         subtask_bid : ConstrainedBid
-            
-    #         if t > subtask_bid.t_img and subtask_bid.winner != ConstrainedBid.NONE:
-    #             return True
-        
-    #     return False
 
     """
     ------------------------

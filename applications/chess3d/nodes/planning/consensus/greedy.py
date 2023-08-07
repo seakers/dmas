@@ -3,155 +3,19 @@ import logging
 import math
 from typing import Any, Callable
 import pandas as pd
-
 import zmq
-from nodes.orbitdata import OrbitData
-from nodes.science.reqs import GroundPointMeasurementRequest, MeasurementRequetTypes
-from nodes.planning.planners import Bid
-from dmas.network import NetworkConfig
-from nodes.science.reqs import MeasurementRequest
-from nodes.states import *
-from applications.planning.actions import WaitForMessages
-from dmas.agents import AgentAction
+
 from messages import *
+from nodes.actions import WaitForMessages
 from nodes.planning.planners import PlanningModule
+from nodes.science.reqs import GroundPointMeasurementRequest
+from nodes.planning.consensus.bids import Bid, GreedyBid
+from nodes.science.reqs import MeasurementRequest
+from nodes.orbitdata import OrbitData
+from nodes.states import *
 
-
-class GreedyBid(Bid):
-    """
-    ## Bid for Greedy planner
-
-    Describes a bid placed on a measurement request by a given agent
-
-    ### Attributes:
-        - req (`dict`): measurement request being bid on
-        - req_id (`str`): id of the request being bid on
-        - subtask_index (`int`) : index of the subtask to be bid on
-        - main_measurement (`str`): name of the main measurement assigned by this subtask bid
-        - bidder (`bidder`): name of the agent keeping track of this bid information
-        - own_bid (`float` or `int`): latest bid from bidder
-        - winner (`str`): name of current the winning agent
-        - winning_bid (`float` or `int`): current winning bid
-        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
-        - t_update (`float` or `int`): latest time when this bid was updated
-    """
-    def __init__(
-                    self, 
-                    req: dict, 
-                    subtask_index : int,
-                    main_measurement : str,
-                    bidder: str, 
-                    winning_bid: Union[float, int] = 0, 
-                    own_bid: Union[float, int] = 0, 
-                    winner: str = Bid.NONE, 
-                    t_img: Union[float, int] = -1, 
-                    t_update: Union[float, int] = -1,
-                    **_
-                ) -> Bid:
-        """
-        Creates an instance of a task bid
-
-        ### Arguments:
-            - req (`dict`): measurement request being bid on
-            - main_measurement (`str`): name of the main measurement assigned by this subtask bid
-            - dependencies (`list`): portion of the dependency matrix related to this subtask bid
-            - time_constraints (`list`): portion of the time dependency matrix related to this subtask bid
-            - bidder (`bidder`): name of the agent keeping track of this bid information
-            - own_bid (`float` or `int`): latest bid from bidder
-            - winner (`str`): name of current the winning agent
-            - winning_bid (`float` or `int`): current winning bid
-            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
-            - t_update (`float` or `int`): latest time when this bid was updated
-        """
-        super().__init__(req, bidder, winning_bid, own_bid, winner, t_img, t_update)
-
-        self.subtask_index = subtask_index
-        self.main_measurement = main_measurement
-        
-    def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
-        """
-        Sets new values for this bid
-
-        ### Arguments: 
-            - new_bid (`int` or `float`): new bid value
-            - t_img (`int` or `float`): new imaging time
-            - t_update (`int` or `float`): update time
-        """
-        self.own_bid = new_bid
-        self.winning_bid = new_bid
-        self.winner = self.bidder
-        self.t_img = t_img
-        self.t_update = t_update
-
-    def __str__(self) -> str:
-        """
-        Returns a string representation of this task bid in the following format:
-        - `task_id`, `subtask_index`, `main_measurement`, `dependencies`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`, `t_update`
-        """
-        task = MeasurementRequest(**self.req)
-        split_id = task.id.split('-')
-        line_data = [split_id[0], self.subtask_index, self.main_measurement, self.dependencies, task.pos, self.bidder, round(self.own_bid, 3), self.winner, round(self.winning_bid, 3), round(self.t_img, 3), round(self.t_violation, 3), self.bid_solo, self.bid_any]
-        out = ""
-        for i in range(len(line_data)):
-            line_datum = line_data[i]
-            out += str(line_datum)
-            if i < len(line_data) - 1:
-                out += ','
-
-        return out
-    
-    def copy(self) -> object:
-        return GreedyBid(  **self.to_dict() )
-
-    def subtask_bids_from_task(req : MeasurementRequest, bidder : str) -> list:
-        """
-        Generates subtask bids from a measurement task request
-        """
-        subtasks = []        
-        for subtask_index in range(len(req.measurement_groups)):
-            main_measurement, dependend_measurements = req.measurement_groups[subtask_index]
-
-            if len(dependend_measurements) == 0:
-                # DO NOT allow for colaboration
-                subtasks.append(GreedyBid(  
-                                            req.to_dict(), 
-                                            subtask_index,
-                                            main_measurement,
-                                            bidder
-                                        )
-                                )
-        return subtasks
-
-    def reset(self, t_update: Union[float, int]) -> None:        
-        # reset bid values
-        super().reset(t_update)
-
-    def has_winner(self) -> bool:
-        """
-        Checks if this bid has a winner
-        """
-        return self.winner != GreedyBid.NONE
-
-    def update(self, other_dict: dict, t_update: Union[float, int]) -> object:
-        other = GreedyBid(**other_dict)
-
-        if (    other.winning_bid > self.winning_bid
-            or (other.winning_bid == self.winning_bid and self._tie_breaker(self, other))
-            ):
-            self._update_info(other)
-            
-        self.t_update = t_update
-        return self
-
-    def _update_info(self, other : Bid, t_update: Union[float, int]) -> None:
-        super()._update_info(other)
-        self.t_update = t_update
-        
-
-    def reset(self, t: Union[float, int]) -> None:
-        super().reset()
-        self.t_update = t
-
+from dmas.network import NetworkConfig
+from dmas.agents import AgentAction
 
 class GreedyPlanner(PlanningModule):
     """
@@ -234,7 +98,7 @@ class GreedyPlanner(PlanningModule):
 
                     if req.id not in results:
                         # was not aware of this task; add to results as a blank bid
-                        results[req.id] = GreedyBid.subtask_bids_from_task(req, self.get_parent_name())
+                        results[req.id] = GreedyBid.new_bids_from_request(req, self.get_parent_name())
 
                     results, bundle, path = self.planning_phase(state, results, bundle, path)
                     self.plan = self.plan_from_path(state, results, path)
@@ -296,7 +160,7 @@ class GreedyPlanner(PlanningModule):
         current_bids = {req.id : {} for req, _ in bundle}
         for req, subtask_index in bundle:
             req : MeasurementRequest
-            current_bid : GreedyBid = results[req.id][subtask_index]
+            current_bid : Bid = results[req.id][subtask_index]
             current_bids[req.id][subtask_index] = current_bid.copy()
 
         max_path = [(req, subtask_index) for req, subtask_index in path]; 
@@ -341,7 +205,7 @@ class GreedyPlanner(PlanningModule):
                     ):
 
                     # check for cualition and mutex satisfaction
-                    proposed_bid : GreedyBid = projected_bids[measurement_req.id][subtask_index]
+                    proposed_bid : Bid = projected_bids[measurement_req.id][subtask_index]
                     
                     max_path = projected_path
                     max_task = measurement_req
@@ -362,7 +226,7 @@ class GreedyPlanner(PlanningModule):
             for measurement_req, subtask_index in path:
                 measurement_req : MeasurementRequest
                 subtask_index : int
-                new_bid : GreedyBid = max_path_bids[measurement_req.id][subtask_index]
+                new_bid : Bid = max_path_bids[measurement_req.id][subtask_index]
 
                 results[measurement_req.id][subtask_index] = new_bid
 
@@ -385,19 +249,14 @@ class GreedyPlanner(PlanningModule):
 
                 is_biddable = self.can_bid(state, req, subtask_index, results[req_id]) 
                 already_in_bundle = self.check_if_in_bundle(req, subtask_index, bundle)
-                already_performed = self.task_has_been_performed(results, req, subtask_index, state.t)
+                already_performed = self.request_has_been_performed(results, req, subtask_index, state.t)
                 
                 if is_biddable and not already_in_bundle and not already_performed:
                     available.append((req, subtaskbid.subtask_index))
 
         return available
     
-    def check_if_in_bundle(self, req : MeasurementRequest, subtask_index : int, bundle : list) -> bool:
-        for req_i, subtask_index_j in bundle:
-            if req_i.id == req.id and subtask_index == subtask_index_j:
-                return True
     
-        return False
 
     def can_bid(self, state : SimulationAgentState, req : MeasurementRequest, subtask_index : int, subtaskbids : list) -> bool:
         """
@@ -415,16 +274,33 @@ class GreedyPlanner(PlanningModule):
         
         return True
 
-    def task_has_been_performed(self, results : dict, req : MeasurementRequest, subtask_index : int, t : Union[int, float]) -> bool:
-        current_bid : GreedyBid = results[req.id][subtask_index]
-        subtask_already_performed = t > current_bid.t_img and current_bid.winner != GreedyBid.NONE
-        if subtask_already_performed:
+    def check_if_in_bundle(self, req : MeasurementRequest, subtask_index : int, bundle : list) -> bool:
+        for req_i, subtask_index_j in bundle:
+            req_i : MeasurementRequest; subtask_index_j : int
+            if req_i.id == req.id and subtask_index == subtask_index_j:
+                return True
+    
+        return False
+
+    def request_has_been_performed(self, results : dict, req : MeasurementRequest, subtask_index : int, t : Union[int, float]) -> bool:
+        # check if subtask at hand has been performed
+        current_bid : Bid = results[req.id][subtask_index]
+        subtask_already_performed = t > current_bid.t_img >= 0 + req.duration and current_bid.winner != Bid.NONE
+        if subtask_already_performed or current_bid.performed:
             return True
 
-        for subtask_bid in results[req.id]:
-            subtask_bid : GreedyBid            
-            if t > subtask_bid.t_img and subtask_bid.winner != GreedyBid.NONE:
-                return True
+        # check if a mutually exclusive subtask has already been performed
+        for _, subtask_bids in results.items():
+            
+            for subtask_bid in subtask_bids:
+                subtask_bid : Bid         
+
+                if (
+                    t > subtask_bid.t_img + req.duration 
+                    and subtask_bid.winner != Bid.NONE
+                    and req.dependency_matrix[subtask_index][subtask_bid.subtask_index] < 0
+                    ):
+                    return True
         
         return False
 
@@ -485,124 +361,202 @@ class GreedyPlanner(PlanningModule):
             utility += bid.own_bid
 
         return utility
-        
-    def plan_from_path( self, 
-                        state : SimulationAgentState, 
-                        results : dict, 
-                        path : list
-                    ) -> list:
+
+    def calc_imaging_time(self, state : SimulationAgentState, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
         """
-        Generates a list of AgentActions from the current path.
-
-        Agents look to move to their designated measurement target and perform the measurement.
+        Computes the ideal" time when a task in the path would be performed
+        ### Returns
+            - t_img (`float`): earliest available imaging time
         """
+        # calculate the state of the agent prior to performing the measurement request
+        i = path.index((req, subtask_index))
+        if i == 0:
+            t_prev = state.t
+            prev_state = state.copy()
+        else:
+            prev_req, prev_subtask_index = path[i-1]
+            prev_req : MeasurementRequest; prev_subtask_index : int
+            bid_prev : Bid = bids[prev_req.id][prev_subtask_index]
+            t_prev : float = bid_prev.t_img + prev_req.duration
 
-        plan = []
-        for i in range(len(path)):
-            measurement_req, subtask_index = path[i]
-            measurement_req : MeasurementRequest; subtask_index : int
-            subtask_bid : GreedyBid = results[measurement_req.id][subtask_index]
-
-            if not isinstance(measurement_req, GroundPointMeasurementRequest):
-                raise NotImplementedError(f"Cannot create plan for requests of type {type(measurement_req)}")
-            
-            if i == 0:
-                t_prev = state.t
-                prev_state = state
-            else:
-                prev_req, prev_subtask_index = path[i-1]
-                prev_req : MeasurementRequest; prev_subtask_index : int
-                bid_prev : Bid = results[prev_req.id][prev_subtask_index]
-                t_prev : float = bid_prev.t_img + prev_req.duration
-
-                if isinstance(state, SatelliteAgentState):
-                    prev_state : SatelliteAgentState = state.propagate(t_prev)
-                    prev_state.attitude = [
+            if isinstance(state, SatelliteAgentState):
+                prev_state : SatelliteAgentState = state.propagate(t_prev)
+                
+                prev_state.attitude = [
                                         prev_state.calc_off_nadir_agle(prev_req),
                                         0.0,
                                         0.0
                                     ]
-
-                elif isinstance(state, UAVAgentState):
-                    prev_state : UAVAgentState = state.copy()
-                    prev_state.t = t_prev
-
-                    if isinstance(prev_req, GroundPointMeasurementRequest):
-                        prev_state.pos = prev_req.pos
-                    else:
-                        raise NotImplementedError(f"cannot calculate travel time start for requests of type {type(prev_req)} for uav agents")
-
+            elif isinstance(state, UAVAgentState):
+                prev_state = state.copy()
+                prev_state.t = t_prev
+                
+                if isinstance(prev_req, GroundPointMeasurementRequest):
+                    prev_state.pos = prev_req.pos
                 else:
-                    raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
+                    raise NotImplementedError
+            else:
+                raise NotImplementedError(f"cannot calculate imaging time for agent states of type {type(state)}")
 
-            # point to target
-            t_maneuver_end = None
+        return self.calc_arrival_times(prev_state, req, t_prev)[0]
+
+    def calc_arrival_times(self, state : SimulationAgentState, req : MeasurementRequest, t_prev : Union[int, float]) -> float:
+        """
+        Estimates the quickest arrival time from a starting position to a given final position
+        """
+        if isinstance(req, GroundPointMeasurementRequest):
+            # compute earliest time to the task
             if isinstance(state, SatelliteAgentState):
-                t_maneuver_start = prev_state.t
-                tf = prev_state.calc_off_nadir_agle(measurement_req)
-                t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
+                t_imgs = []
+                lat,lon,_ = req.lat_lon_pos
+                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_prev)
 
-                if t_maneuver_start == -1.0:
-                    continue
-                if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
-                    maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
-                    plan.append(maneuver_action)            
-
-            # move to target
-            t_move_start = prev_state.t if t_maneuver_end is None else t_maneuver_end
-            if isinstance(state, SatelliteAgentState):
-                lat, lon, _ = measurement_req.lat_lon_pos
-                df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
-                if df.empty:
-                    continue
                 for _, row in df.iterrows():
-                    t_move_end = row['time index'] * self.orbitdata.time_step
-                    break
+                    t_img = row['time index'] * self.orbitdata.time_step
+                    dt = t_img - state.t
+                
+                    # propagate state
+                    propagated_state : SatelliteAgentState = state.propagate(t_img)
 
-                future_state : SatelliteAgentState = state.propagate(t_move_end)
-                final_pos = future_state.pos
+                    # compute off-nadir angle
+                    thf = propagated_state.calc_off_nadir_agle(req)
+                    dth = thf - propagated_state.attitude[0]
+
+                    # estimate arrival time using fixed angular rate TODO change to 
+                    if dt >= dth / 1.0: # TODO change maximum angular rate 
+                        t_imgs.append(t_img)
+                return t_imgs
 
             elif isinstance(state, UAVAgentState):
-                final_pos = measurement_req.pos
-                dr = np.array(final_pos) - np.array(prev_state.pos)
+                dr = np.array(req.pos) - np.array(state.pos)
                 norm = np.sqrt( dr.dot(dr) )
-                
-                t_move_end = t_move_start + norm / state.max_speed
+                return [norm / state.max_speed + t_prev]
 
             else:
-                raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
-            
-            t_img_start = t_move_end
-            t_img_end = t_img_start + measurement_req.duration
+                raise NotImplementedError(f"arrival time estimation for agents of type {self.parent_agent_type} is not yet supported.")
 
-            if isinstance(self._clock_config, FixedTimesStepClockConfig):
-                dt = self._clock_config.dt
-                if t_move_start < np.Inf:
-                    t_move_start = dt * math.floor(t_move_start/dt)
-                if t_move_end < np.Inf:
-                    t_move_end = dt * math.ceil(t_move_end/dt)
+        else:
+            raise NotImplementedError(f"cannot calculate imaging time for measurement requests of type {type(req)}")       
 
-                if t_img_start < np.Inf:
-                    t_img_start = dt * math.ceil(t_img_start/dt)
-                if t_img_end < np.Inf:
-                    t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
-            
-            if abs(t_move_start - t_move_end) >= 1e-3:
-                move_action = TravelAction(final_pos, t_move_start, t_move_end)
-                plan.append(move_action)
-            
-            # perform measurement
-            measurement_action = MeasurementAction( 
-                                                    measurement_req.to_dict(),
-                                                    subtask_index, 
-                                                    subtask_bid.main_measurement,
-                                                    subtask_bid.winning_bid,
-                                                    t_img_start, 
-                                                    t_img_end
-                                                    )
-            plan.append(measurement_action)  
         
-        return plan
+    # def plan_from_path( self, 
+    #                     state : SimulationAgentState, 
+    #                     results : dict, 
+    #                     path : list
+    #                 ) -> list:
+    #     """
+    #     Generates a list of AgentActions from the current path.
+
+    #     Agents look to move to their designated measurement target and perform the measurement.
+    #     """
+
+    #     plan = []
+    #     for i in range(len(path)):
+    #         measurement_req, subtask_index = path[i]
+    #         measurement_req : MeasurementRequest; subtask_index : int
+    #         subtask_bid : GreedyBid = results[measurement_req.id][subtask_index]
+
+    #         if not isinstance(measurement_req, GroundPointMeasurementRequest):
+    #             raise NotImplementedError(f"Cannot create plan for requests of type {type(measurement_req)}")
+            
+    #         if i == 0:
+    #             t_prev = state.t
+    #             prev_state = state
+    #         else:
+    #             prev_req, prev_subtask_index = path[i-1]
+    #             prev_req : MeasurementRequest; prev_subtask_index : int
+    #             bid_prev : Bid = results[prev_req.id][prev_subtask_index]
+    #             t_prev : float = bid_prev.t_img + prev_req.duration
+
+    #             if isinstance(state, SatelliteAgentState):
+    #                 prev_state : SatelliteAgentState = state.propagate(t_prev)
+    #                 prev_state.attitude = [
+    #                                     prev_state.calc_off_nadir_agle(prev_req),
+    #                                     0.0,
+    #                                     0.0
+    #                                 ]
+
+    #             elif isinstance(state, UAVAgentState):
+    #                 prev_state : UAVAgentState = state.copy()
+    #                 prev_state.t = t_prev
+
+    #                 if isinstance(prev_req, GroundPointMeasurementRequest):
+    #                     prev_state.pos = prev_req.pos
+    #                 else:
+    #                     raise NotImplementedError(f"cannot calculate travel time start for requests of type {type(prev_req)} for uav agents")
+
+    #             else:
+    #                 raise NotImplementedError(f"cannot calculate travel time start for agent states of type {type(state)}")
+
+    #         # point to target
+    #         t_maneuver_end = None
+    #         if isinstance(state, SatelliteAgentState):
+    #             prev_state : SatelliteAgentState
+    #             t_maneuver_start = prev_state.t
+    #             tf = prev_state.calc_off_nadir_agle(measurement_req)
+    #             t_maneuver_end = t_maneuver_start + abs(tf - prev_state.attitude[0]) / 1.0 # TODO change max attitude rate 
+
+    #             if t_maneuver_start == -1.0:
+    #                 continue
+    #             if abs(t_maneuver_start - t_maneuver_end) >= 1e-3:
+    #                 maneuver_action = ManeuverAction([tf, 0, 0], t_maneuver_start, t_maneuver_end)
+    #                 plan.append(maneuver_action)            
+
+    #         # move to target
+    #         t_move_start = prev_state.t if t_maneuver_end is None else t_maneuver_end
+    #         if isinstance(state, SatelliteAgentState):
+    #             lat, lon, _ = measurement_req.lat_lon_pos
+    #             df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, t_move_start)
+    #             if df.empty:
+    #                 continue
+    #             for _, row in df.iterrows():
+    #                 t_move_end = row['time index'] * self.orbitdata.time_step
+    #                 break
+
+    #             future_state : SatelliteAgentState = state.propagate(t_move_end)
+    #             final_pos = future_state.pos
+
+    #         elif isinstance(state, UAVAgentState):
+    #             final_pos = measurement_req.pos
+    #             dr = np.array(final_pos) - np.array(prev_state.pos)
+    #             norm = np.sqrt( dr.dot(dr) )
+                
+    #             t_move_end = t_move_start + norm / state.max_speed
+
+    #         else:
+    #             raise NotImplementedError(f"cannot calculate travel time end for agent states of type {type(state)}")
+            
+    #         t_img_start = t_move_end
+    #         t_img_end = t_img_start + measurement_req.duration
+
+    #         if isinstance(self._clock_config, FixedTimesStepClockConfig):
+    #             dt = self._clock_config.dt
+    #             if t_move_start < np.Inf:
+    #                 t_move_start = dt * math.floor(t_move_start/dt)
+    #             if t_move_end < np.Inf:
+    #                 t_move_end = dt * math.ceil(t_move_end/dt)
+
+    #             if t_img_start < np.Inf:
+    #                 t_img_start = dt * math.ceil(t_img_start/dt)
+    #             if t_img_end < np.Inf:
+    #                 t_img_end = dt * math.ceil((t_img_start + measurement_req.duration)/dt)
+            
+    #         if abs(t_move_start - t_move_end) >= 1e-3:
+    #             move_action = TravelAction(final_pos, t_move_start, t_move_end)
+    #             plan.append(move_action)
+            
+    #         # perform measurement
+    #         measurement_action = MeasurementAction( 
+    #                                                 measurement_req.to_dict(),
+    #                                                 subtask_index, 
+    #                                                 subtask_bid.main_measurement,
+    #                                                 subtask_bid.winning_bid,
+    #                                                 t_img_start, 
+    #                                                 t_img_end
+    #                                                 )
+    #         plan.append(measurement_action)  
+        
+    #     return plan
 
     async def teardown(self) -> None:
         # Nothing to teardown

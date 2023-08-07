@@ -8,17 +8,16 @@ import random
 import sys
 import zmq
 import concurrent.futures
-from nodes.planning.consensus.maccbba import MACCBBA
-# from applications.chess3d.nodes.planning.mccbba import MCCBBA
 from nodes.states import UAVAgentState
 from nodes.uav import UAVAgent
-from nodes.planning.greedy import GreedyPlanner
+from nodes.planning.consensus.greedy import GreedyPlanner
 from nodes.science.reqs import GroundPointMeasurementRequest
 from nodes.groundstat import GroundStationAgent
 from nodes.satellite import SatelliteAgent
 from nodes.states import *
 from nodes.planning.fixed import FixedPlanner
 from nodes.planning.planners import PlannerTypes
+from nodes.planning.consensus.maccbba import MACCBBA
 from nodes.science.utility import utility_function
 from nodes.agent import SimulationAgent
 from nodes.states import SimulationAgentTypes

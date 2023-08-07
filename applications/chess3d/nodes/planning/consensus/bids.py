@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import asyncio
-from ctypes import Union
 from enum import Enum
+from typing import Union
 import numpy as np
 
 from applications.chess3d.nodes.science.reqs import MeasurementRequest
@@ -9,6 +9,7 @@ from applications.chess3d.nodes.science.reqs import MeasurementRequest
 class BidTypes(Enum):
     UNCONSTRAINED_BID = 'UNCONSTRAINED_BID'
     CONSTRAINED_BID = 'CONSTRAINED_BID'
+    GREEDY = 'GREEDY'
 
 class Bid(ABC):
     """
@@ -484,7 +485,7 @@ class Bid(ABC):
         return out
 
     @abstractmethod
-    def new_bids_from_task(task : MeasurementRequest, bidder : str) -> list:
+    def new_bids_from_request(req : MeasurementRequest, bidder : str) -> list:
         pass
 
     def has_winner(self) -> bool:
@@ -518,6 +519,8 @@ class Bid(ABC):
             return UnconstrainedBid(**d)
         elif d['bid_type'] == BidTypes.CONSTRAINED_BID.value:
             return ConstrainedBid(**d)
+        elif d['bid_type'] == BidTypes.GREEDY.value:
+            return GreedyBid(**d)
         else:
             raise AttributeError(f"bids of type `{d['bid_type']}` not yet supported.")
         
@@ -583,7 +586,7 @@ class UnconstrainedBid(Bid):
                             performed
                             )
     
-    def new_bids_from_task(task : MeasurementRequest, bidder : str) -> list:
+    def new_bids_from_request(task : MeasurementRequest, bidder : str) -> list:
         """
         Generates subtask bids from a measurement task request
         """
@@ -717,7 +720,7 @@ class ConstrainedBid(Bid):
         self.bid_solo = self.bid_solo_max
         self.bid_any = self.bid_any_max
 
-    def new_bids_from_task(task : MeasurementRequest, bidder : str) -> list:
+    def new_bids_from_request(task : MeasurementRequest, bidder : str) -> list:
         """
         Generates subtask bids from a measurement task request
         """
@@ -1024,3 +1027,138 @@ class BidBuffer(object):
                 break
 
         return await self.pop_all()
+
+class GreedyBid(Bid):
+    """
+    ## Bid for Greedy planner
+
+    Describes a bid placed on a measurement request by a given agent
+
+    ### Attributes:
+        - req (`dict`): measurement request being bid on
+        - req_id (`str`): id of the request being bid on
+        - subtask_index (`int`) : index of the subtask to be bid on
+        - main_measurement (`str`): name of the main measurement assigned by this subtask bid
+        - bidder (`bidder`): name of the agent keeping track of this bid information
+        - own_bid (`float` or `int`): latest bid from bidder
+        - winner (`str`): name of current the winning agent
+        - winning_bid (`float` or `int`): current winning bid
+        - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
+        - t_update (`float` or `int`): latest time when this bid was updated
+    """
+    def __init__(
+                    self, 
+                    req: dict, 
+                    subtask_index : int,
+                    main_measurement : str,
+                    bidder: str, 
+                    winning_bid: Union[float, int] = 0, 
+                    own_bid: Union[float, int] = 0, 
+                    winner: str = Bid.NONE, 
+                    t_img: Union[float, int] = -1, 
+                    t_update: Union[float, int] = -1,
+                    **_
+                ) -> Bid:
+        """
+        Creates an instance of a task bid
+
+        ### Arguments:
+            - req (`dict`): measurement request being bid on
+            - main_measurement (`str`): name of the main measurement assigned by this subtask bid
+            - dependencies (`list`): portion of the dependency matrix related to this subtask bid
+            - time_constraints (`list`): portion of the time dependency matrix related to this subtask bid
+            - bidder (`bidder`): name of the agent keeping track of this bid information
+            - own_bid (`float` or `int`): latest bid from bidder
+            - winner (`str`): name of current the winning agent
+            - winning_bid (`float` or `int`): current winning bid
+            - t_img (`float` or `int`): time where the task is set to be performed by the winning agent
+            - t_update (`float` or `int`): latest time when this bid was updated
+        """
+        super().__init__(BidTypes.GREEDY.value, req, subtask_index, main_measurement, bidder, winning_bid, own_bid, winner, t_img, t_update)
+
+        self.subtask_index = subtask_index
+        self.main_measurement = main_measurement
+        
+    def set_bid(self, new_bid : Union[int, float], t_img : Union[int, float], t_update : Union[int, float]) -> None:
+        """
+        Sets new values for this bid
+
+        ### Arguments: 
+            - new_bid (`int` or `float`): new bid value
+            - t_img (`int` or `float`): new imaging time
+            - t_update (`int` or `float`): update time
+        """
+        self.own_bid = new_bid
+        self.winning_bid = new_bid
+        self.winner = self.bidder
+        self.t_img = t_img
+        self.t_update = t_update
+
+    def __str__(self) -> str:
+        """
+        Returns a string representation of this task bid in the following format:
+        - `task_id`, `subtask_index`, `main_measurement`, `dependencies`, `bidder`, `own_bid`, `winner`, `winning_bid`, `t_img`, `t_update`
+        """
+        task = MeasurementRequest(**self.req)
+        split_id = task.id.split('-')
+        line_data = [split_id[0], self.subtask_index, self.main_measurement, self.dependencies, task.pos, self.bidder, round(self.own_bid, 3), self.winner, round(self.winning_bid, 3), round(self.t_img, 3), round(self.t_violation, 3), self.bid_solo, self.bid_any]
+        out = ""
+        for i in range(len(line_data)):
+            line_datum = line_data[i]
+            out += str(line_datum)
+            if i < len(line_data) - 1:
+                out += ','
+
+        return out
+    
+    def copy(self) -> object:
+        return GreedyBid(  **self.to_dict() )
+
+    def new_bids_from_request(req : MeasurementRequest, bidder : str) -> list:
+        """
+        Generates subtask bids from a measurement task request
+        """
+        subtasks = []        
+        for subtask_index in range(len(req.measurement_groups)):
+            main_measurement, dependend_measurements = req.measurement_groups[subtask_index]
+
+            if len(dependend_measurements) == 0:
+                # DO NOT allow for colaboration
+                subtasks.append(GreedyBid(  
+                                            req.to_dict(), 
+                                            subtask_index,
+                                            main_measurement,
+                                            bidder
+                                        )
+                                )
+        return subtasks
+
+    def reset(self, t_update: Union[float, int]) -> None:        
+        # reset bid values
+        super().reset(t_update)
+
+    def has_winner(self) -> bool:
+        """
+        Checks if this bid has a winner
+        """
+        return self.winner != GreedyBid.NONE
+
+    def update(self, other_dict: dict, t_update: Union[float, int]) -> object:
+        other = GreedyBid(**other_dict)
+
+        if (    other.winning_bid > self.winning_bid
+            or (other.winning_bid == self.winning_bid and self._tie_breaker(self, other))
+            ):
+            self._update_info(other)
+            
+        self.t_update = t_update
+        return self
+
+    def _update_info(self, other : Bid, t_update: Union[float, int]) -> None:
+        super()._update_info(other)
+        self.t_update = t_update
+        
+
+    def reset(self, t: Union[float, int]) -> None:
+        super().reset()
+        self.t_update = t

@@ -35,7 +35,7 @@
                 "@type": "Basic Sensor"
             },
             "planner" : {
-                "@type" : "MACCBBA",
+                "@type" : "GREEDY",
                 "utility" : "LINEAR"
             }
         },
@@ -72,7 +72,7 @@
                 "@type": "Basic Sensor"
             },
             "planner" : {
-                "@type" : "MACCBBA",
+                "@type" : "GREEDY",
                 "utility" : "LINEAR"
             }
         }
