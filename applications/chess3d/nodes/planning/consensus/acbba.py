@@ -6,10 +6,10 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from applications.chess3d.nodes.planning.consensus.bids import BidBuffer, UnconstrainedBid
-from applications.chess3d.nodes.science.reqs import GroundPointMeasurementRequest, MeasurementRequest
-from applications.chess3d.nodes.science.utility import synergy_factor
-from applications.chess3d.nodes.states import SatelliteAgentState, SimulationAgentState, UAVAgentState
+from nodes.planning.consensus.bids import BidBuffer, UnconstrainedBid
+from nodes.science.reqs import GroundPointMeasurementRequest, MeasurementRequest
+from nodes.science.utility import synergy_factor
+from nodes.states import SatelliteAgentState, SimulationAgentState, UAVAgentState
 from applications.planning.actions import WaitForMessages
 from nodes.planning.consensus.consesus import ConsensusPlanner
 
@@ -101,12 +101,16 @@ class ACBBA(ConsensusPlanner):
         finally:
             self.bundle_builder_results = results 
 
+    def generate_bids_from_request(self, req : MeasurementRequest) -> list:
+        return UnconstrainedBid.new_bids_from_request(req, self.get_parent_name())
+
+    
+
     """
     ----------------------
         PLANNING PHASE 
     ----------------------
     """
-
     def planning_phase(self, state : SimulationAgentState, results : dict, bundle : list, path : list, level : int = logging.DEBUG) -> None:
         """
         Uses the most updated measurement request information to construct a path
@@ -115,6 +119,7 @@ class ACBBA(ConsensusPlanner):
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
+        changes = []
         changes_to_bundle = []
 
         available_tasks : list = self.get_available_tasks(state, bundle, results)
@@ -184,29 +189,39 @@ class ACBBA(ConsensusPlanner):
                 # # remove bid task from list of available tasks
                 # available_tasks.remove((max_task, max_subtask))
             
-            #  update bids
+            # update results
             for measurement_req, subtask_index in path:
                 measurement_req : MeasurementRequest
                 subtask_index : int
                 new_bid : UnconstrainedBid = max_path_bids[measurement_req.id][subtask_index]
                 old_bid : UnconstrainedBid = results[measurement_req.id][subtask_index]
 
-                if old_bid != new_bid and (measurement_req, subtask_index) not in changes_to_bundle:
+                if old_bid != new_bid:
                     changes_to_bundle.append((measurement_req, subtask_index))
 
                 results[measurement_req.id][subtask_index] = new_bid
 
-            self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level)
-            self.log_task_sequence('bundle', bundle, level)
-            self.log_task_sequence('path', path, level)
+            # self.log_results('PRELIMINART MODIFIED BUNDLE RESULTS', results, level)
+            # self.log_task_sequence('bundle', bundle, level)
+            # self.log_task_sequence('path', path, level)
 
             available_tasks : list = self.get_available_tasks(state, bundle, results)
+
+        # broadcast changes to bundle
+        for measurement_req, subtask_index in changes_to_bundle:
+            measurement_req : MeasurementRequest
+            subtask_index : int
+
+            new_bid = results[measurement_req.id][subtask_index]
+
+            # add to changes broadcast 
+            changes.append(new_bid)
 
         self.log_results('builder - MODIFIED BUNDLE RESULTS', results, level)
         self.log_task_sequence('bundle', bundle, level)
         self.log_task_sequence('path', path, level)
 
-        return results, bundle, path, changes_to_bundle
+        return results, bundle, path, changes
 
     def calc_path_bid(
                         self, 
@@ -243,7 +258,7 @@ class ACBBA(ConsensusPlanner):
                 # calculate imaging time
                 req_i : MeasurementRequest
                 subtask_j : int
-                t_img = self.calc_imaging_time(state, original_results, path, bids, req_i, subtask_j)
+                t_img = self.calc_imaging_time(state, path, bids, req_i, subtask_j)
 
                 # calc utility
                 params = {"req" : req_i, "subtask_index" : subtask_j, "t_img" : t_img}
@@ -368,14 +383,14 @@ class ACBBA(ConsensusPlanner):
                         bid : UnconstrainedBid
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3)]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3)]
                         data.append(line)
                 elif isinstance(results[req_id], dict):
                     for bid_index in results[req_id]:
                         bid : UnconstrainedBid = results[req_id][bid_index]
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3)]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3)]
                         data.append(line)
                 else:
                     raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
@@ -391,7 +406,7 @@ class ACBBA(ConsensusPlanner):
                 bid : UnconstrainedBid
                 req = MeasurementRequest.from_dict(bid.req)
                 split_id = req.id.split('-')
-                line = [split_id[0], bid.subtask_index, bid.main_measurement, req.lat_lon_pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_update, 3), round(bid.t_img, 3)]
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_update, 3), round(bid.t_img, 3)]
                 data.append(line)
         
             df = pd.DataFrame(data, columns=headers)

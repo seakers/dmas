@@ -13,7 +13,7 @@
             ],
             "max_speed" : 1.0,
             "instrument": {
-                "name": "POSEIDON-3BAltimeter",
+                "name": "OLI",
                 "mass": 10,
                 "volume": 12.45,
                 "dataRate": 40,
@@ -35,7 +35,7 @@
                 "@type": "Basic Sensor"
             },
             "planner" : {
-                "@type" : "GREEDY",
+                "@type" : "ACBBA",
                 "utility" : "LINEAR"
             }
         },
@@ -72,7 +72,7 @@
                 "@type": "Basic Sensor"
             },
             "planner" : {
-                "@type" : "GREEDY",
+                "@type" : "ACBBA",
                 "utility" : "LINEAR"
             }
         }

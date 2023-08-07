@@ -167,12 +167,16 @@ class Bid(ABC):
         broadcast_out : Bid; changed : bool
 
         if broadcast_out is not None:
-            other = ConstrainedBid(**other_dict)
+            other : Bid = Bid.from_dict(other_dict)
             if other.bidder == broadcast_out.bidder:
                 return other, changed
             else:
                 return self, changed
         return None, changed
+
+    def __update_time(self, t_update : float) -> None:
+        """Records the lastest time this bid was updated"""
+        self.t_update = t_update
 
     def _update_rules(self, other_dict : dict, t : Union[float, int]) -> tuple:
         """
@@ -188,8 +192,8 @@ class Bid(ABC):
             - rebroadcast (`TaskBid` or `NoneType`): bid information to be rebroadcasted to other agents.
             - changed (`bool`): boolean value indicating if a change was made to this bid
         """
-        other : ConstrainedBid = ConstrainedBid(**other_dict)
-        prev : ConstrainedBid = self.copy() 
+        other : Bid = Bid.from_dict(other_dict)
+        prev : Bid = self.copy() 
 
         if self.req_id != other.req_id:
             # if update is for a different task, ignore update
@@ -383,6 +387,8 @@ class Bid(ABC):
 
     def _update_info(self,
                         other, 
+                        t : float,
+                        *args,
                         **kwargs
                     ) -> None:
         """
@@ -403,7 +409,8 @@ class Bid(ABC):
         if self.bidder == other.bidder:
             self.own_bid = other.own_bid
 
-    @abstractmethod
+        self.t_update = t
+
     def reset(self, t_update) -> None:
         """
         Resets the values of this bid while keeping track of lates update time
@@ -503,7 +510,7 @@ class Bid(ABC):
         """
         Returns a deep copy of this bid
         """
-        return self.from_dict(self.to_dict())
+        return Bid.from_dict(self.to_dict())
 
     def to_dict(self) -> dict:
         """
@@ -556,7 +563,8 @@ class UnconstrainedBid(Bid):
                     t_img: Union[float, int] = -1, 
                     t_update: Union[float, int] = -1, 
                     dt_converge: Union[float, int] = 0, 
-                    performed: bool = False
+                    performed: bool = False,
+                    **_
                 ) -> object:
         """
         ### Arguments:
@@ -586,18 +594,18 @@ class UnconstrainedBid(Bid):
                             performed
                             )
     
-    def new_bids_from_request(task : MeasurementRequest, bidder : str) -> list:
+    def new_bids_from_request(req : MeasurementRequest, bidder : str) -> list:
         """
-        Generates subtask bids from a measurement task request
+        Generates subtask bids from a measurement request
         """
         subtasks = []        
-        for subtask_index in range(len(task.measurement_groups)):
-            main_measurement, dependent_measurements = task.measurement_groups[subtask_index]
+        for subtask_index in range(len(req.measurement_groups)):
+            main_measurement, dependent_measurements = req.measurement_groups[subtask_index]
             
             if len(dependent_measurements) > 0: 
                 continue
             
-            subtasks.append(UnconstrainedBid(   task.to_dict(), 
+            subtasks.append(UnconstrainedBid(   req.to_dict(), 
                                                 subtask_index,
                                                 main_measurement,
                                                 bidder))
@@ -646,7 +654,8 @@ class ConstrainedBid(Bid):
                     dt_violoation: Union[float, int] = 1e-6,
                     bid_solo : int = 1,
                     bid_any : int = 1, 
-                    performed: bool = False
+                    performed: bool = False,
+                    **_
                 ) -> object:
         """
         ### Arguments:
@@ -720,18 +729,18 @@ class ConstrainedBid(Bid):
         self.bid_solo = self.bid_solo_max
         self.bid_any = self.bid_any_max
 
-    def new_bids_from_request(task : MeasurementRequest, bidder : str) -> list:
+    def new_bids_from_request(req : MeasurementRequest, bidder : str) -> list:
         """
-        Generates subtask bids from a measurement task request
+        Generates subtask bids from a measurement request
         """
         subtasks = []        
-        for subtask_index in range(len(task.measurement_groups)):
-            main_measurement, _ = task.measurement_groups[subtask_index]
-            subtasks.append(ConstrainedBid( task.to_dict(), 
+        for subtask_index in range(len(req.measurement_groups)):
+            main_measurement, _ = req.measurement_groups[subtask_index]
+            subtasks.append(ConstrainedBid( req.to_dict(), 
                                         subtask_index,
                                         main_measurement,
-                                        task.dependency_matrix[subtask_index],
-                                        task.time_dependency_matrix[subtask_index],
+                                        req.dependency_matrix[subtask_index],
+                                        req.time_dependency_matrix[subtask_index],
                                         bidder))
         return subtasks
 

@@ -6,8 +6,7 @@ import time
 from typing import Any, Callable, Union
 import pandas as pd
 import zmq
-from applications.chess3d.nodes.orbitdata import OrbitData
-from applications.chess3d.nodes.science.utility import synergy_factor
+from nodes.orbitdata import OrbitData
 from nodes.planning.consensus.bids import Bid
 
 from nodes.science.reqs import MeasurementRequest
@@ -314,19 +313,19 @@ class ConsensusPlanner(PlanningModule):
                     action = WaitForMessages(self.get_current_time(), t_idle)
                     plan_out.append(action.to_dict())
 
-                # # --- FOR DEBUGGING PURPOSES ONLY: ---
-                # out = f'\nPLAN\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end\n'
-                # for action in self.plan:
-                #     action : AgentAction
-                #     out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end}\n"
-                # self.log(out, level)
+                # --- FOR DEBUGGING PURPOSES ONLY: ---
+                out = f'\nPLAN\nid\taction type\tt_start\tt_end\n'
+                for action in self.plan:
+                    action : AgentAction
+                    out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end}\n"
+                self.log(out, level)
 
-                # out = f'\nPLAN OUT\tT{self.get_current_time()}\nid\taction type\tt_start\tt_end\n'
-                # for action in plan_out:
-                #     action : dict
-                #     out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
-                # self.log(out, level)
-                # # -------------------------------------
+                out = f'\nPLAN OUT\nid\taction type\tt_start\tt_end\n'
+                for action in plan_out:
+                    action : dict
+                    out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
+                self.log(out, level)
+                # -------------------------------------
 
                 self.log(f'sending {len(plan_out)} actions to agent...')
                 plan_msg = PlanMessage(self.get_element_name(), self.get_network_name(), plan_out)
@@ -433,7 +432,7 @@ class ConsensusPlanner(PlanningModule):
             req = MeasurementRequest.from_dict(their_bid.req)
             if new_req:
                 # was not aware of this request; add to results as a blank bid
-                results[req.id] = Bid.new_bids_from_request(req, self.get_parent_name())
+                results[req.id] = self.generate_bids_from_request(req)
 
                 # add to changes broadcast
                 my_bid : Bid = results[req.id][0]
@@ -699,15 +698,16 @@ class ConsensusPlanner(PlanningModule):
             return True
 
         # check if a mutually exclusive subtask has already been performed
-        for _, subtask_bid in results:
-            subtask_bid : Bid         
+        for _, subtask_bids in results.items():
+            for subtask_bid in subtask_bids:
+                subtask_bid : Bid         
 
-            if (
-                t > subtask_bid.t_img + req.duration 
-                and subtask_bid.winner != Bid.NONE
-                and req.dependency_matrix[subtask_index][subtask_bid.subtask_index] < 0
-                ):
-                return True
+                if (
+                    t > subtask_bid.t_img + req.duration 
+                    and subtask_bid.winner != Bid.NONE
+                    and req.dependency_matrix[subtask_index][subtask_bid.subtask_index] < 0
+                    ):
+                    return True
         
         return False
 

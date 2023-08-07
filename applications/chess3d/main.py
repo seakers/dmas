@@ -8,6 +8,7 @@ import random
 import sys
 import zmq
 import concurrent.futures
+from applications.chess3d.nodes.planning.consensus.acbba import ACBBA
 from nodes.states import UAVAgentState
 from nodes.uav import UAVAgent
 from nodes.planning.consensus.greedy import GreedyPlanner
@@ -126,6 +127,13 @@ def agent_factory(  scenario_name : str,
         #                         utility_function[planner_util],
         #                         payload,
         #                         logger=logger)
+
+        elif planner_type == PlannerTypes.ACBBA.value:
+            planner = ACBBA(results_path,
+                            agent_name,
+                            agent_network_config,
+                            utility_function[planner_util],
+                            payload)
 
         elif planner_type == PlannerTypes.MACCBBA.value:
             planner = MACCBBA(results_path,

@@ -176,6 +176,9 @@ class MeasurementRequest(object):
         else:
             raise NotImplementedError(f"Requests of type `{req['request_type']}` not yet supported.")
 
+    def __eq__(self, other) -> bool:
+        return self.to_dict() == other.to_dict()
+
 class GroundPointMeasurementRequest(MeasurementRequest):
     """
     Describes a measurement reques of a specific Ground Point to be performed by agents in the simulation
