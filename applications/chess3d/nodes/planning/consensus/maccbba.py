@@ -277,8 +277,8 @@ class MACCBBA(ConsensusPlanner):
                 # compare to maximum task
                 projected_utility = projected_bids[measurement_req.id][subtask_index].winning_bid
                 current_utility = results[measurement_req.id][subtask_index].winning_bid
-                if (max_task is None 
-                    or (projected_utility > current_utility and projected_path_utility > max_path_utility)
+                if ((max_task is None or projected_path_utility > max_path_utility)
+                    and projected_utility > current_utility
                     ):
 
                     # check for cualition and mutex satisfaction

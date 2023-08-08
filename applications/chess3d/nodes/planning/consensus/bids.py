@@ -199,6 +199,10 @@ class Bid(ABC):
             # if update is for a different task, ignore update
             raise AttributeError(f'cannot update bid with information from another bid intended for another task (expected task id: {self.task_id}, given id: {other.task_id})')
 
+        if other.performed and not self.performed:
+            self._update_info(other, t)
+            return self, prev!=self
+
         if other.bidder == self.bidder:
             if other.t_update > self.t_update:
                 self._update_info(other,t)
@@ -410,6 +414,7 @@ class Bid(ABC):
             self.own_bid = other.own_bid
 
         self.t_update = t
+        self.performed = other.performed
 
     def reset(self, t_update) -> None:
         """

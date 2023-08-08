@@ -282,37 +282,70 @@ if __name__ == "__main__":
 
     ## load initial measurement request
     measurement_reqs = []
-    df = pd.read_csv(scenario_path + '/gpRequests.csv')
-        
-    for _, row in df.iterrows():
-        s_max = row['s_max']
-        
-        measurements_str : str = row['measurements']
-        measurements_str = measurements_str.replace('[','')
-        measurements_str = measurements_str.replace(']','')
-        measurements_str = measurements_str.replace(' ','')
-        measurements = measurements_str.split(',')
+    if scenario_dict['scenario']['@type'] == 'RANDOM':
+        reqs_dict = scenario_dict['scenario']['requests']
+        for i_req in range(reqs_dict['n']):
+            max_distance = np.sqrt((reqs_dict['x_bounds'][1] - reqs_dict['x_bounds'][0]) **2 + (reqs_dict['y_bounds'][1] - reqs_dict['y_bounds'][0])**2)
+            x_pos = reqs_dict['x_bounds'][0] + (reqs_dict['x_bounds'][1] - reqs_dict['x_bounds'][0]) * random.random()
+            y_pos = reqs_dict['y_bounds'][0] + (reqs_dict['y_bounds'][1] - reqs_dict['y_bounds'][0]) * random.random()
+            z_pos = 0.0
+            pos = [x_pos, y_pos, z_pos]
+            lan_lon_pos = [0.0, 0.0, 0.0]
 
-        t_start = row['t_start']
-        t_end = row['t_end']
-        t_corr = row['t_corr']
+            s_max = 100
+            measurements = []
+            required_measurements = reqs_dict['measurement_reqs']
+            for _ in range(random.randint(1, len(required_measurements))):
+                measurement = random.choice(required_measurements)
+                while measurement in measurements:
+                    measurement = random.choice(required_measurements)
+                measurements.append(measurement)
 
-        lat, lon, alt = row.get('lat', None), row.get('lon', None), row.get('alt', None)
-        if lat is None and lon is None and alt is None: 
-            x_pos, y_pos, z_pos = row.get('x_pos', None), row.get('y_pos', None), row.get('z_pos', None)
-            if x_pos is not None and y_pos is not None and z_pos is not None:
-                pos = [x_pos, y_pos, z_pos]
-                lat, lon, alt = 0.0, 0.0, 0.0
+
+            t_start = (delta.seconds - max_distance) * random.random()
+            t_end = t_start + (delta.seconds - t_start) * random.random()
+            t_end = t_end if t_start - t_end > max_distance else max_distance
+            t_corr = t_end - t_start
+
+            req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
+            measurement_reqs.append(req)
+
+    else:
+        df = pd.read_csv(scenario_path + '/gpRequests.csv')
+            
+        for _, row in df.iterrows():
+            s_max = row['s_max']
+            
+            measurements_str : str = row['measurements']
+            measurements_str = measurements_str.replace('[','')
+            measurements_str = measurements_str.replace(']','')
+            measurements_str = measurements_str.replace(' ','')
+            measurements = measurements_str.split(',')
+
+            t_start = row['t_start']
+            t_end = row['t_end']
+            t_corr = row['t_corr']
+
+            lat, lon, alt = row.get('lat', None), row.get('lon', None), row.get('alt', None)
+            if lat is None and lon is None and alt is None: 
+                x_pos, y_pos, z_pos = row.get('x_pos', None), row.get('y_pos', None), row.get('z_pos', None)
+                if x_pos is not None and y_pos is not None and z_pos is not None:
+                    pos = [x_pos, y_pos, z_pos]
+                    lat, lon, alt = 0.0, 0.0, 0.0
+                else:
+                    raise ValueError('GP Measurement Requests in `gpRequest.csv` must specify a ground position as lat-lon-alt or cartesian coordinates.')
             else:
-                raise ValueError('GP Measurement Requests in `gpRequest.csv` must specify a ground position as lat-lon-alt or cartesian coordinates.')
-        else:
-            pos = None
+                pos = None
 
-        lan_lon_pos = [lat, lon, alt]
-        req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
-        measurement_reqs.append(req)
+            lan_lon_pos = [lat, lon, alt]
+            req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
+            measurement_reqs.append(req)
 
     # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
+    for measurement_req in measurement_reqs:
+        measurement_req : GroundPointMeasurementRequest
+        print(measurement_req.pos, measurement_req.measurements, measurement_req.t_start, measurement_req.t_end)
+
     clock_config = EventDrivenClockConfig(start_date, end_date)
 
     # initialize manager

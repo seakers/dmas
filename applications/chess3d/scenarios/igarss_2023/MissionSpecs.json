@@ -96,6 +96,16 @@
         }
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
-    "scenario": {"@type": "TEST", "duration": 30.0, "connectivity" : "FULL", "utility" : "LINEAR"},
+    "scenario": {   "@type": "RANDOM", 
+                    "duration": 30.0, 
+                    "connectivity" : "FULL", 
+                    "utility" : "LINEAR",
+                    "requests" : {
+                        "n" : 1,
+                        "measurement_reqs" : ["OLI",  "POSEIDON-3BAltimeter"],
+                        "x_bounds" : [0.0, 5.0],
+                        "y_bounds" : [0.0, 5.0]
+                    }
+                },
     "settings": {"coverageType": "GRID COVERAGE"}
 }

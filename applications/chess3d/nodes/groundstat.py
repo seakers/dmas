@@ -1,12 +1,12 @@
 import asyncio
 import logging
-from typing import Any, Callable, Union
-from dmas.agents import AgentAction
+from typing import Any, Callable
+from nodes.science.reqs import *
 from dmas.network import NetworkConfig
 from nodes.planning.groundstat import GroundStationPlanner
 from nodes.science.science import ScienceModule
 from nodes.agent import SimulationAgentState, SimulationAgent
-import numpy as np
+import pandas as pd
 import zmq
 
 class GroundStationAgent(SimulationAgent):
@@ -72,6 +72,8 @@ class GroundStationAgent(SimulationAgent):
                             level, 
                             logger)
 
+        self.measurement_reqs = measurement_reqs
+
     async def setup(self) -> None:
         # nothing to setup
         return
@@ -80,3 +82,30 @@ class GroundStationAgent(SimulationAgent):
         await asyncio.sleep(5e-2) # wait for others to connect 
         
         await super().live()
+
+    async def teardown(self) -> None:
+        await super().teardown()
+
+        # print measurement requests from the ground
+        headers = ['id', 'type', 'x_pos','y_pos','z_pos','s_max','measurements','t_start','t_end','t_corr']
+        data = []
+        for req in self.measurement_reqs:
+            req : GroundPointMeasurementRequest
+            line = [    
+                        req.id.split('-')[0],
+                        req.request_type,
+                        req.pos[0],
+                        req.pos[1],
+                        req.pos[2],
+                        req.s_max,
+                        f"{req.measurements}",
+                        req.t_start,
+                        req.t_end,
+                        req.t_corr
+                    ]
+            data.append(line)
+
+        # log and save results
+        summary_df = pd.DataFrame(data, columns=headers)
+        self.log(f"\nMEASUREMENT REQUESTS:\n{str(summary_df)}\n\n", level=logging.WARNING)
+        summary_df.to_csv(f"{self.results_path}/../gpRequests.csv", index=False)

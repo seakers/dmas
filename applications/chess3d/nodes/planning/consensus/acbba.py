@@ -17,7 +17,7 @@ from nodes.planning.consensus.consesus import ConsensusPlanner
 class ACBBA(ConsensusPlanner):
     async def bundle_builder(self) -> None:
         try:
-            results = {}
+            results = {}; prev_bundle_results = {}
             path = []
             bundle = []; prev_bundle = []
             level = logging.WARNING
@@ -48,24 +48,45 @@ class ACBBA(ConsensusPlanner):
                 self.iter_counter += 1
 
                 # Planning Phase
-                t_0 = time.perf_counter()
-                results, bundle, path,\
-                     planner_changes = self.planning_phase( self.agent_state, 
-                                                            results, 
-                                                            bundle, 
-                                                            path, 
-                                                            level
-                                                        )
-                dt = time.perf_counter() - t_0
-                self.stats['planning'].append(dt)
+                if len(consensus_rebroadcasts) > 0:
+                    t_0 = time.perf_counter()
+                    results, bundle, path,\
+                        planner_changes = self.planning_phase( self.agent_state, 
+                                                                results, 
+                                                                bundle, 
+                                                                path, 
+                                                                level
+                                                            )
+                    dt = time.perf_counter() - t_0
+                    self.stats['planning'].append(dt)
 
-                broadcast_buffer = BidBuffer()
-                await broadcast_buffer.put_bids(planner_changes)
-                planner_changes = await broadcast_buffer.pop_all()
-                self.log_changes("builder - CHANGES MADE FROM PLANNING", planner_changes, level)
-                
-                # Check for convergence
-                if self.compare_bundles(bundle, prev_bundle):                    
+                    broadcast_buffer = BidBuffer()
+                    await broadcast_buffer.put_bids(planner_changes)
+                    planner_changes = await broadcast_buffer.pop_all()
+                    self.log_changes("builder - CHANGES MADE FROM PLANNING", planner_changes, level)
+                    
+                    # Check for convergence
+                    same_bundle = self.compare_bundles(bundle, prev_bundle)
+                    
+                    same_bids = True
+                    for key, bids in prev_bundle_results.items():
+                        key : str; bids : list
+                        for i in range(len(bids)):
+                            prev_bid = prev_bundle_results[key][i]
+                            current_bid = results[key][i]
+
+                            if prev_bid is None:
+                                continue
+
+                            if prev_bid != current_bid:
+                                same_bids = False
+                                break
+
+                            if not same_bids:
+                                break
+
+                # if converged and same_bundle and same_bids:
+                if same_bundle and same_bids:
                     # generate plan from path
                     await self.agent_state_lock.acquire()
                     plan = self.plan_from_path(self.agent_state, results, path)
@@ -73,14 +94,22 @@ class ACBBA(ConsensusPlanner):
 
                 else:
                     # wait for messages or for next bid time-out
+                    # converged = same_bundle and same_bids
+
                     t_next = np.Inf
                     wait_action = WaitForMessages(self.get_current_time(), t_next)
                     plan = [wait_action]
                 
                 # save previous bundle for future convergence checks
+                prev_bundle_results = {}
                 prev_bundle = []
-                for req, subtask in bundle:
-                    prev_bundle.append((req, subtask))
+                for req, subtask_index in bundle:
+                    req : MeasurementRequest; subtask_index : int
+                    prev_bundle.append((req, subtask_index))
+                    
+                    if req.id not in prev_bundle_results:
+                        prev_bundle_results[req.id] = [None for _ in results[req.id]]
+                    prev_bundle_results[req.id][subtask_index] = results[req.id][subtask_index].copy()
 
                 # Broadcast changes to bundle and any changes from consensus
                 broadcast_bids : list = consensus_rebroadcasts
@@ -165,10 +194,10 @@ class ACBBA(ConsensusPlanner):
                     continue
                 
                 # compare to maximum task
-                bid_utility = projected_bids[measurement_req.id][subtask_index].winning_bid
-                if (max_task is None 
-                    # or projected_path_utility > max_path_utility
-                    or bid_utility > max_utility
+                projected_utility = projected_bids[measurement_req.id][subtask_index].winning_bid
+                current_utility = results[measurement_req.id][subtask_index].winning_bid
+                if ((max_task is None or projected_path_utility > max_path_utility)
+                    and projected_utility > current_utility
                     ):
 
                     # check for cualition and mutex satisfaction

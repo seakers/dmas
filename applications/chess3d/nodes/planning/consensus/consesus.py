@@ -536,12 +536,13 @@ class ConsensusPlanner(PlanningModule):
         changes = []
         rebroadcasts = []
         task_to_remove = None
+        task_to_reset = None
         for req, subtask_index in bundle:
             req : MeasurementRequest
 
             # check if bid has been performed 
             subtask_bid : Bid = results[req.id][subtask_index]
-            if self.bid_completed(req, subtask_bid, t):
+            if self.is_bid_completed(req, subtask_bid, t):
                 task_to_remove = (req, subtask_index)
                 break
 
@@ -553,40 +554,52 @@ class ConsensusPlanner(PlanningModule):
                 bid_index = bids.index(subtask_bid)
                 bid : Bid = bids[bid_index]
 
-                if self.bid_completed(req, bid, t) and req.dependency_matrix[subtask_index][bid_index] < 0:
+                if self.is_bid_completed(req, bid, t) and req.dependency_matrix[subtask_index][bid_index] < 0:
                     task_to_remove = (req, subtask_index)
+                    task_to_reset = (req, subtask_index) 
                     break   
 
             if task_to_remove is not None:
                 break
 
         if task_to_remove is not None:
-            bundle_index = bundle.index(task_to_remove)
-            
-            # level=logging.WARNING
-            self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
-            self.log_task_sequence('bundle', bundle, level)
-            self.log_task_sequence('path', path, level)
-
-            for _ in range(bundle_index, len(bundle)):
-                # remove task from bundle and path
-                req, subtask_index = bundle.pop(bundle_index)
-                path.remove((req, subtask_index))
-
-                bid : Bid = results[req.id][subtask_index]
-                bid.reset(t)
-                results[req.id][subtask_index] = bid
-
-                rebroadcasts.append(bid)
-                changes.append(bid)
-
+            if task_to_reset is not None:
+                bundle_index = bundle.index(task_to_remove)
+                
+                # level=logging.WARNING
                 self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
                 self.log_task_sequence('bundle', bundle, level)
                 self.log_task_sequence('path', path, level)
 
+                for _ in range(bundle_index, len(bundle)):
+                    # remove task from bundle and path
+                    req, subtask_index = bundle.pop(bundle_index)
+                    path.remove((req, subtask_index))
+
+                    bid : Bid = results[req.id][subtask_index]
+                    bid.reset(t)
+                    results[req.id][subtask_index] = bid
+
+                    rebroadcasts.append(bid)
+                    changes.append(bid)
+
+                    self.log_results('PRELIMINARY PREVIOUS PERFORMER CHECKED RESULTS', results, level)
+                    self.log_task_sequence('bundle', bundle, level)
+                    self.log_task_sequence('path', path, level)
+            else: 
+                # remove performed subtask from bundle and path 
+                bundle_index = bundle.index(task_to_remove)
+                req, subtask_index = bundle.pop(bundle_index)
+                path.remove((req, subtask_index))
+
+                # set bid as completed
+                bid : Bid = results[req.id][subtask_index]
+                bid.performed = True
+                results[req.id][subtask_index] = bid
+
         return results, bundle, path, changes, rebroadcasts
 
-    def bid_completed(self, req : MeasurementRequest, bid : Bid, t : float) -> bool:
+    def is_bid_completed(self, req : MeasurementRequest, bid : Bid, t : float) -> bool:
         """
         Checks if a bid has been completed or not
         """
@@ -612,7 +625,7 @@ class ConsensusPlanner(PlanningModule):
                     return False
             return True
         return False
-
+    
     def sum_path_utility(self, path : list, bids : dict) -> float:
         utility = 0.0
         for req, subtask_index in path:
@@ -740,7 +753,7 @@ class ConsensusPlanner(PlanningModule):
         if state.t < t_conv_min:
             plan.append( WaitForMessages(state.t, t_conv_min) )
         else:
-            plan.append( WaitForMessages(state.t, state.t) )
+            # plan.append( WaitForMessages(state.t, state.t) )
             t_conv_min = state.t
 
         # add actions per measurement
@@ -860,6 +873,17 @@ class ConsensusPlanner(PlanningModule):
                                                     t_img_end
                                                     )
             plan.append(measurement_action)  
+
+            # inform others of request completion
+            bid : Bid = subtask_bid.copy()
+            bid.performed = True
+            plan.append(BroadcastMessageAction(MeasurementBidMessage(   self.get_parent_name(), 
+                                                                        self.get_parent_name(),
+                                                                        bid.to_dict() 
+                                                                    ).to_dict(),
+                                                t_img_end
+                                                )
+                        )
         
         return plan
 

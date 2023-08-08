@@ -40,7 +40,7 @@ def plot_2d(scenario_path : str, results_path : str, show_plot : bool = False) -
 
     # load initial measurement request
     measurement_reqs = []
-    df = pd.read_csv(scenario_path + '/gpRequests.csv')
+    df = pd.read_csv(results_path + '/gpRequests.csv')
         
     for _, row in df.iterrows():
         s_max = row['s_max']
