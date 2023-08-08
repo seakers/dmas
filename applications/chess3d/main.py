@@ -126,8 +126,7 @@ def agent_factory(  scenario_name : str,
                             agent_name,
                             agent_network_config,
                             utility_function[planner_util],
-                            payload,
-                            max_bundle_size=1)
+                            payload)
 
         elif planner_type == PlannerTypes.MACCBBA.value:
             planner = MACCBBA(results_path,
@@ -296,9 +295,9 @@ if __name__ == "__main__":
                 measurements.append(measurement)
 
 
-            t_start = (delta.seconds - max_distance) * random.random()
+            t_start = delta.seconds * random.random()
             t_end = t_start + (delta.seconds - t_start) * random.random()
-            t_end = t_end if t_start - t_end > max_distance else max_distance
+            t_end = t_end if t_end - t_start > max_distance else t_start + max_distance
             t_corr = t_end - t_start
 
             req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
@@ -336,9 +335,9 @@ if __name__ == "__main__":
             measurement_reqs.append(req)
 
     # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
-    for measurement_req in measurement_reqs:
-        measurement_req : GroundPointMeasurementRequest
-        print(measurement_req.pos, measurement_req.measurements, measurement_req.t_start, measurement_req.t_end)
+    # for measurement_req in measurement_reqs:
+    #     measurement_req : GroundPointMeasurementRequest
+    #     print(measurement_req.pos, measurement_req.measurements, measurement_req.t_start, measurement_req.t_end)
 
     clock_config = EventDrivenClockConfig(start_date, end_date)
 

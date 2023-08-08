@@ -220,15 +220,15 @@ class ConsensusPlanner(PlanningModule):
     async def planner(self) -> None:
         try:
             plan = []
-            level = logging.WARNING
-            # level = logging.DEBUG
+            # level = logging.WARNING
+            level = logging.DEBUG
 
             while True:
                 # wait for agent to update state
                 _ : AgentStateMessage = await self.states_inbox.get()
 
                 # --- Check Action Completion ---
-                x = 1
+                
                 while not self.action_status_inbox.empty():
                     action_msg : AgentActionMessage = await self.action_status_inbox.get()
                     action : AgentAction = action_from_dict(**action_msg.action)
@@ -260,16 +260,6 @@ class ConsensusPlanner(PlanningModule):
                             removed : AgentAction
                             plan : list
                             plan.remove(removed)
-                            # removed = removed.to_dict()
-
-                            # if (isinstance(removed, MeasurementAction) 
-                            #     and action_msg.status == AgentAction.COMPLETED):
-                            #     req : MeasurementRequest = MeasurementRequest.from_dict(removed.measurement_req)
-                            #     bids : list = self.generate_bids_from_request(req)
-                            #     bid : Bid = bids[removed.subtask_index]
-                            #     bid.set_performed(self.get_current_time())
-
-                            #     await self.listener_to_builder_buffer.put_bid(bid)
 
                             if (isinstance(removed, BroadcastMessageAction) 
                                 and action_msg.status == AgentAction.COMPLETED):
@@ -344,13 +334,13 @@ class ConsensusPlanner(PlanningModule):
                 for action in plan:
                     action : AgentAction
                     out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end}\n"
-                self.log(out, level)
+                self.log(out, level=logging.WARNING)
 
                 out = f'\nPLAN OUT\nid\taction type\tt_start\tt_end\n'
                 for action in plan_out:
                     action : dict
                     out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
-                self.log(out, level)
+                self.log(out, level=logging.WARNING)
                 # -------------------------------------
 
                 self.log(f'sending {len(plan_out)} actions to agent...')
@@ -735,19 +725,7 @@ class ConsensusPlanner(PlanningModule):
         subtask_already_performed = t > current_bid.t_img >= 0 + req.duration and current_bid.winner != Bid.NONE
         if subtask_already_performed or current_bid.performed:
             return True
-
-        # check if a mutually exclusive subtask has already been performed
-        for _, subtask_bids in results.items():
-            for subtask_bid in subtask_bids:
-                subtask_bid : Bid         
-
-                if (
-                    t > subtask_bid.t_img + req.duration 
-                    and subtask_bid.winner != Bid.NONE
-                    and req.dependency_matrix[subtask_index][subtask_bid.subtask_index] < 0
-                    ):
-                    return True
-        
+       
         return False
 
     """

@@ -1,6 +1,6 @@
 {   
     "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
-    "duration": 0.000115740740741,
+    "duration": 0.00115740740741,
     "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR"},
     "uav" : [
         {
@@ -96,13 +96,13 @@
         }
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
-    "scenario": {   "@type": "TEST", 
+    "scenario": {   "@type": "RANDOM", 
                     "duration": 30.0, 
                     "connectivity" : "FULL", 
                     "utility" : "LINEAR",
                     "requests" : {
-                        "n" : 3,
-                        "measurement_reqs" : ["OLI"],
+                        "n" : 5,
+                        "measurement_reqs" : ["OLI", "POSEIDON-3BAltimeter"],
                         "x_bounds" : [0.0, 5.0],
                         "y_bounds" : [0.0, 5.0]
                     }

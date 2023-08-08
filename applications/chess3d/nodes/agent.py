@@ -242,6 +242,13 @@ class SimulationAgent(Agent):
                     except asyncio.CancelledError:
                         return
 
+                    # update the agent's state
+                    if self.get_current_time() < t:
+                        x = 1
+
+                    status, _ = self.state.perform_action(action, self.get_current_time())
+                    self.state_history.append(self.state.to_dict())
+
                 # update action completion status
                 action.status = status
 

@@ -29,8 +29,18 @@ class GroundStationPlanner(FixedPlanner):
             # TODO schedule broadcasts depending on agent access
             action = BroadcastMessageAction(msg.to_dict(), measurement_req.t_start)
 
-            plan.append(action)
-
+            if len(plan) == 0:
+                plan.append(action)
+            else:
+                i_insert = -1
+                for i in range(len(plan)):
+                    action_i : AgentAction = plan[i]
+                    if action.t_start <= action_i.t_start:
+                        i_insert = i
+                        break
+                        
+                plan.insert(i_insert, action)
+        
         super().__init__(   results_path, 
                             parent_name, 
                             plan, 

@@ -58,6 +58,11 @@ class MeasurementRequest(object):
                 if not isinstance(measurement, str):
                     raise AttributeError(f'`measurements` must a `list` of elements of type `str`. contains elements of type {type(measurement)}.')
         
+        if t_start > t_end:
+            raise ValueError(f"`t_start` must be smaller than `t_end`")
+        if t_corr < 0:
+            raise ValueError(f"`t_corr` must be non-negative.")
+        
         # initialize
         self.request_type = request_type
         self.t_start = t_start

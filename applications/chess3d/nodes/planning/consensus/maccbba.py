@@ -28,8 +28,8 @@ class MACCBBA(ConsensusPlanner):
             path = []
             bundle = []
             converged = False
-            level = logging.WARNING
-            # level = logging.DEBUG
+            # level = logging.WARNING
+            level = logging.DEBUG
 
             while True:
                 # wait for incoming bids
@@ -352,6 +352,24 @@ class MACCBBA(ConsensusPlanner):
                     )
         else:
             return subtaskbid.N_req == n_sat
+
+    def request_has_been_performed(self, results: dict, req: MeasurementRequest, subtask_index: int, t: Union[int, float]) -> bool:
+        if super().request_has_been_performed(results, req, subtask_index, t):
+            return True
+
+        # check if a mutually exclusive subtask has already been performed
+        for _, subtask_bids in results.items():
+            for subtask_bid in subtask_bids:
+                subtask_bid : Bid         
+
+                if (
+                    t > subtask_bid.t_img + req.duration 
+                    and subtask_bid.winner != Bid.NONE
+                    and req.dependency_matrix[subtask_index][subtask_bid.subtask_index] < 0
+                    ):
+                    return True
+        
+        return False
 
     def calc_imaging_time(self, state : SimulationAgentState, original_results : dict, path : list, bids : dict, req : MeasurementRequest, subtask_index : int) -> float:
         """

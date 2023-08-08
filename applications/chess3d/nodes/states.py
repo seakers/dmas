@@ -53,7 +53,7 @@ class SimulationAgentState(AbstractAgentState):
         self.status : str = status
         self.t : float = t
 
-    def update_state(self, 
+    def update_state(   self, 
                         t : Union[int, float], 
                         status : str = None, 
                         state : dict = None) -> None:
@@ -61,18 +61,19 @@ class SimulationAgentState(AbstractAgentState):
         if self.engineering_module is not None:
             self.engineering_module.update_state(t)
 
-        # update position and velocity
-        if state is None:
-            self.pos, self.vel, self.attitude, self.attitude_rates = self.kinematic_model(t)
-        else:
-            self.pos = state['pos']
-            self.vel = state['vel']
-            self.attitude = state['attitude']
-            self.attitude_rates = state['attitude_rates']
+        if t - self.t > 0:
+            # update position and velocity
+            if state is None:
+                self.pos, self.vel, self.attitude, self.attitude_rates = self.kinematic_model(t)
+            else:
+                self.pos = state['pos']
+                self.vel = state['vel']
+                self.attitude = state['attitude']
+                self.attitude_rates = state['attitude_rates']
 
-        # update time and status
-        self.t = t 
-        self.status = status if status is not None else self.status
+            # update time and status
+            self.t = t 
+            self.status = status if status is not None else self.status
         
     def propagate(self, tf : Union[int, float]) -> tuple:
         """
@@ -587,6 +588,12 @@ class UAVAgentState(SimulationAgentState):
         return pos, self.vel.copy(), self.attitude, self.attitude_rates
 
     def perform_travel(self, action: TravelAction, t: Union[int, float]) -> tuple:
+        
+        dt = t - self.t
+
+        if dt < 0:
+            x = 1
+
         # update state
         self.update_state(t, status=self.TRAVELING)
 
