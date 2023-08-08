@@ -26,7 +26,10 @@ class ACBBA(ConsensusPlanner):
 
             while True:
                 # wait for incoming bids
-                incoming_bids = await self.listener_to_builder_buffer.wait_for_updates()
+                await self.replan.wait()
+
+                # incoming_bids = await self.listener_to_builder_buffer.wait_for_updates()
+                incoming_bids = await self.listener_to_builder_buffer.pop_all()
                 self.log_changes('builder - BIDS RECEIVED', incoming_bids, level)
 
                 # Consensus Phase 
@@ -85,21 +88,24 @@ class ACBBA(ConsensusPlanner):
 
                             if not same_bids:
                                 break
+                        
+                    await self.agent_state_lock.acquire()
+                    plan = self.plan_from_path(self.agent_state, results, path)
+                    self.agent_state_lock.release()
+                    if not same_bundle or not same_bids:
+                        plan.insert(0, WaitForMessages(self.get_current_time(), np.Inf))
 
-                    # if converged and same_bundle and same_bids:
-                    if same_bundle and same_bids:
-                        # generate plan from path
-                        await self.agent_state_lock.acquire()
-                        plan = self.plan_from_path(self.agent_state, results, path)
-                        self.agent_state_lock.release()
+                    # if same_bundle and same_bids:
+                    #     # generate plan from path
+                    #     await self.agent_state_lock.acquire()
+                    #     plan = self.plan_from_path(self.agent_state, results, path)
+                    #     self.agent_state_lock.release()
 
-                    else:
-                        # wait for messages or for next bid time-out
-                        # converged = same_bundle and same_bids
-
-                        t_next = np.Inf
-                        wait_action = WaitForMessages(self.get_current_time(), t_next)
-                        plan = [wait_action]
+                    # else:
+                    #     # wait for messages or for next bid time-out
+                    #     # converged = same_bundle and same_bids
+                    #     wait_action = WaitForMessages(self.get_current_time(), np.Inf)
+                    #     plan = [wait_action]
                 
                 else:
                     x = 1
@@ -169,10 +175,9 @@ class ACBBA(ConsensusPlanner):
             req : MeasurementRequest
             max_path_bids[req.id][subtask_index] = results[req.id][subtask_index]
 
-        max_utility = 0.0
         max_task = -1
 
-        while len(available_tasks) > 0 and max_task is not None:                   
+        while len(available_tasks) > 0 and max_task is not None and len(bundle) < self.max_bundle_size:                   
             # find next best task to put in bundle (greedy)
             max_task = None 
             max_subtask = None
@@ -408,7 +413,7 @@ class ACBBA(ConsensusPlanner):
             - level (`int`): logging level to be used
         """
         if self._logger.getEffectiveLevel() <= level:
-            headers = ['req_id', 'i', 'mmt', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img']
+            headers = ['req_id', 'i', 'mmt', 'location', 'bidder', 'bid', 'winner', 'bid', 't_img', 'performed']
             data = []
             for req_id in results:
                 if isinstance(results[req_id], list):
@@ -416,14 +421,14 @@ class ACBBA(ConsensusPlanner):
                         bid : UnconstrainedBid
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3)]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), bid.performed]
                         data.append(line)
                 elif isinstance(results[req_id], dict):
                     for bid_index in results[req_id]:
                         bid : UnconstrainedBid = results[req_id][bid_index]
                         req = MeasurementRequest.from_dict(bid.req)
                         split_id = req.id.split('-')
-                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3)]
+                        line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_img, 3), bid.performed]
                         data.append(line)
                 else:
                     raise ValueError(f'`results` must be of type `list` or `dict`. is of type {type(results)}')
@@ -433,13 +438,13 @@ class ACBBA(ConsensusPlanner):
 
     def log_changes(self, dsc: str, changes: list, level=logging.DEBUG) -> None:
         if self._logger.getEffectiveLevel() <= level:
-            headers = ['req_id', 'i', 'mmt', 'location', 'bidder', 'bid', 'winner', 'bid', 't_update', 't_img']
+            headers = ['req_id', 'i', 'mmt', 'location', 'bidder', 'bid', 'winner', 'bid', 't_update', 't_img', 'performed']
             data = []
             for bid in changes:
                 bid : UnconstrainedBid
                 req = MeasurementRequest.from_dict(bid.req)
                 split_id = req.id.split('-')
-                line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_update, 3), round(bid.t_img, 3)]
+                line = [split_id[0], bid.subtask_index, bid.main_measurement, req.pos, bid.bidder, round(bid.own_bid, 3), bid.winner, round(bid.winning_bid, 3), round(bid.t_update, 3), round(bid.t_img, 3), bid.performed]
                 data.append(line)
         
             df = pd.DataFrame(data, columns=headers)

@@ -50,7 +50,7 @@
             ],
             "max_speed" : 1.0,
             "instrument": {
-                "name": "OLI",
+                "name": "POSEIDON-3BAltimeter",
                 "mass": 10,
                 "volume": 12.45,
                 "dataRate": 40,
@@ -96,7 +96,7 @@
         }
     ],
     "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
-    "scenario": {   "@type": "RANDOM", 
+    "scenario": {   "@type": "TEST", 
                     "duration": 30.0, 
                     "connectivity" : "FULL", 
                     "utility" : "LINEAR",

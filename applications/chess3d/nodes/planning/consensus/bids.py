@@ -168,10 +168,12 @@ class Bid(ABC):
 
         if broadcast_out is not None:
             other : Bid = Bid.from_dict(other_dict)
-            if other.bidder == broadcast_out.bidder:
-                return other, changed
-            else:
-                return self, changed
+            return other, changed
+            
+            # if other.bidder == broadcast_out.bidder:
+            #     return other, changed
+            # else:
+            #     return self, changed
         return None, changed
 
     def __update_time(self, t_update : float) -> None:
@@ -505,6 +507,12 @@ class Bid(ABC):
         Checks if this bid has a winner
         """
         return self.winner != Bid.NONE
+
+    def set_performed(self, t : float, performed : bool = True) -> None:
+        self.__update_time(t)
+        self.performed = performed
+        self.t_img = t
+        self.winner = self.bidder
     
     """
     ---------------------------

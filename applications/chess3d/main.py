@@ -120,20 +120,14 @@ def agent_factory(  scenario_name : str,
                                     utility_function[planner_util],
                                     payload,
                                     logger=logger)
-        # elif planner_type == PlannerTypes.MCCBBA.value:
-        #     planner = MCCBBA(results_path,
-        #                         agent_name, 
-        #                         agent_network_config,
-        #                         utility_function[planner_util],
-        #                         payload,
-        #                         logger=logger)
 
         elif planner_type == PlannerTypes.ACBBA.value:
             planner = ACBBA(results_path,
                             agent_name,
                             agent_network_config,
                             utility_function[planner_util],
-                            payload)
+                            payload,
+                            max_bundle_size=1)
 
         elif planner_type == PlannerTypes.MACCBBA.value:
             planner = MACCBBA(results_path,

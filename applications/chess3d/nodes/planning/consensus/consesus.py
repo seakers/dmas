@@ -68,6 +68,8 @@ class ConsensusPlanner(PlanningModule):
         self.orbitdata = None
         self.plan_inbox = asyncio.Queue()
 
+        self.replan = asyncio.Event()
+
     async def live(self) -> None:
         """
         Performs three concurrent tasks:
@@ -217,7 +219,7 @@ class ConsensusPlanner(PlanningModule):
 
     async def planner(self) -> None:
         try:
-            self.plan = []
+            plan = []
             level = logging.WARNING
             # level = logging.DEBUG
 
@@ -225,37 +227,8 @@ class ConsensusPlanner(PlanningModule):
                 # wait for agent to update state
                 _ : AgentStateMessage = await self.states_inbox.get()
 
-                # --- Look for Plan Updates ---
-
-                plan_out = []
-                # Check if relevant changes to the bundle were performed
-                if len(self.listener_to_broadcaster_buffer) > 0:
-                    # wait for plan to be updated
-                    self.plan : list = await self.plan_inbox.get()
-
-                    # compule updated bids from the listener and bundle buiilder
-                    if len(self.builder_to_broadcaster_buffer) > 0:
-                        # received bids to rebroadcast from bundle-builder
-                        builder_bids : list = await self.builder_to_broadcaster_buffer.pop_all()
-                                                
-                        # flush bids from listener    
-                        _ = await self.listener_to_broadcaster_buffer.pop_all()
-
-                        rebroadcast_bids : list = builder_bids.copy()
-
-                        self.log_changes("planner - REBROADCASTS TO BE DONE", rebroadcast_bids, level)
-                        
-                        for rebroadcast_bid in rebroadcast_bids:
-                            rebroadcast_bid : Bid
-                            bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), rebroadcast_bid.to_dict())
-                            plan_out.append( BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()).to_dict() )
-                    else:
-                        # flush redundant broadcasts from listener
-                        _ = await self.listener_to_broadcaster_buffer.pop_all()
-
-                # --- Execute plan ---
-
-                # check plan completion 
+                # --- Check Action Completion ---
+                x = 1
                 while not self.action_status_inbox.empty():
                     action_msg : AgentActionMessage = await self.action_status_inbox.get()
                     action : AgentAction = action_from_dict(**action_msg.action)
@@ -270,10 +243,14 @@ class ConsensusPlanner(PlanningModule):
 
                     else:
                         # if action was completed or aborted, remove from plan
+                        if action_msg.status == AgentAction.COMPLETED:
+                            self.log(f'action of type `{action.action_type}` completed!', level)
+                            x = 1
+
                         action_dict : dict = action_msg.action
                         completed_action = AgentAction(**action_dict)
                         removed = None
-                        for action in self.plan:
+                        for action in plan:
                             action : AgentAction
                             if action.id == completed_action.id:
                                 removed = action
@@ -281,30 +258,79 @@ class ConsensusPlanner(PlanningModule):
                         
                         if removed is not None:
                             removed : AgentAction
-                            self.plan : list
-                            self.plan.remove(removed)
-                            removed = removed.to_dict()
+                            plan : list
+                            plan.remove(removed)
+                            # removed = removed.to_dict()
+
+                            # if (isinstance(removed, MeasurementAction) 
+                            #     and action_msg.status == AgentAction.COMPLETED):
+                            #     req : MeasurementRequest = MeasurementRequest.from_dict(removed.measurement_req)
+                            #     bids : list = self.generate_bids_from_request(req)
+                            #     bid : Bid = bids[removed.subtask_index]
+                            #     bid.set_performed(self.get_current_time())
+
+                            #     await self.listener_to_builder_buffer.put_bid(bid)
+
+                            if (isinstance(removed, BroadcastMessageAction) 
+                                and action_msg.status == AgentAction.COMPLETED):
+                                bid_msg = MeasurementBidMessage(**removed.msg)
+                                bid : Bid = Bid.from_dict(bid_msg.bid)
+                                bid.set_performed(self.get_current_time())
+
+                                await self.listener_to_builder_buffer.put_bid(bid)
+                
+                # --- Look for Plan Updates ---
+
+                plan_out = []
+                # Check if relevant changes to the bundle were performed
+                if len(self.listener_to_builder_buffer) > 0:
+                    # wait for plan to be updated
+                    self.replan.set(); self.replan.clear()
+                    plan : list = await self.plan_inbox.get()
+
+                    # compule updated bids from the listener and bundle buiilder
+                    if len(self.builder_to_broadcaster_buffer) > 0:
+                        # received bids to rebroadcast from bundle-builder
+                        builder_bids : list = await self.builder_to_broadcaster_buffer.pop_all()
+                                                
+                        # flush bids from listener    
+                        _ = await self.listener_to_broadcaster_buffer.pop_all()
+
+                        # compile bids to be rebroadcasted
+                        rebroadcast_bids : list = builder_bids.copy()
+                        self.log_changes("planner - REBROADCASTS TO BE DONE", rebroadcast_bids, level)
+                        
+                        # create message broadcasts for every bid
+                        for rebroadcast_bid in rebroadcast_bids:
+                            rebroadcast_bid : Bid
+                            bid_message = MeasurementBidMessage(self.get_parent_name(), self.get_parent_name(), rebroadcast_bid.to_dict())
+                            plan_out.append( BroadcastMessageAction(bid_message.to_dict(), self.get_current_time()).to_dict() )
+                    else:
+                        # flush redundant broadcasts from listener
+                        _ = await self.listener_to_broadcaster_buffer.pop_all()
+
+                # --- Execute plan ---
 
                 # get next action to perform
                 plan_out_ids = [action['id'] for action in plan_out]
                 if len(plan_out_ids) > 0:
-                    for action in self.plan:
+                    for action in plan:
                         action : AgentAction
                         if (action.t_start <= self.get_current_time()
                             and action.id not in plan_out_ids):
                             plan_out.append(action.to_dict())
                             break
                 else:
-                    for action in self.plan:
+                    for action in plan:
                         action : AgentAction
                         if (action.t_start <= self.get_current_time()
                             and action.id not in plan_out_ids):
                             plan_out.append(action.to_dict())
 
                 if len(plan_out) == 0:
-                    if len(self.plan) > 0:
+                    if len(plan) > 0:
                         # next action is yet to start, wait until then
-                        next_action : AgentAction = self.plan[0]
+                        next_action : AgentAction = plan[0]
                         t_idle = next_action.t_start if next_action.t_start > self.get_current_time() else self.get_current_time()
                     else:
                         # no more actions to perform, idle until the end of the simulation
@@ -315,7 +341,7 @@ class ConsensusPlanner(PlanningModule):
 
                 # --- FOR DEBUGGING PURPOSES ONLY: ---
                 out = f'\nPLAN\nid\taction type\tt_start\tt_end\n'
-                for action in self.plan:
+                for action in plan:
                     action : AgentAction
                     out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end}\n"
                 self.log(out, level)
@@ -876,7 +902,7 @@ class ConsensusPlanner(PlanningModule):
 
             # inform others of request completion
             bid : Bid = subtask_bid.copy()
-            bid.performed = True
+            bid.set_performed(t_img_end)
             plan.append(BroadcastMessageAction(MeasurementBidMessage(   self.get_parent_name(), 
                                                                         self.get_parent_name(),
                                                                         bid.to_dict() 
