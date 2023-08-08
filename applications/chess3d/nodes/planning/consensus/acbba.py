@@ -21,6 +21,7 @@ class ACBBA(ConsensusPlanner):
             path = []
             bundle = []; prev_bundle = []
             level = logging.WARNING
+            plan = []
             # level = logging.DEBUG
 
             while True:
@@ -85,20 +86,23 @@ class ACBBA(ConsensusPlanner):
                             if not same_bids:
                                 break
 
-                # if converged and same_bundle and same_bids:
-                if same_bundle and same_bids:
-                    # generate plan from path
-                    await self.agent_state_lock.acquire()
-                    plan = self.plan_from_path(self.agent_state, results, path)
-                    self.agent_state_lock.release()
+                    # if converged and same_bundle and same_bids:
+                    if same_bundle and same_bids:
+                        # generate plan from path
+                        await self.agent_state_lock.acquire()
+                        plan = self.plan_from_path(self.agent_state, results, path)
+                        self.agent_state_lock.release()
 
+                    else:
+                        # wait for messages or for next bid time-out
+                        # converged = same_bundle and same_bids
+
+                        t_next = np.Inf
+                        wait_action = WaitForMessages(self.get_current_time(), t_next)
+                        plan = [wait_action]
+                
                 else:
-                    # wait for messages or for next bid time-out
-                    # converged = same_bundle and same_bids
-
-                    t_next = np.Inf
-                    wait_action = WaitForMessages(self.get_current_time(), t_next)
-                    plan = [wait_action]
+                    x = 1
                 
                 # save previous bundle for future convergence checks
                 prev_bundle_results = {}
