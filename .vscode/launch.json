@@ -101,20 +101,6 @@
         },
 
         {
-            "name": "IGARSS",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            },
-            "args" : "igarss_2023"
-        },
-
-        {
             "name": "VISUALIZER TESTER",
             "type": "python",
             "request": "launch",
@@ -125,7 +111,38 @@
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
-            "args" : "igarss_2023"
+            "args" : ["acbba_test_uav", "2d"]
+        },
+
+
+        {
+            "name": "ACBBA TEST - UAVS",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args" : "acbba_test_uav"
+        },
+
+
+
+        {
+            "name": "ACBBA TEST - SATS",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args" : "acbba_test_sats"
         }
     ],
 

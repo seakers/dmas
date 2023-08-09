@@ -1,15 +1,15 @@
 import json
-import os
 import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import numpy as np
+from IPython.display import HTML
 
 from nodes.science.reqs import *
 
 
-def plot_2d(scenario_path : str, results_path : str, show_plot : bool = False) -> None:
+def plot_2d(scenario_path : str, results_path : str, show_plot : bool = False) -> animation.FuncAnimation:
 
     # load scenario json file
     scenario_file = open(scenario_path + '/MissionSpecs.json', 'r')
@@ -182,10 +182,18 @@ def plot_2d(scenario_path : str, results_path : str, show_plot : bool = False) -
     
     return anim
 
+def plot_earth(scenario_path : str, results_path : str, show_plot : bool = False) -> animation.FuncAnimation:
+    pass
+
 if __name__ == '__main__':
-    scenario_name = sys.argv[1]
+    scenario_name = str(sys.argv[1])
+    plot_type = str(sys.argv[2])
     scenario_path = f"{scenario_name}" if "./scenarios/" in scenario_name else f'./scenarios/{scenario_name}/'
     results_path = f'{scenario_path}/results/'
 
-    plot_2d(scenario_path, results_path)
-    x = 1
+    if plot_type == '2d':
+        anim : animation.FuncAnimation = plot_2d(scenario_path, results_path, show_plot=True)
+        
+    elif plot_type == 'earth':
+        anim : animation.FuncAnimation = plot_earth(scenario_path, results_path)
+    

@@ -209,7 +209,7 @@ if __name__ == "__main__":
     scenario_name = sys.argv[1]
     plot_results = True
     save_plot = False
-    level = logging.WARNING
+    level = logging.DEBUG
 
     # terminal welcome message
     print_welcome(scenario_name)
@@ -278,12 +278,16 @@ if __name__ == "__main__":
     if scenario_dict['scenario']['@type'] == 'RANDOM':
         reqs_dict = scenario_dict['scenario']['requests']
         for i_req in range(reqs_dict['n']):
-            max_distance = np.sqrt((reqs_dict['x_bounds'][1] - reqs_dict['x_bounds'][0]) **2 + (reqs_dict['y_bounds'][1] - reqs_dict['y_bounds'][0])**2)
-            x_pos = reqs_dict['x_bounds'][0] + (reqs_dict['x_bounds'][1] - reqs_dict['x_bounds'][0]) * random.random()
-            y_pos = reqs_dict['y_bounds'][0] + (reqs_dict['y_bounds'][1] - reqs_dict['y_bounds'][0]) * random.random()
-            z_pos = 0.0
-            pos = [x_pos, y_pos, z_pos]
-            lan_lon_pos = [0.0, 0.0, 0.0]
+            if spacecraft_dict:
+                raise NotImplementedError('random spacecraft scenario not yet implemented.')
+
+            elif uav_dict: 
+                max_distance = np.sqrt((reqs_dict['x_bounds'][1] - reqs_dict['x_bounds'][0]) **2 + (reqs_dict['y_bounds'][1] - reqs_dict['y_bounds'][0])**2)
+                x_pos = reqs_dict['x_bounds'][0] + (reqs_dict['x_bounds'][1] - reqs_dict['x_bounds'][0]) * random.random()
+                y_pos = reqs_dict['y_bounds'][0] + (reqs_dict['y_bounds'][1] - reqs_dict['y_bounds'][0]) * random.random()
+                z_pos = 0.0
+                pos = [x_pos, y_pos, z_pos]
+                lan_lon_pos = [0.0, 0.0, 0.0]
 
             s_max = 100
             measurements = []
@@ -407,7 +411,6 @@ if __name__ == "__main__":
             agents.append(agent)
             port += 6
 
-    agents = []
     if uav_dict is not None:
         # Create uav agents
         for d in uav_dict:
