@@ -24,7 +24,7 @@ class ConsensusPlanner(PlanningModule):
                     parent_network_config: NetworkConfig, 
                     utility_func: Callable[[], Any], 
                     payload : list,
-                    max_bundle_size = 4,
+                    max_bundle_size = 3,
                     planning_horizon = 3600,
                     level: int = logging.INFO, 
                     logger: logging.Logger = None

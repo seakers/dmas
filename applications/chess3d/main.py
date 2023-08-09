@@ -295,9 +295,11 @@ if __name__ == "__main__":
                 measurements.append(measurement)
 
 
-            t_start = delta.seconds * random.random()
-            t_end = t_start + (delta.seconds - t_start) * random.random()
-            t_end = t_end if t_end - t_start > max_distance else t_start + max_distance
+            # t_start = delta.seconds * random.random()
+            t_start = 0.0
+            # t_end = t_start + (delta.seconds - t_start) * random.random()
+            # t_end = t_end if t_end - t_start > max_distance else t_start + max_distance
+            t_end = delta.seconds
             t_corr = t_end - t_start
 
             req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
