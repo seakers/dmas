@@ -101,7 +101,7 @@
         },
 
         {
-            "name": "VISUALIZER TESTER",
+            "name": "VISUALIZER TESTER - Plane",
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/applications/chess3d/visualizer.py",
@@ -111,7 +111,21 @@
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
-            "args" : ["acbba_test_uav", "2d"]
+            "args" : ["acbba_test_uav", "plane"]
+        },
+
+        {
+            "name": "VISUALIZER TESTER - Earth",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/visualizer.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args" : ["acbba_test_sats", "earth"]
         },
 
 
