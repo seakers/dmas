@@ -137,6 +137,7 @@ class SimulationAgent(Agent):
                     self.state.update_state(self.get_current_time(), state=resp_msg.state)
                     self.state_history.append(self.state.to_dict())
                     senses.append(resp_msg)
+                    
                 else:
                     state_msg = AgentStateMessage(  self.get_element_name(), 
                                                     self.get_element_name(),
