@@ -1,0 +1,111 @@
+{   
+    "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
+    "duration": 0.00115740740741,
+    "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR"},
+    "uav" : [
+        {
+            "@id" : "uav1",
+            "name" : "uav1",
+            "pos" : [
+                0,
+                0,
+                0
+            ],
+            "max_speed" : 1.0,
+            "instrument": {
+                "name": "OLI",
+                "mass": 10,
+                "volume": 12.45,
+                "dataRate": 40,
+                "bitsPerPixel": 8,
+                "power": 12,
+                "snr": 33,
+                "spatial_res": 50,
+                "spectral_res": 7e-09,
+                "orientation": {
+                    "referenceFrame": "SC_BODY_FIXED",
+                    "convention": "REF_FRAME_ALIGNED"
+                },
+                "fieldOfViewGeometry": {
+                    "shape": "RECTANGULAR",
+                    "angleHeight": 5,
+                    "angleWidth": 60
+                },
+                "@id": "bs1",
+                "@type": "Basic Sensor"
+            },
+            "planner" : {
+                "@type" : "ACBBA",
+                "utility" : "LINEAR"
+            }
+        },
+
+        {
+            "@id" : "uav2",
+            "name" : "uav2",
+            "pos" : [
+                4,
+                0,
+                0
+            ],
+            "max_speed" : 1.0,
+            "instrument": {
+                "name": "POSEIDON-3BAltimeter",
+                "mass": 10,
+                "volume": 12.45,
+                "dataRate": 40,
+                "bitsPerPixel": 8,
+                "power": 12,
+                "snr": 33,
+                "spatial_res": 50,
+                "spectral_res": 7e-09,
+                "orientation": {
+                    "referenceFrame": "SC_BODY_FIXED",
+                    "convention": "REF_FRAME_ALIGNED"
+                },
+                "fieldOfViewGeometry": {
+                    "shape": "RECTANGULAR",
+                    "angleHeight": 5,
+                    "angleWidth": 60
+                },
+                "@id": "bs1",
+                "@type": "Basic Sensor"
+            },
+            "planner" : {
+                "@type" : "ACBBA",
+                "utility" : "LINEAR"
+            }
+        }
+    ],
+    "groundStation" : [
+        {
+            "@id" : "gs1",
+            "name" : "Svalbard",
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "altitude": 0,
+            "minimumElevation": 7,
+            "antenna": {
+                "bands" : ["s-band", "x-band"],
+                "frequency": 2120e9,
+                "eirp": 63.5,
+                "gain": 44.6,
+                "diameter" : 10.3,
+                "power": 10
+            }            
+        }
+    ],
+    "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
+    "scenario": {   "@type": "RANDOM", 
+                    "duration": 30.0, 
+                    "connectivity" : "FULL", 
+                    "utility" : "LINEAR",
+                    "requests" : {
+                        "n" : 5,
+                        "measurement_reqs" : ["OLI", "POSEIDON-3BAltimeter"],
+                        "x_bounds" : [0.0, 5.0],
+                        "y_bounds" : [0.0, 5.0]
+                    }
+                },
+    "settings": {"coverageType": "GRID COVERAGE"}
+}
