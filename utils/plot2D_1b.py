@@ -7,6 +7,14 @@ import numpy as np
 import imageio
 import sys
 
+def unique(lakes):
+    lakes = np.asarray(lakes)[:,0:1]
+    return np.unique(lakes,axis=0)
+
+def time_unique(lakes):
+    lakes = np.asarray(lakes)
+    return np.unique(lakes,axis=0)
+
 def get_past_points(points, curr_time):
     lats = []
     lons = []
@@ -49,6 +57,8 @@ if __name__=="__main__":
     alt_hfs = []
     tss_floods = []
     alt_floods = []
+    tss_all = []
+    alt_all = []
     # iterate over files in
     # that directory
     for filename in os.listdir(directory):
@@ -56,7 +66,7 @@ if __name__=="__main__":
         # checking if it is a file
         if os.path.isfile(f):
             if "flood" in f:
-                if "Landsat" in f or "imaging" in f:
+                if "Landsat" in f or "Sentinel-2" in f or "imaging" in f:
                     with open(f) as csv_file:
                         csv_reader = csv.reader(csv_file, delimiter=',')
                         i = 0
@@ -64,7 +74,8 @@ if __name__=="__main__":
                             if(i == 0):
                                 i = 1
                                 continue
-                            tss_floods.append((row[0],row[1],row[2]))
+                            if(float(row[2]) < 86400*4):
+                                tss_floods.append((row[0],row[1],row[2]))
                 else:
                     with open(f) as csv_file:
                         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -73,9 +84,31 @@ if __name__=="__main__":
                             if(i == 0):
                                 i = 1
                                 continue
-                            alt_floods.append((row[0],row[1],row[2]))
+                            if(float(row[2]) < 86400*4):
+                                alt_floods.append((row[0],row[1],row[2]))
+            elif "hfs" in f:
+                if "Landsat" in f or "Sentinel-2" in f or "imaging" in f:
+                    with open(f) as csv_file:
+                        csv_reader = csv.reader(csv_file, delimiter=',')
+                        i = 0
+                        for row in csv_reader:
+                            if(i == 0):
+                                i = 1
+                                continue
+                            if(float(row[2]) < 86400*4):
+                                tss_hfs.append((row[0],row[1],row[2]))
+                else:
+                    with open(f) as csv_file:
+                        csv_reader = csv.reader(csv_file, delimiter=',')
+                        i = 0
+                        for row in csv_reader:
+                            if(i == 0):
+                                i = 1
+                                continue
+                            if(float(row[2]) < 86400*4):
+                                alt_hfs.append((row[0],row[1],row[2]))
             else:
-                if "Landsat" in f or "imaging" in f:
+                if "Landsat" in f or "Sentinel-2" in f or "imaging" in f:
                     with open(f) as csv_file:
                         csv_reader = csv.reader(csv_file, delimiter=',')
                         i = 0
@@ -83,7 +116,8 @@ if __name__=="__main__":
                             if(i == 0):
                                 i = 1
                                 continue
-                            tss_hfs.append((row[0],row[1],row[2]))
+                            if(float(row[2]) < 86400*4):
+                                tss_all.append((row[0],row[1],row[2]))
                 else:
                     with open(f) as csv_file:
                         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -92,7 +126,8 @@ if __name__=="__main__":
                             if(i == 0):
                                 i = 1
                                 continue
-                            alt_hfs.append((row[0],row[1],row[2]))
+                            if(float(row[2]) < 86400*4):
+                                alt_all.append((row[0],row[1],row[2]))
     ground_track_dir = './utils/ground_tracks/arbitrary'
     alt_ground_tracks = []
     tss_ground_tracks = []
@@ -100,7 +135,7 @@ if __name__=="__main__":
         f = os.path.join(ground_track_dir, filename)
         # checking if it is a file
         if os.path.isfile(f):
-            if "Landsat" in f or "imaging" in f:
+            if "Landsat" in f or "imaging" in f or "sentinel" in f:
                 print("imaging!")
                 with open(f) as csv_file:
                     csv_reader = csv.reader(csv_file, delimiter=',')
@@ -129,6 +164,15 @@ if __name__=="__main__":
                         alt_ground_tracks.append((float(row[2]),lon,row[0]))
     if "arbitrary" in ground_track_dir:
         tss_ground_tracks = alt_ground_tracks
+    print("Number of floods imaged: "+str(len(time_unique(tss_floods))))
+    print("Number of unique floods imaged: "+str(len(unique(tss_floods))))
+    print("Number of floods altimetered: "+str(len(time_unique(alt_floods))))
+    print("Number of unique floods altimetered: "+str(len(unique(alt_floods))))
+    print("Number of high flow events imaged: "+str(len(time_unique(tss_hfs))))
+    print("Number of unique high flow events imaged: "+str(len(unique(tss_hfs))))
+    print("Number of high flow events altimetered: "+str(len(time_unique(alt_hfs))))
+    print("Number of unique high flow events altimetered: "+str(len(unique(alt_hfs))))
+    print("Total number of observations: "+str(len(time_unique(tss_all))+len(time_unique(alt_all))))
     coobs_floods = []
     for tss in tss_floods:
         coobs = False
@@ -149,7 +193,25 @@ if __name__=="__main__":
                 alt_hfs.remove(alt)
         if(coobs):
             tss_hfs.remove(tss)
-    print(coobs_hfs)
+    coobs_all = []
+    for tss in tss_all:
+        coobs = False
+        for alt in alt_all:
+            if tss[0] == alt[0] and tss[1] == alt[1]:
+                coobs_all.append(tss)
+                coobs = True
+                alt_all.remove(alt)
+        if(coobs):
+            tss_all.remove(tss)
+    #print(coobs_hfs)
+
+    print("Number of flood coobs: "+str(len(time_unique(coobs_floods))))
+    print("Number of high flow coobs: "+str(len(time_unique(coobs_hfs))))
+    print("Number of all coobs: "+str(len(time_unique(coobs_all))))
+    
+    print("Number of unique flood coobs: "+str(len(unique(coobs_floods))))
+    print("Number of unique high flow coobs: "+str(len(unique(coobs_hfs))))
+    #print("Number of unique all coobs: "+str(len(unique(coobs_all))))
     
 
 
@@ -206,7 +268,7 @@ if __name__=="__main__":
     coobs_lons = []
     hfs_coobs_lats = []
     hfs_coobs_lons = []    
-    for t in range(0,86400*16,1000):
+    for t in range(0,86400*4,2000):
         hf_lats,hf_lons = get_curr_points(hf_points,t)
         flood_lats, flood_lons = get_curr_points(flood_points,t)
         alt_lats, alt_lons = get_past_points(alt_floods,t)
@@ -221,7 +283,7 @@ if __name__=="__main__":
         filename = f'./utils/images/frame_{t}.png'
         filenames.append(filename)
         # last frame of each viz stays longer
-        if (t == 86400*16):
+        if (t == 86400*4):
             for i in range(5):
                 filenames.append(filename)        # save img
         m = Basemap(projection='merc',llcrnrlat=20,urcrnrlat=60,\
@@ -249,14 +311,20 @@ if __name__=="__main__":
         m.scatter(tss_x,tss_y,4,marker='^',color='r', label='Imagery floods')
         m.scatter(hfs_coobs_x,hfs_coobs_y,5,marker='s',color='purple', label='High flow coobservations')
         m.scatter(coobs_x,coobs_y,5,marker='s',color='magenta', label='Flood coobservations')
-        plt.legend(fontsize=5,loc='upper right')
-        plt.title('3D-CHESS observations at time t='+str(t)+' s')
-        plt.savefig(filename,dpi=200)
-        if (t == 86400*16):
+        ax = plt.gca()
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+
+        # Put a legend to the right of the current axis
+        ax.legend(loc='center left', fontsize=5, bbox_to_anchor=(1, 0.5))
+        # plt.legend(fontsize=5,loc='upper right')
+        plt.title('3D-CHESS observations at time t='+str(np.round(t/86400,2))+' days')
+        plt.savefig(filename,dpi=300)
+        if (t == 86400*4):
             plt.savefig("final_1b.png",dpi=200)
         plt.close()
     print('Charts saved\n')
-    gif_name = 'plot2D_1b'
+    gif_name = 'plot2D_1b_arbitrary'
     # Build GIF
     print('Creating gif\n')
     with imageio.get_writer(f'{gif_name}.gif', mode='I') as writer:

@@ -480,7 +480,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 0.0,
+                    "raan": 45.0,
                     "aop": 0.0,
                     "ta": 0.0
                 }
@@ -597,7 +597,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 0.0,
+                    "raan": 45.0,
                     "aop": 0.0,
                     "ta": 180.0
                 }
@@ -714,7 +714,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 180.0,
+                    "raan": 225.0,
                     "aop": 0.0,
                     "ta": 90.0
                 }
@@ -831,7 +831,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 180.0,
+                    "raan": 225.0,
                     "aop": 0.0,
                     "ta": 270.0
                 }
@@ -924,7 +924,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 0.0,
+                    "raan": 90.0,
                     "aop": 0.0,
                     "ta": 0.0
                 }
@@ -1017,7 +1017,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 0.0,
+                    "raan": 90.0,
                     "aop": 0.0,
                     "ta": 180.0
                 }
@@ -1110,7 +1110,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 180.0,
+                    "raan": 270.0,
                     "aop": 0.0,
                     "ta": 90.0
                 }
@@ -1203,7 +1203,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 180.0,
+                    "raan": 270.0,
                     "aop": 0.0,
                     "ta": 270.0
                 }
@@ -1273,7 +1273,7 @@
                 "fieldOfViewGeometry": {
                     "shape": "RECTANGULAR",
                     "angleHeight": 5,
-                    "angleWidth": 60
+                    "angleWidth": 8
                 },
                 "@id": "bs1",
                 "@type": "Basic Sensor"
@@ -1293,7 +1293,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 0.0,
+                    "raan": 135.0,
                     "aop": 0.0,
                     "ta": 0.0
                 }
@@ -1302,7 +1302,7 @@
                 "@type": "COMMS_TEST"
             },
             "notifier": "True",
-            "missionProfile": "3D-CHESS",
+            "missionProfile": "nadir",
             "preplan": "True"
         },
         {
@@ -1363,7 +1363,7 @@
                 "fieldOfViewGeometry": {
                     "shape": "RECTANGULAR",
                     "angleHeight": 5,
-                    "angleWidth": 60
+                    "angleWidth": 8
                 },
                 "@id": "bs1",
                 "@type": "Basic Sensor"
@@ -1383,7 +1383,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 0.0,
+                    "raan": 135.0,
                     "aop": 0.0,
                     "ta": 180.0
                 }
@@ -1392,7 +1392,7 @@
                 "@type": "COMMS_TEST"
             },
             "notifier": "True",
-            "missionProfile": "3D-CHESS",
+            "missionProfile": "nadir",
             "preplan": "True"
         },
         {
@@ -1453,7 +1453,7 @@
                 "fieldOfViewGeometry": {
                     "shape": "RECTANGULAR",
                     "angleHeight": 5,
-                    "angleWidth": 60
+                    "angleWidth": 8
                 },
                 "@id": "bs1",
                 "@type": "Basic Sensor"
@@ -1473,7 +1473,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 180.0,
+                    "raan": 315.0,
                     "aop": 0.0,
                     "ta": 90.0
                 }
@@ -1482,7 +1482,7 @@
                 "@type": "COMMS_TEST"
             },
             "notifier": "True",
-            "missionProfile": "3D-CHESS",
+            "missionProfile": "nadir",
             "preplan": "True"
         },
         {
@@ -1543,7 +1543,7 @@
                 "fieldOfViewGeometry": {
                     "shape": "RECTANGULAR",
                     "angleHeight": 5,
-                    "angleWidth": 60
+                    "angleWidth": 8
                 },
                 "@id": "bs1",
                 "@type": "Basic Sensor"
@@ -1563,7 +1563,7 @@
                     "sma": 6878,
                     "ecc": 0.01,
                     "inc": 67,
-                    "raan": 180.0,
+                    "raan": 315.0,
                     "aop": 0.0,
                     "ta": 270.0
                 }
@@ -1572,7 +1572,7 @@
                 "@type": "COMMS_TEST"
             },
             "notifier": "True",
-            "missionProfile": "3D-CHESS",
+            "missionProfile": "nadir",
             "preplan": "True"
         },
         {

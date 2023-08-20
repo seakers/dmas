@@ -600,6 +600,9 @@ class ObservationPlannerTask(PlannerTask):
 
     def get_target(self):
         return self.target
+    
+    def to_json(self):
+        return json.dumps(self, default=lambda o:o.__dict__, sort_keys=True, indent=4)
 
 class ChargePlannerTask(PlannerTask):
     def __init__(self, start: float, end: float) -> None:
@@ -645,6 +648,17 @@ class MeasurementRequest(Request):
 
     def get_science_val(self):
         return self._science_val
+    
+    def to_json(self):
+        return json.dumps(self, default=lambda o:o.__dict__, sort_keys=True, indent=4)
+    
+class PlannerRequest(Request):
+    def __init__(self, plan_list) -> None:
+        super().__init__("Planner")
+        self.plan_list = plan_list
+
+    def get_plan_list(self):
+        return self.plan_list
     
     def to_json(self):
         return json.dumps(self, default=lambda o:o.__dict__, sort_keys=True, indent=4)

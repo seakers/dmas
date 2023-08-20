@@ -81,8 +81,7 @@ if __name__ == '__main__':
     # processes.append(Process(target=landsat_run, args=(directory)))
     #processes.append(Process(target=customsat_run, args=(directory)))
     processes.append(Process(target=iridium_run, args=(directory)))
-    if "scenario1" in sys.argv[1]:
-        processes.append(Process(target=centralnode_run, args=(directory)))
+    processes.append(Process(target=centralnode_run, args=(directory)))
     print('Starting agent run process...')
     for process in processes:
         process.start()

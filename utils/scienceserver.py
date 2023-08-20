@@ -13,7 +13,7 @@ from landsatxplore.earthexplorer import EarthExplorer
 # Initialize a new API instance and get an access key
 api = API("bgorr", "SpectralAnalysis8")
 fn = ''
-path = "./scenarios/sim_test/imagery/" # Fill a valid download path
+path = "./utils/imagery/" # Fill a valid download path
 maxthreads = 5 # Threads count for downloads
 sema = threading.Semaphore(value=maxthreads)
 label = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") # Customized label using date time
@@ -24,7 +24,7 @@ threads = []
 # landsat_ot_c2_l2|displayId
 # LC08_L2SP_012025_20201231_20210308_02_T1
 # LC08_L2SP_012027_20201215_20210314_02_T1
-scenesFile = './scenarios/sim_test/imagery/scenes.txt'
+scenesFile = './utils/imagery/scenes.txt'
 
 # Send http request
 def sendRequest(url, data, apiKey = None, exitIfNoResponse = True):  
@@ -98,11 +98,11 @@ def getLandsatFilePath(lat,lon):
 
     # Search for Landsat TM scenes
     scenes = api.search(
-        dataset='landsat_ot_c2_l2',
+        dataset='landsat_tm_c2_l2',
         latitude=lat,
         longitude= lon,
-        start_date='2020-01-01',
-        end_date='2020-12-01',
+        start_date='2007-06-01',
+        end_date='2007-06-31',
         max_cloud_cover=10
     )
     print(scenes)
@@ -111,7 +111,7 @@ def getLandsatFilePath(lat,lon):
     #     print(scene['display_id'])
     scene = scenes[0]
     with open(scenesFile, 'w') as f:
-        f.write('landsat_ot_c2_l2|displayId\n')
+        f.write('landsat_tm_c2_l2|displayId\n')
         f.write(scene['display_id'])
     print("\nRunning Scripts...\n")
     startTime = time.time()
@@ -276,3 +276,5 @@ def getLandsatFilePath(lat,lon):
     executionTime = round((time.time() - startTime), 2)
     print(f'Total time: {executionTime} seconds')
     return fn
+
+getLandsatFilePath(50,-98)

@@ -563,12 +563,17 @@ class GroundTestAgent(AgentClient):
     def __init__(self, name, scenario_dir) -> None:
         super().__init__(name, scenario_dir)
         request_generator = False
-        if "scenario1b" in scenario_dir:
+        # TODO comment this back
+        centralized = False
+        if "scenario1b" in scenario_dir and not centralized:
             request_generator = True
+        request_generator = True
         self.submodules = [
                             ScienceModule(self,scenario_dir,request_generator),
                             GroundEngineeringModule(self)
                           ]
+        if centralized:
+            self.submodules.append(PlanningModule(self,scenario_dir))
 
 """
 --------------------

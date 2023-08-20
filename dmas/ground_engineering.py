@@ -1881,7 +1881,7 @@ class TransmitterComponent(ComponentModule):
             #     await self.tasks.put(task_msg)
             
             elif isinstance(msg.content, MeasurementRequest):
-                self.log(f'Received a measurement request!',level=logging.INFO)
+                self.log(f'Received a measurement request!',level=logging.DEBUG)
                 inter_node_msg = InterNodeMeasurementRequestMessage(self,"Iridium",msg.content)
                 task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
                 await self.tasks.put(task_msg)

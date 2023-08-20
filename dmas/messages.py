@@ -156,6 +156,40 @@ class PrintMessage(InterNodeMessage):
         """
         return PrintMessage.from_dict(json.loads(j))
 
+class InterNodePlannerMessage(InterNodeMessage):
+    def __init__(self, src: str, dst: str, content : str) -> None:
+        super().__init__(src, dst, InterNodeMessageTypes.PLANNER_MESSAGE, content)
+
+    def to_dict(self) -> dict:
+        d = super().to_dict()
+        d['content'] = self.content
+        return d
+
+    def from_dict(d : dict):
+        """
+        Creates an instance of a message class object from a dictionary 
+        """
+        src = d.get('src', None)
+        dst = d.get('dst', None)
+        content = d.get('content', None)
+
+        if src is None or dst is None or content is None:
+            raise Exception('Dictionary does not contain necessary information to construct this message object.')
+
+        return PlannerRequestMessage(src, dst, content)
+    
+    def from_json(j):
+        """
+        Creates an instance of a message class object from a json object 
+        """
+        return PlannerRequestMessage.from_dict(json.loads(j))
+    
+    def to_json(self):
+        """
+        Creates a json file from this message 
+        """
+        return json.dumps(self.to_dict())
+
 class InterNodeMeasurementRequestMessage(InterNodeMessage):
     def __init__(self, src: str, dst: str, content : str) -> None:
         super().__init__(src, dst, InterNodeMessageTypes.MEASUREMENT_REQUEST, content)
@@ -1554,6 +1588,22 @@ class MeasurementRequestMessage(InternalMessage):
     
     def get_request(self) -> Request:
         return self.content
+
+class PlannerRequestMessage(InternalMessage):
+    def __init__(self, src_module: str, dst_module: str, request : Request) -> None:
+        """
+        Internal message comminicating a measurement request to be scheduled
+        """
+        super().__init__(src_module, dst_module, request, name='PlannerRequestMessage')
+    
+    def get_request(self) -> Request:
+        return self.content
+    
+    def to_json(self):
+        """
+        Creates a json file from this message 
+        """
+        return json.dumps(self.to_dict())
 
 class DataMessage(InternalMessage):
     def __init__(self, src_module: str, dst_module: str, target_lat: float, target_lon: float, data: str, name:str = 'DataMessage', metadata : dict = {}) -> None:

@@ -1904,7 +1904,7 @@ class OnboardComputerModule(ComponentModule):
                         self.log(f'Sending data to {AgentModuleTypes.SCIENCE_MODULE} for processing...')
                         
                         self.memory_stored += data_vol
-                        self.log(f'Data successfully stored in internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).',level=logging.INFO)
+                        self.log(f'Data successfully stored in internal memory! New internal memory state: ({self.memory_stored}/{self.memory_capacity}).',level=logging.DEBUG)
                         
                         await self.send_internal_message(msg)
 
@@ -3037,8 +3037,14 @@ class TransmitterComponent(ComponentModule):
             #     await self.tasks.put(task_msg)
             
             elif isinstance(msg.content, MeasurementRequest):
-                self.log(f'Received a measurement request!',level=logging.INFO)
+                self.log(f'Received a measurement request!',level=logging.DEBUG)
                 inter_node_msg = InterNodeMeasurementRequestMessage(self,"Iridium",msg.content)
+                task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
+                await self.tasks.put(task_msg)
+
+            elif isinstance(msg.content, PlannerRequest):
+                self.log(f'Received a planner message!',level=logging.INFO)
+                inter_node_msg = InterNodePlannerMessage(self,"Iridium",msg.content)
                 task_msg = TransmitMessageTask("Iridium",inter_node_msg,1.0)
                 await self.tasks.put(task_msg)
 
@@ -3120,7 +3126,7 @@ class TransmitterComponent(ComponentModule):
                 #     raise asyncio.CancelledError
 
                 else:
-                    self.log(f'Message of type {type(msg)} timed out!',level=logging.DEBUG)
+                    self.log(f'Message of type {type(msg)} timed out!',level=logging.INFO)
                     raise asyncio.CancelledError
 
             else:
@@ -3129,7 +3135,7 @@ class TransmitterComponent(ComponentModule):
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.',level=logging.DEBUG)
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
 
             # release update lock if cancelled during task handling
             if acquired:
@@ -3399,8 +3405,14 @@ class ReceiverComponent(ComponentModule):
                             # handle message 
                             self.log(f'Received print instruction: \'{msg.content}\'')
 
-                        # elif msg_type is InterNodeMessageTypes.PLANNER_MESSAGE:
-                        #     pass
+                        elif msg_type is InterNodeMessageTypes.PLANNER_MESSAGE:
+                            msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
+                            self.log('Received planner message!',level=logging.INFO)
+                            msg_contents = json.loads(msg.content)["content"]
+                            planner_message = PlannerRequest(msg_contents)
+                            plan_msg = InternalMessage(self.name, AgentModuleTypes.PLANNING_MODULE.value, planner_message)
+                            self.log(f'Sending planner message to planning module (hopefully)!',level=logging.INFO)
+                            await self.send_internal_message(plan_msg) # send measurement request to planning module
                         elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
                             msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
                             msg_contents = json.loads(msg.content)["content"]

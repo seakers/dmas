@@ -216,6 +216,9 @@ if __name__=="__main__":
                             lon = float(row[3])
                         vnir_ground_tracks.append((float(row[2]),lon,float(row[0])*10))
     coobs_lakes = []
+    print(len(all_temps))
+    print(len(all_levels))
+    print(len(all_images))
     for image in all_images:
         coobs = False
         for alt in all_levels:
@@ -224,11 +227,6 @@ if __name__=="__main__":
                     if temp[0] == alt[0] and temp[1] == alt[1]:
                         coobs_lakes.append(image)
                         coobs = True
-                        all_temps.remove(temp)
-            if(coobs):
-                all_levels.remove(alt)
-        if(coobs):
-            all_images.remove(image)
     print(cold_lakes)
     print("Cold lakes: "+str(len(unique(cold_lakes))))
     print("Hot lakes: "+str(len(unique(hot_lakes))))
@@ -293,7 +291,7 @@ if __name__=="__main__":
     #hfs_coobs_lats = []
     #hfs_coobs_lons = []
     duration = 86400
-    for t in range(0,duration,500):
+    for t in range(0,duration,2000):
         #hf_lats,hf_lons = get_curr_points(hf_points,t)
         #flood_lats, flood_lons = get_curr_points(flood_points,t)
         #alt_lats, alt_lons = get_past_points(alt_floods,t)

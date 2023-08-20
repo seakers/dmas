@@ -30,3 +30,10 @@ utils/images/*
 !utils/images/.gitkeep
 utils/usgs_data/*
 !utils/usgs_data/.gitkeep
+*.gif
+utils/grealm
+utils/HydroLAKES_points_v10_shp
+utils/lake_geojsons
+utils/laketemps
+utils/laketemps_recent
+utils/potential_images

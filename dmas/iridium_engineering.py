@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from asyncio import CancelledError
+import asyncio
 from typing import Union
 import logging
 from messages import *
@@ -156,6 +157,17 @@ class IridiumTransmitterComponent(ComponentModule):
                         continue
                     task_msg = TransmitMessageTask(agent,msg,1.0)
                     await self.tasks.put(task_msg)
+            elif isinstance(msg.content, PlannerRequestMessage):
+                self.log(f'Received a planner request message!',level=logging.INFO)
+                agent_port_dict = self.get_top_module().AGENT_TO_PORT_MAP
+                for agent_port in agent_port_dict:
+                    agent = agent_port_dict[agent_port]
+                    self.log(f'Sending to agent: {agent_port}',level=logging.DEBUG)
+                    if(agent_port == "Iridium" or agent_port == msg.src_module or agent_port == "Central Node"):
+                        continue
+                    inter_node_msg = InterNodePlannerMessage("Iridium",agent_port,msg.content)
+                    task_msg = TransmitMessageTask(agent,inter_node_msg,1.0)
+                    await self.tasks.put(task_msg)
             else:
                 self.log(f'Internal message of type {type(msg.content)} not yet supported. Discarding message...',level=logging.INFO)
             
@@ -219,7 +231,7 @@ class IridiumTransmitterComponent(ComponentModule):
 
                 # return task completion status                
                 if transmit_msg.done():
-                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.INFO)                    
+                    self.log(f'Successfully transmitted message of type {type(msg)} to target \'{msg.dst}\'!',level=logging.DEBUG)                    
                     return TaskStatus.DONE
 
                 # elif (wait_for_access_end.done() and wait_for_access_end not in pending) or (wait_for_access_end_event.done() and wait_for_access_end_event not in pending):
@@ -500,8 +512,11 @@ class IridiumReceiverComponent(ComponentModule):
                             # handle message 
                             self.log(f'Received print instruction: \'{msg.content}\'')
 
-                        # elif msg_type is InterNodeMessageTypes.PLANNER_MESSAGE:
-                        #     pass
+                        elif msg_type is InterNodeMessageTypes.PLANNER_MESSAGE:
+                            msg : InterNodePlannerMessage = InterNodePlannerMessage.from_dict(msg_dict)
+                            ext_msg = InternalMessage(self.name, ComponentNames.TRANSMITTER.value, msg)
+                            self.log(f'Sending planner request message to other agents (hopefully)!',level=logging.INFO)
+                            await self.send_internal_message(ext_msg) # send measurement request to all other agents
                         elif msg_type is InterNodeMessageTypes.MEASUREMENT_REQUEST:
                             msg : InterNodeMessage = InterNodeMessage.from_dict(msg_dict)
                             self.log(f'Internodemessage type is {msg}',level=logging.DEBUG)
@@ -540,8 +555,8 @@ class IridiumReceiverComponent(ComponentModule):
                 raise asyncio.CancelledError
 
         except asyncio.CancelledError:
-            self.log(f'Aborting task of type {type(task)}.')
-            parent_agent.agent_socket_in_lock.release()
+            self.log(f'Aborting task of type {type(task)}.',level=logging.INFO)
+            await parent_agent.agent_socket_in_lock.release()
 
             # release update lock if cancelled during task handling
             if acquired:
