@@ -755,7 +755,7 @@ class ConsensusPlanner(PlanningModule):
             if t_conv < t_conv_min:
                 t_conv_min = t_conv
 
-        if state.t < t_conv_min:
+        if state.t <= t_conv_min:
             plan.append( WaitForMessages(state.t, t_conv_min) )
         else:
             # plan.append( WaitForMessages(state.t, state.t) )

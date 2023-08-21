@@ -98,9 +98,9 @@ class ACBBA(ConsensusPlanner):
                         plan.insert(0, TravelAction(self.agent_state.pos, self.get_current_time()))
                         self.agent_state_lock.release()
 
-                    if not same_bundle or not same_bids:
-                        # if not converged yet, await for 
-                        plan.insert(0, WaitForMessages(self.get_current_time(), np.Inf))
+                    # if not same_bundle or not same_bids:
+                    #     # if not converged yet, await for 
+                    #     plan.insert(0, WaitForMessages(self.get_current_time(), np.Inf))
                 
                 else:
                     x = 1
