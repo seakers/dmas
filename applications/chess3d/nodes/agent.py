@@ -269,7 +269,6 @@ class SimulationAgent(Agent):
                 # set task complation
                 action.status = AgentAction.COMPLETED
             
-            
             elif action_dict['action_type'] == ActionTypes.WAIT_FOR_MSG.value:
                 # unpack action 
                 task = WaitForMessages(**action_dict)

@@ -61,7 +61,7 @@ class SimulationAgentState(AbstractAgentState):
         if self.engineering_module is not None:
             self.engineering_module.update_state(t)
 
-        if t - self.t > 0:
+        if t - self.t >= 0:
             # update position and velocity
             if state is None:
                 self.pos, self.vel, self.attitude, self.attitude_rates = self.kinematic_model(t)
@@ -571,6 +571,7 @@ class UAVAgentState(SimulationAgentState):
                             t)
         self.max_speed = max_speed
         self.eps = eps
+        
 
     def kinematic_model(self, tf: Union[int, float]) -> tuple:
         dt = tf - self.t
@@ -630,6 +631,9 @@ class UAVAgentState(SimulationAgentState):
                         ]
 
             dt = min(action.t_end - t, norm / self.max_speed)
+
+            # calc dt_fuel
+
             return action.PENDING, dt
 
     def perform_maneuver(self, action: ManeuverAction, t: Union[int, float]) -> tuple:
