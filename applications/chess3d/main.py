@@ -209,7 +209,7 @@ if __name__ == "__main__":
     scenario_name = sys.argv[1]
     plot_results = True
     save_plot = False
-    level = logging.DEBUG
+    # level = logging.WARNING
 
     # terminal welcome message
     print_welcome(scenario_name)
@@ -230,6 +230,7 @@ if __name__ == "__main__":
     spacecraft_dict = scenario_dict.get('spacecraft', None)
     uav_dict = scenario_dict.get('uav', None)
     gstation_dict = scenario_dict.get('groundStation', None)
+    settings_dict = scenario_dict.get('settings', None)
 
     agent_names = [SimulationElementRoles.ENVIRONMENT.value]
     if spacecraft_dict:
@@ -244,6 +245,20 @@ if __name__ == "__main__":
 
     # precompute orbit data
     orbitdata_dir = precompute_orbitdata(scenario_name) if spacecraft_dict is not None else None
+
+    # read logger level
+    if isinstance(settings_dict, dict):
+        level = settings_dict.get('logger', logging.WARNING)
+        if not isinstance(level, int):
+            levels = {
+                        'DEBUG': logging.DEBUG, 
+                        'WARNING' : logging.WARNING,
+                        'CRITICAL' : logging.CRITICAL,
+                        'ERROR' : logging.ERROR
+                    }
+            level = levels[level]
+    else:
+        level = logging.WARNING
 
     # read clock configuration
     epoch_dict : dict = scenario_dict.get("epoch")
@@ -319,6 +334,7 @@ if __name__ == "__main__":
             measurements_str = measurements_str.replace('[','')
             measurements_str = measurements_str.replace(']','')
             measurements_str = measurements_str.replace(' ','')
+            measurements_str = measurements_str.replace('\'','')
             measurements = measurements_str.split(',')
 
             t_start = row['t_start']
@@ -341,10 +357,6 @@ if __name__ == "__main__":
             measurement_reqs.append(req)
 
     # clock_config = FixedTimesStepClockConfig(start_date, end_date, dt)
-    # for measurement_req in measurement_reqs:
-    #     measurement_req : GroundPointMeasurementRequest
-    #     print(measurement_req.pos, measurement_req.measurements, measurement_req.t_start, measurement_req.t_end)
-
     clock_config = EventDrivenClockConfig(start_date, end_date)
 
     # initialize manager

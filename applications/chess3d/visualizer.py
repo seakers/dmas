@@ -11,7 +11,6 @@ from geopandas import GeoDataFrame
 
 from nodes.science.reqs import *
 
-
 def plot_plane(scenario_path : str, results_path : str, show_plot : bool = False) -> animation.FuncAnimation:
     # load scenario json file
     scenario_file = open(scenario_path + '/MissionSpecs.json', 'r')
