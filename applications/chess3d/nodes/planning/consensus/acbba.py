@@ -5,13 +5,12 @@ import time
 from typing import Union
 import numpy as np
 import pandas as pd
-from applications.chess3d.nodes.actions import TravelAction
 
 from nodes.planning.consensus.bids import BidBuffer, UnconstrainedBid
 from nodes.science.reqs import GroundPointMeasurementRequest, MeasurementRequest
 from nodes.science.utility import synergy_factor
 from nodes.states import SatelliteAgentState, SimulationAgentState, UAVAgentState
-from applications.planning.actions import WaitForMessages
+from nodes.actions import *
 from nodes.planning.consensus.consesus import ConsensusPlanner
 
 
@@ -99,9 +98,9 @@ class ACBBA(ConsensusPlanner):
                         plan.insert(0, TravelAction(self.agent_state.pos, self.get_current_time()))
                         self.agent_state_lock.release()
 
-                    if not same_bundle or not same_bids:
-                        # if not converged yet, await for 
-                        plan.insert(0, WaitForMessages(self.get_current_time(), np.Inf))
+                    # if not same_bundle or not same_bids:
+                    #     # if not converged yet, await for 
+                    #     plan.insert(0, WaitForMessages(self.get_current_time(), np.Inf))
                 
                 else:
                     x = 1

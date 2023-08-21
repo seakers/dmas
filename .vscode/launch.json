@@ -6,6 +6,7 @@
     "configurations": [
 
 
+
         {
             "name": "ACBBA Planning Test",
             "type": "python",
@@ -24,19 +25,6 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/applications/planning/accbba_wrapper.py",
-            "console": "integratedTerminal",
-            "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/planning",
-            "env": {
-                "PYTHONPATH": "${workspaceRoot}"
-            }
-        },
-
-        {
-            "name": "IGARSS ACCBBA",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceRoot}/applications/planning/igarss.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceRoot}/applications/planning",
