@@ -104,8 +104,8 @@ class ConsensusPlanner(PlanningModule):
         try:
             # initiate results tracker
             results = {}
-            level = logging.WARNING
-            # level = logging.DEBUG
+            # level = logging.WARNING
+            level = logging.DEBUG
 
             # listen for broadcasts and place in the appropriate inboxes
             while True:
@@ -277,6 +277,7 @@ class ConsensusPlanner(PlanningModule):
                     # wait for plan to be updated
                     self.replan.set(); self.replan.clear()
                     plan : list = await self.plan_inbox.get()
+                    self.plan_history.append((self.get_current_time(), plan))
 
                     # compule updated bids from the listener and bundle buiilder
                     if len(self.builder_to_broadcaster_buffer) > 0:
@@ -334,13 +335,13 @@ class ConsensusPlanner(PlanningModule):
                 for action in plan:
                     action : AgentAction
                     out += f"{action.id.split('-')[0]}, {action.action_type}, {action.t_start}, {action.t_end}\n"
-                self.log(out, level=logging.WARNING)
+                # self.log(out, level=logging.WARNING)
 
                 out = f'\nPLAN OUT\nid\taction type\tt_start\tt_end\n'
                 for action in plan_out:
                     action : dict
                     out += f"{action['id'].split('-')[0]}, {action['action_type']}, {action['t_start']}, {action['t_end']}\n"
-                self.log(out, level=logging.WARNING)
+                # self.log(out, level=logging.WARNING)
                 # -------------------------------------
 
                 self.log(f'sending {len(plan_out)} actions to agent...')
@@ -971,21 +972,24 @@ class ConsensusPlanner(PlanningModule):
     
     async def teardown(self) -> None:
         # log plan history
-        headers = ['plan_index', 't', 'req_id', 'subtask_index', 't_img', 'u_exp']
+        headers = ['plan_index', 't_plan', 'req_id', 'subtask_index', 't_img', 'u_exp']
         data = []
-
+        
         for i in range(len(self.plan_history)):
-            for t, req, subtask_index, subtask_bid in self.plan_history[i]:
-                req : MeasurementRequest
-                subtask_index : int
-                subtask_bid : Bid
-                
+            t_plan, plan = self.plan_history[i]
+            t_plan : float; plan : list
+
+            for action in plan:
+                if not isinstance(action, MeasurementAction):
+                    continue
+
+                req : MeasurementRequest = MeasurementRequest.from_dict(action.measurement_req)
                 line_data = [   i,
-                                t,
+                                np.round(t_plan,3),
                                 req.id.split('-')[0],
-                                subtask_index,
-                                np.round(subtask_bid.t_img,3 ),
-                                np.round(subtask_bid.winning_bid,3)
+                                action.subtask_index,
+                                np.round(action.t_start,3 ),
+                                np.round(action.u_exp,3)
                 ]
                 data.append(line_data)
 
