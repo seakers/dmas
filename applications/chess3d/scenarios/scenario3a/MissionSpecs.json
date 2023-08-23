@@ -1,16 +1,17 @@
 {   
     "epoch":{"@type":"GREGORIAN_UT1", "year":2020, "month":1, "day":1, "hour":0, "minute":0, "second":0},
     "duration": 0.00115740740741,
+    "propagator": {"@type": "J2 ANALYTICAL PROPAGATOR"},
     "uav" : [
         {
             "@id" : "uav1",
             "name" : "uav1",
             "pos" : [
-                0,
-                0,
+                -104,
+                30,
                 0
             ],
-            "max_speed" : 0.25,
+            "max_speed" : 1.0,
             "instrument": {
                 "name": "OLI",
                 "mass": 10,
@@ -47,7 +48,7 @@
                 0,
                 0
             ],
-            "max_speed" : 0.1,
+            "max_speed" : 1.0,
             "instrument": {
                 "name": "POSEIDON-3BAltimeter",
                 "mass": 10,
@@ -83,7 +84,7 @@
                 1,
                 0
             ],
-            "max_speed" : 1,
+            "max_speed" : 1.0,
             "instrument": {
                 "name": "POSEIDON-3BAltimeter",
                 "mass": 10,
@@ -112,9 +113,29 @@
             }
         }
     ],
+    "groundStation" : [
+        {
+            "@id" : "gs1",
+            "name" : "Svalbard",
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "altitude": 0,
+            "minimumElevation": 7,
+            "antenna": {
+                "bands" : ["s-band", "x-band"],
+                "frequency": 2120e9,
+                "eirp": 63.5,
+                "gain": 44.6,
+                "diameter" : 10.3,
+                "power": 10
+            }            
+        }
+    ],
+    "grid": [{"@type": "autogrid", "@id": 1, "latUpper":80, "latLower":-80, "lonUpper":180, "lonLower":-180, "gridRes": 5}],
     "scenario": {   "@type": "NOT_RANDOM", 
+                    "duration": 30.0, 
+                    "connectivity" : "FULL", 
                     "utility" : "LINEAR"
-                    
                 },
     "settings": {"coverageType": "GRID COVERAGE"}
 }
