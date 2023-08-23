@@ -469,6 +469,7 @@ if __name__ == "__main__":
         pool.submit(monitor.run, *[])
         pool.submit(manager.run, *[])
         pool.submit(environment.run, *[])
+        print("length of agents ", len(agents))
         for agent in agents:                
             agent : SimulationAgent
             pool.submit(agent.run, *[])    
