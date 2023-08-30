@@ -131,8 +131,6 @@
             "args" : "acbba_test_uav"
         },
 
-
-
         {
             "name": "ACBBA TEST - SATS",
             "type": "python",
@@ -145,6 +143,20 @@
                 "PYTHONPATH": "${workspaceRoot}"
             },
             "args" : "acbba_test_sats"
+        },
+
+        {
+            "name": "VISUALIZER TEST - SAT SIM",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceRoot}/applications/chess3d",
+            "env": {
+                "PYTHONPATH": "${workspaceRoot}"
+            },
+            "args" : "visualizer_test"
         }
     ],
 

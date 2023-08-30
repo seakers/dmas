@@ -175,7 +175,11 @@ class PlanningModule(InternalModule):
         if self.parent_agent_type != None:
             raise RuntimeError(f"orbit data already loaded. It can only be assigned once.")            
 
-        scenario_name = self.results_path.split('/')[-1]
+        results_path_list = self.results_path.split('/')
+        if 'results' in results_path_list[-1]:
+            results_path_list.pop()
+
+        scenario_name = results_path_list[-1]
         scenario_dir = f'./scenarios/{scenario_name}/'
         data_dir = scenario_dir + '/orbitdata/'
 

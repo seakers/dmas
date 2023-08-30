@@ -4,12 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import numpy as np
-from shapely.geometry import Point
-import geopandas as gpd
-from geopandas import datasets
-from geopandas import GeoDataFrame
 
-from nodes.science.reqs import *
+from nodes.science.reqs import GroundPointMeasurementRequest
 
 def plot_plane(scenario_path : str, results_path : str, show_plot : bool = False) -> animation.FuncAnimation:
     # load scenario json file
@@ -181,132 +177,134 @@ def plot_plane(scenario_path : str, results_path : str, show_plot : bool = False
     
     return anim
 
-def plot_earth(scenario_path : str, results_path : str, show_plot : bool = False) -> animation.FuncAnimation:
-    # load scenario json file
-    scenario_file = open(scenario_path + '/MissionSpecs.json', 'r')
-    scenario_dict : dict = json.load(scenario_file)
-    scenario_file.close()
+# def plot_earth(scenario_path : str, results_path : str, show_plot : bool = False) -> animation.FuncAnimation:
+#     # load scenario json file
+#     scenario_file = open(scenario_path + '/MissionSpecs.json', 'r')
+#     scenario_dict : dict = json.load(scenario_file)
+#     scenario_file.close()
 
-    # read agent names
-    spacecraft_dict = scenario_dict.get('spacecraft', None)
-    uav_dict = scenario_dict.get('uav', None)
+#     # read agent names
+#     spacecraft_dict = scenario_dict.get('spacecraft', None)
+#     uav_dict = scenario_dict.get('uav', None)
 
-    agent_names = []
-    if spacecraft_dict:
-        for spacecraft in spacecraft_dict:
-            agent_names.append(spacecraft['name'])
-    if uav_dict:
-        for uav in uav_dict:
-            agent_names.append(uav['name'])
+#     agent_names = []
+#     if spacecraft_dict:
+#         for spacecraft in spacecraft_dict:
+#             agent_names.append(spacecraft['name'])
+#     if uav_dict:
+#         for uav in uav_dict:
+#             agent_names.append(uav['name'])
 
 
-    # load agent data
-    agent_data = {}
-    t = None
-    for agent_name in agent_names:      
-        df = pd.read_csv(f"{results_path}/{agent_name}/states.csv")
-        agent_data[agent_name] = df
-        if t is None or len(df['t']) < len(t):
-            t = df['t']
+#     # load agent data
+#     agent_data = {}
+#     t = None
+#     for agent_name in agent_names:      
+#         df = pd.read_csv(f"{results_path}/{agent_name}/states.csv")
+#         agent_data[agent_name] = df
+#         if t is None or len(df['t']) < len(t):
+#             t = df['t']
 
-    # load initial measurement request
-    measurement_reqs = []
-    # df = pd.read_csv(results_path + '/gpRequests.csv')
-    df = pd.read_csv(scenario_path + '/gpRequests.csv')
         
-    for idx, row in df.iterrows():
-        s_max = row['s_max']
+
+    # # load initial measurement request
+    # measurement_reqs = []
+    # # df = pd.read_csv(results_path + '/gpRequests.csv')
+    # df = pd.read_csv(scenario_path + '/gpRequests.csv')
         
-        measurements_str : str = row['measurements']
-        measurements_str = measurements_str.replace('[','')
-        measurements_str = measurements_str.replace(']','')
-        measurements_str = measurements_str.replace(' ','')
-        measurements = measurements_str.split(',')
+    # for idx, row in df.iterrows():
+    #     s_max = row['s_max']
+        
+    #     measurements_str : str = row['measurements']
+    #     measurements_str = measurements_str.replace('[','')
+    #     measurements_str = measurements_str.replace(']','')
+    #     measurements_str = measurements_str.replace(' ','')
+    #     measurements = measurements_str.split(',')
 
-        t_start = row['t_start']
-        t_end = row['t_end']
-        t_corr = row['t_corr']
+    #     t_start = row['t_start']
+    #     t_end = row['t_end']
+    #     t_corr = row['t_corr']
 
-        lat, lon, alt = row.get('lat', None), row.get('lon', None), row.get('alt', None)
-        if lat is None and lon is None and alt is None: 
-            x_pos, y_pos, z_pos = row.get('x_pos', None), row.get('y_pos', None), row.get('z_pos', None)
-            if x_pos is not None and y_pos is not None and z_pos is not None:
-                pos = [x_pos, y_pos, z_pos]
-                lat, lon, alt = 0.0, 0.0, 0.0
-            else:
-                raise ValueError('GP Measurement Requests in `gpRequest.csv` must specify a ground position as lat-lon-alt or cartesian coordinates.')
-        else:
-            pos = None
+    #     lat, lon, alt = row.get('lat', None), row.get('lon', None), row.get('alt', None)
+    #     if lat is None and lon is None and alt is None: 
+    #         x_pos, y_pos, z_pos = row.get('x_pos', None), row.get('y_pos', None), row.get('z_pos', None)
+    #         if x_pos is not None and y_pos is not None and z_pos is not None:
+    #             pos = [x_pos, y_pos, z_pos]
+    #             lat, lon, alt = 0.0, 0.0, 0.0
+    #         else:
+    #             raise ValueError('GP Measurement Requests in `gpRequest.csv` must specify a ground position as lat-lon-alt or cartesian coordinates.')
+    #     else:
+    #         pos = None
 
-        if abs(lat) > 90:
-            sign = lat / abs(lat)
-            new_lat = 180 - abs(lat)
-            lat = sign * new_lat
-            lon += 180 if lon <= 180 else -180
+    #     if abs(lat) > 90:
+    #         sign = lat / abs(lat)
+    #         new_lat = 180 - abs(lat)
+    #         lat = sign * new_lat
+    #         lon += 180 if lon <= 180 else -180
             
-            df.loc[idx,'lat']=lat
-            df.loc[idx,'lon']=lon
+    #         df.loc[idx,'lat']=lat
+    #         df.loc[idx,'lon']=lon
 
-        lan_lon_pos = [lat, lon, alt]
-        req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
-        measurement_reqs.append(req)
+    #     lan_lon_pos = [lat, lon, alt]
+    #     req = GroundPointMeasurementRequest(lan_lon_pos, s_max, measurements, t_start, t_end, t_corr, pos=pos)
+    #     measurement_reqs.append(req)
 
-    # initialize plot
-    fig, ax = plt.subplots()
+    # # initialize plot
+    # fig, ax = plt.subplots()
 
-    # # find bounds
-    # bounds = [0,0]
-    # for agent_name in agent_names:
-    #     df = agent_data[agent_name]
-    #     x_min, x_max = min(df['x_pos']), max(df['x_pos'])
-    #     y_min, y_max = min(df['y_pos']), max(df['y_pos'])
-    #     z_min, z_max = min(df['z_pos']), max(df['z_pos'])
+    # # # find bounds
+    # # bounds = [0,0]
+    # # for agent_name in agent_names:
+    # #     df = agent_data[agent_name]
+    # #     x_min, x_max = min(df['x_pos']), max(df['x_pos'])
+    # #     y_min, y_max = min(df['y_pos']), max(df['y_pos'])
+    # #     z_min, z_max = min(df['z_pos']), max(df['z_pos'])
 
-    #     bounds[0] = x_min if x_min < bounds[0] else bounds[0]
-    #     bounds[1] = x_max if x_max > bounds[1] else bounds[1]
+    # #     bounds[0] = x_min if x_min < bounds[0] else bounds[0]
+    # #     bounds[1] = x_max if x_max > bounds[1] else bounds[1]
 
-    #     bounds[0] = y_min if y_min < bounds[0] else bounds[0]
-    #     bounds[1] = y_max if y_max > bounds[1] else bounds[1]
+    # #     bounds[0] = y_min if y_min < bounds[0] else bounds[0]
+    # #     bounds[1] = y_max if y_max > bounds[1] else bounds[1]
 
-    #     bounds[0] = z_min if z_min < bounds[0] else bounds[0]
-    #     bounds[1] = z_max if z_max > bounds[1] else bounds[1]
+    # #     bounds[0] = z_min if z_min < bounds[0] else bounds[0]
+    # #     bounds[1] = z_max if z_max > bounds[1] else bounds[1]
 
-    # bounds[0] *= 1.10.  
-    # bounds[1] *= 1.10
+    # # bounds[0] *= 1.10.  
+    # # bounds[1] *= 1.10
 
-    # # plot original agent position
-    # agent_scats = {}
-    # agent_lines = {}
-    # for agent in agent_data:
-    #     x_str, y_str = agent_data[agent]['x_pos'][0], agent_data[agent]['y_pos'][0]
+    # # # plot original agent position
+    # # agent_scats = {}
+    # # agent_lines = {}
+    # # for agent in agent_data:
+    # #     x_str, y_str = agent_data[agent]['x_pos'][0], agent_data[agent]['y_pos'][0]
 
-    #     agent_scats[agent] = ax.scatter([float(x_str)], [float(y_str)], label=f'{agent}')
-    #     agent_lines[agent] = ax.plot([float(x_str)], [float(y_str)])
+    # #     agent_scats[agent] = ax.scatter([float(x_str)], [float(y_str)], label=f'{agent}')
+    # #     agent_lines[agent] = ax.plot([float(x_str)], [float(y_str)])
 
 
-    # load measurement location
-    # measurement_data = pd.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
+    # # load measurement location
+    # # measurement_data = pd.read_csv(f"{results_path}/ENVIRONMENT/measurements.csv")
     
-    # plot task location
-    # x_tasks = []
-    # y_tasks = []
-    # for req in measurement_reqs:
-    #     req : GroundPointMeasurementRequest
-    #     x_i, y_i, _ = req.pos
-    #     x_tasks.append(x_i)
-    #     y_tasks.append(y_i)
-    #     task_id = req.id.split('-')[0]
-        # print(f'{task_id},{req.pos},{req.measurements}')
+    # # plot task location
+    # # x_tasks = []
+    # # y_tasks = []
+    # # for req in measurement_reqs:
+    # #     req : GroundPointMeasurementRequest
+    # #     x_i, y_i, _ = req.pos
+    # #     x_tasks.append(x_i)
+    # #     y_tasks.append(y_i)
+    # #     task_id = req.id.split('-')[0]
+    #     # print(f'{task_id},{req.pos},{req.measurements}')
 
-    geometry = [Point(xy) for xy in zip(df['lon'],df['lat'])]
-    gdf = GeoDataFrame(df, geometry=geometry)   
+    # geometry = [Point(xy) for xy in zip(df['lon'],df['lat'])]
+    # gdf = GeoDataFrame(df, geometry=geometry)   
 
-    #this is a simple map that goes with geopandas
-    world : GeoDataFrame = gpd.read_file(datasets.get_path('naturalearth_lowres'))
-    gdf.plot(ax=world.plot(figsize=(10, 6)), marker='o', color='red', markersize=15);
+    # #this is a simple map that goes with geopandas
+    # world : GeoDataFrame = gpd.read_file(datasets.get_path('naturalearth_lowres'))
+    # gdf.plot(ax=world.plot(figsize=(10, 6)), marker='o', color='red', markersize=15);
 
-    plt.grid(True)
-    x = 1
+    # plt.grid(True)
+    # x = 1
 
 if __name__ == '__main__':
     scenario_name = str(sys.argv[1])
@@ -314,9 +312,9 @@ if __name__ == '__main__':
     scenario_path = f"{scenario_name}" if "./scenarios/" in scenario_name else f'./scenarios/{scenario_name}/'
     results_path = f'{scenario_path}/results/'
 
-    if plot_type == '2d':
-        anim : animation.FuncAnimation = plot_plane(scenario_path, results_path, show_plot=True)
+    # if plot_type == '2d':
+    #     anim : animation.FuncAnimation = plot_plane(scenario_path, results_path, show_plot=True)
         
-    elif plot_type == 'earth':
-        anim : animation.FuncAnimation = plot_earth(scenario_path, results_path)
-    
+    # elif plot_type == 'earth':
+    #     anim : animation.FuncAnimation = plot_earth(scenario_path, results_path)
+    pass

@@ -186,7 +186,7 @@ class GreedyPlanner(PlanningModule):
                     and isinstance(state, SatelliteAgentState)
                     ):
                     # check if the satellite can observe the GP
-                    lat,lon,_ = measurement_req.pos
+                    lat,lon,_ = measurement_req.lat_lon_pos
                     df : pd.DataFrame = self.orbitdata.get_ground_point_accesses_future(lat, lon, 0.0)
                     if df.empty:
                         continue
@@ -350,6 +350,10 @@ class GreedyPlanner(PlanningModule):
                 winning_path = path
                 winning_bids = bids
                 winning_path_utility = path_utility
+
+        # TODO implement a true-greedy planning approach
+        # path = [scheduled_task for scheduled_task in original_path]
+        # path.append( (req, subtask_index) )
 
         return winning_path, winning_bids, winning_path_utility
 

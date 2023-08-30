@@ -5,7 +5,6 @@ from itertools import combinations, permutations
 import numpy as np
 import uuid
 import numpy
-from utils import lat_lon_to_pos
 
 class MeasurementRequetTypes(Enum):
     GROUND_POINT = 'GROUND_POINT'
@@ -184,6 +183,36 @@ class MeasurementRequest(object):
 
     def __eq__(self, other) -> bool:
         return self.to_dict() == other.to_dict()
+
+    def pos_to_lat_lon(pos : list) -> list:
+        R = 6.3781363e+003
+        pos_vec = np.array(pos)
+
+        r = np.sqrt( pos_vec.dot(pos_vec) )
+
+        x = np.array([1, 0, 0])
+        y = np.array([0, 1, 0])
+        z = np.array([0, 0, 1])
+
+        th1 = np.arccos( pos_vec.dot(z) / r ) * 180 / np.pi
+        lat = 90 - th1
+
+        x_proj = x * pos_vec.dot(x)
+        y_proj = y * pos_vec.dot(y)
+        lon = np.arctan2(y_proj, x_proj)
+
+        alt = r - R
+
+        return lat, lon, alt
+
+    def lat_lon_to_pos(lat : float, lon : float, alt : float) -> list:
+        R = 6.3781363e+003 + alt
+        pos = [
+                R * np.cos( lat * np.pi / 180.0) * np.cos( lon * np.pi / 180.0),
+                R * np.cos( lat * np.pi / 180.0) * np.sin( lon * np.pi / 180.0),
+                R * np.sin( lat * np.pi / 180.0)
+        ] 
+        return pos
 
 class GroundPointMeasurementRequest(MeasurementRequest):
     """
