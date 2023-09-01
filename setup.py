@@ -9,7 +9,7 @@ def readme():
 
 setup(
     name='DMAS',
-    version='0.1.0',
+    version='1.0.0',
     description='Decentralized Multi-Agent Satellite Simulation Tool',
     author='SEAK Lab',
     author_email='aguilaraj15@tamu.edu',
