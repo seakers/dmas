@@ -769,16 +769,14 @@ class ScienceModule(InternalModule):
             item["severity"] = 0.0
             item["event_type"] = ""
             return outlier, item
-        start_date = dt.datetime(2022,6,1,0,0,0)
         latest_obs = None
         for obs in lake_obs:
-            # date = str(obs[4])
-            # obs_date = dt.datetime(2022,int(date[4:6]),int(date[6:8]),0,0,0)
-            obs_time = obs[3]
-            if(self.get_current_time() > obs_time):
+            obs_start = obs[2]
+            obs_duration = obs[3]
+            if (self.get_current_time() > obs_start) and (self.get_current_time() < obs_start+obs_duration):
                 latest_obs = obs
         if latest_obs is None:
-            latest_obs = lake_obs[0]
+            return False, None
         
         # if latest_obs[5] > (latest_obs[2]+latest_obs[3]):
         #     if latest_obs[3] == 0.0:
@@ -813,17 +811,14 @@ class ScienceModule(InternalModule):
             item["severity"] = 0.0
             item["event_type"] = ""
             return outlier, item
-        start_date = dt.datetime(2010,6,1,0,0,0)
         latest_obs = None
         for obs in lake_obs:
-            # DEPRECATED BY REVISED SCENARIO 2
-            # date = str(obs[4])
-            # obs_date = dt.datetime(2010,int(date[4:6]),int(date[6:8]),0,0,0)
-            obs_time = obs[3]
-            if(self.get_current_time() > obs_time):
+            obs_start = obs[2]
+            obs_duration = obs[3]
+            if (self.get_current_time() > obs_start) and (self.get_current_time() < obs_start+obs_duration):
                 latest_obs = obs
         if latest_obs is None:
-            latest_obs = lake_obs[0]
+            return False, None
         
         item["severity"] = latest_obs[4]
         outlier = True
@@ -859,20 +854,18 @@ class ScienceModule(InternalModule):
             if (abs(float(item["lat"])-self.points[i, 0]) < 0.01) and (abs(float(item["lon"]) - self.points[i, 1]) < 0.01):
                 if self.points[i,5] == 1:
                     lake_obs.append(self.points[i,:])
-        start_date = dt.datetime(2010,6,1,0,0,0)
         if len(lake_obs) == 0:
             item["severity"] = 0.0
             item["event_type"] = ""
             return outlier, item
         latest_obs = None
         for obs in lake_obs:
-            # date = str(obs[4])
-            # obs_date = dt.datetime(2010,int(date[4:6]),int(date[6:8]),0,0,0)
-            obs_time = obs[3]
-            if(self.get_current_time() > obs_time):
+            obs_start = obs[2]
+            obs_duration = obs[3]
+            if (self.get_current_time() > obs_start) and (self.get_current_time() < obs_start+obs_duration):
                 latest_obs = obs
         if latest_obs is None:
-            latest_obs = lake_obs[0]
+            return False, None
         
         item["severity"] = latest_obs[4]
         outlier = True
