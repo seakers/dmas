@@ -11,10 +11,10 @@
             "name": "ACBBA Planning Test",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/planning/acbba_wrapper.py",
+            "program": "${workspaceRoot}/examples/planning/acbba_wrapper.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/planning",
+            "cwd": "${workspaceRoot}/examples/planning",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             }
@@ -24,10 +24,10 @@
             "name": "ACCBBA Planning Test",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/planning/accbba_wrapper.py",
+            "program": "${workspaceRoot}/examples/planning/accbba_wrapper.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/planning",
+            "cwd": "${workspaceRoot}/examples/planning",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             }
@@ -37,10 +37,10 @@
             "name": "3D CHESS - TESTER",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "program": "${workspaceRoot}/examples/chess3d/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -51,10 +51,10 @@
             "name": "3D CHESS - MACCBBA TESTER",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "program": "${workspaceRoot}/examples/chess3d/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -65,10 +65,10 @@
             "name": "3D CHESS - SCENARIO 2",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "program": "${workspaceRoot}/examples/chess3d/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -79,10 +79,10 @@
             "name": "3D CHESS - ENGINEERING TESTER",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/nodes/engineering/test.py",
+            "program": "${workspaceRoot}/examples/chess3d/nodes/engineering/test.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             }
@@ -92,10 +92,10 @@
             "name": "VISUALIZER TESTER - Plane",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/visualizer.py",
+            "program": "${workspaceRoot}/examples/chess3d/visualizer.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -106,10 +106,10 @@
             "name": "VISUALIZER TESTER - Earth",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/visualizer.py",
+            "program": "${workspaceRoot}/examples/chess3d/visualizer.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -121,10 +121,10 @@
             "name": "ACBBA TEST - UAVS",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "program": "${workspaceRoot}/examples/chess3d/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -135,10 +135,10 @@
             "name": "ACBBA TEST - SATS",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "program": "${workspaceRoot}/examples/chess3d/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
@@ -149,10 +149,10 @@
             "name": "VISUALIZER TEST - SAT SIM",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/applications/chess3d/main.py",
+            "program": "${workspaceRoot}/examples/chess3d/main.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "cwd": "${workspaceRoot}/applications/chess3d",
+            "cwd": "${workspaceRoot}/examples/chess3d",
             "env": {
                 "PYTHONPATH": "${workspaceRoot}"
             },
