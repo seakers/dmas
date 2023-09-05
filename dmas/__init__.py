@@ -8,4 +8,4 @@ This autonomy ranges from environment detection to autonomous operations plannin
  
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

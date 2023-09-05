@@ -442,7 +442,7 @@ class OrbitData:
 """
 TESTING
 """
-async def main(scenario_dir):
+def main(scenario_dir):
     orbit_data_list = OrbitData.from_directory(scenario_dir)
 
     # expected val: (grid, point) = 0, 0
@@ -460,4 +460,4 @@ async def main(scenario_dir):
 
 if __name__ == '__main__':
     scenario_dir = './scenarios/sim_test/'
-    asyncio.run(main(scenario_dir))
+    main(scenario_dir)
