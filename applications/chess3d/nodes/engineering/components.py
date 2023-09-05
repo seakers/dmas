@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Union
 import uuid
 
-from nodes.engineering.actions import ComponentAction
+from nodes.engineering.actions import ComponentAction, Activatewheel, Deactivatewheel
 
 
 class Component(ABC):
@@ -163,5 +163,43 @@ class ReactionWheel(ABC):
         dt = t_f - self.t
         th = th_o + dth/dt
         self.th = th
-    def Perform_action(self,**kwargs) -> bool:
-    
+    def Perform_action(self, action:ComponentAction, t:float) -> bool:
+        if isinstance(action,Deactivatewheel):
+            self.Perform_Deactivate_wheel(action,t)
+        elif isinstance(action,Activatewheel):
+            return self.Perform_Activatewheel(action,t)
+        else:
+            return False
+    def Perform_Activate_wheel(self, action: Activatewheel, t:float,
+                               chng_spd:float,**kwargs) -> bool:
+        """
+        Performs an action on this component
+
+        ### Arguments:
+            - action (:obj:`ComponentAction`) : action to be performed
+            - t (`float` or `int`) : current simulation time in [s]
+
+        ### Returns:
+            - boolean value indicating if performing the action was successful or not
+        """
+        # Update
+        self.chng_spd = chng_spd
+        self.update(t,status=self.ENABLED)
+        # Initiate speed change
+        self.rot_spd = self.chng_spd
+
+    def Perform_Deactivate_wheel(self,action:Deactivatewheel, t:float, **kwargs) -> bool:
+        """
+        Performs an action on this component
+
+        ### Arguments:
+            - action (:obj:`ComponentAction`) : action to be performed
+            - t (`float` or `int`) : current simulation time in [s]
+
+        ### Returns:
+            - boolean value indicating if performing the action was successful or not
+        """
+        # Update
+        self.update(t,status=self.DISABLED)
+        # Initiate spped change
+        self.rot_spd = 0.00
