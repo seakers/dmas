@@ -1,4 +1,4 @@
-PROJECT := DMAS
+PROJECT := dmas
 
 .DEFAULT_GOAL := all
 
@@ -19,7 +19,7 @@ help:
 	@echo "  bare       	to uninstall the package and remove *egg*"
 
 
-all: bare install docs
+all: bare install 
 
 install: install_intrupy install_orbitpy
 	-X=`pwd`; \
@@ -45,6 +45,11 @@ docs: docs_clean #Build the documentation
 docs_clean: 
 	-X=`pwd`; \
 	echo '<<<' $$DOC '>>>'; cd $$X; cd $(DOC); make clean;
+
+clean: 
+	@echo "Cleaning up..."
+	@find . -name "*.pyc" -delete
+	@find . -type d -name __pycache__ -print0 | xargs -0 rm -rf
 
 bare: clean
 	pip uninstall -y $(PROJECT) 
