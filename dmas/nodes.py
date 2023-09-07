@@ -97,7 +97,7 @@ class Node(SimulationElement):
 
     async def _activate(self) -> None:
         # give manager time to set up
-        self.log('waiting for simulation manager to configure its own network...', level=logging.INFO) 
+        self.log('waiting for simulation manager to configure its own network...', level=logging.DEBUG) 
         await asyncio.sleep(1e-1)
         if self.manager_name != SimulationElementRoles.MANAGER.value:
             await asyncio.sleep(1e-1)
@@ -120,7 +120,7 @@ class Node(SimulationElement):
     async def _external_sync(self) -> tuple:
         try:
             # request to sync with the simulation manager
-            self.log('syncing with manager...', level=logging.INFO) 
+            self.log('syncing with manager...', level=logging.DEBUG) 
             while True:
                 # send sync request from REQ socket
                 msg = NodeSyncRequestMessage(self.get_element_name(), self.manager_name, self._network_config.to_dict())
@@ -136,7 +136,7 @@ class Node(SimulationElement):
                     self.log(f'sync request not accepted. trying again later...')
                 else:
                     # if the manager acknowledged the sync request, stop trying
-                    self.log(f'sync request accepted! waiting for simulation information from manager...', level=logging.INFO)
+                    self.log(f'sync request accepted! waiting for simulation information from manager...', level=logging.DEBUG)
                     break
 
             # wait for external address ledger from manager
@@ -155,7 +155,7 @@ class Node(SimulationElement):
 
                 else:
                     # if the manager did not acknowledge the sync request, try again later
-                    self.log(f'received simulation information message from simulation manager!', level=logging.INFO)
+                    self.log(f'received simulation information message from simulation manager!', level=logging.DEBUG)
                     msg = SimulationInfoMessage(**content)
                     
                     external_ledger = dict()
@@ -305,7 +305,7 @@ class Node(SimulationElement):
         """
         Informs the node manager that the node is ready to start the simulation.
         """
-        self.log('informing manager of ready state...', level=logging.INFO) 
+        self.log('informing manager of ready state...', level=logging.DEBUG) 
         while True:
             # send ready announcement from REQ socket
             ready_msg = NodeReadyMessage(self.get_element_name(), self.manager_name)
@@ -321,14 +321,14 @@ class Node(SimulationElement):
                 await asyncio.wait(random.random())
             else:
                 # if the manager acknowledge the message, stop trying
-                self.log(f'ready state message accepted! waiting for simulation to start...', level=logging.INFO)
+                self.log(f'ready state message accepted! waiting for simulation to start...', level=logging.DEBUG)
                 break
 
     async def __broadcast_deactivated(self):
         """
         Informs the node manager that the node has deactivated
         """
-        self.log('informing manager of ready state...', level=logging.INFO) 
+        self.log('informing manager of ready state...', level=logging.DEBUG) 
         while True:
             # send ready announcement from REQ socket
             ready_msg = NodeDeactivatedMessage(self.get_element_name(), self.manager_name)
@@ -344,7 +344,7 @@ class Node(SimulationElement):
                 await asyncio.wait(random.random())
             else:
                 # if the manager acknowledge the message, stop trying
-                self.log(f'deactivated state message accepted! waiting for simulation to start...', level=logging.INFO)
+                self.log(f'deactivated state message accepted! waiting for simulation to start...', level=logging.DEBUG)
                 break
 
     async def __wait_for_manager_ready(self):
@@ -368,7 +368,7 @@ class Node(SimulationElement):
 
             else:
                 # manager announced the start of the simulation
-                self.log(f'received simulation start message from simulation manager!', level=logging.INFO)
+                self.log(f'received simulation start message from simulation manager!', level=logging.DEBUG)
                 return
 
     async def _execute(self) -> None:
@@ -423,7 +423,7 @@ class Node(SimulationElement):
         """
         Waits for all internal modules to become offline
         """
-        await self.__wait_for_module_messages(ModuleMessageTypes.MODULE_DEACTIVATED, 'Offline Internal Modules')
+        await self.__wait_for_module_messages(ModuleMessageTypes.MODULE_DEACTIVATED, 'Listen for Offline Internal Modules')
 
     async def __wait_for_module_messages(self, target_type : ModuleMessageTypes, desc : str):
         """
@@ -438,7 +438,7 @@ class Node(SimulationElement):
 
             pbar = None
             prog = 0
-            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
+            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}', leave=False) as pbar:
                 while len(responses) < len(self.__modules):
                     # listen for messages from internal module
                     dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)

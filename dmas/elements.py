@@ -88,16 +88,16 @@ class SimulationElement(NetworkElement):
         """
         try:
             # activate simulation element
-            self.log('activating...', level=logging.INFO)
+            self.log('activating...', level=logging.DEBUG)
             await self._activate()
 
             ## update status to ACTIVATED
             self._status = SimulationElementStatus.ACTIVATED
-            self.log('activated! Waiting for simulation to start...', level=logging.INFO)
+            self.log('activated! Waiting for simulation to start...', level=logging.DEBUG)
 
             # wait for simulatio nstart
             await self._wait_sim_start()
-            self.log('simulation has started!', level=logging.INFO)
+            self.log('simulation has started! Executing...', level=logging.DEBUG)
 
             ## update status to RUNNING
             self._status = SimulationElementStatus.RUNNING
@@ -106,9 +106,8 @@ class SimulationElement(NetworkElement):
             self._clock_config.set_simulation_runtime_start( time.perf_counter() )
 
             # start element life
-            self.log('executing...', level=logging.INFO)
             await self._execute()
-            self.log('execution completed!', level=logging.INFO)
+            self.log('execution completed!', level=logging.DEBUG)
             
             self.log('`run()` executed properly.')
             return 1

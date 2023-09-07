@@ -200,7 +200,7 @@ class TestInternalModule(unittest.TestCase):
             if not self.has_modules():
                 return
 
-            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}') as pbar:
+            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}', leave=False) as pbar:
                 while len(responses) < len(self.__modules):
                     # listen for messages from internal module
                     dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)

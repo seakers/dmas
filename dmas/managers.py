@@ -134,7 +134,7 @@ class AbstractManager(SimulationElement):
             read_task = None
             send_task = None
 
-            with tqdm(total=len(self._simulation_element_name_list) , desc=desc) as pbar:
+            with tqdm(total=len(self._simulation_element_name_list) , desc=desc, leave=False) as pbar:
                 while (
                         len(received_messages) < len(self._simulation_element_name_list) 
                         and len(self._simulation_element_name_list) > 0
