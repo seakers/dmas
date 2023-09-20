@@ -1,4 +1,6 @@
 import asyncio
+import inspect
+import time
 from typing import Union
 import numpy
 
@@ -111,3 +113,39 @@ class Container:
             return self.level >= value
         
         await self.__when_cond(accept)
+
+
+def runtime_tracker( f ):
+    """ Registers the run-time for completing the function `f` """
+
+    if inspect.iscoroutinefunction(f):
+        async def tracker(self, *args):
+            t_0 = time.perf_counter()
+            result = await f(self, *args)
+            dt = time.perf_counter() - t_0
+            
+            if self.stats is None or not isinstance(self.stats, dict):
+                raise AttributeError(f"class of type `{type(self)}` must contain `stats` attribute of type `dict`.")
+            
+            if f.__name__ not in self.stats:
+                self.stats[f.__name__] = []
+            self.stats[f.__name__].append(dt)
+
+            return result
+    
+    else:
+        def tracker(self, *args):
+            t_0 = time.perf_counter()
+            result = f(self, *args)
+            dt = time.perf_counter() - t_0
+            
+            if self.stats is None or not isinstance(self.stats, dict):
+                raise AttributeError(f"class of type `{type(self)}` must contain `stats` attribute of type `dict`.")
+            
+            if f.__name__ not in self.stats:
+                self.stats[f.__name__] = []
+            self.stats[f.__name__].append(dt)
+
+            return result
+    
+    return tracker
