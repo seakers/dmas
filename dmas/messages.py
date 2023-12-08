@@ -23,8 +23,15 @@ class SimulationMessage(object):
         - dst (`str`): name of the intended simulation element to receive this message
         - msg_type (`str`): type of message being sent
         - id (`str`) : Universally Unique IDentifier for this message
+        - path (`list`) : path the message must travel to get to its inteded destination
     """
-    def __init__(self, src : str, dst : str, msg_type : str, id : str = None):
+    def __init__(self, 
+                 src : str, 
+                 dst : str, 
+                 msg_type : str, 
+                 id : str = None,
+                 path : list = [] 
+                ):
         """
         Initiates an instance of a simulation message.
         
@@ -33,6 +40,7 @@ class SimulationMessage(object):
             - dst (`str`): name of the intended simulation element to receive this message
             - msg_type (`str`): type of message being sent
             - id (`str`) : Universally Unique IDentifier for this message
+            - path (`list`) : path the message must travel to get to its inteded destination
         """
         super().__init__()
 
@@ -40,6 +48,7 @@ class SimulationMessage(object):
         self.src = src
         self.dst = dst
         self.msg_type = msg_type
+        self.path = [elem for elem in path]
         self.id = str(uuid.UUID(id)) if id is not None else str(uuid.uuid1())
 
         # check types 
