@@ -139,6 +139,9 @@ class AgentAction(ABC):
         """
         return str(self.to_dict())
     
+    def __hash__(self) -> int:
+        return hash(str(self))
+    
 class Agent(Node):
     """
     ## Agent Node
