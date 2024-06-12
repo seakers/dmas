@@ -601,17 +601,11 @@ class NetworkElement(ABC):
             socket : zmq.Socket; socket_lock : asyncio.Lock
             acquired_by_me = False
 
-            if (socket is None 
-                or socket_lock is None):
+            if (socket is None or socket_lock is None):
                 raise KeyError(f'Socket of type {socket_type.name} not contained in this simulation element.')
             
             # check socket's message transmition capabilities
-            if (
-                socket_type != zmq.REQ 
-                and socket_type != zmq.REP 
-                and socket_type != zmq.PUB 
-                and socket_type != zmq.PUSH
-                ):
+            if socket_type not in [zmq.REQ, zmq.REP, zmq.PUB, zmq.PUSH]:
                 raise RuntimeError(f'Cannot send messages from a port of type {socket_type.name}.')
 
             # acquire lock
