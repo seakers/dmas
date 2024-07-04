@@ -140,7 +140,10 @@ class AgentAction(ABC):
         return str(self.to_dict())
     
     def __hash__(self) -> int:
-        return hash(str(self))
+        return hash(repr(self))
+    
+    def __repr__(self) -> str:
+        return f"{self.action_type}_{self.id.split('-')[0]}"
     
 class Agent(Node):
     """
@@ -238,24 +241,15 @@ class Agent(Node):
             while not self.state.is_failure():
                 # sense environment
                 self.log('sensing...')
-                t_0 = time.perf_counter()
                 senses = await self.sense(statuses)
-                dt = time.perf_counter() - t_0
-                # self.stats['sense'].append(dt)
 
                 # think of next action(s) to take
                 self.log('thinking...')
-                t_0 = time.perf_counter()
                 actions = await self.think(senses)
-                dt = time.perf_counter() - t_0
-                # self.stats['think'].append(dt)
 
                 # perform action(s)
-                t_0 = time.perf_counter()
                 self.log('performing action(s)...')
                 statuses = await self.do(actions)
-                dt = time.perf_counter() - t_0
-                # self.stats['do'].append(dt)
         
         except asyncio.CancelledError:
             return        
