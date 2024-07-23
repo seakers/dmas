@@ -119,10 +119,11 @@ class AbstractManager(SimulationElement):
         self.log(f'Ending simulation for date {self._clock_config.end_date} (computer clock at {time.perf_counter()}[s])', level=logging.INFO)
 
     async def _publish_deactivate(self) -> None:
+        # notify monitor of simulation end
         sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
         await self._send_manager_msg(sim_end_msg, zmq.PUSH)
     
-    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : SimulationMessage = SimulationMessage, desc : str = 'Waiting for simulation elements'):
+    async def __wait_for_elements(self, message_type : NodeMessageTypes, message_class : type = SimulationMessage, desc : str = 'Waiting for simulation elements'):
         """
         Awaits for all simulation elements to share a specific type of message with the manager.
         

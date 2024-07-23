@@ -6,7 +6,6 @@ import concurrent.futures
 from tqdm import tqdm
 from dmas.managers import *
 
-
 class TestSimulationManager(unittest.TestCase): 
     class Client(SimulationElement):
         def __init__(self, 

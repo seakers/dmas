@@ -322,7 +322,7 @@ class NodeMessageTypes(Enum):
     TEST = 'TEST'
     SYNC_REQUEST = 'SYNC_REQUEST'
     NODE_READY = 'READY'
-    NODE_DEACTIVATED = 'DEACTIVATED'
+    DEACTIVATED = 'DEACTIVATED'
     RECEPTION_ACK = 'RECEPTION_ACKNOWLEDGED'
     RECEPTION_IGNORED = 'RECEPTION_IGNORED'
     MODULE_ACTIVATE = 'SIM_START'
@@ -459,7 +459,7 @@ class NodeDeactivatedMessage(SimulationMessage):
             - dst (`str`): name of the intended simulation element to receive this message
             - id (`uuid.UUID`) : Universally Unique IDentifier for this message
         """
-        super().__init__(src, dst, NodeMessageTypes.NODE_DEACTIVATED.value, id)
+        super().__init__(src, dst, NodeMessageTypes.DEACTIVATED.value, id)
 
 class NodeInfoMessage(SimulationMessage):
     """

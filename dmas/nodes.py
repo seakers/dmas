@@ -344,7 +344,7 @@ class Node(SimulationElement):
                 await asyncio.wait(random.random())
             else:
                 # if the manager acknowledge the message, stop trying
-                self.log(f'deactivated state message accepted! waiting for simulation to start...', level=logging.DEBUG)
+                self.log(f'deactivated state message accepted! waiting for simulation to end...', level=logging.DEBUG)
                 break
 
     async def __wait_for_manager_ready(self):
@@ -372,40 +372,48 @@ class Node(SimulationElement):
                 return
 
     async def _execute(self) -> None:
-        # activate concurrent tasks to be performed by node
-        live_task = asyncio.create_task(self.live(), name='live_task')                               # execute live routine
-        tasks = [live_task]
+        try: 
+            # activate concurrent tasks to be performed by node
+            live_task = asyncio.create_task(self.live(), name='live_task')                               # execute live routine
+            tasks = [live_task]
 
-        if self.has_modules():
-            # listen for modules becoming offline
-            offline_modules_task = asyncio.create_task(self.__wait_for_offline_modules())
-            tasks.append(offline_modules_task)
-        
-        # wait until either of the tasts finishes
-        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            if self.has_modules():
+                # listen for modules becoming offline
+                offline_modules_task = asyncio.create_task(self.__wait_for_offline_modules(return_when=asyncio.FIRST_COMPLETED), name='offline_modules')
+                tasks.append(offline_modules_task)
+            
+            # wait until either of the tasts finishes
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
 
-        for task in done:
-            self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+            for task in done:
+                self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
 
-        # cancel all pending tasks
-        while not live_task.done():
-            self.log(f'cancelling `{live_task.get_name()}` task...')
-            live_task.cancel()
-            await asyncio.wait(live_task, timeout=0.1)
+            # cancel live tasks if needed
+            if live_task in pending:
+                self.log(f'cancelling `{live_task.get_name()}` task...')
+                live_task.cancel()
+                await live_task
 
-        # inform manager
-        if self.manager_name != SimulationElementRoles.MANAGER.value:
-            await self.__broadcast_deactivated()
+            # inform manager
+            if self.manager_name != SimulationElementRoles.MANAGER.value:
+                await self.__broadcast_deactivated()
 
-        if self.has_modules() and offline_modules_task in pending:
-            # internal modules are not yet disabled. inform modules that the node is terminating
-            self.log('terminating internal modules....')
-            terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
-            await self._send_internal_msg(terminate_msg, zmq.PUB)
+            # check if internal modules are not yet disabled
+            if self.has_modules():
+                # get name of terminated module
+                terinated_module : str = offline_modules_task.result() if offline_modules_task in done else None
+                
+                # inform modules that the node is terminating
+                self.log('terminating internal modules....')
+                terminate_msg = TerminateInternalModuleMessage(self._element_name, self._element_name)
+                await self._send_internal_msg(terminate_msg, zmq.PUB)
 
-            await asyncio.wait(pending, return_when=asyncio.ALL_COMPLETED)
-        
-        done = 1
+                # wait for all internal modules to become offline
+                await self.__wait_for_offline_modules(return_when=asyncio.ALL_COMPLETED, ignore={terinated_module})
+            
+        except Exception as e:
+            print(e)
+            x = 1
         
     @abstractmethod
     async def live(self) -> None:
@@ -419,27 +427,38 @@ class Node(SimulationElement):
         """
         pass
 
-    async def __wait_for_offline_modules(self) -> None:
+    async def __wait_for_offline_modules(self, return_when=asyncio.FIRST_COMPLETED, ignore : list = {}) -> None:
         """
         Waits for all internal modules to become offline
         """
-        await self.__wait_for_module_messages(ModuleMessageTypes.MODULE_DEACTIVATED, 'Listen for Offline Internal Modules')
+        return await self.__wait_for_module_messages(ModuleMessageTypes.MODULE_DEACTIVATED, 
+                                                     'Listen for Offline Internal Modules',
+                                                     return_when, 
+                                                     ignore)
 
-    async def __wait_for_module_messages(self, target_type : ModuleMessageTypes, desc : str):
+    async def __wait_for_module_messages(self, 
+                                         target_type : ModuleMessageTypes,
+                                         desc : str, 
+                                         return_when=asyncio.ALL_COMPLETED,
+                                         ignore : list = {}) -> str:
         """
         Waits for all internal modules to send a message of type `target_type` through the node's REP port
         """
         try:
             responses = []
-            module_names = [m.get_element_name() for m in self.__modules]
+            module_names = [m.get_element_name() for m in self.__modules if m.get_element_name() not in ignore]
             
             if not self.has_modules():
                 return
 
             pbar = None
-            prog = 0
-            with tqdm(total=len(self.__modules) , desc=f'{self.name}: {desc}', leave=False) as pbar:
-                while len(responses) < len(self.__modules):
+            with tqdm(total=len(self.__modules), desc=f'{self.name}: {desc}', leave=False) as pbar:
+                # initialize progress bar status
+                pbar.update(len(ignore))
+                prog = len(ignore)
+
+                # wait for all module messages
+                while len(responses) < len(self.__modules) - len(ignore):
                     # listen for messages from internal module
                     dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
                     dst : str; src : str; msg_dict : dict
@@ -452,9 +471,16 @@ class Node(SimulationElement):
                         ):
                         # Add to list of registered modules if it hasn't been registered before
                         responses.append(src)
-                        pbar.update(1)
-                        prog += 1
                         resp = NodeReceptionAckMessage(self._element_name, src)
+
+                        # update progress abr
+                        if return_when == asyncio.FIRST_COMPLETED:
+                            pbar.update(len(self.__modules) - prog)
+                            prog = len(self.__modules)
+                        elif return_when == asyncio.ALL_COMPLETED:
+                            pbar.update(1)
+                            prog += 1
+                        
                     else:
                         # ignore message
                         resp = NodeReceptionIgnoredMessage(self._element_name, src)
@@ -462,7 +488,10 @@ class Node(SimulationElement):
                     # respond to module
                     await self._send_internal_msg(resp, zmq.REP)
 
-            return
+                    if return_when == asyncio.FIRST_COMPLETED:
+                        return src
+
+            return None
         
         except asyncio.CancelledError:
             if pbar is not None:
