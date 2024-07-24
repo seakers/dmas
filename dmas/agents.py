@@ -231,7 +231,7 @@ class Agent(Node):
         
         except asyncio.CancelledError:
             return
-
+        
     async def reactive_routine(self):
         """
         Agent performs sense-think-do loop 

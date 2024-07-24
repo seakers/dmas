@@ -388,11 +388,10 @@ class Node(SimulationElement):
             for task in done:
                 self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
 
-            # cancel live tasks if needed
-            if live_task in pending:
-                self.log(f'cancelling `{live_task.get_name()}` task...')
-                live_task.cancel()
-                await live_task
+            # cancel pending tasks
+            for task in pending:
+                self.log(f'cancelling `{task.get_name()}` task...')
+                task.cancel(); await task
 
             # inform manager
             if self.manager_name != SimulationElementRoles.MANAGER.value:
@@ -409,11 +408,11 @@ class Node(SimulationElement):
                 await self._send_internal_msg(terminate_msg, zmq.PUB)
 
                 # wait for all internal modules to become offline
-                await self.__wait_for_offline_modules(return_when=asyncio.ALL_COMPLETED, ignore={terinated_module})
+                await self.__wait_for_offline_modules(return_when=asyncio.ALL_COMPLETED, 
+                                                      ignore={terinated_module})
             
         except Exception as e:
             print(e)
-            x = 1
         
     @abstractmethod
     async def live(self) -> None:
@@ -427,7 +426,7 @@ class Node(SimulationElement):
         """
         pass
 
-    async def __wait_for_offline_modules(self, return_when=asyncio.FIRST_COMPLETED, ignore : list = {}) -> None:
+    async def __wait_for_offline_modules(self, return_when, ignore : list = {}) -> None:
         """
         Waits for all internal modules to become offline
         """
@@ -440,19 +439,24 @@ class Node(SimulationElement):
                                          target_type : ModuleMessageTypes,
                                          desc : str, 
                                          return_when=asyncio.ALL_COMPLETED,
-                                         ignore : list = {}) -> str:
+                                         ignore : set = {}) -> str:
         """
         Waits for all internal modules to send a message of type `target_type` through the node's REP port
         """
         try:
             responses = []
-            module_names = [m.get_element_name() for m in self.__modules if m.get_element_name() not in ignore]
+            module_names = [m.get_element_name() 
+                            for m in self.__modules 
+                            if m.get_element_name() not in ignore]
+            ignore = {m for m in ignore if m is not None}
             
             if not self.has_modules():
                 return
 
             pbar = None
-            with tqdm(total=len(self.__modules), desc=f'{self.name}: {desc}', leave=False) as pbar:
+            with tqdm(total=len(self.__modules), 
+                      desc=f'{self.name}: {desc}', 
+                      leave=False) as pbar:
                 # initialize progress bar status
                 pbar.update(len(ignore))
                 prog = len(ignore)
@@ -461,10 +465,10 @@ class Node(SimulationElement):
                 while len(responses) < len(self.__modules) - len(ignore):
                     # listen for messages from internal module
                     dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
-                    dst : str; src : str; msg_dict : dict
+                    msg_dict : dict
                     msg_type = msg_dict.get('msg_type', None)
 
-                    if (dst in self.name
+                    if (    dst in self.name
                         and src in module_names
                         and msg_type == target_type.value
                         and src not in responses
