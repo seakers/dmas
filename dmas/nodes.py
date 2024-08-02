@@ -454,46 +454,46 @@ class Node(SimulationElement):
                 return
 
             pbar = None
-            with tqdm(total=len(self.__modules), 
-                      desc=f'{self.name}: {desc}', 
-                      leave=False) as pbar:
-                # initialize progress bar status
-                pbar.update(len(ignore))
-                prog = len(ignore)
+            # with tqdm(total=len(self.__modules), 
+            #           desc=f'{self.name}: {desc}', 
+            #           leave=False, disable=return_when!=asyncio.FIRST_COMPLETED) as pbar:
+            #     # initialize progress bar status
+            #     pbar.update(len(ignore))
+            #     prog = len(ignore)
 
-                # wait for all module messages
-                while len(responses) < len(self.__modules) - len(ignore):
-                    # listen for messages from internal module
-                    dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
-                    msg_dict : dict
-                    msg_type = msg_dict.get('msg_type', None)
+            # wait for all module messages
+            while len(responses) < len(self.__modules) - len(ignore):
+                # listen for messages from internal module
+                dst, src, msg_dict = await self._receive_internal_msg(zmq.REP)
+                msg_dict : dict
+                msg_type = msg_dict.get('msg_type', None)
 
-                    if (    dst in self.name
-                        and src in module_names
-                        and msg_type == target_type.value
-                        and src not in responses
-                        ):
-                        # Add to list of registered modules if it hasn't been registered before
-                        responses.append(src)
-                        resp = NodeReceptionAckMessage(self._element_name, src)
+                if (    dst in self.name
+                    and src in module_names
+                    and msg_type == target_type.value
+                    and src not in responses
+                    ):
+                    # Add to list of registered modules if it hasn't been registered before
+                    responses.append(src)
+                    resp = NodeReceptionAckMessage(self._element_name, src)
 
-                        # update progress abr
-                        if return_when == asyncio.FIRST_COMPLETED:
-                            pbar.update(len(self.__modules) - prog)
-                            prog = len(self.__modules)
-                        elif return_when == asyncio.ALL_COMPLETED:
-                            pbar.update(1)
-                            prog += 1
-                        
-                    else:
-                        # ignore message
-                        resp = NodeReceptionIgnoredMessage(self._element_name, src)
-
-                    # respond to module
-                    await self._send_internal_msg(resp, zmq.REP)
-
+                    # update progress abr
                     if return_when == asyncio.FIRST_COMPLETED:
-                        return src
+                        pbar.update(len(self.__modules) - prog)
+                        prog = len(self.__modules)
+                    # elif return_when == asyncio.ALL_COMPLETED:
+                        # pbar.update(1)
+                        # prog += 1
+                    
+                else:
+                    # ignore message
+                    resp = NodeReceptionIgnoredMessage(self._element_name, src)
+
+                # respond to module
+                await self._send_internal_msg(resp, zmq.REP)
+
+                if return_when == asyncio.FIRST_COMPLETED:
+                    return src
 
             return None
         
