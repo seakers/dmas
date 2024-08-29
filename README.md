@@ -25,13 +25,12 @@ conda activate ./.venv
 
 4. Install `dmas` library by running `make` command in terminal in repository directory:
 ```
-make install
+make 
 ```
-> ### NOTEs: 
+> ### NOTES: 
 > - **Installation instructions above are only supported in Mac or Linux systems.** For windows installation, use a Windows Subsystem for Linux (WSL) and follow the instructions above.
-> - Command line cloning of this repository is recommended as Github Desktop client users may experience problems due to submodule dependencies.
-> - Mac users are known to experience issues installing the `propcov` dependency contained within the `orbitpy` submodule during the automated installation procedure. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy/tree/master/propcov) for fixes.
-> - For development in Windows, Visual Studio Code's remote development feature in WSL was used. See [instructions for remote develpoment in VSCode](https://code.visualstudio.com/docs/remote/wsl-tutorial) for more details on WSL installation and remote development environment set-up.
+> - Mac users are known to experience issues installing the `propcov` dependency contained within the `orbitpy` library during installation. See [`orbitpy`'s installation notes](https://github.com/EarthObservationSimulator/orbitpy/tree/master/propcov) for fixes.
+> - For development in Windows, Visual Studio Code's remote development feature in WSL was used. See [instructions for remote development in VSCode](https://code.visualstudio.com/docs/remote/wsl-tutorial) for more details on WSL installation and remote development environment set-up.
 
 ---
 ## Contact 
