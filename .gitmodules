@@ -1,6 +1,0 @@
-[submodule "instrupy"]
-	path = instrupy
-	url = https://github.com/EarthObservationSimulator/instrupy.git
-[submodule "orbitpy"]
-	path = orbitpy
-	url = https://github.com/EarthObservationSimulator/orbitpy.git
