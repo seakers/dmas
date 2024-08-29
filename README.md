@@ -21,7 +21,7 @@ conda activate ./.venv
 ```
 3. Install `gfortran`. and `make`. See [here](https://fortran-lang.org/learn/os_setup/install_gfortran).
 
-4. Install [`instrupy`](https://github.com/EarthObservationSimulator/instrupy) and [`orbitpy`](https://github.com/EarthObservationSimulator/orbitpy).
+4. Install [`instrupy`](https://github.com/EarthObservationSimulator/instrupy) and [`orbitpy`](https://github.com/Aslan15/orbitpy).
 
 4. Install `dmas` library by running `make` command in terminal in repository directory:
 ```
