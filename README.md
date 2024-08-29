@@ -15,9 +15,9 @@ For documentation please visit: https://dmas.readthedocs.io/
 2. Create and activate a virtual conda environment:
 
 ```
-conda create -p ./.venv python=3.8
+conda create -p desired/path/to/virtual/environment python=3.8
 
-conda activate ./.venv
+conda activate desired/path/to/virtual/environment
 ```
 3. Install `gfortran`. and `make`. See [here](https://fortran-lang.org/learn/os_setup/install_gfortran).
 
