@@ -21,18 +21,14 @@ help:
 
 all: bare install 
 
-install: install_intrupy install_orbitpy
+install: 
 	-X=`pwd`; \
-	cd $$X; pip install -e .
-
-install_intrupy: #Installs instrupy submodule
-	-X=`pwd`; \
-	cd $$X; cd $(INSTRUPY); make install
+	cd $$X; pip install -e .; \
+	pip install matplotlib; \
+	pip install neo4j; \
+	pip install pyzmq; \
+	pip install tqdm
 	
-install_orbitpy: install_intrupy #Installs orbit submodule
-	-X=`pwd`; \
-	cd $$X; cd $(ORBITPY); make install
-
 runtest_eosim:
 	-X=`pwd`; \
 	cd $$X; cd $(INSTRUPY); python -m unittest discover; \

@@ -9,11 +9,11 @@ def readme():
 
 setup(
     name='DMAS',
-    version='1.0.0',
+    version='1.1.0',
     description='Decentralized Multi-Agent Satellite Simulation Tool',
     author='SEAK Lab',
     author_email='aguilaraj15@tamu.edu',
     packages=['dmas'],
     scripts=[],
-    install_requires=['matplotlib', 'neo4j', 'pyzmq', 'tqdm'] 
+    install_requires=['matplotlib', 'neo4j', 'pyzmq', 'tqdm', 'instrupy', 'orbitpy'] 
 )
