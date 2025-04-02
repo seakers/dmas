@@ -671,7 +671,7 @@ class NetworkElement(ABC):
 
             # acquire lock
             self.log(f'acquiring port lock for socket of type {socket_type.name}...')
-            acquired_by_me = await socket_lock.acquire()
+            # acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
 
             # send message
@@ -732,7 +732,7 @@ class NetworkElement(ABC):
 
             # acquire lock
             self.log(f'acquiring port lock for socket of type {socket_type.name}...')
-            acquired_by_me = await socket_lock.acquire()
+            # acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {socket_type.name} acquired! Sending message...')
 
             # send message
@@ -823,7 +823,7 @@ class NetworkElement(ABC):
 
             # acquire lock
             self.log(f'acquiring port lock for socket of type {socket_type.name}...')
-            acquired_by_me = await socket_lock.acquire()
+            # acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
 
             # send multi-part message
@@ -888,7 +888,7 @@ class NetworkElement(ABC):
 
             # acquire lock
             self.log(f'acquiring port lock for socket of type {socket_type.name}...')
-            acquired_by_me = await socket_lock.acquire()
+            # acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
 
             # send multi-part message
@@ -953,7 +953,7 @@ class NetworkElement(ABC):
 
             # acquire lock
             self.log(f'acquiring port lock for socket of type {socket_type.name}...')
-            acquired_by_me = await socket_lock.acquire()
+            # acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {socket_type.name} acquired! Receiving message...')
 
 
@@ -1001,7 +1001,7 @@ class NetworkElement(ABC):
             
             # acquire lock
             self.log(f'acquiring port lock for socket of type {zmq.SocketType.REQ.name}...')
-            acquired_by_me = await socket_lock.acquire()
+            # acquired_by_me = await socket_lock.acquire()
             self.log(f'port lock for socket of type {zmq.SocketType.REQ.name} acquired! connecting to {msg.dst}...')
 
             # connect to destination's socket
