@@ -112,14 +112,14 @@ class AbstractManager(SimulationElement):
         await timer_task
 
         # give processes time to clear manager broadcast port 
-        asyncio.sleep(0.1)
+        await asyncio.sleep(0.1)
 
         # broadcast simulation end
         sim_end_msg = SimulationEndMessage(self._network_name, time.perf_counter())
         await self._send_manager_msg(sim_end_msg, zmq.PUB)
 
         # give processes time to clear manager broadcast port 
-        asyncio.sleep(0.1)
+        await asyncio.sleep(0.1)
         await self._send_manager_msg(sim_end_msg, zmq.PUB)
 
         # TODO: allow for simulation to end if all nodes are deactivated before the timer runs out
