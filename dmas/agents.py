@@ -192,11 +192,6 @@ class Agent(Node):
 
         self.state : AbstractAgentState = initial_state
         self.stats = {}
-        # self.stats = {
-        #                 'sense' : [],
-        #                 'think' : [],
-        #                 'do' : []
-        #             }
         
 
     async def _activate(self) -> None:
