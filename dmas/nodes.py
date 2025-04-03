@@ -60,12 +60,17 @@ class Node(SimulationElement):
         Returns `1` if excecuted successfully or if `0` otherwise
         """
         try:
-            with concurrent.futures.ThreadPoolExecutor(len(self.__modules) + 1) as pool:
-                pool.submit(asyncio.run, *[self._run_routine()])
-                for module in self.__modules:
-                    module : Node
-                    pool.submit(module.run, *[])
 
+            if self.__modules:
+                with concurrent.futures.ThreadPoolExecutor(len(self.__modules) + 1) as pool:
+                    pool.submit(asyncio.run, *[self._run_routine()])
+                    for module in self.__modules:
+                        module : Node
+                        pool.submit(module.run, *[])
+            else:
+                asyncio.run(self._run_routine())
+                
+            # wait for all modules to finish
             return 1
 
         except Exception as e:

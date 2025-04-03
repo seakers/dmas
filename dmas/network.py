@@ -995,6 +995,7 @@ class NetworkElement(ABC):
             # get appropriate socket and lock
             socket, socket_lock = socket_map.get(zmq.REQ, (None, None))
             socket : zmq.Socket; socket_lock : asyncio.Lock
+            acquired_by_me = False
 
             if socket is None or socket_lock is None:
                 raise KeyError(f'Socket of type {zmq.SocketType.REQ.name} not contained in this simulation element.')
