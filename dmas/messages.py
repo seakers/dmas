@@ -77,7 +77,11 @@ class SimulationMessage(object):
         """
         Creates a json file from this message 
         """
-        return json.dumps(self.to_dict())
+        try:
+            return json.dumps(self.to_dict())
+        except Exception as e:
+            print(f'Failed to create JSON from message. {e}')
+            raise e
 
     def __str__(self) -> str:
         """

@@ -76,6 +76,7 @@ class AgentAction(ABC):
     PENDING = 'PENDING'
     COMPLETED = 'COMPLETED'
     ABORTED = 'ABORTED'
+    FAILED = 'FAILED'
 
     def __init__(   self, 
                     action_type : str,
