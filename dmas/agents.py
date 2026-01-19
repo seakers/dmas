@@ -120,7 +120,8 @@ class AgentAction(ABC):
         """
         Compares two instances of a task. Returns True if they represent the same task.
         """
-        return self.to_dict() == dict(other.__dict__)
+        assert isinstance(other, AgentAction), f"Can only compare with another `AgentAction`. is of type {type(other)}."
+        return self.to_dict() == other.to_dict()
 
     def to_dict(self) -> dict:
         """
