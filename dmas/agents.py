@@ -212,8 +212,15 @@ class Agent(Node):
 
             done, pending = await asyncio.wait([t_1, t_2], return_when=asyncio.FIRST_COMPLETED)
 
+            # handle the terminated task
             for task in done:
                 self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
+
+                # check for exceptions
+                if task.exception() is not None: raise task.exception()
+            
+            # task can only be cancelled by simulation end; print results
+            self.print_results()
 
             # cancel pending task
             for task in pending:
@@ -249,10 +256,15 @@ class Agent(Node):
                 statuses = await self.do(actions)
         
         except asyncio.CancelledError:
-            return        
+            # successfully terminate task
+            return     
         
+        except Exception as e:
+            raise e   
         # except FailureStateException:
         #     return
+        # except Exception as e:
+        #     raise e                
                 
     async def listen_to_broadcasts(self):
         """
@@ -347,3 +359,11 @@ class Agent(Node):
             - statuses (`dict`): map of the latest actions performed by the agent and their completion status
         """
         pass
+
+    def teardown(self):
+        # nothing to add at the moment; just call super teardown
+        return super().teardown()
+    
+    @abstractmethod
+    def print_results(self) -> None:
+        """ Prints the results/stats of the agent's performance """

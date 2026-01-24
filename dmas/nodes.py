@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import random
+from time import sleep
+import numpy as np
 import zmq
 from tqdm import tqdm
 import concurrent.futures
@@ -393,6 +395,9 @@ class Node(SimulationElement):
             for task in done:
                 self.log(f'`{task.get_name()}` task finalized! Terminating all other tasks...')
 
+                # check for exceptions
+                if task.exception() is not None: raise task.exception()
+
             # cancel pending tasks
             for task in pending:
                 self.log(f'cancelling `{task.get_name()}` task...')
@@ -418,6 +423,7 @@ class Node(SimulationElement):
             
         except Exception as e:
             print(e)
+            raise e
         
     @abstractmethod
     async def live(self) -> None:
@@ -665,6 +671,10 @@ class Node(SimulationElement):
         # get own sub port
         socket, _ = self._external_socket_map.get(zmq.SUB)
         socket : azmq.Socket
+
+        # wait for any pending messages to be received
+        if socket.poll(timeout=0) and zmq.POLLIN:
+            sleep(1e-3)
 
         # conenct to destiation
         self.log(f'disconnecting to {dst} via {dst_address}...')
