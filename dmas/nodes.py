@@ -285,7 +285,6 @@ class Node(SimulationElement):
         
         elif (isinstance(self._clock_config, FixedTimesStepClockConfig)
                 or isinstance(self._clock_config, EventDrivenClockConfig)):
-            self.__t_curr : Container
             return self.__t_curr.level
              
         else:
@@ -297,7 +296,6 @@ class Node(SimulationElement):
             return 
         elif (isinstance(self._clock_config, FixedTimesStepClockConfig)
                 or isinstance(self._clock_config, EventDrivenClockConfig)):
-            self.__t_curr : Container
             await self.__t_curr.set_level(t)
         else:
             raise NotImplementedError(f'clock config of type {type(self._clock_config)} not yet implemented.')

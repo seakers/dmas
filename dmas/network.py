@@ -354,7 +354,8 @@ class NetworkElement(ABC):
             raise PermissionError('Attempted to configure network after it has already been configurated.')
 
         network_context = azmq.Context()
-        network_context.setsockopt(zmq.MAX_SOCKETS, 1024*4)
+        # network_context.setsockopt(zmq.MAX_SOCKETS, 1024*5)
+        network_context.setsockopt(zmq.MAX_SOCKETS, 20)
 
         self.log(f'configuring network manager sockets...')
         manager_socket_map = self.__config_manager_network(network_context)
@@ -544,6 +545,7 @@ class NetworkElement(ABC):
         # close network context
         if self._network_context is not None:
             self._network_context : azmq.Context
+            self._network_context.term()
             self._network_context.destroy()  
 
         self._network_activated = False

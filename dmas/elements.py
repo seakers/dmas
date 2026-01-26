@@ -63,6 +63,13 @@ class SimulationElement(NetworkElement):
         self._status = SimulationElementStatus.INIT
         self._clock_config : ClockConfig = None     
 
+        # inititate base network connections 
+        # self.log(f'configuring network...')
+        # self._network_context, self._manager_socket_map, \
+        #     self._external_socket_map, self._internal_socket_map \
+        #         = self._config_network()
+        # self.log(f'NETWORK CONFIGURED!')
+
     """
     ELEMENT OPERATION METHODS
     """
@@ -134,7 +141,9 @@ class SimulationElement(NetworkElement):
         """
         # inititate base network connections 
         self.log(f'configuring network...')
-        self._network_context, self._manager_socket_map, self._external_socket_map, self._internal_socket_map = self._config_network()
+        self._network_context, self._manager_socket_map, \
+            self._external_socket_map, self._internal_socket_map \
+                = self._config_network()
         self.log(f'NETWORK CONFIGURED!')
 
         # check for correct socket initialization
@@ -282,6 +291,9 @@ class SimulationElement(NetworkElement):
 
         # perform tear-down procedure
         await self.teardown()
+
+        # deactivate network elements
+        self._deactivate_network()
 
 
     @abstractmethod
