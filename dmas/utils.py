@@ -117,35 +117,39 @@ class Container:
 
 def runtime_tracker( f ):
     """ Registers the run-time for completing the function `f` """
+    try:
+        if inspect.iscoroutinefunction(f):
+            async def tracker(self, *args):
+                t_0 = time.perf_counter()
+                result = await f(self, *args)
+                dt = time.perf_counter() - t_0
+                
+                if self.stats is None or not isinstance(self.stats, dict):
+                    raise AttributeError(f"class of type `{type(self)}` must contain `stats` attribute of type `dict`.")
+                
+                # if f.__name__ not in self.stats:
+                #     self.stats[f.__name__] = []
+                self.stats[f.__name__].append(dt)
 
-    if inspect.iscoroutinefunction(f):
-        async def tracker(self, *args):
-            t_0 = time.perf_counter()
-            result = await f(self, *args)
-            dt = time.perf_counter() - t_0
-            
-            if self.stats is None or not isinstance(self.stats, dict):
-                raise AttributeError(f"class of type `{type(self)}` must contain `stats` attribute of type `dict`.")
-            
-            if f.__name__ not in self.stats:
-                self.stats[f.__name__] = []
-            self.stats[f.__name__].append(dt)
+                return result
+        
+        else:
+            def tracker(self, *args):
+                t_0 = time.perf_counter()
+                result = f(self, *args)
+                dt = time.perf_counter() - t_0
+                
+                if self.stats is None or not isinstance(self.stats, dict):
+                    raise AttributeError(f"class of type `{type(self)}` must contain `stats` attribute of type `dict`.")
+                
+                # if f.__name__ not in self.stats:
+                #     self.stats[f.__name__] = []
+                self.stats[f.__name__].append(dt)
 
-            return result
+                return result
     
-    else:
-        def tracker(self, *args):
-            t_0 = time.perf_counter()
-            result = f(self, *args)
-            dt = time.perf_counter() - t_0
-            
-            if self.stats is None or not isinstance(self.stats, dict):
-                raise AttributeError(f"class of type `{type(self)}` must contain `stats` attribute of type `dict`.")
-            
-            if f.__name__ not in self.stats:
-                self.stats[f.__name__] = []
-            self.stats[f.__name__].append(dt)
-
-            return result
+    except Exception as e:
+        raise e
     
-    return tracker
+    finally:
+        return tracker

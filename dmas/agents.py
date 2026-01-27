@@ -192,9 +192,7 @@ class Agent(Node):
         if zmq.SUB not in agent_network_config.get_external_addresses():
             raise AttributeError(f'`node_network_config` must contain a SUB port and an address within its external address map.')
 
-        self.state : AbstractAgentState = initial_state
-        self.stats = {}
-        
+        self.state : AbstractAgentState = initial_state        
 
     async def _activate(self) -> None:
         await super()._activate()

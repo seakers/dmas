@@ -1,6 +1,7 @@
 import logging
 import time
 import asyncio
+from collections import defaultdict
 
 from dmas.network import *
 from dmas.utils import *
@@ -61,7 +62,9 @@ class SimulationElement(NetworkElement):
         """
         super().__init__(element_name, element_network_config, level, logger)
         self._status = SimulationElementStatus.INIT
-        self._clock_config : ClockConfig = None     
+        self._clock_config : ClockConfig = None       
+
+        self.stats = defaultdict(list)
 
         # inititate base network connections 
         # self.log(f'configuring network...')

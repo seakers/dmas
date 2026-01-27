@@ -6,6 +6,7 @@ import numpy as np
 import zmq
 from tqdm import tqdm
 import concurrent.futures
+
 from dmas.elements import *
 from dmas.messages import *
 from dmas.network import NetworkConfig
@@ -53,7 +54,7 @@ class Node(SimulationElement):
         for module in modules:
             if not isinstance(module, Node):
                 raise TypeError(f'elements in `modules` argument must be of type `{Node}`. Is of type {type(module)}.')                
-        self.__modules = modules.copy()        
+        self.__modules = modules.copy()      
 
     def run(self) -> int:
         """
