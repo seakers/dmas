@@ -570,10 +570,19 @@ class NetworkElement(ABC):
             - `bool` representing a successful transmission if True or False if otherwise.
         """
         # send multi-part message
-        dst : str = msg.dst
-        src : str = self.get_element_name()
+        if isinstance(msg, SimulationMessage):
+            dst : str = msg.dst
+            src : str = self.get_element_name()
 
-        content : str = str(msg.to_json())
+            content : str = str(msg.to_json())
+        elif isinstance(msg, dict):
+            dst : str = msg.get('dst', '')
+            src : str = self.get_element_name()
+
+            content : str = str(json.dumps(msg))
+        else:
+            raise TypeError(f'Cannot send message of type {type(msg)}. Must be of type `SimulationMessage` or `dict`.')
+
         self.log(f'sending message json: {content}')
 
         await socket.send_multipart([dst.encode('ascii'), 
