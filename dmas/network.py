@@ -783,7 +783,11 @@ class NetworkElement(ABC):
                 and the body of the message as `content` (`dict`)
         """
         # send multi-part message
-        b_dst, b_src, b_content = await socket.recv_multipart()
+        b_dst, b_src, b_content, *other = await socket.recv_multipart()
+
+        if len(other) > 0:
+            x = 1
+        
         b_dst : bytes; b_src : bytes; b_content : bytes
 
         dst : str = b_dst.decode('ascii')

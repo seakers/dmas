@@ -646,7 +646,7 @@ class Node(SimulationElement):
         socket.connect(dst_address)
         self.log(f'successfully connected from {dst}!')
 
-    def unsubscribe_to_broadcasts(self, dst) -> None:
+    async def unsubscribe_to_broadcasts(self, dst) -> None:
         """
         Disconnects this network node's subscribe port to the destination's publish port
         """
@@ -672,8 +672,8 @@ class Node(SimulationElement):
         socket : azmq.Socket
 
         # wait for any pending messages to be received
-        if socket.poll(timeout=0) and zmq.POLLIN:
-            sleep(1e-3)
+        if await socket.poll(timeout=0) and zmq.POLLIN:
+            await asyncio.sleep(1e-3)
 
         # conenct to destiation
         self.log(f'disconnecting to {dst} via {dst_address}...')
